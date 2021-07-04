@@ -19,6 +19,7 @@
         defc        TILE_DIRT = 2
         defc        TILE_WATER = 0
         defc        TILE_H_ROAD = 7
+        defc        TILE_V_ROAD = 8
         defc        TILE_H_RAIL = 20
         defc        TILE_H_POWER = 33
         defc        TILE_PARK = 56
@@ -646,7 +647,7 @@ get_random_number:
         add     hl,de
         jp      nxtctrl
 
-.L24213        defw        0                ;VAR - holds textxy
+.V_24213        defw        0                ;VAR - holds textxy
 
 
 .L5e97  ld      b,(hl)
@@ -657,14 +658,14 @@ get_random_number:
         inc     hl
         ld      d,(hl)
         ld      (textxy),bc
-        ld      (L24213),de
+        ld      (V_24213),de
         ld      a,(textxy)
-        ld      (L24334+1),a
+        ld      (SMC_24334+1),a
         ld      a,56
         ld      b,57
         ld      c,58
         call    L5ed3
-        ld      a,(L24213+1)
+        ld      a,(V_24213+1)
         sub     2
         ld      b,a
 
@@ -696,7 +697,7 @@ get_random_number:
         ld      (textpos),hl
         ld      a,64
         call    prudg
-        ld      a,(L24213)
+        ld      a,(V_24213)
         sub     2
         ld      b,a
 
@@ -713,7 +714,7 @@ get_random_number:
         ld      a,66
         call    prudg
         ld      hl,textxy
-.L24334                                ;FIXME
+.SMC_24334                                ;FIXME
         ld      (hl),0
         inc     hl
         inc     (hl)
@@ -1042,8 +1043,8 @@ pointer_down:
         ret     
 .L63c4  ld      (hl),184
         jp      draw_map
-        nop     
-        nop     
+
+V_pointer_charxy:   defw        0   ;VAR 25545/63c9 - pointer coords reduced to chars
         nop     
         nop     
 
@@ -1056,31 +1057,33 @@ pointer_down:
         srl     b
         srl     b
         srl     c
-        ld      (25545),bc
-        call    L6d51
+        ld      (V_pointer_charxy),bc
+        call    L6d51                   ;See if an icon is selected?
         ld      a,1
         ld      (V_simulation_disabled),a
-        call    L6cbf
-        call    L6401
+        call    do_view_change
+        call    handle_menus
         call    L7012
         xor     a
         ld      (V_simulation_disabled),a
         ret     
 
-
+wait_for_space_key_release:
 .L63f9  ld      a,(keystore+7)
         and     1           ;'SPACE'
-        jr      z,L63f9                 ; (-7)
+        jr      z,wait_for_space_key_release                 ; (-7)
         ret     
 
 
-.L6401  ld      a,(25546)
-        and     a
+; Handle menu selection
+;
+handle_menus:
+.L6401  ld      a,(V_pointer_charxy+1)
+        and     a                   ;Only valid on first road
         ret     nz
-
-        call    L63f9
+        call    wait_for_space_key_release
         call    L640e
-        jr      L63f9                   ; (-21)
+        jr      wait_for_space_key_release                   ; (-21)
 
 .L640e  ld      a,(V_pointerxy)
         ld      ix,menu_system
@@ -1105,7 +1108,7 @@ pointer_down:
         ld      b,a
         ld      c,0
         call    xypos
-        ld      (print_tile_hl+1),hl
+        ld      (SMC_print_tile_hl+1),hl
         ld      bc,(V_25863)
         ld      a,(36767)      
         and     15
@@ -1131,7 +1134,7 @@ L6464:
         and     a
         jr      nz,L64d6                ; (103)
         call    replace_zone_with_power_if_needed
-        call    L64a9
+        call    update_road_tile_for_traffic
 L6475
         ld      h,0
         ld      (V_current_tile),hl
@@ -1142,7 +1145,7 @@ L6475
         add     hl,de
 
 ; Print the tile from hl
-.print_tile_hl
+.SMC_print_tile_hl
 .L6481  ld      de,18432        ;SCREEN address, SMC
         ld      b,8
 .L6486  ld      a,(hl)
@@ -1170,20 +1173,24 @@ replace_zone_with_power_if_needed:
         ld      l,TILE_NEED_POWER            ;Need power icon
         ret     
 
-
+; Process road - changes graphics to indicate business
+;
+; Entry: l = tile at the coordinates
+; Exit:  l = tile to actually print
+update_road_tile_for_traffic:
 .L64a9  ld      a,l
-        ld      b,52
-        cp      7
+        ld      b,52            ;tile what?
+        cp      TILE_H_ROAD               ;
         jr      z,L64b5                 ; (5)
-        ld      b,54
-        cp      8
+        ld      b,54            ;tile what?
+        cp      TILE_V_ROAD
         ret     nz
 .L64b5  push    hl
         push    de
         push    bc
         ld      hl,(25865)
         call    L7635           ;Get coords of address
-        call    L7581
+        call    get_traffic_density_value
         ld      a,(hl)
         pop     bc
         pop     de
@@ -1221,12 +1228,12 @@ replace_zone_with_power_if_needed:
         add     hl,hl
         ld      de,udgs + 1288
         add     hl,de
-        jp      print_tile_hl
+        jp      SMC_print_tile_hl
 
 V_tile_colour_offset:   defw    0       ;6505/25861 offset to colour for tiles
 
 ;6507
-.V_25863        defb    $1e, $25        ;VAR  6507/25863 unk
+.V_25863        defb    $1e, $25        ;VAR  6507/25863 coordinates of top left of view
 
 ;6509
         defb    $00, $00
@@ -1234,7 +1241,7 @@ V_tile_colour_offset:   defw    0       ;6505/25861 offset to colour for tiles
 ; draw level on screen?
 .draw_map
 .L650b  ld      hl,18432
-        ld      (print_tile_hl+1),hl          ;SMC code nobbling
+        ld      (SMC_print_tile_hl+1),hl          ;SMC code nobbling
         ld      bc,(V_25863)          ;Coordinates for mapview top left corner
         call    levelmap_xypos
         ld      de,64
@@ -1251,12 +1258,12 @@ V_tile_colour_offset:   defw    0       ;6505/25861 offset to colour for tiles
         ld      hl,udgs + 3296
         ld      (V_tile_colour_offset),hl
         call    print_tile
-        ld      hl,(print_tile_hl+1)
+        ld      hl,(SMC_print_tile_hl+1)
         inc     l
         jr      nz,L6541                ; (3)
 draw_map_screen_addr:
         ld      hl,20480
-.L6541  ld      (print_tile_hl+1),hl              ;SMC code nobbling
+.L6541  ld      (SMC_print_tile_hl+1),hl              ;SMC code nobbling
         ld      hl,(V_left_tile_index)
         inc     hl
         ld      (V_left_tile_index),hl
@@ -1707,7 +1714,7 @@ V_26442:
         ld      c,0
         ld      (textxy),bc
         ld      a,32
-        ld      (L24213),a
+        ld      (V_24213),a
         ld      a,64
         ld      b,65
         ld      c,66
@@ -2389,18 +2396,15 @@ map_check_dirt:
         pop     bc
         ret     
 
-
-.L6cbf  ld      bc,(25545)
+do_view_change:
+.L6cbf  ld      bc,(V_pointer_charxy)
         ld      a,c
-        and     a
+        and     a               ;Menu row
         ret     nz
-
-        ld      a,b
-        cp      2
+        ld      a,b             ;We want x == 2
+        cp      2              
         ret     nz
-
-        call    L63f9
-
+        call    wait_for_space_key_release
 .L6ccd  ld      a,(keystore+5)
         and     1       ;'P'
         call    z,L6d0f
@@ -2423,7 +2427,7 @@ map_check_dirt:
         ld      a,(keystore+7)
         and     1       ;'SPACE'
         jr      nz,L6ccd                ; (-53)
-        jp      L63f9
+        jp      wait_for_space_key_release
 
 .L6d05  ld      hl,V_25863
         ld      a,(hl)
@@ -2439,7 +2443,6 @@ map_check_dirt:
         inc     a
         cp      64
         ret     z
-
         ld      (hl),a
         ret     
 
@@ -2449,7 +2452,6 @@ map_check_dirt:
         dec     a
         cp      255
         ret     z
-
         ld      (hl),a
         ret     
 
@@ -2459,7 +2461,6 @@ map_check_dirt:
         inc     a
         cp      80
         ret     z
-
         ld      (hl),a
         ret     
 
@@ -2494,8 +2495,8 @@ map_check_dirt:
 V_27984:    defb        1       ;VAR 6d50/27984 
 
 ;6d51
-.Ld551
-        ld      bc,(25545)
+.L6d51
+        ld      bc,(V_pointer_charxy)
         ld      a,b
         and     a
         ret     z
@@ -2506,14 +2507,14 @@ V_27984:    defb        1       ;VAR 6d50/27984
         ret     c
         cp      30
         ret     nc
-        call    L63f9
-        ld      a,(25545)
+        call    wait_for_space_key_release
+        ld      a,(V_pointer_charxy)
         sub     2
         srl     a
         ld      b,a
 
 .L6d6d  push    bc
-        call    L6e3a
+        call    get_cost_for_zone
         ld      b,0
         ld      hl,(money)
         ld      a,(money+2)
@@ -2584,7 +2585,7 @@ D_zone_sizes:
 
 .L6ddd  push    bc
         ld      a,c
-        call    L6e3a
+        call    get_cost_for_zone
         ld      b,0
         ld      hl,(money)
         ld      a,(money+2)
@@ -2645,9 +2646,10 @@ zone_cost:
         defw    5000
         defw    10000       ;airport
 
-; Gets the cost for icon under the cursor?
-; Entry: a = icon number
+; Gets the cost for the selected icon index
+; Entry: a = zone index number
 ; Exit: de = cost
+get_cost_for_zone:
 .L6e3a  add     a,a
         ld      e,a
         ld      d,0
@@ -2694,7 +2696,7 @@ V_28265:    defb    0       ;VAR 28265/6e69
         ld      (V_28263),bc
         jp      levelmap_xypos
 
-.L6e74  ld      bc,(25545)
+.L6e74  ld      bc,(V_pointer_charxy)
 
 ; Possibly the 
 .L6e78  ld      a,(V_28265)
@@ -2721,7 +2723,7 @@ V_28265:    defb    0       ;VAR 28265/6e69
 
 ; Join up neighbour paths for power cables, road, rail
 join_up_neighbour_cells:
-.L6e97  ld      bc,(25545)
+.L6e97  ld      bc,(V_pointer_charxy)
 .L6e9b  push    hl
         push    de
         push    bc
@@ -2954,7 +2956,7 @@ zone_action_jump_table:
         defw    action_zone_airport     ;$2B, $75
 
 
-.L7012  ld      a,(25546)
+.L7012  ld      a,(V_pointer_charxy+1)
         cp      8
         ret     c
         ld      a,(L23891+1)
@@ -3393,7 +3395,7 @@ action_zone_bulldoze:
 
 
 ; Zone bulldoze costs
-L7301:
+D_7301:
         defb    0
         defb    1
         defb    4
@@ -3419,7 +3421,7 @@ L7301:
         and     7
         ld      c,a
         ld      b,0
-        ld      hl,L7301
+        ld      hl,D_7301
         add     hl,de
         ld      e,(hl)
         ld      d,0
@@ -3429,11 +3431,11 @@ L7301:
         ld      a,(ix+0)
         and     7
 
-.L7337  ld      (smc_bulldoze_zone_width+1),a
+.L7337  ld      (SMC_bulldoze_zone_width+1),a
         ld      b,a
 ; Clear the whole zone and step through the bulldoze sequence
 .L733b  push    ix
-smc_bulldoze_zone_width:
+SMC_bulldoze_zone_width:
         ld      c,0             ;SMC
 .L733f  ld      (ix+0),70
         inc     ix
@@ -3754,16 +3756,17 @@ minimap_xypos_25:
 
 
 ; Traffic density map
+get_traffic_density_value:
 .L7581  ld      hl,minimaps+3456
         ld      (V_minimap_start),hl
         jr      minimap_xypos_50                   ; (-75)
 
-; Police minimap
+; Police minimap - get value
 .L7589  ld      hl,minimaps+576
         ld      (V_minimap_start),hl
         jr      minimap_xypos_25                   ; (-55)
 
-; Fire minimap
+; Fire minimap - get value
 .L7591  ld      hl,minimaps
         ld      (V_minimap_start),hl
         jr      minimap_xypos_25                   ; (-63)
@@ -3955,18 +3958,17 @@ l_mult_hlxde:
 .L7665  djnz    L765e                  ; (-9)
         ret     
 
-
+;Does something on a minimap 50%
+;
+;Exit: a = ???
 .L7668  ld      d,0
         ld      b,2
-
 .L766c  ld      c,2
         push    hl
-
 .L766f  ld      a,(hl)
         cp      d
         jr      c,L7674                 ; (1)
         ld      d,a
-
 .L7674  inc     hl
         dec     c
         jr      nz,L766f                ; (-9)
@@ -3982,7 +3984,7 @@ D_30338:
         defb    $00         ;Police
         defb    $01         ;Fire
         defb    $02         ;Church
-        defb    $03         ;Hopsital
+        defb    $03         ;Hospital
         defb    $09         ;Stadium
         defb    $0B         ;Coal
         defb    $0B         ;Nuclear
@@ -4062,7 +4064,8 @@ D_30428:
 ; Entry: bc = coordinates
 ;         a = direction
 ; Exit:  bc = original coordinates
-;        hl = levelmap of coords + diection
+;        hl = levelmap of coords + direction
+
 .L76e4  push    bc
         call    L76ed
         call    levelmap_xypos
@@ -4282,7 +4285,7 @@ display_transport_sprite:
         cp      (hl)
         jr      z,L7822                 ; (14)
         ld      a,(L77d9)               ;Direction to look in
-        call    L76e4
+        call    L76e4                   ;Move in direction
         ld      a,(hl)
         call    tile_to_flags
         and     2
@@ -4307,7 +4310,7 @@ display_transport_sprite:
 
 
 .L783d  ld      a,(L77d9)
-        call    L76ed
+        call    L76ed               ;Move coords in direction
         ld      a,(L77d9)
         add     a,2
         and     3
@@ -4573,7 +4576,7 @@ place_fallout:
 
 .L79ea  call    get_random_number
         and     3
-        call    L76ed
+        call    L76ed               ;Move coords in direction
         push    bc
         call    levelmap_xypos
         pop     bc
@@ -5032,7 +5035,7 @@ show_mini_maps:
 
 
 .L7d1d  ld      bc,(V_map_iter_xy)
-        call    L7581
+        call    get_traffic_density_value
         call    L7668
         ld      (32448),a
         ret     
@@ -5862,7 +5865,7 @@ start_simulation:
         ld      (hl),0
         ldir    
         ld      a,255
-        ld      (35013),a
+        ld      (V_35013),a
         ld      (35074),a
         ld      a,15
         ld      (31793),a
@@ -6122,7 +6125,7 @@ DecTrafficMem:
         ret     z
 
         call    L7709
-        call    L7581
+        call    get_traffic_density_value
         ld      a,(hl)
         add     a,20
         jr      c,L85b3                 ; (4)
@@ -6218,7 +6221,7 @@ DecTrafficMem:
 
 
 .L8644  ld      a,(34311)
-        call    L76ed
+        call    L76ed               ;Move coords in direction
         ld      a,(34311)
         add     a,2
         and     3
@@ -6472,17 +6475,14 @@ V_34760:    defb    0, 255, 0, 255      ;VAR 34760/87c8
 .L87cc  ld      a,(V_map_iter_xy)
         ld      hl,V_34760
         call    L87db
-        ld      a,(34694)
+        ld      a,(V_map_iter_xy+1)
         ld      hl,V_34760+2
-
 .L87db  cp      (hl)
         jr      c,L87df                 ; (1)
         ld      (hl),a
-
 .L87df  inc     hl
         cp      (hl)
         ret     nc
-
         ld      (hl),a
         ret     
 
@@ -6601,9 +6601,9 @@ V_34921:
         exx     
         ret     
 
-        rst     56
+V_35013:    defb    $FF         ;VAR 35013/88c5
 
-.L88c6  ld      hl,35013
+.L88c6  ld      hl,V_35013
         ld      a,(hl)
         inc     a
         jr      z,L88d4                 ; (7)
@@ -6745,12 +6745,11 @@ V_35205:  defb    $32         ;VAR 8985/35205
 .L899b  xor     a
         ld      (35226),a
         ld      e,4
-
 .L89a1  push    de
         ld      bc,(V_map_iter_xy)
         ld      a,e
         dec     a
-        call    L76ed
+        call    L76ed               ;Move coords in direction
         call    levelmap_xypos
         jr      nc,L89d3                ; (35)
         ld      a,(35225)
@@ -6762,7 +6761,6 @@ V_35205:  defb    $32         ;VAR 8985/35205
         call    tile_to_flags
         bit     7,a
         jr      z,L89d3                 ; (17)
-
 .L89c2  ld      a,(35226)
         inc     a
         ld      (35226),a
@@ -6770,18 +6768,15 @@ V_35205:  defb    $32         ;VAR 8985/35205
         and     7
         jr      nz,L89d3                ; (3)
         call    L89ea
-
 .L89d3  pop     de
         dec     e
         jr      nz,L89a1                ; (-54)
         ld      a,(35225)
         and     a
         ret     nz
-
         call    get_random_number
         and     3
         ret     nz
-
         ld      a,(35226)
         and     a
         jp      z,L8956
@@ -6794,8 +6789,6 @@ V_35205:  defb    $32         ;VAR 8985/35205
         ld      a,(hl)
         and     a
         ret     z
-
-
 .L89f3  bit     7,(hl)
         jp      nz,L7b86
         push    hl
@@ -6804,27 +6797,20 @@ V_35205:  defb    $32         ;VAR 8985/35205
         cpir    
         pop     hl
         ret     z
-
         ld      a,(35224)
         ld      (hl),a
         ret     
 
-        rst     56
-        rst     56
-        ld      c,c
-        rst     56
-        nop     
-        ld      c,d
-        rst     56
-        ld      bc,75
-        rst     56
-        ld      d,b
-        nop     
-        ld      bc,332
-        rst     56
-        ld      c,a
-        ld      bc,19968
-        ld      bc,19713
+
+D_35336:
+;8a08
+        defb    $FF, $FF, $49, $FF, $00, $4A, $FF, $01
+        defb    $4B, $00, $FF, $50, $00, $01, $4C, $01
+        defb    $FF, $4F, $01, $00, $4E, $01
+        
+        
+        defb    $01, $4D
+
 
 .L8a20  call    get_random_number
         and     7
@@ -6833,12 +6819,12 @@ V_35205:  defb    $32         ;VAR 8985/35205
         add     a,c
         ld      c,a
         ld      b,0
-        ld      ix,35336
+        ld      ix,D_35336
         add     ix,bc
         ld      a,(V_map_iter_xy)
         add     a,(ix+1)
         ld      c,a
-        ld      a,(34694)
+        ld      a,(V_map_iter_xy+1)
         add     a,(ix+0)
         ld      b,a
         ret     
@@ -8459,38 +8445,13 @@ print_budget_amounts:
         jp      L66b6
 
 
-
-        rrca    
-        rra     
-        rra     
-        ccf     
-        ccf     
-        ld      a,a
-        ld      a,a
-        rst     56
-        rst     56
-        rst     56
-        rst     56
-        rst     56
-        rst     56
-        rst     56
-        rst     56
-        rst     56
-        nop     
-        inc     bc
-        ld      b,7
-        ex      af,af'
-        ld      a,(bc)
-        inc     c
-        rrca    
-        rrca    
-        rrca    
-        rrca    
-        rrca    
-        rrca    
-        rrca    
-        rrca    
-        rrca    
+;950a/38154
+D_38154:
+        defb    $0F, $1F, $1F, $3F, $3F, $7F, $7F, $FF
+        defb    $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF
+        defb    $00, $03, $06, $07, $08, $0A, $0C, $0F
+        defb    $0F, $0F, $0F, $0F, $0F, $0F, $0F, $0F
+        
 
 .L952a  ld      a,255
         ld      hl,(37649)
@@ -8510,11 +8471,10 @@ print_budget_amounts:
         call    L_div16x16
         ld      c,l
         ld      b,0
-        ld      hl,38154
+        ld      hl,D_38154
         add     hl,bc
         ld      a,(hl)
-
-.L9555  ld      (35013),a
+.L9555  ld      (V_35013),a
         ld      (35074),a
         ld      a,15
         ld      hl,(V_Budget_Police_Funding)
@@ -9151,7 +9111,7 @@ SendMessages:
         ld      a,h
         or      l
         jr      z,L9af2                 ; (10)
-        ld      a,(35013)
+        ld      a,(V_35013)
         cp      255
         ld      a,13
         jp      nz,set_alert_message
@@ -9290,15 +9250,16 @@ D_39758:
         ld      a,(V_current_zone_width_to_print)
         and     a
         jr      nz,L9be8                ; (30)
-        call    L64a9
+        call    update_road_tile_for_traffic
         ld      h,0
         add     hl,hl
         add     hl,hl
         add     hl,hl
-        ld      de,60008
+        ld      de,udgs + 536
         add     hl,de
 
-.L9bd6  ld      de,16392
+SMC_39894:          
+.L9bd6  ld      de,16392            ;SMC, screen address of road tile
         inc     hl
         call    L9bf9
         inc     d
@@ -9317,8 +9278,12 @@ D_39758:
         ld      de,udgs + 1288
         add     hl,de
         jr      L9bd6                   ; (-34)
+
+
         nop     
 
+
+; This does the traffic effect for roads?
 .L9bf9  ld      a,(hl)
         and     128
         ld      c,a
@@ -9349,7 +9314,6 @@ D_39758:
         rrc     c
         rrc     c
         rrc     c
-
 .L9c24  ld      a,(de)
         and     b
         or      c
@@ -9399,7 +9363,7 @@ D_minimap_offsets:
 
 
 .L9c57  ld      hl,16392
-        ld      (39895),hl
+        ld      (SMC_39894+1),hl
         xor     a
         ld      (39984),a
         ld      a,16
@@ -9425,7 +9389,7 @@ D_minimap_offsets:
         ex      de,hl
         ld      b,48
 
-.L9c86  ld      de,(39895)
+.L9c86  ld      de,(SMC_39894+1)
         push    de
         ld      a,(39982)
         ld      (V_minimap_xy),a
@@ -9440,18 +9404,18 @@ D_minimap_offsets:
 
 .L9c9f  ld      (25865),hl
         exx     
-        call    L9bc3
-        ld      c,33
-        call    L9d0c
-        call    L9d44
+        call    L9bc3                   ;Mark traffic on the map
+        ld      c,33                    ;White paper, blue ink
+        call    L9d0c                   ;Set attribute
+        call    check_if_minimaps_should_be_displayed
         ld      hl,39984
         ld      a,(hl)
         xor     1
         ld      (hl),a
         jr      nz,L9cbe                ; (7)
-        ld      hl,(39895)
+        ld      hl,(SMC_39894+1)
         inc     hl
-        ld      (39895),hl
+        ld      (SMC_39894+1),hl
 
 .L9cbe  ld      hl,(V_left_tile_index)
         inc     hl
@@ -9468,7 +9432,7 @@ D_minimap_offsets:
         call    drow
         call    drow
         call    drow
-        ld      (39895),hl
+        ld      (SMC_39894+1),hl
         ex      de,hl
         ld      de,48
         add     hl,de
@@ -9501,7 +9465,7 @@ do_minimap_attr_intensity:
         ld      hl,D_40186
         add     hl,bc
         ld      c,(hl)
-.L9d0c  ld      hl,(39895)
+.L9d0c  ld      hl,(SMC_39894+1)
         ld      a,h
         rrca    
         rrca    
@@ -9523,7 +9487,7 @@ do_minimap_attr_intensity:
         ld      b,10
         ld      c,5
 
-.L9d2c  ld      hl,(39895)
+.L9d2c  ld      hl,(SMC_39894+1)
         ld      a,(hl)
         and     d
         or      b
@@ -9547,6 +9511,8 @@ do_minimap_attr_intensity:
 
 V_minimap_selection_index:  defb    $06     ;VAR 9d43/40259 - which minimap is selected
 
+
+check_if_minimaps_should_be_displayed:
 .L9d44
         ld      a,$43
         sbc     l
