@@ -26,6 +26,8 @@
         defc        TILE_PARK2 = 57
         defc        TILE_NEED_POWER = 59
         defc        TILE_RADIOACTIVE = 89
+        defc        TILE_FLOOD = 68
+        defc        TILE_FIRE = 69
 
 ;Entry! - 
 
@@ -747,7 +749,8 @@ get_random_number:
         call    prt_ctrl
         defb        T_SETCOL,57
         defb        T_SETXY,5,1
-.L24424                ;VAR        (12) - townname
+D_cityname:
+.D_24424                ;VAR        (12) - townname
         defm        "HERESVILLE  "
         defb        T_SETXY,5,17
         defm        "FUNDS $"
@@ -1099,10 +1102,12 @@ handle_menus:
         jp      L66f2
         nop     
 
-.L6434  ld      a,(36767)
+V_25651:    defb    0       ;VAR 256511/6433
+
+.L6434  ld      a,(V_36767)
         and     16
-        ld      (25651),a
-        ld      a,(36767)
+        ld      (V_25651),a
+        ld      a,(V_36767)
         and     15
         add     a,8
         ld      b,a
@@ -1110,7 +1115,7 @@ handle_menus:
         call    xypos
         ld      (SMC_print_tile_hl+1),hl
         ld      bc,(V_25863)
-        ld      a,(36767)      
+        ld      a,(V_36767)      
         and     15
         add     a,b
         ld      b,a
@@ -1167,7 +1172,7 @@ replace_zone_with_power_if_needed:
         ret     c
         cp      87
         ret     nc
-        ld      a,(36767)
+        ld      a,(V_36767)
         bit     5,a
         ret     z
         ld      l,TILE_NEED_POWER            ;Need power icon
@@ -1199,7 +1204,7 @@ update_road_tile_for_traffic:
         jr      nc,L64d3                ; (10)
         cp      150
         ret     c
-        ld      a,(25651)
+        ld      a,(V_25651)
         and     a
         jr      z,L64d3                 ; (1)
         inc     b
@@ -1212,7 +1217,7 @@ update_road_tile_for_traffic:
         dec     (hl)
         ld      a,(ix+0)
         ld      ix,25813
-        ld      hl,36767
+        ld      hl,V_36767
         bit     5,(hl)
         jr      z,L64ef                 ; (7)
         and     240
@@ -1645,16 +1650,19 @@ V_26439:    defw    0       ;VAR 26439
 V_26441:    defb    0       ;VAR 26441
 
 
+; Zeros...
 V_26442:
         defb        $0C, $3C, $A5, $0E, $52, $A5
         defb        $10, $6A, $A5, $16, $8C, $A5, $FF
 
-        defs        107        ;What's up here? - Selection table? LOOK!
+        defs        106        ;What's up here? - Selection table? LOOK!
+
+V_26562:    defb    0       ;VAR 26562
 
 .L67c3  ld      iy,V_26442
         ld      (V_26439),ix
         xor     a
-        ld      (26562),a
+        ld      (V_26562),a
         ld      a,(ix+0)
         ld      (V_26441),a
         inc     ix
@@ -1694,7 +1702,7 @@ V_26442:
         ld      (iy+2),h
         ld      de,3
         add     iy,de
-        ld      hl,26562
+        ld      hl,V_26562
         inc     (hl)
         ret     
 
@@ -1720,19 +1728,20 @@ V_26442:
         ld      c,66
         call    L5ed3
         jr      L67d7                   ; (-116)
-        nop     
+
+V_26699:    defb    0   ;VAR 26699/684b
 
 .L684c  call    L6806
         inc     ix
         ld      l,(ix+0)
         ld      h,(ix+1)
         ld      a,(hl)
-        ld      (26699),a
+        ld      (V_26699),a
         inc     ix
         inc     ix
         call    L6882
         call    L6922
-        ld      a,(26699)
+        ld      a,(V_26699)
         and     a
         jr      z,L6876                 ; (11)
         call    prt_ctrl
@@ -1842,7 +1851,6 @@ V_26442:
 .L6933  ld      c,1
         call    cxytoattr
         ld      b,30
-
 .L693a  ld      a,(hl)
         xor     70
         ld      (hl),a
@@ -1852,7 +1860,7 @@ V_26442:
 
 .V_26496        defw        0                ;VAR - sommat with printing address
 
-.L6944  ld      a,(26562)
+.L6944  ld      a,(V_26562)
         and     a
         ret     z
         xor     a
@@ -1891,22 +1899,23 @@ V_26442:
         jr      z,L6996                 ; (7)
         ret     
 
-        nop     
-        nop     
-        nop     
-        nop     
-        nop     
-        inc     d
+
+V_27024:    defb    0       ;VAR 27024/6990     max options/row
+V_27025:    defw    0       ;VAR 27025/6991
+
+V27027: defw        0       ;VAR 27027/6993 - xy coordinates for menu?
+
+V_27029:    defb    0       ;VAR 27029/6995
 
 .L6996  ld      a,10
-        ld      (27029),a
+        ld      (V_27029),a
         call    L6a60
         call    L6a7e
         ld      a,(hl)
-        ld      (27028),a
+        ld      (V_27027+1),a
         call    L6905
         ld      a,(hl)
-        ld      (27027),a
+        ld      (V_27027),a
         inc     hl
         ld      a,(hl)
         inc     hl
@@ -1914,10 +1923,10 @@ V_26442:
         ld      l,a
         inc     hl
         inc     hl
-        ld      (27025),hl
+        ld      (V_27025),hl
         inc     hl
         ld      a,(hl)
-        ld      (27024),a
+        ld      (V_27024),a
         ld      a,69
         ld      (textcol),a
 
@@ -1933,7 +1942,7 @@ V_26442:
         and     1           ;'A'
         call    z,L69fa
         call    L6a2a
-        ld      a,(27029)
+        ld      a,(V_27029)
         and     a
         jr      z,L69c0                 ; (-38)
         ld      b,a
@@ -1942,25 +1951,24 @@ V_26442:
         djnz    L69e7                   ; (-3)
         jr      L69c0                   ; (-44)
 
-.L69ec  ld      a,(27024)
+; Move down the menu list?
+.L69ec  ld      a,(V_27024)
         inc     a
         ld      c,a
-        ld      hl,(27025)
+        ld      hl,(V_27025)
         ld      a,(hl)
         inc     a
         cp      c
         ret     z
-
         ld      (hl),a
         ret     
 
-
-.L69fa  ld      hl,(27025)
+; Move up the menu list?
+.L69fa  ld      hl,(V_27025)
         ld      a,(hl)
         dec     a
         cp      255
         ret     z
-
         ld      (hl),a
         ret     
 
@@ -1973,10 +1981,10 @@ V_26442:
         call    L6a16
         jp      L6950
 
-.L6a16  ld      bc,(27027)
+.L6a16  ld      bc,(V_27027)
         call    xypos
         ld      (textpos),hl
-        ld      hl,(27025)
+        ld      hl,(V_27025)
         ld      l,(hl)
         ld      h,0
         call    prhund
@@ -1991,17 +1999,16 @@ V_26442:
 
 .L6a31  call    twiddlekeys
         jr      z,L6a3e                 ; (8)
-        ld      hl,27029
+        ld      hl,V_27029
         ld      a,(hl)
         and     a
         ret     z
-
         dec     (hl)
         ret     
 
 
 .L6a3e  ld      a,10
-        ld      (27029),a
+        ld      (V_27029),a
         ret     
 
 
@@ -2029,10 +2036,8 @@ menu_up:
         dec     a
         cp      255
         ret     z
-
         call    L6a60
         ld      (hl),a
-
 .L6a60  push    hl
         push    af
         call    L6a7e
@@ -2043,21 +2048,19 @@ menu_up:
         ret     
 
 menu_down:
-.L6a6c  ld      a,(26562)
+.L6a6c  ld      a,(V_26562)
         ld      b,a
         ld      hl,V_menu_selection
         ld      a,(hl)
         inc     a
         cp      b
         ret     z
-
         call    L6a60
         ld      (hl),a
         jr      L6a60                   ; (-29)
 
 
 V_menu_selection:    defb        0   ;VAR 6a7d/27261 - Current menu selection
-        nop     
 
 .L6a7e  ld      a,(V_menu_selection)
         ld      b,a
@@ -2124,11 +2127,11 @@ create_landscape:
         call    get_random_number
         and     63
         add     a,16
-        ld      (27650),a
+        ld      (V_27650),a
         call    get_random_number
         and     63
         add     a,16
-        ld      (27651),a
+        ld      (V_27650+1),a
         call    get_random_number
         and     3
         add     a,a
@@ -2251,9 +2254,7 @@ levelmap_xypos:
         ret
 
 
-        ld      a,(bc)
-        ld      a,(bc)
-
+V_27650:        defw    0           ;VAR 6c02/2760
 V_27652:        defb    $05         ;VAR 6c04/27652
 V_27653:        defb    $02         ;VAR 6c05/27653
 V_27654:        defb    $00         ;VAR 6c06/27654
@@ -2264,13 +2265,15 @@ V_27655:        defw    $0404       ;VAR 6c07/27655
 .L6c09  ld      a,(V_27652)
         ld      h,a
         ld      l,0
-        ld      (27677),hl
+        ld      (SMC_27676+1),hl
         ld      h,l
-        ld      (27674),hl
+        ld      (SMC_27673+1),hl
         ld      b,49
 
 .L6c18  push    bc
+SMC_27673:
         ld      hl,0            ;SMC 27674
+SMC_27676:
         ld      de,0            ;SMC 27677
         ld      b,d
         ld      c,e
@@ -2295,16 +2298,16 @@ V_27655:        defw    $0404       ;VAR 6c07/27655
         inc     bc
         add     hl,bc
         ex      de,hl
-        ld      (27674),hl
-        ld      (27677),de
-        ld      bc,(27650)
+        ld      (SMC_27673+1),hl
+        ld      (SMC_27676+1)),de
+        ld      bc,(V_27650)
         ld      a,d
         add     a,b
         ld      b,a
         ld      a,h
         add     a,c
         ld      c,a
-        ld      a,(27675)
+        ld      a,(SMC_27673+2)
         neg     
         add     a,a
         ld      d,a
@@ -2420,7 +2423,7 @@ do_view_change:
         halt    
         call    draw_map
         call    L778f
-        ld      hl,36767
+        ld      hl,V_36767
         ld      a,(hl)
         add     a,4
         ld      (hl),a
@@ -2483,10 +2486,8 @@ do_view_change:
 
 .L6d45  cp      49
         ret     c
-
         cp      58
         ret     nc
-
         sub     49
         ld      b,a
         jr      L6d6d                   ; (29)
@@ -2512,7 +2513,6 @@ V_27984:    defb        1       ;VAR 6d50/27984
         sub     2
         srl     a
         ld      b,a
-
 .L6d6d  push    bc
         call    get_cost_for_zone
         ld      b,0
@@ -2597,7 +2597,6 @@ D_zone_sizes:
         pop     bc
         push    bc
         call    L6dfd
-
 .L6df8  pop     bc
         inc     c
         djnz    L6ddd                   ; (-31)
@@ -2611,10 +2610,8 @@ D_zone_sizes:
         call    xypos
         ld      d,170
         ld      b,16
-
 .L6e0a  ld      c,2
         push    hl
-
 .L6e0d  ld      a,(hl)
         and     d
         ld      (hl),a
@@ -2879,7 +2876,7 @@ get_neighbours:
 
         ld      a,(hl)
         exx     
-        ld      hl,29291
+        ld      hl,D_29291
         ld      bc,8
         cpir    
         exx     
@@ -4162,7 +4159,7 @@ display_transport_sprite:
         ld      a,c
         sub     l
         ld      c,a
-        ld      a,(36767)
+        ld      a,(V_36767)
         and     15
         add     a,8
         cp      b
@@ -4214,20 +4211,20 @@ display_transport_sprite:
         ret     
 
 ; Does something with the transport sprite
-.L778f  ld      a,(30678)
+.L778f  ld      a,(V_30678)
         and     a
         jr      z,L77b3                 ; (30)
-        ld      bc,(30675)
+        ld      bc,(V_30675)
         call    levelmap_xypos_with_check
         ld      a,(hl)
         cp      31
         jr      z,L77b3                 ; (18)
         cp      32
         jr      z,L77b3                 ; (14)
-        ld      a,(30678)
+        ld      a,(V_30678)
         and     a
-        ld      bc,(30675)
-        ld      a,(30677)
+        ld      bc,(V_30675)
+        ld      a,(V_30677)
         call    nz,display_transport_sprite
 
 .L77b3  ld      a,(30841)
@@ -4246,9 +4243,11 @@ display_transport_sprite:
         call    nz,display_transport_sprite
         ret     
 
-        inc     e
-        jr      L77d9                   ; (3)
-        nop     
+V_30675:    defw    0       ;VAR 30675/77d3
+
+V_30677:    defb    0       ;VAR 30677/77d5
+
+V_30678:    defb        0       ;VAR 30678/77d6
         nop     
         nop     
 
@@ -4256,22 +4255,22 @@ display_transport_sprite:
         nop     
         nop     
 
-.L77dc  ld      a,(30678)
+.L77dc  ld      a,(V_30678)
         and     a
         ret     z
 
-        ld      bc,(30675)
+        ld      bc,(V_30675)
         call    levelmap_xypos
         ld      a,(hl)
         call    tile_to_flags
         and     2                       ;rail?
         jr      nz,L77f5                ; (5)
         xor     a
-        ld      (30678),a
+        ld      (V_30678),a
         ret     
 
 
-.L77f5  ld      bc,(30675)
+.L77f5  ld      bc,(V_30675)
         call    get_random_number
         and     3
         ld      (30680),a
@@ -4315,20 +4314,20 @@ display_transport_sprite:
         add     a,2
         and     3
         ld      (30679),a
-        ld      (30675),bc
+        ld      (V_30675),bc
         ld      c,3
         and     1
         jr      nz,L7858                ; (1)
         inc     c
 
 .L7858  ld      a,c
-        ld      (30677),a
+        ld      (V_30677),a
         ret     
 
 
 .L785d  ld      a,(37650)
         cp      8
-        ld      a,(30678)
+        ld      a,(V_30678)
         and     a
         ret     nz
 
@@ -4337,9 +4336,9 @@ display_transport_sprite:
         ret     nz
 
         ld      hl,(V_map_iter_xy)
-        ld      (30675),hl
+        ld      (V_30675),hl
         ld      a,1
-        ld      (30678),a
+        ld      (V_30678),a
         ret     
 
         nop     
@@ -5878,7 +5877,7 @@ start_simulation:
         ld      (V_wait_for_budget_confirm),a
         ld      (36655),a
         ld      (36656),a
-        ld      (30678),a
+        ld      (V_30678),a
         ld      (30841),a
         ld      (30845),a
         ld      (V_meltdown_triggered),a
@@ -6792,7 +6791,7 @@ V_35205:  defb    $32         ;VAR 8985/35205
 .L89f3  bit     7,(hl)
         jp      nz,L7b86
         push    hl
-        ld      hl,29291
+        ld      hl,D_29291
         ld      bc,8
         cpir    
         pop     hl
@@ -7600,7 +7599,9 @@ census_church_hosp:
 .money        defb  0,0,0   ; VAR - money!! - 8f99
 .V_month:     defb  0       ; VAR 36763 (8f9b) - Month
 .V_year:      defw  1902    ; VAR 36764 (8f9c) - Year
-.V_8f9e:      defw  0       ;VAR 36766/8f9e
+.V_8f9e:      defb  0       ;VAR 36766/8f9e
+.V_36767      defb  0       ;VAR 36767 - tick counter for ui thread
+
 
 
 ; Real entry to the game
@@ -7611,9 +7612,9 @@ census_church_hosp:
         call    initialise_simulation_variables
         call    cls_white
         call    ingame_scrdraw
-        call    L908a
-        call    L906d
-        ld      ix,42268
+        call    change_fire_tile
+        call    change_flood_tile
+        ld      ix,menu_difficulty_text
         call    cls_print_topbox
         call    L67c3
         call    L6944
@@ -7646,7 +7647,7 @@ census_church_hosp:
         ld      a,(V_wait_for_budget_confirm)
         and     a
         call    nz,show_budget
-        ld      hl,36767
+        ld      hl,V_36767
         inc     (hl)
         ld      a,(V_show_mini_maps)
         and     a
@@ -7656,21 +7657,21 @@ census_church_hosp:
         call    z,show_mini_maps
         jr      L8fcc                   ; (-81)
 
-.L901d  ld      a,(36767)
+.L901d  ld      a,(V_36767)
         and     31
         call    z,display_alert_message
-        ld      a,(36767)
+        ld      a,(V_36767)
         and     15
         call    z,L904d
-        ld      a,(36767)
+        ld      a,(V_36767)
         and     15
         jp      z,print_money
         cp      1
         jp      z,print_date
         cp      2
-        jr      z,L906d                 ; (47)
+        jr      z,change_flood_tile                 ; animation
         cp      3
-        jr      z,L908a                 ; (72)
+        jr      z,change_fire_tile                 ; animation
         cp      4
         jp      z,sim_start_disaster
         cp      5
@@ -7693,12 +7694,16 @@ census_church_hosp:
         call    doicons
         jp      L6d90
 
-.L906d  ld      de,60560
+
+; Animation by copying the udgs
+; Flood
+change_flood_tile:
+.L906d  ld      de,60560                ;udg 69
         ld      hl,60728
         call    get_random_number
         and     3
         ld      b,a
-        ld      a,(36767)
+        ld      a,(V_36767)
         add     a,b
         and     16
         jr      z,L9084                 ; (3)
@@ -7707,13 +7712,15 @@ census_church_hosp:
         ldir    
         ret     
 
-
-.L908a  ld      de,60552
+; Copying in the UDG area?
+; Flames?
+change_fire_tile:
+.L908a  ld      de,60552                ;udg 68
         ld      hl,60744
         call    get_random_number
         and     3
         ld      b,a
-        ld      a,(36767)
+        ld      a,(V_36767)
         add     a,b
         and     16
         jr      z,L90a1                 ; (3)
@@ -7746,7 +7753,7 @@ census_church_hosp:
         ld      a,(hl)
         cp      6           ;trees
         ret     z
-        ld      (hl),69
+        ld      (hl),TILE_FIRE
         ret     
 
 
@@ -7768,7 +7775,7 @@ census_church_hosp:
         call    get_random_number
         and     31
         jr      nz,L90fc                ; (2)
-        ld      (hl),68     ;Flood character?
+        ld      (hl),TILE_FLOOD     ;Flood character?
 .L90fc  inc     hl
         dec     bc
         ld      a,b
@@ -9367,7 +9374,7 @@ D_minimap_offsets:
         xor     a
         ld      (39984),a
         ld      a,16
-        ld      (25651),a
+        ld      (V_25651),a
         ld      a,(V_minimap_section)
         add     a,a
         ld      c,a
@@ -9630,16 +9637,16 @@ minimap_return:
 action_save:
         call    menu_enter_filename
         ld      bc,$100c
-        ld      (42712),bc
+        ld      (V_input_xy),bc
         ld      hl,43312            
-        ld      (42714),hl  ;destination for string
+        ld      (V_42714),hl  ;destination for string
         call    input_string
         call    save_and_wait_for_keypress
         ld      hl,money
         ld      de,43324
         ld      bc,7
         ldir    
-        ld      hl,24424
+        ld      hl,D_cityname
         ld      de,43332
         ld      bc,12
         ldir    
@@ -9664,9 +9671,9 @@ action_save:
 action_load:
         call    menu_enter_filename
         ld      bc,$100C
-        ld      (42712),bc
+        ld      (V_input_xy),bc
         ld      hl,43300
-        ld      (42714),hl
+        ld      (V_42714),hl
         call    input_string
         di      
         call    cls_white        ;why?!?!?
@@ -9719,7 +9726,7 @@ action_load:
         ld      bc,7
         ldir    
         ld      hl,43332
-        ld      de,L24424
+        ld      de,D_cityname
         ld      bc,12
         ldir    
         ei      
@@ -9892,7 +9899,7 @@ action_start_new_city:
         ld      (V_InitialSeed),hl
 
 start_city:
-.La0c1  call    La519
+.La0c1  call    menu_difficulty
         jp      create_landscape
 
 
@@ -10231,7 +10238,9 @@ action_set_show_maps:
 ; A518
 V_difficulty:   defb    0       ;VAR (42264) - difficulty level
 
+menu_difficulty:
 .La519  call    print_routine
+menu_difficulty_text:
 .L42268
         defb        8,0
         defm        "    SELECT DIFFICULTY LEVE"
@@ -10268,18 +10277,18 @@ action_difficulty:
 
 action_input_city_name:
 .La5b0  ld      hl,$0501
-.La5b3  ld      (42712),hl
-        ld      hl,24424
-        ld      (42714),hl
+.La5b3  ld      (V_input_xy),hl
+        ld      hl,D_cityname
+        ld      (V_42714),hl
         ld      a,57
-        ld      (42937),a
+        ld      (SMC_42936+1),a
         ld      a,185
-        ld      (42945),a
+        ld      (SMC_42944+1),a
         call    input_string
         ld      a,71
-        ld      (42937),a
+        ld      (SMC_42936+1),a
         ld      a,199
-        ld      (42945),a
+        ld      (SMC_42944+1),a
         call    L6a60
         call    ingame_txt
         jp      L6944
@@ -10287,7 +10296,7 @@ action_input_city_name:
 
 use_old_landscape:
         ld      hl,(V_InitialSeed)
-        ld      (42523),hl
+        ld      (SMC_42523),hl
         call    print_routine
         defb        8,0
         defm        "       USE OLD LANDSCAP"
@@ -10295,7 +10304,10 @@ use_old_landscape:
         defb        3,0
         defm        "CURRENT LANDSCAPE GENE "
 ;42521
-        defb        6,0,0,0,0
+        defb        6,0
+SMC_42523:
+        defw        0
+        defb        0
         defb        0,160,3,0,160,0,160
         defb        2
         defw        input_new_gene      ;114,166        ;variable pickup?
@@ -10315,10 +10327,10 @@ use_old_landscape:
         defb        4
 
 input_new_gene:
-        ld      hl,2841
-        ld      (42712),hl
+        ld      hl,$0b19
+        ld      (V_input_xy),hl
         ld      hl,V_InitialSeed
-        ld      (42714),hl
+        ld      (V_42714),hl
         ld      hl,$0501
         ld      (V_input_isnumber),hl
         call    input_entry
@@ -10347,8 +10359,10 @@ text_generating_landscape:
         defb    'T' + 128
         defb    4
 
-.:a6d8
-        defb    0,0,0,0,0
+V_input_xy:    defw    0       ;VAR 42712/a6d8 - coordinates for input
+V_42714:    defw    0       ;VAR 42714/a6da - destination for input?
+
+V_42716:    defb    0       ;VAR 42716/a6dc -  current length of input?
 
 ;a6dd/42717
 V_input_isnumber:   defb    0       ;VAR 42717/ we want a number
@@ -10370,7 +10384,7 @@ input_string:
   
 input_entry:
 .La6ff  xor     a
-        ld      (42716),a
+        ld      (V_42716),a
 .La703  ld      a,(V_input_isnumber)
         and     a
         call    nz,La7d4        ;If numeric clear the buffer
@@ -10393,7 +10407,7 @@ input_entry:
         ld      a,(keystore)
         and     1       ;'SHIFT'
         jr      nz,La742                ; (18)
-        ld      hl,42716
+        ld      hl,V_42716
         ld      a,b
         cp      56
         jr      z,La799                 ; (97)
@@ -10429,23 +10443,23 @@ input_entry:
         call    La7a3
         jr      La70a                   ; (-99)
 
-.La76d  ld      a,(42716)
+.La76d  ld      a,(V_42716)
         ld      e,a
         ld      d,0
-        ld      hl,(42714)
+        ld      hl,(V_42714)
         add     hl,de
         ld      (hl),b
-        ld      hl,42716
+        ld      hl,V_42716
         jr      La799                   ; (28)
 
 .La77d  call    La786
-        ld      hl,42716
+        ld      hl,V_42716
         call    La793
 
-.La786  ld      a,(42716)
+.La786  ld      a,(V_42716)
         ld      e,a
         ld      d,0
-        ld      hl,(42714)
+        ld      hl,(V_42714)
         add     hl,de
         ld      (hl),32
         ret     
@@ -10468,21 +10482,23 @@ input_entry:
         ret     
 
 
-.La7a3  ld      bc,(42712)
+.La7a3  ld      bc,(V_input_xy)
         call    xypos
         ld      (textpos),hl
-        ld      hl,(42714)
+        ld      hl,(V_42714)
         ld      a,(V_input_maxlen)
         ld      b,a
         ld      c,0
 
 .La7b6  push    bc
         push    hl
-        ld      e,71
-        ld      a,(42716)
+SMC_42936:
+        ld      e,71                ;SMC - 42937
+        ld      a,(V_42716)
         cp      c
         jr      nz,La7c2                ; (2)
-        ld      e,199
+SMC_42944:
+        ld      e,199               ;SMC - 42945
 
 .La7c2  ld      a,e
         ld      (textcol),a
@@ -10504,14 +10520,13 @@ input_entry:
         ldir    
         call    La7ed
         ld      hl,V_input_buffer
-        ld      (42714),hl
+        ld      (V_42714),hl
         ret     
 
-        nop     
-        nop     
+V_42987:    defw    0       ;VAR 42987/a7eb
 
-.La7ed  ld      hl,(42714)
-        ld      (42987),hl
+.La7ed  ld      hl,(V_42714)
+        ld      (V_42987),hl
         ld      iy,V_input_buffer
         ld      a,(hl)
         inc     hl
@@ -10557,7 +10572,7 @@ input_entry:
         call    La854
         ret     c
         ex      de,hl
-        ld      hl,(42987)
+        ld      hl,(V_42987)
         ld      (hl),e
         inc     hl
         ld      (hl),d
