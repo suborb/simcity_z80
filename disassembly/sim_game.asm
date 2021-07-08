@@ -751,7 +751,7 @@ get_random_number:
         call    prt_ctrl
         defb        T_SETCOL,57
         defb        T_SETXY,5,1
-D_cityname:
+SMC_cityname:
 .D_24424                ;VAR        (12) - townname
         defm        "HERESVILLE  "
         defb        T_SETXY,5,17
@@ -4169,7 +4169,7 @@ display_transport_sprite:
         add     hl,hl
         add     hl,hl
         add     hl,hl
-        ld      de,43140
+        ld      de,transport_sprites
         add     hl,de
         ex      de,hl
         call    xypos
@@ -9594,20 +9594,20 @@ action_save:
         call    menu_enter_filename
         ld      bc,$100c
         ld      (V_input_xy),bc
-        ld      hl,43312            
+        ld      hl,V_tapeheader            
         ld      (V_42714),hl  ;destination for string
         call    input_string
         call    save_and_wait_for_keypress
         ld      hl,money
-        ld      de,43324
+        ld      de,V_tape_money
         ld      bc,7
         ldir    
-        ld      hl,D_cityname
-        ld      de,43332
+        ld      hl,SMC_cityname
+        ld      de,D_43332
         ld      bc,12
         ldir    
         di      
-        ld      ix,43312
+        ld      ix,V_tapeheader
         ld      de,31
         ld      a,255
         scf     
@@ -9628,7 +9628,7 @@ action_load:
         call    menu_enter_filename
         ld      bc,$100C
         ld      (V_input_xy),bc
-        ld      hl,43300
+        ld      hl,V_load_filename
         ld      (V_42714),hl
         call    input_string
         di      
@@ -9639,14 +9639,14 @@ action_load:
         defb        T_SETXY,8,11
         defm        "SEARCHING"
         defb        T_END
-        ld      ix,43312
+        ld      ix,V_tapeheader
         ld      de,31   ;12 char filename, 7b money, 12b something else
         ld      a,255
         scf     
         call    load
         jr      nc,L9f0c                ; (116)
         call    L9f1a
-        ld      hl,43300
+        ld      hl,V_load_filename
         ld      b,12
 
 .L9ea0  ld      a,(hl)
@@ -9656,8 +9656,8 @@ action_load:
         djnz    L9ea0                   ; (-8)
         jr      L9ebe                   ; (20)
 
-.L9eaa  ld      hl,43312
-        ld      ix,43300
+.L9eaa  ld      hl,V_tapeheader
+        ld      ix,V_load_filename
         ld      b,12
 
 .L9eb3  ld      a,(hl)
@@ -9677,12 +9677,12 @@ action_load:
         scf     
         call    load
         jr      nc,L9efc                ; (33)
-        ld      hl,43324
+        ld      hl,V_tape_money
         ld      de,money
         ld      bc,7
         ldir    
-        ld      hl,43332
-        ld      de,D_cityname
+        ld      hl,D_43332
+        ld      de,SMC_cityname
         ld      bc,12
         ldir    
         ei      
@@ -9715,7 +9715,7 @@ action_load:
         defm        "FOUND :- "
         defb        T_END
 
-        ld      hl,43312
+        ld      hl,V_tapeheader
         ld      b,12
 .L9f2f  push    hl
         push    bc
@@ -10234,7 +10234,7 @@ action_difficulty:
 action_input_city_name:
 .La5b0  ld      hl,$0501
 .La5b3  ld      (V_input_xy),hl
-        ld      hl,D_cityname
+        ld      hl,SMC_cityname
         ld      (V_42714),hl
         ld      a,57
         ld      (SMC_42936+1),a
@@ -10588,189 +10588,28 @@ isnumber:
 
 ; Some 2x2 graphics here, stored by line - masked - transport characters?
 ;43140
-        nop     
-        nop     
-        nop     
-        ld      b,b
-        nop     
-        ret     nz
+transport_sprites:
+        BINARY      "assets/transport.spr"
+  
 
-        ld      bc,960
-        add     a,d
-        dec     b
-        ld      b,127
-        call    m,Lc49f
-        ld      hl,(1448)
-        ld      b,3
-        add     a,d
-        ld      bc,192
-        ret     nz
+V_load_filename:    defs    12,32          ;VAR 43300 - filename we want to load
 
-        nop     
-        ld      b,b
-        nop     
-        nop     
-        nop     
-        nop     
-        nop     
-        nop     
-        nop     
-        nop     
-        dec     b
-        jr      nz,La8ad                ; (2)
-        ld      e,b
-        inc     b
+; Tape header buffer for loading/saving
+; 
+; 12 bytes filename
+;
+;
+; 12 bytes city name at D_43332
+V_tapeheader:
+        defs    12             ;VAR 43312/a930
+V_tape_money:    defs    8               ;VAR 43324/
+   
 
-.La8ad  sub     b
-        inc     b
-        and     b
-        ld      a,(bc)
+D_43332:    defm        "HERESVILLE  "
         ld      c,b
-        ld      bc,1104
-        and     b
-        add     hl,bc
-        ld      b,b
-        dec     b
-        jr      nz,La8c5                ; (10)
-        add     a,b
-        inc     b
-        ld      b,b
-        ld      (bc),a
-        add     a,b
-        inc     b
-        nop     
-        nop     
-        nop     
-        nop     
 
-.La8c5  nop     
-        inc     b
-        nop     
-        inc     b
-        jr      nz,La8cd                ; (2)
-        ld      d,b
-        ld      a,(bc)
 
-.La8cd  ret     po
-
-        add     hl,bc
-        jr      nc,La8db                ; (10)
-        add     a,b
-        dec     b
-        ld      d,b
-        inc     c
-        and     b
-        dec     b
-        ld      b,b
-        ld      a,(bc)
-        jr      nz,La8dd                ; (2)
-
-.La8db  add     a,b
-        dec     b
-
-.La8dd  ld      b,b
-        ld      bc,0
-        add     a,b
-        nop     
-        nop     
-        nop     
-        nop     
-        ld      a,a
-        cp      213
-        ld      d,l
-        and     d
-        inc     hl
-        and     d
-        inc     hl
-        push    de
-        ld      d,l
-        ld      a,a
-        cp      0
-        nop     
-        nop     
-        nop     
-        nop     
-        nop     
-        nop     
-        nop     
-        nop     
-        nop     
-        nop     
-        nop     
-        nop     
-        nop     
-        nop     
-        nop     
-        nop     
-        nop     
-        inc     a
-        nop     
-        ld      e,d
-        nop     
-        ld      h,(hl)
-        nop     
-        ld      b,d
-        nop     
-        ld      h,(hl)
-        nop     
-        ld      e,d
-        nop     
-        ld      h,(hl)
-        nop     
-        ld      b,d
-        nop     
-        ld      h,(hl)
-        nop     
-        ld      e,d
-        nop     
-        ld      h,(hl)
-        nop     
-        ld      b,d
-        nop     
-        ld      h,(hl)
-        nop     
-        ld      e,d
-        nop     
-        ld      h,(hl)
-        nop     
-        inc     a
-        nop     
-        jr      nz,La946                ; (32)
-        jr      nz,La948                ; (32)
-        jr      nz,La94a                ; (32)
-        jr      nz,La94c                ; (32)
-        jr      nz,La94e                ; (32)
-        jr      nz,La950                ; (32)
-        jr      nz,La952                ; (32)
-        jr      nz,La954                ; (32)
-        jr      nz,La956                ; (32)
-        jr      nz,La958                ; (32)
-        jr      nz,La95a                ; (32)
-        jr      nz,La95c                ; (32)
-        nop     
-        nop     
-        nop     
-        nop     
-        nop     
-        nop     
-        nop     
-        nop     
-        ld      c,b
-        ld      b,l
-
-.La946  ld      d,d
-        ld      b,l
-
-.La948  ld      d,e
-        ld      d,(hl)
-
-.La94a  ld      c,c
-        ld      c,h
-
-.La94c  ld      c,h
-        ld      b,l
-
-.La94e  jr      nz,La970               ; (32)
+; End of tape header
 
 ; La950      
 ; At $a94e
@@ -10785,8 +10624,8 @@ minimaps:
 
 ; The UDGs for the images
 ; data of some description?
-
-        BINARY        "udgs.bin"
+; at 59472
+        BINARY        "assets/udgs.bin"
 
 
 V_tickcount:        defb    0       ;VAR 63236 - tickcount for taskswap
