@@ -40,9 +40,8 @@
         ld      (V_simulation_disabled),a
         xor     a
         ld      (V_kempston),a
-        ld      hl,32768
-
-; Test for kempston
+        ld      hl,32768    
+        ; Test for kempston
 .L5b2e  in      a,(31)
         cp      31
         jr      nc,L5b3e                ; (10)
@@ -464,9 +463,10 @@ get_random_number:
         sla     b
         sla     b
         ld      a,c
-        ld      (23971),a
+        ld      (SMC_23970+1),a
 .L5da0  push    bc
         push    hl
+SMC_23970:
         ld      b,2
 .L5da4  ld      a,(hl)
         xor     255
@@ -693,9 +693,9 @@ get_random_number:
 .L5ed3
         ld      e,(hl)
         ld      a,b
-        ld      (24313),a
+        ld      (SMC_24312+1),a
         ld      a,c
-        ld      (24327),a
+        ld      (SMC_24326+1),a
         ld      bc,(textxy)
         call    xypos
         ld      (textpos),hl
@@ -708,13 +708,15 @@ get_random_number:
 .L5ef3  push    bc
         ld      hl,textpos
         inc     (hl)
+SMC_24312:
         ld      a,65
-        cp      32                ;BUG BUG BUG!
+        cp      32
         call    nz,prudg
         pop     bc
         djnz    L5ef3                   ; (-15)
         ld      hl,textpos
         inc     (hl)
+SMC_24326:
         ld      a,66
         call    prudg
         ld      hl,textxy
@@ -762,7 +764,7 @@ SMC_cityname:
 ; 5f80
 .print_money  
         ld      bc,$0518
-        ld      hl,money
+        ld      hl,V_money
         call    prt24bit
         ret     
 
@@ -1195,7 +1197,7 @@ update_road_tile_for_traffic:
 .L64b5  push    hl
         push    de
         push    bc
-        ld      hl,(25865)
+        ld      hl,(V_25865)
         call    L7635           ;Get coords of address
         call    get_traffic_density_value
         ld      a,(hl)
@@ -1243,7 +1245,7 @@ V_tile_colour_offset:   defw    0       ;6505/25861 offset to colour for tiles
 .V_25863        defb    $1e, $25        ;VAR  6507/25863 coordinates of top left of view
 
 ;6509
-        defb    $00, $00
+V_25865:    defw    0       ;VAR 25865/6509
         
 ; draw level on screen?
 .draw_map
@@ -1260,7 +1262,7 @@ V_tile_colour_offset:   defw    0       ;6505/25861 offset to colour for tiles
         ld      a,(hl)
         cp      128
         call    nc,L655b                ;
-.L652b  ld      (25865),hl              ;Holds the map pointer?
+.L652b  ld      (V_25865),hl              ;Holds the map pointer?
         exx     
         ld      hl,udgs + 3296
         ld      (V_tile_colour_offset),hl
@@ -2513,8 +2515,8 @@ V_27984:    defb        1       ;VAR 6d50/27984
 .L6d6d  push    bc
         call    get_cost_for_zone
         ld      b,0
-        ld      hl,(money)
-        ld      a,(money+2)
+        ld      hl,(V_money)
+        ld      a,(V_money+2)
         ld      c,a
         call    l_sub24
         ld      a,c
@@ -2584,8 +2586,8 @@ D_zone_sizes:
         ld      a,c
         call    get_cost_for_zone
         ld      b,0
-        ld      hl,(money)
-        ld      a,(money+2)
+        ld      hl,(V_money)
+        ld      a,(V_money+2)
         ld      c,a
         call    l_sub24
         ld      a,c
@@ -2664,8 +2666,8 @@ get_cost_for_zone:
 .L6e46  push    hl
         push    bc
         ld      b,0
-        ld      hl,(money)
-        ld      a,(money+2)
+        ld      hl,(V_money)
+        ld      a,(V_money+2)
         ld      c,a
         call    l_sub24
         and     a
@@ -2674,9 +2676,9 @@ get_cost_for_zone:
         pop     hl
         scf     
         ret     
-.L6e5c  ld      (money),hl
+.L6e5c  ld      (V_money),hl
         ld      a,c
-        ld      (money+2),a
+        ld      (V_money+2),a
         pop     bc
         pop     hl
         or      a
@@ -2973,8 +2975,9 @@ zone_action_jump_table:
         inc     hl
         ld      h,(hl)
         ld      l,a
-        ld      (28736),hl          ;store the address following
-        call    0
+        ld      (SMC_28735+1),hl          ;store the address following
+SMC_28735:
+        call    0               ;TODO: Why not just call  jp(hl)
 
 .L7042  ld      a,(keystore+1)
         and     1       ;'A'
@@ -3291,13 +3294,14 @@ L721e:
         ld      d,(hl)
         inc     hl
         ld      a,(hl)
-        ld      (29271),a
+        ld      (SMC_29270+1),a
         ld      a,0
         ld      (V_28510),a
         call    L6f5f
         ret     nc
 
         ld      a,(V_neighbour_tile_to_check)
+SMC_29270:
         add     a,11
         ld      (V_28510),a
         call    L6f5f
@@ -3637,7 +3641,7 @@ default_nuclear_power_station_tiles:
 
 action_zone_power_station:
         ld      de,3000         ;Do we actually have 3000?
-        ld      hl,(money)
+        ld      hl,(V_money)
         and     a
         sbc     hl,de
         ret     c
@@ -4455,7 +4459,7 @@ place_fallout:
         xor     a
         ld      (V_meltdown_triggered),a
         ld      a,69
-        ld      (35224),a
+        ld      (V_35224),a
         ld      hl,(V_map_iter_addr)
         call    L7b86
         ld      hl,(V_map_iter_xy)
@@ -4535,7 +4539,7 @@ V_31127:    defb    0       ;VAR 31127/7997
         call    get_random_number
         and     7
         jr      nz,L79ea                ; (56)
-        ld      hl,(33954)
+        ld      hl,(V_33954)
         ld      a,h
         sub     b
         jr      z,L79be                 ; (5)
@@ -4778,13 +4782,12 @@ show_mini_maps:
 
 .L7b99  ld      a,(ix+0)
         and     7
-        ld      (31653),a
+        ld      (SMC_31652+1),a
         ld      b,a
-
 .L7ba2  push    ix
+SMC_31652:
         ld      c,0
-
-.L7ba6  ld      a,(35224)
+.L7ba6  ld      a,(V_35224)
         ld      (ix+0),a
         inc     ix
         dec     c
@@ -4808,12 +4811,11 @@ show_mini_maps:
 
 .L7bce  ld      a,(ix+0)
         and     7
-        ld      (31706),a
+        ld      (SMC_31705+1),a
         ld      b,a
-
 .L7bd7  push    ix
+SMC_31705:
         ld      c,0
-
 .L7bdb  ld      a,58
         ld      (ix+0),a
         inc     ix
@@ -4825,29 +4827,20 @@ show_mini_maps:
         djnz    L7bd7                   ; (-23)
         ret     
 
-        add     hl,bc
-        add     hl,bc
-        ld      (bc),a
-        add     hl,bc
-        add     hl,bc
-        add     hl,bc
-        ld      (bc),a
-        ld      bc,2306
-        ld      (bc),a
-        ld      bc,257
-        ld      (bc),a
-        add     hl,bc
-        ld      (bc),a
-        ld      bc,2306
-        add     hl,bc
-        add     hl,bc
-        ld      (bc),a
-        add     hl,bc
-        add     hl,bc
-        rrca    
+
+; Represents the influence of police/fire station
+D_31727:
+        defb    $09, $09, $02, $09, $09 
+        defb    $09, $02, $01, $02, $09
+        defb    $02, $01, $01, $01, $02 
+        defb    $09, $02, $01, $02, $09 
+        defb    $09, $09, $02, $09, $09
+
+
+V_31752:    defb        0       ;VAR 31752/7c08
 
 .L7c09  ld      bc,(V_map_iter_xy)
-        ld      ix,31727
+        ld      ix,D_31727
         call    L7591           ;Fire map
         ld      de,50
         and     a
@@ -4867,10 +4860,10 @@ show_mini_maps:
         jr      nz,L7c1c                ; (-20)
         ret     
 
-        rrca    
+V_31793:    defb    0       ;VAR 31793/7c31
 
 .L7c32  ld      bc,(V_map_iter_xy)
-        ld      ix,31727
+        ld      ix,D_31727
         call    L7589           ;Get police minimap address
         ld      de,50           ;Go 8 tiles up and two left??
         and     a
@@ -4891,10 +4884,10 @@ show_mini_maps:
         ret     
 
 
-.L7c5a  ld      a,(31793)
+.L7c5a  ld      a,(V_31793)
         jr      L7c62                   ; (3)
 
-.L7c5f  ld      a,(31752)
+.L7c5f  ld      a,(V_31752)
 
 .L7c62  ld      b,(ix+0)
         dec     b
@@ -4927,7 +4920,8 @@ D_31863:
         defb    $09, $05, $01, $01, $05, $09
         defb    $09, $09, $05, $05, $09, $09
         defb    $09, $09, $09, $09, $09, $09
-        defb    $ff
+
+V_31935:    defb    $ff       ;VAR 31935/7cbf
 
 
 .L7cc0  ld      bc,(V_map_iter_xy)
@@ -4953,7 +4947,7 @@ D_31863:
         ret     
 
 
-.L7ce8  ld      a,(31935)
+.L7ce8  ld      a,(V_31935)
         ld      b,(ix+0)
         dec     b
         jr      z,L7cf5                 ; (4)
@@ -5127,7 +5121,7 @@ V_zone_size_to_scan:    defw    0       ;VAR 32045/7d2d - size of zone to scan
         ret     
 
 
-.L7e03  ld      hl,(33954)
+.L7e03  ld      hl,(V_33954)
         ld      a,h
         sub     b
         jp      p,L7e0d
@@ -5194,9 +5188,9 @@ V_32284:    defb        0       ;VAR 32284/7e1c
         xor     a
         ret     
 
-        nop     
+        nop
 
-V_32631:    defb    0       ;VAR 32361/7e69
+V_32361:    defb    0       ;VAR 32361/7e69
 
 .L7e6a  ld      bc,(V_map_iter_xy)
         call    L7589
@@ -5427,7 +5421,7 @@ generate_power_map:
 
 .L7ffd  ld      (V_32793),de              ;Power available
         call    L7635
-        ld      (32791),bc              ;Current coordinates
+        ld      (V_32791),bc              ;Current coordinates
         push    ix
         call    L811d                   ;Start tracing the connections
         pop     ix
@@ -5436,9 +5430,9 @@ generate_power_map:
         jr      L7fe5                   ; (-48)
 
 ;8015
-        defw    0
-        defw    0
-
+V_32789:        defb    0       ;VAR 32789/8015
+V_32790:        defb    0       ;VAR 32790/8016
+V_32791:        defw    0       ;VAR 32791/8017
 V_32793: defw    0          ;VAR 32793/8019 - power available from power station we are processing
 V_powersp:  defw    0       ;VAR 32795/801b - saved stack when aborting power search 
 
@@ -5452,7 +5446,7 @@ V_powerqueue:   defs    256 ;VAR 32797/801c - list of coordinates to check for p
         ld      (V_powersp),sp
         ld      bc,$ffff        ;Place an endmarker
         call    L8177          
-        ld      bc,(32791)      ;Current coordinate we're dealing with
+        ld      bc,(V_32791)      ;Current coordinate we're dealing with
         call    L8177
 .L8136  call    L818f           ;Get next cell 
         ld      a,b             ;Check if we're at the end
@@ -5467,15 +5461,15 @@ V_powerqueue:   defs    256 ;VAR 32797/801c - list of coordinates to check for p
         call    check_tile_needs_power
         jr      nz,L8136                ;Power not needed, go get next starting point
         xor     a
-        ld      (32789),a           ;Down power check indicator
-        ld      (32790),a           ;Up power check indicator
+        ld      (V_32789),a           ;Down power check indicator
+        ld      (V_32790),a           ;Up power check indicator
 .L8152  call    set_tile_as_powered ;Turns power on for tile
         dec     b                   ;Up a row
-        ld      hl,32789
+        ld      hl,V_32789
         call    L816d
         inc     b                   ;And then below
         inc     b
-        ld      hl,32790
+        ld      hl,V_32790
         call    L816d
         dec     b                   ;And then to the right
         inc     c
@@ -5623,8 +5617,8 @@ calculate_city_score:
         ld      (V_city_score+2),a
         ret     
 
-        nop     
-        nop     
+V_33381:    defw    0       ;VAR 33381/8265 - unemployment?
+
 
 ; (Res-(Com+Ind))*4
 set_unemployment:
@@ -5637,15 +5631,14 @@ set_unemployment:
         sbc     hl,de
         add     hl,hl
         add     hl,hl
-        ld      (33381),hl      ;unemployment
+        ld      (V_33381),hl      ;unemployment
         ret     
 
-        nop     
-        nop     
-        nop     
-        nop     
-        nop     
-        nop     
+
+V_33404:    defw    0       ;VAR 33404/827c
+V_33406:    defw    0       ;VAR 33406/827e
+V_33408:    defw    0       ;VAR 33408/8280
+
 
 .L8282  ld      de,(V_ComZPop)
         ld      hl,(V_IndZPop)
@@ -5664,7 +5657,7 @@ set_unemployment:
         add     hl,de
         ld      de,-26
         add     hl,de
-        ld      (33404),hl
+        ld      (V_33404),hl
 
         ld      de,(V_ResZPop)
         ld      hl,(V_IndZPop)
@@ -5685,7 +5678,7 @@ set_unemployment:
         add     hl,de
         ld      de,-30
         add     hl,de
-        ld      (33406),hl  ;(airport *4) + ((((res + ind) / 2) - com) * 8) - 30
+        ld      (V_33406),hl  ;(airport *4) + ((((res + ind) / 2) - com) * 8) - 30
 
         ld      de,(V_ComZPop)
         ld      hl,(V_ResZPop)
@@ -5706,7 +5699,7 @@ set_unemployment:
         add     hl,de
         ld      de,-30
         add     hl,de
-        ld      (33408),hl
+        ld      (V_33408),hl
         ret     
 
 
@@ -5746,27 +5739,27 @@ initialise_simulation_variables:
         ld      c,0
         ld      h,78
         ld      l,32        ;20000
-        ld      (money),hl
+        ld      (V_money),hl
         ld      a,c
-        ld      (money+2),a
+        ld      (V_money+2),a
         ld      a,(V_difficulty)
         and     a
         ret     z
         ld      c,0
         ld      h,39
         ld      l,16        ;10000
-        ld      (money),hl
+        ld      (V_money),hl
         ld      a,c
-        ld      (money+2),a
+        ld      (V_money+2),a
         ld      a,(V_difficulty)
         cp      1
         ret     z
         ld      c,0
         ld      h,19
         ld      l,136        ;5000
-        ld      (money),hl
+        ld      (V_money),hl
         ld      a,c
-        ld      (money+2),a
+        ld      (V_money+2),a
         ret     
 
         nop     
@@ -5804,7 +5797,7 @@ start_simulation:
 
 ; Initialises the simulation variables
 .L83a1  ld      hl,8224
-        ld      (33954),hl
+        ld      (V_33954),hl
         ld      hl,minimaps
         ld      de,minimaps+1
         ld      bc,6911
@@ -5814,16 +5807,16 @@ start_simulation:
         ld      (V_35013),a
         ld      (V_35074),a
         ld      a,15
-        ld      (31793),a
-        ld      (31752),a
+        ld      (V_31793),a
+        ld      (V_31752),a
         xor     a
-        ld      (36610),a
-        ld      (36609),a
+        ld      (V_36610),a
+        ld      (V_36609),a
         ld      (V_34074),a
         ld      (V_sim_loop_counter),a
         ld      (V_wait_for_budget_confirm),a
-        ld      (36655),a
-        ld      (36656),a
+        ld      (V_hospital_demand),a
+        ld      (V_church_demand),a
         ld      (V_30678),a
         ld      (V_30841),a
         ld      (V_30845),a
@@ -5837,14 +5830,14 @@ start_simulation:
         ld      (V_Transport_Funding_Allocated),hl
         ld      (V_Police_Funding_Allocated),hl
         ld      (V_Fire_Funding_Allocated),hl
-        ld      (33381),hl
-        ld      (36611),hl
+        ld      (V_33381),hl
+        ld      (V_36611),hl
         ld      (V_safe_AirportPop),hl
         ld      (V_safe_NuclearPop),hl
         ld      (V_33948),hl
-        ld      (33404),hl
-        ld      (33406),hl
-        ld      (33408),hl
+        ld      (V_33404),hl
+        ld      (V_33406),hl
+        ld      (V_33408),hl
         ld      c,0
         ld      h,0
         ld      l,0
@@ -5930,19 +5923,20 @@ V_33948:     defw    0           ;VAR 33948/8e9c
 V_safe_AirportPop:        defw    0           ;VAR 33950/849e - 
 V_safe_NuclearPop:        defw    0           ;VAR 33952/849e - 
 
-;33954
-        jr      nz,L84c4                ; (32)
+;V_33954
+V_33954:    defw $20, $20       ;VAR 33954/84a2
+
 
 .L84a4  ld      a,(V_34760)
         ld      hl,V_34760+1
         add     a,(hl)
         srl     a
-        ld      (33954),a
+        ld      (V_33954),a
         ld      a,(V_34760+2)
         ld      hl,V_34760+3
         add     a,(hl)
         srl     a
-        ld      (33955),a
+        ld      (V_33954+1),a
         ld      hl,(V_33918)
         ld      (V_33948),hl
         ld      hl,(V_NuclearPop)
@@ -6063,7 +6057,7 @@ V_34153:    defb    0       ;VAR 34153/8569
         and     6
         ld      (V_34153),a
         xor     a
-        ld      (30461),a
+        ld      (V_30461),a
         call    L76fe
         call    L85d6
         ret     c
@@ -6095,7 +6089,7 @@ V_34153:    defb    0       ;VAR 34153/8569
 
 .L85b5  ld      (hl),a
         ld      a,5
-        ld      (31935),a
+        ld      (V_31935),a
         ld      ix,31899
         call    L7cc8
         jr      L859f                   ; (-37)
@@ -6653,7 +6647,7 @@ V_35074:    defb    0       ;VAR 35704/8902
         or      l
         jr      z,L8956                 ; (8)
         ld      a,64
-        ld      (31935),a
+        ld      (V_31935),a
         jp      L7cc0
 
 .L8956  ld      hl,(V_map_iter_addr)
@@ -6681,10 +6675,10 @@ place_dirt:
         cp      b
         jr      c,L8956                 ; (-36)
         ld      a,69
-        ld      (35224),a
+        ld      (V_35224),a
         xor     a
 
-.L8980  ld      (35225),a
+.L8980  ld      (V_35225),a
         jr      L899b                   ; (22)
 
 V_35205:  defb    $32         ;VAR 8985/35205
@@ -6696,17 +6690,16 @@ V_35205:  defb    $32         ;VAR 8985/35205
         jr      z,place_dirt                 ; (-49)
         dec     (hl)
         ld      a,68
-        ld      (35224),a
-        ld      (35225),a
+        ld      (V_35224),a
+        ld      (V_35225),a
         jr      L899b                   ; (3)
 
-
-        nop     
-        nop     
-        nop     
+V_35224:    defb    0       ;VAR 35224/8998
+V_35225:    defb    0       ;VAR 35225/8999
+V_35226:    defb    0       ;VAR 35226/899a
 
 .L899b  xor     a
-        ld      (35226),a
+        ld      (V_35226),a
         ld      e,4
 .L89a1  push    de
         ld      bc,(V_map_iter_xy)
@@ -6715,7 +6708,7 @@ V_35205:  defb    $32         ;VAR 8985/35205
         call    L76ed               ;Move coords in direction
         call    levelmap_xypos
         jr      nc,L89d3                ; (35)
-        ld      a,(35225)
+        ld      a,(V_35225)
         and     a
         jr      nz,L89c2                ; (12)
         ld      a,(hl)
@@ -6724,9 +6717,9 @@ V_35205:  defb    $32         ;VAR 8985/35205
         call    tile_to_flags
         bit     7,a
         jr      z,L89d3                 ; (17)
-.L89c2  ld      a,(35226)
+.L89c2  ld      a,(V_35226)
         inc     a
-        ld      (35226),a
+        ld      (V_35226),a
         call    get_random_number
         and     7
         jr      nz,L89d3                ; (3)
@@ -6734,19 +6727,19 @@ V_35205:  defb    $32         ;VAR 8985/35205
 .L89d3  pop     de
         dec     e
         jr      nz,L89a1                ; (-54)
-        ld      a,(35225)
+        ld      a,(V_35225)
         and     a
         ret     nz
         call    get_random_number
         and     3
         ret     nz
-        ld      a,(35226)
+        ld      a,(V_35226)
         and     a
         jp      z,L8956
         ret     
 
 
-.L89ea  ld      a,(35225)
+.L89ea  ld      a,(V_35225)
         and     a
         jr      z,L89f3                 ; (3)
         ld      a,(hl)
@@ -6760,7 +6753,7 @@ V_35205:  defb    $32         ;VAR 8985/35205
         cpir    
         pop     hl
         ret     z
-        ld      a,(35224)
+        ld      a,(V_35224)
         ld      (hl),a
         ret     
 
@@ -6892,7 +6885,7 @@ D_35336:
         ld      (V_34398),hl
         call    L856a                   ;Some transport check?
 .L8ada  call    L7cfe
-        ld      hl,(33404)
+        ld      hl,(V_33404)
         ld      (V_32450),hl
         call    L7f12
         ld      a,(V_34921)
@@ -6907,10 +6900,10 @@ D_35336:
         jp      L8a70
 
 
-.L8afe  ld      a,(36655)
+.L8afe  ld      a,(V_hospital_demand)
         and     a
         jr      nz,L8b17                ; (19)
-        ld      a,(36656)
+        ld      a,(V_church_demand)
         and     a
         jr      nz,L8b27                ; (29)
         xor     a
@@ -6921,7 +6914,7 @@ D_35336:
         jp      L75b0
 
 .L8b17  xor     a
-        ld      (36655),a
+        ld      (V_hospital_demand),a
         ld      bc,(V_map_iter_xy)
         dec     b
         dec     c
@@ -6929,7 +6922,7 @@ D_35336:
         jp      L75b0
 
 .L8b27  xor     a
-        ld      (36656),a
+        ld      (V_church_demand),a
         ld      bc,(V_map_iter_xy)
         dec     b
         dec     c
@@ -6961,7 +6954,7 @@ L8b37:
         ld      (V_34398),hl
         call    L856a
 .L8b6c  call    L7cfe
-        ld      a,(33404)
+        ld      a,(V_33404)
         ld      (V_32450),a
         call    L7f12
         call    get_random_number
@@ -7003,15 +6996,10 @@ sim_place_zone_3x3:
         ld      bc,$0303
         jp      place_zone_direct
 
-
-        nop     
-        nop     
-        ld      bc,257
-        ld      (bc),a
-        ld      (bc),a
-        inc     bc
-        inc     bc
-        inc     bc
+D_35770:
+        defb    00 00 01 01 01 02
+        defb     02 03 03 03
+        
 
 .L8bc4  ld      hl,(V_ComZPop)
         inc     hl
@@ -7051,7 +7039,7 @@ L8be0:
         ld      (V_34398),hl
         call    L856a
 .L8c0c  call    L7cfe
-        ld      hl,(33406)
+        ld      hl,(V_33406)
         ld      (V_32450),hl
         call    L7f45
         call    get_random_number
@@ -7068,7 +7056,7 @@ L8be0:
         dec     a
         ld      c,a
         ld      b,0
-        ld      hl,35770
+        ld      hl,D_35770
         add     hl,bc
         ld      a,(hl)
         ld      bc,(V_map_iter_xy)
@@ -7129,7 +7117,7 @@ L8c77:
         ld      (V_34398),hl
         call    L856a
 
-.L8ca3  ld      hl,(33408)
+.L8ca3  ld      hl,(V_33408)
         ld      (V_32450),hl
         xor     a
         ld      (V_32447),a
@@ -7154,7 +7142,7 @@ L8c77:
 .L8cd5  ld      a,(V_32605)
         add     a,a
         add     a,a
-        ld      (31935),a
+        ld      (V_31935),a
         jp      L7cc0
 
 .L8ce0  push    af
@@ -7202,7 +7190,7 @@ L8d0b:
         ld      (V_34152),a
         call    L7ec4
         ld      a,255
-        ld      (31935),a
+        ld      (V_31935),a
         jp      L7cc0
 
 DoNuclear:
@@ -7223,7 +7211,7 @@ L8d2f:
         call    L7ec4
         call    place_fallout
         ld      a,48
-        ld      (31935),a
+        ld      (V_31935),a
         jp      L7cc0
 
 DoPolice:
@@ -7368,7 +7356,7 @@ L8e10:
         jr      z,L8e4a                 ; (3)
         ld      (V_PortPop),hl
 .L8e4a  ld      a,96
-        ld      (31935),a
+        ld      (V_31935),a
         jp      L7cc0
 
 DoAirport:
@@ -7458,23 +7446,25 @@ V_population:   defb    0,0,0   ;VAR 8e90/36496 - population
 .L8eef  ld      hl,(V_money_after_budget)
         ld      a,(V_money_after_budget+2)
         ld      c,a
-        ld      (money),hl
+        ld      (V_money),hl
         ld      a,c
-        ld      (money+2),a
+        ld      (V_money+2),a
         call    L952a
         ret     
 
-        nop     
-        nop     
-        nop     
-        nop     
+
+V_36609:    defb    0       ;VAR 36609/8f01 - crime concern
+V_36610:    defb    0       ;VAR 36610/8f01 - house price concern
+
+V_36611:    defw    0       ;VAR 36611/8f03 
+
 
 .L8f05  ld      hl,(V_33902)
         ld      de,(V_33904)
         call    L_div16x16
         ld      a,l
         add     a,a
-        ld      (36609),a       ;Police factor
+        ld      (V_36609),a       ;Police factor
         ld      hl,(V_33906)
         ld      de,(V_33908)
         call    L_div16x16
@@ -7482,18 +7472,19 @@ V_population:   defb    0,0,0   ;VAR 8e90/36496 - population
         srl     a
         srl     a
         srl     a
-        ld      (36610),a       ;House price concern
+        ld      (V_36610),a       ;House price concern
         ld      hl,(V_33890)
-        ld      (36611),hl
+        ld      (V_36611),hl
         ret     
 
-        nop     
-        nop     
+
+V_hospital_demand:    defb    0       ;VAR 36655/8f2f - hopsital demand
+V_church_demand:    defb    0       ;VAR 36656/8f30 - church demand
 
 ; Determine if we need a hospital or church
 census_church_hosp:
 .L8f31  xor     a
-        ld      (36655),a
+        ld      (V_hospital_demand),a
         ld      hl,(V_ResZPop)
         ld      a,18
         call    L_div_hl_a
@@ -7503,10 +7494,10 @@ census_church_hosp:
         bit     7,h
         jr      nz,L8f4c                ; (4)
         ld      a,l
-        ld      (36655),a       ;hospital demand
+        ld      (V_hospital_demand),a       ;hospital demand
 
 .L8f4c  xor     a
-        ld      (36656),a
+        ld      (V_church_demand),a
         ld      hl,(V_ResZPop)
         ld      a,20
         call    L_div_hl_a
@@ -7516,7 +7507,7 @@ census_church_hosp:
         bit     7,h
         ret     nz
         ld      a,l
-        ld      (36656),a       ;church demand
+        ld      (V_church_demand),a       ;church demand
         ret     
 
 ; Setup the simulation speed
@@ -7641,7 +7632,7 @@ V_36767:      defb  0       ;VAR 36767 - tick counter for ui thread
 
 .V_36950        defw        0        ;VAR - unknown
 
-.L9058  ld      de,(money)
+.L9058  ld      de,(V_money)
         ld      hl,(V_36950)
         and     a
         sbc     hl,de
@@ -7835,7 +7826,7 @@ show_budget:
         ld      (V_simulation_disabled),a
         call    L9329
         call    L9358
-        ld      hl,37702
+        ld      hl,37702        ;TODO - in budget screen
 
 .L91a2  ld      (V_26496),hl
         ld      ix,text_budget
@@ -8208,8 +8199,8 @@ V_money_after_budget:            defb    0,0,0           ;VAR 37670/9326 money a
 
         nop     
 
-.L9358  ld      hl,(money)
-        ld      a,(money+2)
+.L9358  ld      hl,(V_money)
+        ld      a,(V_money+2)
         ld      c,a
         ld      (V_previous_money),hl
         ld      a,c
@@ -8263,8 +8254,8 @@ V_money_after_budget:            defb    0,0,0           ;VAR 37670/9326 money a
         ld      (V_cashflow),hl
         ld      a,c
         ld      (V_cashflow+2),a
-        ld      hl,(money)
-        ld      a,(money+2)
+        ld      hl,(V_money)
+        ld      a,(V_money+2)
         ld      c,a
         ld      de,(V_expenditure)
         ld      a,(V_expenditure+2)
@@ -8279,9 +8270,8 @@ V_money_after_budget:            defb    0,0,0           ;VAR 37670/9326 money a
         ld      (V_money_after_budget+2),a
         ret     
 
-        nop     
-        nop     
-        nop     
+V_37878:    defb   0,0,0       ;VAR 37878/93f6
+
 
 .L93f9  ld      hl,(V_previous_money)
         ld      a,(V_previous_money+2)
@@ -8290,17 +8280,17 @@ V_money_after_budget:            defb    0,0,0           ;VAR 37670/9326 money a
         ld      a,(V_tax_collected+2)
         ld      b,a
         call    l_add24
-        ld      (37878),hl
+        ld      (V_37878),hl
         ld      a,c
-        ld      (37880),a
+        ld      (V_37878+2),a
         ld      de,(V_Transport_Funding_Allocated)
         ld      b,0
         call    l_sub24
         bit     7,c
         ret     z
 
-        ld      hl,(37878)
-        ld      a,(37880)
+        ld      hl,(V_37878)
+        ld      a,(V_37878+2)
         ld      c,a
         ld      (V_Transport_Funding_Allocated),hl
         ret     
@@ -8316,17 +8306,17 @@ V_money_after_budget:            defb    0,0,0           ;VAR 37670/9326 money a
         ld      de,(V_Transport_Funding_Allocated)
         ld      b,0
         call    l_sub24
-        ld      (37878),hl
+        ld      (V_37878),hl
         ld      a,c
-        ld      (37880),a
+        ld      (V_37878+2),a
         ld      de,(V_Police_Funding_Allocated)
         ld      b,0
         call    l_sub24
         bit     7,c
         ret     z
 
-        ld      hl,(37878)
-        ld      a,(37880)
+        ld      hl,(V_37878)
+        ld      a,(V_37878+2)
         ld      c,a
         ld      (V_Police_Funding_Allocated),hl
         ret     
@@ -8345,17 +8335,17 @@ V_money_after_budget:            defb    0,0,0           ;VAR 37670/9326 money a
         ld      de,(V_Police_Funding_Allocated)
         ld      b,0
         call    l_sub24
-        ld      (37878),hl
+        ld      (V_37878),hl
         ld      a,c
-        ld      (37880),a
+        ld      (V_37878+2),a
         ld      de,(V_Fire_Funding_Allocated)
         ld      b,0
         call    l_sub24
         bit     7,c
         ret     z
 
-        ld      hl,(37878)
-        ld      a,(37880)
+        ld      hl,(V_37878)
+        ld      a,(V_37878+2)
         ld      c,a
         ld      (V_Fire_Funding_Allocated),hl
         ret     
@@ -8456,7 +8446,7 @@ D_38170:
         add     hl,bc
         ld      a,(hl)
 
-.L9586  ld      (31793),a
+.L9586  ld      (V_31793),a
         ld      a,15
         ld      hl,(V_Transport_Funding_Requested)
         ld      de,20
@@ -8479,7 +8469,7 @@ D_38170:
         add     hl,bc
         ld      a,(hl)
 
-.L95b4  ld      (31752),a
+.L95b4  ld      (V_31752),a
         ret     
 
 ; Evaluation?
@@ -8676,7 +8666,7 @@ print_evaluation_concerns:
         ld      de,(V_38913)
         add     hl,de
         ld      (V_38913),hl
-        ld      a,(36609)           ;Crime concern
+        ld      a,(V_36609)           ;Crime concern
         srl     a
         srl     a
         ld      l,a
@@ -8722,7 +8712,7 @@ print_evaluation_concerns:
         ld      de,(V_38913)
         add     hl,de
         ld      (V_38913),hl
-        ld      a,(36610)           ;House prices concern
+        ld      a,(V_36610)           ;House prices concern
         ld      l,a
         ld      h,0
         call    ckpercent
@@ -8733,7 +8723,7 @@ print_evaluation_concerns:
         ld      de,(V_38913)
         add     hl,de
         ld      (V_38913),hl
-        ld      hl,(33381)          ;Unemployment concern
+        ld      hl,(V_33381)          ;Unemployment concern
         call    ckpercent
         push    hl
         ld      bc,$0d1b
@@ -8839,7 +8829,7 @@ print_mayor_rating:
         ld      hl,V_mayor_rating
         jr      L9954                   ; (3)
 
-.L9951  ld      hl,39216
+.L9951  ld      hl,V_mayor_rating+1
 .L9954  inc     (hl)
         djnz    L9939                   ; (-30)
         ld      a,(V_mayor_rating)       ;Yes good job
@@ -9075,7 +9065,7 @@ SendMessages:
         ld      a,h
         or      l
         jr      z,L9b03                 ; (10)
-        ld      a,(31752)
+        ld      a,(V_31752)
         cp      15
         ld      a,14
         jp      nz,set_alert_message
@@ -9084,7 +9074,7 @@ SendMessages:
         ld      a,h
         or      l
         jr      z,L9b14                 ; (10)
-        ld      a,(31793)
+        ld      a,(V_31793)
         cp      15
         ld      a,15
         jp      nz,set_alert_message
@@ -9104,7 +9094,7 @@ SendMessages:
         cp      60
         ld      a,19
         call    nc,set_alert_message
-        ld      a,(36609)
+        ld      a,(V_36609)
         cp      20
 
 .L9b3a  ld      a,20
@@ -9283,12 +9273,13 @@ V_minimap_section:    defb        0       ;VAR 9c2b/39979 - selected minimap qua
 
         nop     
         nop     
-        nop     
-        nop     
+
+V_39982:        defw    0       ;VAR 39982/9c2e
 
 V_39984:        defb    0       ;VAR 39984/9c30
 V_minimap_xy:    defw    0       ;VAR 9c31/39985 - xypos in minimap being printed
 
+V_39986:        defb    0       ;VAR 39986/9c32
 
 ; Address within the levelmap that 0-8 keys correspond to
 
@@ -9337,15 +9328,15 @@ D_minimap_offsets:
         ld      b,(hl)
         inc     hl
         ld      c,(hl)
-        ld      (39982),bc
+        ld      (V_39982),bc
         ld      a,b
-        ld      (39986),a
+        ld      (V_39986),a
         ex      de,hl
         ld      b,48
 
 .L9c86  ld      de,(SMC_39894+1)
         push    de
-        ld      a,(39982)
+        ld      a,(V_39982)
         ld      (V_minimap_xy),a
         ld      c,48
 
@@ -9356,7 +9347,7 @@ D_minimap_offsets:
         cp      128
         call    nc,L655b
 
-.L9c9f  ld      (25865),hl
+.L9c9f  ld      (V_25865),hl
         exx     
         call    L9bc3                   ;Mark traffic on the map
         ld      c,33                    ;White paper, blue ink
@@ -9392,9 +9383,9 @@ D_minimap_offsets:
         add     hl,de
         xor     a
         ld      (V_current_zone_width_to_print),a
-        ld      a,(39986)
+        ld      a,(V_39986)
         inc     a
-        ld      (39986),a
+        ld      (V_39986),a
         push    hl
         push    bc
         call    twiddlekeys
@@ -9501,7 +9492,7 @@ minimap_return:
         ret     
 
 ; Think this one is crime...
-.L9d7f  ld      hl,(25865)
+.L9d7f  ld      hl,(V_25865)
         ld      a,(hl)
         call    tile_to_flags
         bit     4,a
@@ -9542,7 +9533,7 @@ minimap_return:
 
 .do_minimap_transport  
 .L9dc4
-        ld      hl,(25865)
+        ld      hl,(V_25865)
         ld      a,(hl)
         call    tile_to_flags
         and     6
@@ -9589,7 +9580,7 @@ action_save:
         ld      (V_42714),hl  ;destination for string
         call    input_string
         call    save_and_wait_for_keypress
-        ld      hl,money
+        ld      hl,V_money
         ld      de,V_tape_money
         ld      bc,7
         ldir    
@@ -9669,7 +9660,7 @@ action_load:
         call    load
         jr      nc,L9efc                ; (33)
         ld      hl,V_tape_money
-        ld      de,money
+        ld      de,V_money
         ld      bc,7
         ldir    
         ld      hl,D_43332
@@ -10349,7 +10340,7 @@ input_entry:
         ld      (42735),hl
         jr      La75d                   ; (56)
 
-.La725  ld      hl,42850
+.La725  ld      hl,La76d
         push    hl
         ld      a,(keystore)
         and     1       ;'SHIFT'
@@ -10597,7 +10588,6 @@ V_tape_money:    defs    8               ;VAR 43324/
    
 
 D_43332:    defm        "HERESVILLE  "
-        ld      c,b
 
 
 ; End of tape header
