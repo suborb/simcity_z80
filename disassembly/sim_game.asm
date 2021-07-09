@@ -2800,8 +2800,8 @@ D_28371:
 .L6f0e  pop     bc
         ret     
 
-V_28443:    defb        0   ;VAR 28432/6f10
-V_28444:    defb        0   ;VAR 28433/6f11
+V_28432:    defb        0   ;VAR 28432/6f10
+V_28433:    defb        0   ;VAR 28433/6f11
 
 .L6f12  push    bc
         call    levelmap_xypos_with_check
@@ -2943,11 +2943,11 @@ zone_action_jump_table:
         defw    action_zone_park        ;$D4, $73
         defw    action_zone_residential ;$FA, $73
         defw    action_zone_commercial  ;$14, $74
-        defb    action_zone_industrial  ;$2E, $74
+        defw    action_zone_industrial  ;$2E, $74
         defw    action_zone_police      ;$48, $74
         defw    action_zone_fire        ;$62, $74, 
         defw    action_zone_stadium     ;$83, $74 
-        defb    action_zone_power_station   ;$B4, $74
+        defw    action_zone_power_station   ;$B4, $74
         defw    action_zone_seaport     ;$F6, $74, 
         defw    action_zone_airport     ;$2B, $75
 
@@ -5221,7 +5221,7 @@ V_32361:    defb    0       ;VAR 32361/7e69
 
 V_32410:    defb        0       ;VAR 32410/7e9a
 
-.L7e9b  ld      a,(L91e4)           ;Tax concern
+.L7e9b  ld      a,(SMC_tax_rate)           ;Tax rate
         ld      b,a
         add     a,a
         add     a,a
@@ -5238,7 +5238,7 @@ V_32410:    defb        0       ;VAR 32410/7e9a
         cp      2
         ret     z
 
-        ld      a,V_(32410)
+        ld      a,(V_32410)
         add     a,b
         ld      (V_32410),a
         ret     
@@ -6997,8 +6997,8 @@ sim_place_zone_3x3:
         jp      place_zone_direct
 
 D_35770:
-        defb    00 00 01 01 01 02
-        defb     02 03 03 03
+        defb    $00, $00, $01, $01, $01, $02
+        defb    $02, $03, $03, $03
         
 
 .L8bc4  ld      hl,(V_ComZPop)
@@ -7543,7 +7543,7 @@ D_8f6c:
 
 ; We have a few variables here 7 I think
 
-money:        defb  0,0,0   ; VAR - money!! - 8f99
+V_money:       defb  0,0,0   ; VAR - money!! - 8f99
 V_month:     defb  0       ; VAR 36763 (8f9b) - Month
 V_year:      defw  1902    ; VAR 36764 (8f9c) - Year
 V_8f9e:      defb  0       ;VAR 36766/8f9e
@@ -7843,19 +7843,19 @@ show_budget:
         defb     $00, $00
         defm    "         FISCAL BUDGE"
         defb    'T' + 128
-        defb    $03
-        defw    0    ;5408 TODO
+        defb    $03, $08
         defm    "TAX RATE!  "
-        defb    $07, $01, $07
-        defw    0   ;a514  TODO
-        defb    $03
-        defb    $00
-        defb    $54
+        defb    $07, $01
+
+        ;@91e4
+SMC_tax_rate:
+        defb    $07, $14
+        defb    '%' + $80
+        defb    $03, $00
         defm    "TAX COLLECTED      "
         defb    '$' + 128
-        defb    $03
-        defb    $00, $a0
-        defb    $00
+        defb    $03, $00
+        defb    $a0, $00
         defm    "       AMOUNT  AMOUNT    FUN"
         defb    'D' + 128
         defb    $00
@@ -7865,291 +7865,41 @@ show_budget:
         defb    $08
         defm    "TRANS  $       $!  "
         defb    $07, $01
-        defb    $64
-        defb    0   ; a564 TODO
-        defb    $8, $50
+
+;9256
+SMC_transport_percent:
+        defb    $64, $64
+        defb    '%'+128
+        defb    $8
         defm    "POLICE $      $!  "
-        defb    $7, $1, $64
-        defm    0	;a5 64	TODO
-
-        ;; TODO MORE TEXT
-        nop     
-        nop     
-        jr      nz,L91e0                ; (32)
-        jr      nz,L91e2                ; (32)
-        jr      nz,L91e4                ; (32)
-        jr      nz,L91e6                ; (32)
-        jr      nz,L920e                ; (70)
-        ld      c,c
-        ld      d,e
-        ld      b,e
-        ld      b,c
-        ld      c,h
-        jr      nz,L9211                ; (66)
-        ld      d,l
-        ld      b,h
-        ld      b,a
-        ld      b,l
-        call    nc,L0803
-        ld      d,h
-        ld      b,c
-        ld      e,b
-        jr      nz,L922d                ; (82)
-        ld      b,c
-        ld      d,h
-        ld      b,l
-        ld      hl,8224
-        jr      nz,L91ea                ; (7)
-        ld      bc,5127
-
-.L91e6  and     l
-        inc     bc
-        nop     
-        ld      d,h
-
-.L91ea  ld      b,c
-        ld      e,b
-        jr      nz,L9231                ; (67)
-        ld      c,a
-        ld      c,h
-        ld      c,h
-        ld      b,l
-        ld      b,e
-        ld      d,h
-        ld      b,l
-        ld      b,h
-        jr      nz,L9218                ; (32)
-        jr      nz,L921a                ; (32)
-        jr      nz,L921c                ; (32)
-        jr      nz,L91a2                ; (-92)
-        inc     bc
-        nop     
-        and     b
-        nop     
-        jr      nz,L9224                ; (32)
-        jr      nz,L9226                ; (32)
-        jr      nz,L9228                ; (32)
-        jr      nz,L924b                ; (65)
-        ld      c,l
-        ld      c,a
-        ld      d,l
-        ld      c,(hl)
-
-.L920e  ld      d,h
-        jr      nz,L9231                ; (32)
-
-.L9211  ld      b,c
-        ld      c,l
-        ld      c,a
-        ld      d,l
-        ld      c,(hl)
-        ld      d,h
-        jr      nz,L9239                ; (32)
-        jr      nz,L923b                ; (32)
-        ld      b,(hl)
-
-.L921c  ld      d,l
-        ld      c,(hl)
-        call    nz,L2000
-        jr      nz,L9243                ; (32)
-        jr      nz,L9245                ; (32)
-        jr      nz,L9247                ; (32)
-        ld      d,d
-
-.L9228  ld      b,l
-        ld      d,c
-        ld      d,e
-        ld      d,h
-        ld      b,h
-
-.L922d  jr      nz,L924f               ; (32)
-        ld      b,c
-        ld      c,h
-
-.L9231  ld      c,h
-        ld      b,e
-        ld      d,h
-        ld      b,h
-        jr      nz,L9257                ; (32)
-        jr      nz,L9259                ; (32)
-
-.L9239  ld      c,h
-        ld      b,l
-
-.L923b  ld      d,(hl)
-        ld      b,l
-        call    z,La000
-        ex      af,af'
-        ld      d,h
-        ld      d,d
-
-.L9243  ld      b,c
-        ld      c,(hl)
-
-.L9245  ld      d,e
-        jr      nz,L9268                ; (32)
-        inc     h
-        jr      nz,L926b                ; (32)
-
-.L924b  jr      nz,L926d               ; (32)
-        jr      nz,L926f                ; (32)
-
-.L924f  jr      nz,L9275               ; (36)
-        ld      hl,8224
-        rlca    
-        ld      bc,L6464
-        and     l
-
-.L9259  ex      af,af'
-        ld      d,b
-        ld      c,a
-        ld      c,h
-        ld      c,c
-        ld      b,e
-        ld      b,l
-
-.L9260  jr      nz,L9286               ; (36)
-        jr      nz,L9284                ; (32)
-        jr      nz,L9286                ; (32)
-        jr      nz,L9288                ; (32)
-
-.L9268  jr      nz,L928e               ; (36)
-        ld      hl,8224
-
-.L926d  rlca    
-        ld      bc,L6464
-        and     l
-        ex      af,af'
-        ld      b,(hl)
-        ld      c,c
-
-.L9275  ld      d,d
-        ld      b,l
-        jr      nz,L9299                ; (32)
-        jr      nz,L929f                ; (36)
-        jr      nz,L929d                ; (32)
-        jr      nz,L929f                ; (32)
-        jr      nz,L92a1                ; (32)
-        jr      nz,L92a7                ; (36)
-        ld      hl,8224
-
-.L9286  rlca    
-        ld      bc,L6464
-        and     l
-        nop     
-        and     b
-        inc     bc
-
-.L928e  nop     
-        and     b
-        nop     
-        ld      b,e
-        ld      b,c
-        ld      d,e
-
-.L9294  ld      c,b
-        jr      nz,L92dd                ; (70)
-        ld      c,h
-        ld      c,a
-
-.L9299  ld      d,a
-        jr      nz,L92bc                ; (32)
-        jr      nz,L92be                ; (32)
-        jr      nz,L92c0                ; (32)
-        jr      nz,L92c2                ; (32)
-        jr      nz,L92c4                ; (32)
-        jr      nz,L924a                ; (-92)
-        nop     
-
-.L92a7  ld      d,b
-        ld      d,d
-        ld      b,l
-        ld      d,(hl)
-        ld      c,c
-        ld      c,a
-        ld      d,l
-        ld      d,e
-        jr      nz,L92f7                ; (70)
-        ld      d,l
-        ld      c,(hl)
-        ld      b,h
-        jr      nz,L92d6                ; (32)
-        jr      nz,L92d8                ; (32)
-        jr      nz,L92da                ; (32)
-        jr      nz,L9260                ; (-92)
-
-.L92bc  nop     
-        jr      nz,L92df                ; (32)
-        jr      nz,L92e1                ; (32)
-        jr      nz,L92e3                ; (32)
-        jr      nz,L92e5                ; (32)
-        jr      nz,L92e7                ; (32)
-        jr      nz,L92e9                ; (32)
-        jr      nz,L92eb                ; (32)
-        jr      nz,L92ed                ; (32)
-        jr      nz,L92ef                ; (32)
-        jr      nz,L92f1                ; (32)
-        dec     l
-        dec     l
-        dec     l
-        dec     l
-        dec     l
-
-.L92d6  dec     l
-        dec     l
-
-.L92d8  dec     l
-        xor     l
-
-.L92da  nop     
-        ld      b,e
-        ld      d,l
-
-.L92dd  ld      d,d
-        ld      d,d
-
-.L92df  ld      b,l
-        ld      c,(hl)
-
-.L92e1  ld      d,h
-        jr      nz,L932a                ; (70)
-        ld      d,l
-
-.L92e5  ld      c,(hl)
-        ld      b,h
-
-.L92e7  ld      d,e
-        jr      nz,L930a                ; (32)
-        jr      nz,L930c                ; (32)
-        jr      nz,L930e                ; (32)
-        jr      nz,L9294                ; (-92)
-        inc     bc
-
-.L92f1  ld      (bc),a
-        inc     bc
-        ld      h,a
-        jr      nz,L9316                ; (32)
-        jr      nz,L9318                ; (32)
-        ld      b,a
-        ld      c,a
-        jr      nz,L9353                ; (87)
-        ld      c,c
-        ld      d,h
-        ld      c,b
-        jr      nz,L9355                ; (84)
-        ld      c,b
-        ld      b,l
-        ld      d,e
-        ld      b,l
-        jr      nz,L934d                ; (70)
-        ld      c,c
-        ld      b,a
-        ld      d,l
-
-.L930a  ld      d,d
-        ld      b,l
-
-.L930c  out     (4),a
+        defb    $7, $1
+;926f
+SMC_police_percent:
+        defb    $64,$64
+        defb    '%'+128
+        defb    $8
+        defm    "FIRE   $      $!  "
+        defb    $07, $01
+;9288
+SMC_fire_percent:
+        defb    $64, $64
+        defb    '%'+128, $00
+        defb    $a0
+        defb    $03, $00, $a0, $00
+        defm    "CASH FLOW           "
+        defb    '$' + 128
+        defb    0
+        defm    "PREVIOUS FUND       "
+        defb    '$' + 128
+        defm    "                    --------"
+        defb    '-' + 128
+        defb    0
+        defm    "CURRENT FUNDS       "
+        defb    '$'+128
+        defb    $03, $02, $03, $67
+        defm    "    GO WITH THESE FIGURE"
+        defb    'S'+128
+        defb    4
 
 V_tax_collected:    defb    0,0,0       ;VAR 37646, 930e
 .L930e  nop     
@@ -8179,7 +7929,7 @@ V_money_after_budget:            defb    0,0,0           ;VAR 37670/9326 money a
         ld      c,a
         ld      a,100
         call    L66b6
-        ld      a,(L91e4)           ;Tax concern
+        ld      a,(SMC_tax_rate)           ;Tax rate
         ld      e,a
         ld      d,0
         call    L_mult_24_16x16
@@ -8215,21 +7965,21 @@ V_money_after_budget:            defb    0,0,0           ;VAR 37670/9326 money a
         ret     
 
 
-.L937c  ld      a,(37462)
+.L937c  ld      a,(SMC_transport_percent)
         ld      hl,(V_Transport_Funding_Requested)
         call    L94ff
         ld      (V_Transport_Funding_Allocated),hl
         ret     
 
 
-.L9389  ld      a,(L926f)
+.L9389  ld      a,(SMC_police_percent)
         ld      hl,(V_Budget_Police_Funding_Requested)
         call    L94ff
         ld      (V_Police_Funding_Allocated),hl
         ret     
 
 
-.L9396  ld      a,(L9288)
+.L9396  ld      a,(SMC_fire_percent)
         ld      hl,(V_Budget_Fire_Funding_Requested)
         call    L94ff
         ld      (V_Fire_Funding_Allocated),hl
@@ -8695,10 +8445,10 @@ print_evaluation_concerns:
         ld      de,(V_38913)
         add     hl,de
         ld      (V_38913),hl
-        ld      a,(L91e4)           ;Tax concern
+        ld      a,(SMC_tax_rate)           ;Tax rate
         ld      l,a
         ld      h,0
-        ld      de,Lfffd
+        ld      de,$fffd
         add     hl,de
         ld      d,h
         ld      e,l
@@ -9044,7 +8794,7 @@ SendMessages:
         ld      a,11
         jp      nc,set_alert_message
 
-.L9ad2  ld      a,(L91e4)
+.L9ad2  ld      a,(SMC_tax_rate)
         cp      12
         ld      a,12                    ;Taxes too high
         jp      nc,set_alert_message
@@ -9621,6 +9371,7 @@ action_load:
         defb        T_SETXY,8,11
         defm        "SEARCHING"
         defb        T_END
+L9e89:
         ld      ix,V_tapeheader
         ld      de,31   ;12 char filename, 7b money, 12b something else
         ld      a,255
@@ -10730,8 +10481,8 @@ V_task1_stack:  defw    0       ;VAR 63241 - task 1 stack (simulator)
         jp      L7a32
         ret     
 
-        jp      Lfe0f
-        jp      Lfe0f
+        jp      $fe0f
+        jp      $fe0f
 
 ; Load tape file
 
@@ -10745,7 +10496,7 @@ V_task1_stack:  defw    0       ;VAR 63241 - task 1 stack (simulator)
         ret     
 
 
-.Lf7aa  jp      L04c6
+.Lf7aa  jp      $04c6
 
 ; Pause 5000
 
