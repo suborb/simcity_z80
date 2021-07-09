@@ -5831,12 +5831,12 @@ start_simulation:
         ld      (V_31127),a
         ld      (V_33629),a
         ld      hl,0
-        ld      (V_37649),hl
-        ld      (V_Budget_Police_Funding),hl
-        ld      (V_Budget_Fire_Funding),hl
-        ld      (37655),hl
-        ld      (37657),hl
-        ld      (37659),hl
+        ld      (V_Transport_Funding_Requested),hl
+        ld      (V_Budget_Police_Funding_Requested),hl
+        ld      (V_Budget_Fire_Funding_Requested),hl
+        ld      (V_Transport_Funding_Allocated),hl
+        ld      (V_Police_Funding_Allocated),hl
+        ld      (V_Fire_Funding_Allocated),hl
         ld      (33381),hl
         ld      (36611),hl
         ld      (V_safe_AirportPop),hl
@@ -7435,11 +7435,11 @@ V_population:   defb    0,0,0   ;VAR 8e90/36496 - population
         ld      a,c
         ld      (V_population+2),a
         ld      hl,(V_33892)
-        ld      (V_37649),hl
+        ld      (V_Transport_Funding_Requested),hl
         ld      hl,(V_PoliceFund)
-        ld      (V_Budget_Police_Funding),hl
+        ld      (V_Budget_Police_Funding_Requested),hl
         ld      hl,(V_FireFund)
-        ld      (V_Budget_Fire_Funding),hl
+        ld      (V_Budget_Fire_Funding_Requested),hl
         ld      a,(V_auto_budget)
         and     a
         jr      nz,L8ee9                ; (13)
@@ -7455,8 +7455,8 @@ V_population:   defb    0,0,0   ;VAR 8e90/36496 - population
 .L8ee9  call    L9329
         call    L9358
 
-.L8eef  ld      hl,(37670)
-        ld      a,(37672)
+.L8eef  ld      hl,(V_money_after_budget)
+        ld      a,(V_money_after_budget+2)
         ld      c,a
         ld      (money),hl
         ld      a,c
@@ -8160,34 +8160,28 @@ show_budget:
 
 .L930c  out     (4),a
 
+V_tax_collected:    defb    0,0,0       ;VAR 37646, 930e
 .L930e  nop     
         nop     
         nop     
 
-V_37649:                    defw        0   ;VAR 37649/9311 - budget, transport funding
-V_Budget_Police_Funding:    defw        0   ;VAR 37651  - budget how much police funding
-V_Budget_Fire_Funding:      defw        0   ;VAR 37653  - budget how much fire funding
+V_Transport_Funding_Requested:                    defw        0   ;VAR 37649/9311 - budget, transport funding
+V_Budget_Police_Funding_Requested:    defw        0   ;VAR 37651  - budget how much police funding
+V_Budget_Fire_Funding_Requested:      defw        0   ;VAR 37653  - budget how much fire funding
    
+V_Transport_Funding_Allocated:  defw    0       ;VAR 37655/9317 
+V_Police_Funding_Allocated:  defw    0       ;VAR 37657/9319 
+V_Fire_Funding_Allocated:  defw    0       ;VAR 37659/931a 
 
-        nop     
 
-.L9318  nop     
-        nop     
-        nop     
-        nop     
-        nop     
-        nop     
-        nop     
-        nop     
-        nop     
-        nop     
-        nop     
-        nop     
-        nop     
-        nop     
-        nop     
-        nop     
-        nop     
+V_expenditure:  defb    0,0,0           ;VAR 37661/931d - how much we spent this budget
+
+V_cashflow:        defb    0,0,0       ;VAR 37664/9320 - cashflow
+
+
+V_previous_money:        defb    0,0,0           ;VAR 37667/9323 previous money before budget
+V_money_after_budget:            defb    0,0,0           ;VAR 37670/9326 money after budget
+
 
 .L9329  ld      hl,(V_population)
         ld      a,(V_population+2)
@@ -8198,9 +8192,9 @@ V_Budget_Fire_Funding:      defw        0   ;VAR 37653  - budget how much fire f
         ld      e,a
         ld      d,0
         call    L_mult_24_16x16
-        ld      (L930e),hl
+        ld      (V_tax_collected),hl
         ld      a,c
-        ld      (37648),a
+        ld      (V_tax_collected+2),a
         ret     
 
         ld      a,71
@@ -8217,9 +8211,9 @@ V_Budget_Fire_Funding:      defw        0   ;VAR 37653  - budget how much fire f
 .L9358  ld      hl,(money)
         ld      a,(money+2)
         ld      c,a
-        ld      (37667),hl
+        ld      (V_previous_money),hl
         ld      a,c
-        ld      (37669),a
+        ld      (V_previous_money+2),a
         call    L937c
         call    L9389
         call    L9396
@@ -8231,75 +8225,75 @@ V_Budget_Fire_Funding:      defw        0   ;VAR 37653  - budget how much fire f
 
 
 .L937c  ld      a,(37462)
-        ld      hl,(V_37649)
+        ld      hl,(V_Transport_Funding_Requested)
         call    L94ff
-        ld      (37655),hl
+        ld      (V_Transport_Funding_Allocated),hl
         ret     
 
 
 .L9389  ld      a,(L926f)
-        ld      hl,(V_Budget_Police_Funding)
+        ld      hl,(V_Budget_Police_Funding_Requested)
         call    L94ff
-        ld      (37657),hl
+        ld      (V_Police_Funding_Allocated),hl
         ret     
 
 
 .L9396  ld      a,(L9288)
-        ld      hl,(V_Budget_Fire_Funding)
+        ld      hl,(V_Budget_Fire_Funding_Requested)
         call    L94ff
-        ld      (37659),hl
+        ld      (V_Fire_Funding_Allocated),hl
         ret     
 
 
-.L93a3  ld      hl,(37655)
-        ld      de,(37657)
+.L93a3  ld      hl,(V_Transport_Funding_Allocated)
+        ld      de,(V_Police_Funding_Allocated)
         ld      bc,0
         call    l_add24
-        ld      de,(37659)
+        ld      de,(V_Fire_Funding_Allocated)
         call    l_add24
-        ld      (37661),hl
+        ld      (V_expenditure),hl
         ld      a,c
-        ld      (37663),a
+        ld      (V_expenditure+2),a
         ld      b,c
         ex      de,hl
-        ld      hl,(L930e)
-        ld      a,(37648)
+        ld      hl,(V_tax_collected)
+        ld      a,(V_tax_collected+2)
         ld      c,a
         call    l_sub24
-        ld      (37664),hl
+        ld      (V_cashflow),hl
         ld      a,c
-        ld      (37666),a
+        ld      (V_cashflow+2),a
         ld      hl,(money)
         ld      a,(money+2)
         ld      c,a
-        ld      de,(37661)
-        ld      a,(37663)
+        ld      de,(V_expenditure)
+        ld      a,(V_expenditure+2)
         ld      b,a
         call    l_sub24
-        ld      de,(37646)
-        ld      a,(37648)
+        ld      de,(V_tax_collected)
+        ld      a,(V_tax_collected+2)
         ld      b,a
         call    l_add24
-        ld      (37670),hl
+        ld      (V_money_after_budget),hl
         ld      a,c
-        ld      (37672),a
+        ld      (V_money_after_budget+2),a
         ret     
 
         nop     
         nop     
         nop     
 
-.L93f9  ld      hl,(37667)
-        ld      a,(37669)
+.L93f9  ld      hl,(V_previous_money)
+        ld      a,(V_previous_money+2)
         ld      c,a
-        ld      de,(37646)
-        ld      a,(37648)
+        ld      de,(V_tax_collected)
+        ld      a,(V_tax_collected+2)
         ld      b,a
         call    l_add24
         ld      (37878),hl
         ld      a,c
         ld      (37880),a
-        ld      de,(37655)
+        ld      de,(V_Transport_Funding_Allocated)
         ld      b,0
         call    l_sub24
         bit     7,c
@@ -8308,24 +8302,24 @@ V_Budget_Fire_Funding:      defw        0   ;VAR 37653  - budget how much fire f
         ld      hl,(37878)
         ld      a,(37880)
         ld      c,a
-        ld      (37655),hl
+        ld      (V_Transport_Funding_Allocated),hl
         ret     
 
 
-.L9429  ld      hl,(37667)
-        ld      a,(37669)
+.L9429  ld      hl,(V_previous_money)
+        ld      a,(V_previous_money+2)
         ld      c,a
-        ld      de,(37646)
-        ld      a,(37648)
+        ld      de,(V_tax_collected)
+        ld      a,(V_tax_collected+2)
         ld      b,a
         call    l_add24
-        ld      de,(37655)
+        ld      de,(V_Transport_Funding_Allocated)
         ld      b,0
         call    l_sub24
         ld      (37878),hl
         ld      a,c
         ld      (37880),a
-        ld      de,(37657)
+        ld      de,(V_Police_Funding_Allocated)
         ld      b,0
         call    l_sub24
         bit     7,c
@@ -8334,27 +8328,27 @@ V_Budget_Fire_Funding:      defw        0   ;VAR 37653  - budget how much fire f
         ld      hl,(37878)
         ld      a,(37880)
         ld      c,a
-        ld      (37657),hl
+        ld      (V_Police_Funding_Allocated),hl
         ret     
 
 
-.L9462  ld      hl,(37667)
-        ld      a,(37669)
+.L9462  ld      hl,(V_previous_money)
+        ld      a,(V_previous_money+2)
         ld      c,a
-        ld      de,(37646)
-        ld      a,(37648)
+        ld      de,(V_tax_collected)
+        ld      a,(V_tax_collected+2)
         ld      b,a
         call    l_add24
-        ld      de,(37655)
+        ld      de,(V_Transport_Funding_Allocated)
         ld      b,0
         call    l_sub24
-        ld      de,(37657)
+        ld      de,(V_Police_Funding_Allocated)
         ld      b,0
         call    l_sub24
         ld      (37878),hl
         ld      a,c
         ld      (37880),a
-        ld      de,(37659)
+        ld      de,(V_Fire_Funding_Allocated)
         ld      b,0
         call    l_sub24
         bit     7,c
@@ -8363,39 +8357,39 @@ V_Budget_Fire_Funding:      defw        0   ;VAR 37653  - budget how much fire f
         ld      hl,(37878)
         ld      a,(37880)
         ld      c,a
-        ld      (37659),hl
+        ld      (V_Fire_Funding_Allocated),hl
         ret     
 
 print_budget_amounts:
 .L94a4  ld      bc,$0516        ;Tax collectd
-        ld      hl,L930e
+        ld      hl,V_tax_collected
         call    prt24bit
         ld      bc,$1216        ;previous fund
-        ld      hl,37667
+        ld      hl,V_previous_money
         call    prt24bit
-        ld      hl,(37655)      ;transport allocated
+        ld      hl,(V_Transport_Funding_Allocated)      ;transport allocated
         ld      bc,$0b11
         call    prt16bit
-        ld      hl,(V_37649)      ;transport requested
+        ld      hl,(V_Transport_Funding_Requested)      ;transport requested
         ld      bc,$0b09
         call    prt16bit
-        ld      hl,(37657)      ;police allocated
+        ld      hl,(V_Police_Funding_Allocated)      ;police allocated
         ld      bc,$0c11
         call    prt16bit
-        ld      hl,(V_Budget_Police_Funding)
+        ld      hl,(V_Budget_Police_Funding_Requested)
         ld      bc,$0c09
         call    prt16bit
-        ld      hl,(37659)      ;fire requested
+        ld      hl,(V_Fire_Funding_Allocated)      ;fire allocated
         ld      bc,$0d11
         call    prt16bit
-        ld      hl,(V_Budget_Fire_Funding)
+        ld      hl,(V_Budget_Fire_Funding_Requested)
         ld      bc,$0d09
         call    prt16bit
         ld      bc,$1116        ;cashflow
-        ld      hl,37664        ;;;XXXTODO???
+        ld      hl,V_cashflow       
         call    prt24bit
         ld      bc,$1416        ;current funds
-        ld      hl,37670        ;;;;XXXTODO???
+        ld      hl,V_money_after_budget       
         call    prt24bit
         ret     
 
@@ -8418,12 +8412,12 @@ D_38170:
         
 
 .L952a  ld      a,255
-        ld      hl,(V_37649)
+        ld      hl,(V_Transport_Funding_Requested)
         ld      de,20
         and     a
         sbc     hl,de
         jr      c,L9555                 ; (30)
-        ld      hl,(V_37649)
+        ld      hl,(V_Transport_Funding_Requested)
         srl     h
         rr      l
         srl     h
@@ -8431,7 +8425,7 @@ D_38170:
         srl     h
         rr      l
         ex      de,hl
-        ld      hl,(37655)
+        ld      hl,(V_Transport_Funding_Allocated)
         call    L_div16x16
         ld      c,l
         ld      b,0
@@ -8441,12 +8435,12 @@ D_38170:
 .L9555  ld      (V_35013),a
         ld      (V_35074),a
         ld      a,15
-        ld      hl,(V_Budget_Police_Funding)
+        ld      hl,(V_Budget_Police_Funding_Requested)
         ld      de,20
         and     a
         sbc     hl,de
         jr      c,L9586                 ; (30)
-        ld      hl,(V_Budget_Police_Funding)
+        ld      hl,(V_Budget_Police_Funding_Requested)
         srl     h
         rr      l
         srl     h
@@ -8454,7 +8448,7 @@ D_38170:
         srl     h
         rr      l
         ex      de,hl
-        ld      hl,(37657)
+        ld      hl,(V_Police_Funding_Allocated)
         call    L_div16x16
         ld      c,l
         ld      b,0
@@ -8464,12 +8458,12 @@ D_38170:
 
 .L9586  ld      (31793),a
         ld      a,15
-        ld      hl,(V_37649)
+        ld      hl,(V_Transport_Funding_Requested)
         ld      de,20
         and     a
         sbc     hl,de
         jr      c,L95b4                 ; (30)
-        ld      hl,(V_Budget_Fire_Funding)
+        ld      hl,(V_Budget_Fire_Funding_Requested)
         srl     h
         rr      l
         srl     h
@@ -8477,7 +8471,7 @@ D_38170:
         srl     h
         rr      l
         ex      de,hl
-        ld      hl,(37659)
+        ld      hl,(V_Fire_Funding_Allocated)
         call    L_div16x16
         ld      c,l
         ld      b,0
@@ -8552,7 +8546,7 @@ L95b8:
         defm        "CITY SCORE :- 50"
         defb        '0'+128
 
-; Hmmm
+; Hmmm TODO
         defb        2,3
         defm        "g!     O"
         defb        'K'+128
