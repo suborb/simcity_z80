@@ -115,6 +115,7 @@ L5b88:  cpl
 ; Key conversion table
 
 .keytab
+        defb        3
         defm        "ZXCVASDFGQWERT1234509876"
         defm        "POIUY"
         defb        8
@@ -538,10 +539,11 @@ SMC_23970:
         defc        T_END           = 254
         defc        T_SETXY         = 255
 
-.endctrl
-        inc        hl
-        jp        (hl)
+replace_with_direct_prchar_call:
+        call    prchar
+        ret
 
+        
 .prt_ctrl  
         pop     hl
 .L5df0  ld      a,(hl)
@@ -556,7 +558,7 @@ SMC_23970:
         cp      252
         jr      z,ctrl_prnum                 ; (30)
         push    hl
-        call    prchar
+        call    replace_with_direct_prchar_call       ; TODO: Optimise this away
         call    incprpos                        ;inc print posn
         pop     hl
 
@@ -622,12 +624,18 @@ SMC_23970:
 .L5e66  add     a,48
         ld      (63310),a
         push    hl
-        call    prchar
+        call    replace_with_direct_prchar_call
         ld      hl,(textpos)
         inc     hl
         ld      (textpos),hl
         pop     hl
         ret     
+
+
+endctrl:
+.L5e78
+        inc     hl
+        jp      (hl)
 
 .ctrl_setxy  
         inc     hl
@@ -797,7 +805,8 @@ text_months:
 
 ; Print the date on screen
 ; Routine $5fae
-.print_date
+print_date:
+.L5fae
         ld      a,(V_month)
         ld      hl,text_months
         call    get_word_from_table
@@ -840,6 +849,8 @@ text_table:
         defm    "AIRPORT $1000"
         defb    '0' + 128
 
+
+L6088:
 ; Code 14 = levels
         defm    "EAS"
         defb    'Y' + 128
@@ -867,27 +878,31 @@ text_table:
         defb    ' ' + 128
 
 ; Code 24
+.L60c2
         defm    "MORE RESIDENTIAL ZONES NEEDE"      ;24
         defb    'D' + 128
         defm    "MORE COMMERCIAL ZONES NEEDE"
         defb    'D' + 128
         defm    "MORE INDUSTRIAL ZONES NEEDE"       ;26
         defb    'D' + 128
+.L6117
         defm    "NEED BIGGER ROAD NETWOR"           ;28
         defb    'K' + 128
         defm    "NEED LARGER RAIL SYSTE"            ;30
         defb    'M' + 128
         defm    "NEED A POWER PLAN"                 ;32
         defb    'T' + 128
+.L6158
         defm    "THE PEOPLE WANT A STADIU"          ;34
         defb    'M'+128
-        defm    "INDUSTRY NEEDS A SEAPOR"           ;36
+        defm    "INDUSTRY NEEDS A SEA POR"           ;36
         defb    'T' + 128
         defm    "COMMERCE NEEDS AN AIRPOR"
         defb    'T' + 128
-        defm    "PEOPLE DEMAND A FIRE DEP"
+        defm    "PEOPLE DEMAND FIRE DEP"
         defb    'T' + 128
-        defm    "PEOPLE DEMAND A POLICE DEP"
+.L61ba
+        defm    "PEOPLE DEMAND POLICE DEP"
         defb    'T' + 128
         defm    "CITIZENS UPSET,TAXES TOO HIG"
         defb    'H' + 128
@@ -899,12 +914,15 @@ text_table:
         defb    'S' + 128
         defm    "ZONES NEED POWE"
         defb    'R' + 128
+.L6248
         defm    "BROWNOUT DETECTE"
         defb    'D' + 128
         defm    "NUCLEAR MELTDOW"
         defb    'N' + 128
         defm    "TOO MUCH POLLUTIO"
         defb    'N' + 128
+        defm    "CRIME TOO HIG"
+        defb    'H' + 128
         defm    "TRAFFIC JAMES ARE BA"
         defb    'D' + 128
         defm    "FIRES HAVE BEEN DETECTE"
@@ -913,6 +931,8 @@ text_table:
         defb    'D' + 128
         defm    "MAJOR EARTHQUAKE DETECTE"
         defb    'D' + 128
+        defm    "AIR CRASH !!"
+        defb    '!' + 128
         defm    "TORNADO DETECTE"
         defb    'D' + 128
 
@@ -1104,7 +1124,6 @@ handle_menus:
         jp      c,L66f2
         ld      ix,menu_windows     ;42178
         jp      L66f2
-        nop     
 
 V_25651:    defb    0       ;VAR 256511/6433
 
@@ -1127,8 +1146,7 @@ V_25651:    defb    0       ;VAR 256511/6433
         ld      de,64
         ld      b,1
         jp      L651d
-        scf     
-        nop     
+
 V_current_tile:        defb        $37,$00                ;VAR 6462/25698 - current tile being printed
 
 L6464:
@@ -1286,7 +1304,7 @@ draw_map_screen_addr:
         djnz    L651d                   ; (-58)
         ret     
 
-V_current_zone_width_to_print:  defw    0   ;VAR 6558/25944 - how much of the current zone width to print
+V_current_zone_width_to_print:  defb    0   ;VAR 6558/25944 - how much of the current zone width to print
 V_left_tile_index:    defw    0   ;VAR 6559/25945 - index for furthest left tile of the zone
 
 
@@ -1454,7 +1472,8 @@ prt24bit_cde:
         push    hl
         push    bc
         ld      a,'-'
-        call    prchar
+.L6644
+        call    replace_with_direct_prchar_call
         call    incprpos
         pop     bc
         pop     hl
@@ -1554,7 +1573,7 @@ L_mult_24_16x16:
         pop     hl
         ret     
 
-; Multiply?
+; Divide?
 .L66b6  ld      e,c
         ld      b,24
         ld      c,a
@@ -1658,7 +1677,7 @@ V_26442:
         defb        $0C, $3C, $A5, $0E, $52, $A5
         defb        $10, $6A, $A5, $16, $8C, $A5, $FF
 
-        defs        106        ;What's up here? - Selection table? LOOK!
+        defs        107       ;What's up here? - Selection table? LOOK!
 
 V_26562:    defb    0       ;VAR 26562
 
@@ -1756,6 +1775,7 @@ V_26699:    defb    0   ;VAR 26699/684b
 .L6876  call    prt_ctrl
         defm        "OFF"
         defb        T_END
+        inc     ix
         jp      L67d7
 
 .L6882  ld      a,(V_26441)
@@ -4726,13 +4746,12 @@ V_31127:    defb    0       ;VAR 31127/7997
         defb        T_SETXY,18,1
         defm        " "
         defb        T_SETCOL,118
-        defb        T_SETXY,18,1
-        defm        "v"
         defb        T_SETXY,19,1
         defm        " "
         defb        T_SETCOL,100
         defb        T_SETXY,20,1
         defm        " "
+.L7b42
         defb        T_SETCOL,82
         defb        T_SETXY,21,1
         defm        " "
@@ -5246,7 +5265,7 @@ V_32410:    defb        0       ;VAR 32410/7e9a
 V_32447:    defb        0       ;VAR 32447/7ebf
 V_32448:    defb        0       ;VAR 32448/7ec0
 V_32449:    defb        0       ;VAR 32449/7ec1
-V_32450:    defb        0       ;VAR 32450/7ec2
+V_32450:    defw        0       ;VAR 32450/7ec2
 
 .L7ec4  call    L7e1d
         call    L7e6a
@@ -5762,8 +5781,6 @@ initialise_simulation_variables:
         ld      (V_money+2),a
         ret     
 
-        nop     
-        nop     
 
 ;Simulation code runs here
 .V_33629            defb        0       ;VAR 835e/33629
@@ -5859,8 +5876,7 @@ start_simulation:
         ret     
 
 ;8443, 33859
-V_33859: defw        0       ;VAR
-        defb        1       ;VAR
+V_33859: defb        0,0,0       ;VAR
 
 V_ResZPop: defw        0       ;VAR
 V_ComZPop: defw        0       ;VAR
@@ -5924,7 +5940,7 @@ V_safe_AirportPop:        defw    0           ;VAR 33950/849e -
 V_safe_NuclearPop:        defw    0           ;VAR 33952/849e - 
 
 ;V_33954
-V_33954:    defw $20, $20       ;VAR 33954/84a2
+V_33954:    defb $20, $20       ;VAR 33954/84a2
 
 
 .L84a4  ld      a,(V_34760)
@@ -7544,6 +7560,7 @@ D_8f6c:
 ; We have a few variables here 7 I think
 
 V_money:       defb  0,0,0   ; VAR - money!! - 8f99
+            defb    0       ;UNUSED
 V_month:     defb  0       ; VAR 36763 (8f9b) - Month
 V_year:      defw  1902    ; VAR 36764 (8f9c) - Year
 V_8f9e:      defb  0       ;VAR 36766/8f9e
@@ -7844,7 +7861,7 @@ show_budget:
         defm    "         FISCAL BUDGE"
         defb    'T' + 128
         defb    $03, $08
-        defm    "TAX RATE!  "
+        defm    "TAX RATE!   "
         defb    $07, $01
 
         ;@91e4
@@ -7852,7 +7869,7 @@ SMC_tax_rate:
         defb    $07, $14
         defb    '%' + $80
         defb    $03, $00
-        defm    "TAX COLLECTED      "
+        defm    "TAX COLLECTED       "
         defb    '$' + 128
         defb    $03, $00
         defb    $a0, $00
@@ -7871,14 +7888,14 @@ SMC_transport_percent:
         defb    $64, $64
         defb    '%'+128
         defb    $8
-        defm    "POLICE $      $!  "
+        defm    "POLICE $       $!  "
         defb    $7, $1
 ;926f
 SMC_police_percent:
         defb    $64,$64
         defb    '%'+128
         defb    $8
-        defm    "FIRE   $      $!  "
+        defm    "FIRE   $       $!  "
         defb    $07, $01
 ;9288
 SMC_fire_percent:
@@ -7889,11 +7906,14 @@ SMC_fire_percent:
         defm    "CASH FLOW           "
         defb    '$' + 128
         defb    0
+L92a7:
         defm    "PREVIOUS FUND       "
         defb    '$' + 128
+        defb    0
         defm    "                    --------"
         defb    '-' + 128
         defb    0
+L92db:
         defm    "CURRENT FUNDS       "
         defb    '$'+128
         defb    $03, $02, $03, $67
@@ -7902,9 +7922,7 @@ SMC_fire_percent:
         defb    4
 
 V_tax_collected:    defb    0,0,0       ;VAR 37646, 930e
-.L930e  nop     
-        nop     
-        nop     
+
 
 V_Transport_Funding_Requested:                    defw        0   ;VAR 37649/9311 - budget, transport funding
 V_Budget_Police_Funding_Requested:    defw        0   ;VAR 37651  - budget how much police funding
@@ -8038,7 +8056,6 @@ V_37878:    defb   0,0,0       ;VAR 37878/93f6
         call    l_sub24
         bit     7,c
         ret     z
-
         ld      hl,(V_37878)
         ld      a,(V_37878+2)
         ld      c,a
@@ -8064,7 +8081,6 @@ V_37878:    defb   0,0,0       ;VAR 37878/93f6
         call    l_sub24
         bit     7,c
         ret     z
-
         ld      hl,(V_37878)
         ld      a,(V_37878+2)
         ld      c,a
@@ -9029,7 +9045,6 @@ V_39982:        defw    0       ;VAR 39982/9c2e
 V_39984:        defb    0       ;VAR 39984/9c30
 V_minimap_xy:    defw    0       ;VAR 9c31/39985 - xypos in minimap being printed
 
-V_39986:        defb    0       ;VAR 39986/9c32
 
 ; Address within the levelmap that 0-8 keys correspond to
 
@@ -9080,7 +9095,7 @@ D_minimap_offsets:
         ld      c,(hl)
         ld      (V_39982),bc
         ld      a,b
-        ld      (V_39986),a
+        ld      (V_minimap_xy+1),a
         ex      de,hl
         ld      b,48
 
@@ -9133,9 +9148,9 @@ D_minimap_offsets:
         add     hl,de
         xor     a
         ld      (V_current_zone_width_to_print),a
-        ld      a,(V_39986)
+        ld      a,(V_minimap_xy+1)
         inc     a
-        ld      (V_39986),a
+        ld      (V_minimap_xy+1),a
         push    hl
         push    bc
         call    twiddlekeys
@@ -9505,11 +9520,11 @@ action_power_coal:
         ret
 
 
-
+;9fd0
 .menu_are_you_sure  
     call    print_routine
         defb        8,0
-        defm        "         ARE YOU SURE"
+        defm        "         ARE YOU SURE "
         defb        '?'+128
         defb        3
         defb        0,160,0,160,0,160,0,160
@@ -10426,7 +10441,8 @@ V_task1_stack:  defw    0       ;VAR 63241 - task 1 stack (simulator)
 ; And colour textcol
 ; Uses ROM plot routine
 
-.prchar
+prchar:
+Lf754:
         ld      l,a
         ld      h,0
         add     hl,hl
