@@ -339,7 +339,7 @@ L5bbb:  ld      a,(hl)
         jr      nz,L5cb2                ; (-17)
         ret     
 
-V_random_seed: defw        0        ;VAR 23748 - random seed
+V_random_seed: defw        $fc03        ;VAR 23748 - random seed
 
 ; Random number generator?
 get_random_number:
@@ -622,7 +622,7 @@ replace_with_direct_prchar_call:
         sbc     hl,de
         dec     a
 .L5e66  add     a,48
-        ld      (63310),a
+        ld      (V_63310),a
         push    hl
         call    replace_with_direct_prchar_call
         ld      hl,(textpos)
@@ -659,7 +659,7 @@ endctrl:
         add     hl,de
         jp      nxtctrl
 
-.V_24213        defw        0                ;VAR - holds textxy
+.V_24213        defw        $1020                ;VAR - holds textxy
 
 
 .L5e97  ld      b,(hl)
@@ -696,10 +696,9 @@ endctrl:
 
 .L24274
         defb        $01
-        defb        $32
-        defb        $e9
+
 .L5ed3
-        ld      e,(hl)
+        ld      (SMC_24296+1),a
         ld      a,b
         ld      (SMC_24312+1),a
         ld      a,c
@@ -707,6 +706,7 @@ endctrl:
         ld      bc,(textxy)
         call    xypos
         ld      (textpos),hl
+SMC_24296:
         ld      a,64
         call    prudg
         ld      a,(V_24213)
@@ -838,7 +838,7 @@ text_table:
         defb    '0' + 128
         defm    "POLICE STATION $50"
         defb    '0' + 128
-        defm    "FIRE STATION $10"
+        defm    "FIRE STATION $50"
         defb    '0' + 128
         defm    "STADIUM $300"
         defb    '0' + 128
@@ -915,7 +915,7 @@ L6088:
         defm    "ZONES NEED POWE"
         defb    'R' + 128
 .L6248
-        defm    "BROWNOUT DETECTE"
+        defm    "BROWNOUTS DETECTE"
         defb    'D' + 128
         defm    "NUCLEAR MELTDOW"
         defb    'N' + 128
@@ -923,7 +923,7 @@ L6088:
         defb    'N' + 128
         defm    "CRIME TOO HIG"
         defb    'H' + 128
-        defm    "TRAFFIC JAMES ARE BA"
+        defm    "TRAFFIC JAMS ARE BA"
         defb    'D' + 128
         defm    "FIRES HAVE BEEN DETECTE"
         defb    'D' + 128
@@ -1355,7 +1355,7 @@ find_left_edge_of_zone:
         dec     ix
         jr      L6596                   ; (-13)
 
-V_26019:    defw    0           ;VAR 26019/65a3 - holds xy coords temporarily?
+V_26019:    defw    $40bd          ;VAR 26019/65a3 - holds xy coords temporarily?
 
 
 ; Print a 16 bit number with sign
@@ -1479,7 +1479,7 @@ prt24bit_cde:
         pop     hl
         ret     
 
-V_26189:        defw        0       ;VAR 26189/664d
+V_26189:        defw       $0202       ;VAR 26189/664d
 
 
 .L664f  ld      b,0
@@ -1508,8 +1508,8 @@ V_26189:        defw        0       ;VAR 26189/664d
 
 .L666f  ld      a,b
         add     a,48
-        ld      (63310),a
-        call    prchar
+        ld      (V_63310),a
+        call    replace_with_direct_prchar_call
         jp      incprpos
 
 .L667b  ld      hl,V_26189+1
@@ -2881,7 +2881,7 @@ get_neighbours:
         pop     bc
         ret     
 
-V_28508:    defb    0       ;VAR 28508/6f5c
+V_28508:    defw    0       ;VAR 28508/6f5c
 V_28510:    defb    0       ;VAR 28510/6f5e
 
 .L6f5f  call    L6e74
@@ -3027,14 +3027,13 @@ D_28770:
 D_28782: 
         ;If we place road on one of these
         defb    $14, $15, $21, $22, $38, $39 
-        defb    $2E, $2F, $30, $31, $07, $07
+        defb    $2E, $2F, $30, $31, $07, $08
 
 D_28794:
         ;If we place rail on one of these
-        defb    $08, $07, $08, $21, $22, $38
-        defb    $39, $2F, $2E, $33, $32, $14
+        defb    $07, $08, $21, $22, $38, $39
+        defb    $2F, $2E, $33, $32, $14, $15
         
-        defb    $15
 
 ; Place a joinable (road,rail,power) 
 place_joinables:
@@ -9866,22 +9865,27 @@ menu_disaster:
         defb    $03
         defb    $02
         defw    action_set_disaster    ;a4ba
+La458:
         defm    "FIR"
         defb    'E' + 128
         defb    $02
         defw    action_set_disaster    ;a4ba
-        defm    "FLOOD"
+        defm    "FLOO"
         defb    'D' + 128
         defb    $02
         defw    action_set_disaster    ;a4ba
+La467:
         defm    "EARTHQUAK"
         defb    'E' + 128
+        defb    $03
         defb    $02
         defw     action_set_disaster   ;a4ba
+La475:
         defm    "AIR CRAS"
         defb    'H' + 128
         defb    $02
         defw    action_set_disaster    ;a4ba
+La481:
         defm    "TORNAD"
         defb    'O' + 128
         defb    $02
@@ -10274,7 +10278,7 @@ V_42987:    defw    0       ;VAR 42987/a7eb
         sbc     hl,de
         dec     a
 .La82a  add     a,48
-        ld      (63310),a
+        ld      (V_63310),a
         ld      (iy+0),a
         inc     iy
 .La834  dec     b
@@ -10445,7 +10449,8 @@ V_task1_stack:  defw    0       ;VAR 63241 - task 1 stack (simulator)
 
 
 ; Vars for print routne
-.textpos        defw        0        ;VAR - text print address
+.V_63310        defb        0       ;VAR 63310/f74e
+.textpos        defw        0        ;VAR - f74f text print address
 .textxy                defw        0        ;VAR - text xy posn
 .textcol        defb        0        ;VAR - text colour
 
