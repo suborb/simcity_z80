@@ -9556,12 +9556,10 @@ menu_system:
         defw        menu_about
         defm        "ABOUT SIM CIT"
         defb        'Y'+128
-        defb        3
         defb        2
         defw        action_start_new_city      ;a0b7
         defm        "START NEW CIT"
         defb        'Y'+128
-        defb        3
         defb        2
         defw        use_old_landscape       ;220,165
         defm        "USE OLD LANDSCAP"
@@ -9571,7 +9569,6 @@ menu_system:
         defw        menu_load_city               ;243,161
         defm        "LOAD CIT"
         defb        'Y'+128
-        defb        3
         defb        2
         defw        menu_save_city
         defm        "SAVE CIT"
@@ -9608,6 +9605,7 @@ start_city:
 
 
 menu_about:
+La0c7:
         call    print_routine
         defb    8,0
         defm    "  SIMCITY THE CITY SIMULATO"
@@ -9618,14 +9616,18 @@ menu_about:
         defb    't' + 128, 3, 0
         defm    "  FOR  PROBE SOFTARE LIMITE"
         defb    'D'+128, 0
-        defm    "SPECTRUM PROGRAMMING A.R.Lil"
+La140:
+        defm    "SPECTRUM PROGRAMMING  A.R.Lil"
         defb    'l'+128, 0
-        defm    "SPECTRUM GRAPHICS A.Lill & J"
+La15f:
+        defm    "SPECTRUM GRAPHICS A.Lill & J "
         defb    'L'+128, 3, 0
+La17f:
         defm    "FOR MORE INFO :- INFOGRAME"
         defb    'S' + 128, 0
         defm    "   84 Rue du 1er Mars 1943"
         defb    ','+128, 0
+La1b7:
         defm    "   69625 Villeurbanne Cedex"
         defb    ',' + 128, 0
         defm    "   France"
@@ -9638,6 +9640,7 @@ menu_about:
 
 
 menu_load_city:         ;La1f3:
+La1f3:
         call    print_routine
         defb    8,0
         defm    "         LOADING MEN"
@@ -9683,9 +9686,10 @@ La247:
 menu_enter_filename:
 .La29a  call    print_routine
         defb    $0c, 00
-        defm    "        TYPE FILENAM"
+        defm    "        TYPE FILE NAM"
         defb    'E' + 128
         defb    0
+.La2b6
         defm    "       THEN PRESS ENTE"
         defb    'R' + 128
         defb    $00, $a0
@@ -9781,18 +9785,21 @@ menu_simulation_speed:
         defb    $02
         defw    action_speed_fast    ;a421
 menu_t_fast:
+La3d0:
         defm    "  FAS"
         defb    'T' + 128
         defb    $00, $a0
         defb    $02
         defw    action_speed_normal    ;a428
 menu_t_normal:
+La3db:
         defm    "  NORMA"
         defb    'L' + 128
         defb    $00, $a0
         defb    $02
         defw    action_speed_slow    ;a420
 menu_t_slow:
+La3e8:
         defm    "  SLO"
         defb    'W' + 128
         defb    $00, $a0
@@ -9802,6 +9809,7 @@ menu_t_paused:
         defm    "  PAUSE"
         defb    'D' + 128
         defb    $00, $a0, $00, $a0
+        defb    $03
         defb    $02
         defw    just_a_ret
         defm    "EXIT MEN"
@@ -9904,7 +9912,7 @@ action_set_disaster:
 ;a4c2
 menu_windows:
         defb    $08, $00
-        defm    "WINDOW"
+        defm    "            WINDOW"
         defb    'S' + 128
         defb    $03
         defb    $02
@@ -9919,6 +9927,7 @@ menu_windows:
         defb    $00, $a0
         defb    $02
         defw    show_evaluation    ;95b8
+La4ef:
         defm    "EVALUATIO"
         defb    'N' + 128
         defb    $00, $a0, $00, $a0, $00, $a0, $00, $a0, $00, $a0
@@ -9931,7 +9940,6 @@ menu_windows:
 
 ;a511
 V_show_mini_maps:   defb    0       ;VAR a511/42257 - set to show mini maps
-        nop     
 
 action_set_show_maps:
 .La512
@@ -9952,17 +9960,20 @@ menu_difficulty_text:
         defb        3,0,160
         defb        2
         defw        action_difficulty
-        defm        "        1 - EAS"
+La53f:
+        defm        "         1 - EAS"
         defb        'Y'+128
         defb        0,160
         defb        2
         defw        action_difficulty
-        defm        "        2 - MEDIU"
+La555:
+        defm        "         2 - MEDIU"
         defb        'M'+128
         defb        0,160
         defb        2
         defw        action_difficulty
-        defm        "        3 - DIFFICUL"
+La56d:
+        defm        "         3 - DIFFICUL"
         defb        'T'+128
         defb        0,160,0,160,0,160,0,160
         defb        3,2
@@ -9999,6 +10010,7 @@ action_input_city_name:
 
 
 use_old_landscape:
+La5dc:
         ld      hl,(V_InitialSeed)
         ld      (SMC_42523),hl
         call    print_routine
@@ -10006,12 +10018,11 @@ use_old_landscape:
         defm        "       USE OLD LANDSCAP"
         defb        'E'+128
         defb        3,0
-        defm        "CURRENT LANDSCAPE GENE "
+        defm        " CURRENT LANDSCAPE GENE "
 ;42521
         defb        6,0
 SMC_42523:
-        defw        0
-        defb        0
+        defb        0,0,0
         defb        0,160,3,0,160,0,160
         defb        2
         defw        input_new_gene      ;114,166        ;variable pickup?
@@ -10031,6 +10042,7 @@ SMC_42523:
         defb        4
 
 input_new_gene:
+La672:
         ld      hl,$0b19
         ld      (V_input_xy),hl
         ld      hl,V_InitialSeed
