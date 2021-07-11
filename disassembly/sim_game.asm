@@ -1006,7 +1006,7 @@ print_string:
         djnz    L634f                   ; (-12)
         ret     
 
-
+check_cursor_keys:
 .L635c  ld      a,(keystore+5)
         and     2           ;'O'
         call    z,pointer_left
@@ -3344,12 +3344,12 @@ unbulldozeable_tiles:
 action_zone_bulldoze:
         call    levelmap_xypos_from_cursor
         ld      a,(hl)
-        cp      128
+        cp      128                     ;Full zone
         jp      nc,L7308
         cp      81
-        jr      c,L7288                 ; (5)
+        jr      c,L7288                 ;1x1 zones
         cp      87
-        jp      c,L7367
+        jp      c,L7367                 ;RIC in the centre
 
 .L7288  ld      hl,D_29291
         ld      bc,8
@@ -3478,12 +3478,10 @@ SMC_bulldoze_zone_width:
 
 .L7367  call    L72ed
         ret     nz
-
-        ld      de,9
+        ld      de,9            ;3x3 RIC zone = $9 to bulldoze
         call    spend_money
         ret     c
-
-        ld      bc,65439
+        ld      bc,-96
         add     hl,bc
         push    hl
         pop     ix
@@ -4281,7 +4279,6 @@ V_30683:    defb        0       ;VAR 30683/77db
 .L77dc  ld      a,(V_30678)
         and     a
         ret     z
-
         ld      bc,(V_30675)
         call    levelmap_xypos
         ld      a,(hl)
@@ -4604,7 +4601,6 @@ V_31127:    defb    0       ;VAR 31127/7997
         ld      a,(hl)
         cp      0
         ret     z
-
         ld      (V_31125),bc
         jr      L79d4                   ; (-45)
 
@@ -7587,15 +7583,15 @@ V_36767:      defb  0       ;VAR 36767 - tick counter for ui thread
         ld      (textcol),a
 
 .L8fcc  call    prpointer
-        call    L5d55
+        call    L5d55           ;Inverse the selected zone size
         ld      bc,2000
 .L8fd5  dec     bc
         ld      a,b
         or      c
         jr      nz,L8fd5                ; (-5)
-        call    L5d55
+        call    L5d55           ;Restore the selected zone size
         call    blankpointer
-        call    L635c
+        call    check_cursor_keys
         call    L778f
         call    L63cd
         ld      a,1
