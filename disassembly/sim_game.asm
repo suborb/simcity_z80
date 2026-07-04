@@ -372,8 +372,8 @@ get_random_number:                          ; $5CC6 / 23750
 
 ; Pointer sprites and mask
 
-.D_23788        defb        0,120,112,120,92,8,0,0
-.D_23796        defb        7,3,7,3,1,35,247,255
+.D_pointer_sprite       defb        0,120,112,120,92,8,0,0        ; $5CEC / 23788 - 8-byte UDG pixel data for cursor arrow
+.D_pointer_mask         defb        7,3,7,3,1,35,247,255          ; $5CF4 / 23796 - 8-byte UDG mask for cursor arrow
 
 .V_pointerxy        defw        $0135        ;VAR 23804 - pointer xypos
 
@@ -388,8 +388,8 @@ get_random_number:                          ; $5CC6 / 23750
         call    xypos
         ld      (V_pointer_xy_prev),hl
         ld      ix,V_pointer_underlay
-        ld      iy,D_23796
-        ld      de,D_23788
+        ld      iy,D_pointer_mask
+        ld      de,D_pointer_sprite
         ld      b,8
 .L5d1d  ld      a,(hl)
         ld      (ix+0),a
@@ -765,7 +765,7 @@ SMC_24326:
         defb        T_SETCOL,57
         defb        T_SETXY,5,1
 SMC_cityname:
-.D_24424                ;VAR        (12) - townname
+.D_24424                                                                                                    ; $5F68 / 24424 - VAR        (12) - townname
         defm        "HERESVILLE  "
         defb        T_SETXY,5,17
         defm        "FUNDS $"
@@ -2133,7 +2133,7 @@ V_InitialSeed:   defw    3       ;VAR 6a8c/27276 - initial random seed
 ; PASS 2 - SHORELINE SMOOTHING  (smooth_shoreline_tiles)
 ;   Every TILE_WATER cell that borders land is replaced with one of
 ;   five water-edge tiles (1-5) chosen by looking up the 8-neighbour
-;   dirt pattern in the two-part table D_27425.  First half of that
+;   dirt pattern in the two-part table D_shoreline_lookup.  First half of that
 ;   table (66 entries) holds bitmasks; second half holds the matching
 ;   replacement tile.  This gives visually smooth coastlines.
 ;
@@ -2152,7 +2152,7 @@ V_InitialSeed:   defw    3       ;VAR 6a8c/27276 - initial random seed
 ;
 ;   (dx, dy) are 16-bit signed fixed-point (8.8) accumulators,
 ;   initialised to (0, s) where s = random step size 2-7.
-;   w and h are the per-axis divisor exponents chosen from D_27347:
+;   w and h are the per-axis divisor exponents chosen from D_blob_shape_table:
 ;     (4,4) square-ish,  (5,3) wide,  (3,5) tall.
 ;   The high bytes of (dx, dy) give the integer map offset from the
 ;   blob centre.  Because the update equations approximate a rotation,
@@ -2195,7 +2195,7 @@ create_landscape:
 ; Ellipse shape table: pairs of (w exponent, h exponent) for draw_filled_ellipse_stroke.
 ; Larger exponent = more compression in that axis.
 ; Randomly indexed by (rand & 3)*2, giving one of: (4,4) square, (5,3) wide, (3,5) tall.
-D_27347:
+D_blob_shape_table:                     ; $6AD3 / 27347 - ellipse (w-exp, h-exp) pairs for terrain paint blobs; indexed by (rand & 3)*2
         defb    $04, $04    ; square-ish
         defb    $05, $03    ; wide
         defb    $03, $05    ; tall
@@ -2230,13 +2230,13 @@ SMC_27367:
         and     63
         add     a,16
         ld      (V_stroke_center+1),a       ; y centre
-        ; pick random shape from D_27347: (4,4), (5,3) or (3,5)
+        ; pick random shape from D_blob_shape_table: (4,4), (5,3) or (3,5)
         call    get_random_number
         and     3
         add     a,a                 ; index = (rand & 3) * 2
         ld      c,a
         ld      b,0
-        ld      hl,D_27347
+        ld      hl,D_blob_shape_table
         add     hl,bc
         ld      de,V_stroke_dims
         ldi                         ; copy w exponent to V_stroke_dims
@@ -2251,7 +2251,8 @@ SMC_27367:
 ; First 66 bytes: 8-neighbour dirt bitmasks (bits 0-7 = NW,N,NE,W,E,SW,S,SE are dirt).
 ; Second 66 bytes: replacement water-edge tile for the matching pattern.
 ; Tiles 1,3,4,5 are the diagonal/curved water-edge graphics; 2=TILE_DIRT.
-D_27425:
+D_shoreline_lookup:                        ; $6B21 / 27425
+                        ; $6B21 / 27425
         defb    $FE, $EB, $F5, $CB, $76, $6E, $DB
         defb    $7E, $E9, $7C, $3E, $D1, $8B, $F4, $8F 
         defb    $CF, $D3, $BE, $7D, $EF, $6C, $36, $EC
@@ -2274,8 +2275,8 @@ D_27425:
 
 
 ; Scan the entire 96x96 map and replace water cells that border land with
-; appropriate shoreline tile graphics, using the D_27425 lookup table.
-; For each TILE_WATER cell: get the 8-neighbour dirt bitmask, search D_27425
+; appropriate shoreline tile graphics, using the D_shoreline_lookup lookup table.
+; For each TILE_WATER cell: get the 8-neighbour dirt bitmask, search D_shoreline_lookup
 ; first half for a matching pattern, then write the corresponding edge tile.
 smooth_shoreline_tiles:
 .L6ba5  ld      b,96
@@ -2292,9 +2293,9 @@ smooth_shoreline_tiles:
         and     a
         jr      z,L6bd3                 ; no dirt neighbours: leave as water
         push    bc
-        ld      hl,D_27425
+        ld      hl,D_shoreline_lookup
         ld      bc,66
-        cpir                            ; search first half of D_27425 for bitmask d
+        cpir                            ; search first half of D_shoreline_lookup for bitmask d
         pop     bc
         jr      nz,L6bd3                ; pattern not in table: leave as water
         ld      de,65
@@ -2358,7 +2359,7 @@ V_stroke_center:        defw    0           ;VAR 6c02/27650 - landscape stroke c
 V_stroke_step:        defb    $05         ;VAR 6c04/27652 - landscape stroke step size (random 2-7, controls drawing density)
 V_stroke_tile:        defb    $02         ;VAR 6c05/27653 - landscape stroke tile type to paint (TILE_DIRT=2 for land pass, TILE_WATER=0 for water pass)
 V_stroke_constraint:        defb    $00         ;VAR 6c06/27654 - landscape stroke constraint tile (0=paint anywhere; else only overwrite cells containing this tile)
-V_stroke_dims:        defw    $0404       ;VAR 6c07/27655 - landscape stroke half-dimensions (w,h) loaded via ldi from D_27347
+V_stroke_dims:        defw    $0404       ;VAR 6c07/27655 - landscape stroke half-dimensions (w,h) loaded via ldi from D_blob_shape_table
 
 
 
@@ -2371,7 +2372,7 @@ V_stroke_dims:        defw    $0404       ;VAR 6c07/27655 - landscape stroke hal
 ;   Each of 49 steps applies a discretised rotation:
 ;     dx_new = dx - (dy >> w) - 1
 ;     dy_new = dy + (dx_new >> h) + 1
-;   where w = V_stroke_dims low byte, h = V_stroke_dims high byte (shape exponents from D_27347).
+;   where w = V_stroke_dims low byte, h = V_stroke_dims high byte (shape exponents from D_blob_shape_table).
 ;   Initial state: dx=0, dy=s (step size from V_stroke_step, range 2-7).
 ;   The high bytes of (dx, dy) give the integer cell offset from the centre.
 ;   At each step, a horizontal span of (-2 * dx_high) cells is painted at
@@ -2673,7 +2674,8 @@ V_selected_tool:    defb        1       ;VAR 6d50/27984 - currently selected bui
         ret     
 
 
-D_zone_sizes:
+D_zone_sizes:                        ; $6DAF / 28079
+                        ; $6DAF / 28079
         defb    $01, $01    ;Bulldozer
         defb    $01, $01    ;Road
         defb    $01, $01    ;Power lines
@@ -2896,7 +2898,7 @@ join_up_neighbour_cells:
 V_neighbour_tile_to_check:    defb    $00         ;VAR 28370 - cell to check for neight
 
 ;6ed3/28371
-D_28371:
+D_road_join_offsets:                    ; $6ED3 / 28371 - (type, tile) pairs for road/rail tile adjacency joining
         defb    $00, $01, $00, $02 
         defb    $00, $03, $00, $06 
         defb    $01, $01, $04, $09
@@ -2911,7 +2913,7 @@ D_28371:
         call    get_neighbours
         ld      e,d
         ld      d,0
-        ld      hl,D_28371
+        ld      hl,D_road_join_offsets
         add     hl,de
         ld      a,(V_neighbour_tile_to_check)
         add     a,(hl)
@@ -3005,7 +3007,7 @@ V_path_tile_type:    defb    0       ;VAR 28510/6f5e - tile type to place in pat
 
         ld      a,(hl)
         exx     
-        ld      hl,D_29291
+        ld      hl,D_joinable_tile_list
         ld      bc,8
         cpir    
         exx     
@@ -3047,7 +3049,8 @@ V_path_tile_type:    defb    0       ;VAR 28510/6f5e - tile type to place in pat
 ; bit 3 = needs power?      val 8
 ; bit 2 = transport - road? val 4
 ; bit 1 = transport - rail? val 2
-D_28572:
+D_tile_flags:                        ; $6F9C / 28572
+                        ; $6F9C / 28572
         defb    $00, $00, $00, $00, $00, $00, $80, $84
         defb    $84, $84, $84, $84, $84, $84, $84, $84
         defb    $84, $84, $85, $85, $82, $82, $82, $82
@@ -3127,19 +3130,22 @@ SMC_28735:
         ret     
 
 ;7062
-D_28770:
+D_power_tile_conversions:                        ; $7062 / 28770
+                        ; $7062 / 28770
         ;If we place power on one of these
         defb   $07, $08, $14, $15, $38, $39
         ;It converts to...
         defb   $31, $30, $32, $33, $21, $22
 ;706e 
 
-D_28782: 
+D_road_tile_conversions:                        ; $706E / 28782
+                        ; $706E / 28782
         ;If we place road on one of these
         defb    $14, $15, $21, $22, $38, $39 
         defb    $2E, $2F, $30, $31, $07, $08
 
-D_28794:
+D_rail_tile_conversions:                        ; $707A / 28794
+                        ; $707A / 28794
         ;If we place rail on one of these
         defb    $07, $08, $21, $22, $38, $39
         defb    $2F, $2E, $33, $32, $14, $15
@@ -3163,7 +3169,7 @@ place_joinables:
 place_road:
 .L709e  call    levelmap_xypos_from_cursor
 .L70a1  ld      a,(hl)
-        ld      hl,D_28782
+        ld      hl,D_road_tile_conversions
         ld      bc,6
         cpir    
         jp      nz,L709c        ;no match
@@ -3188,7 +3194,7 @@ place_tile:
 place_rail:
 .L70cc  call    levelmap_xypos_from_cursor
         ld      a,(hl)
-        ld      hl,D_28794
+        ld      hl,D_rail_tile_conversions
         ld      bc,6
         cpir    
         jp      nz,L709c
@@ -3199,7 +3205,7 @@ place_rail:
 place_power:
 .L70e3  call    levelmap_xypos_from_cursor
         ld      a,(hl)
-        ld      hl,D_28770
+        ld      hl,D_power_tile_conversions
         ld      bc,6
         cpir    
         jp      nz,L709c
@@ -3209,10 +3215,10 @@ place_power:
 
 ; Types used for auto-bulldoze
 ;70fa/28922
-D_28922:
+D_autobulldoze_free_tiles:              ; $70FA / 28922 - tiles that do not need explicit bulldoze (free to build on)
         defb    TILE_DIRT, TILE_WATER            ;DIRT, WATER
 ;70fc/28944
-D_28924:
+D_autobulldoze_tile_types:              ; $70FC / 28924 - tile types auto-bulldozeable; searched by cpir in bulldoze check
         defb    $03, $01, $05, $04, $06, $02
  
 V_auto_bulldoze_flag:    defb        0       ;VAR 28930/7102 - auto-bulldoze mode flag (2=large zone needs bulldoze check, 0=small tool; written but not subsequently read - possibly vestigial)
@@ -3250,7 +3256,7 @@ auto_bulldoze_nun_columns:
 .L7138  ld      a,(hl)
         push    hl      ;Address of top left of zone
         push    bc      ;Size of zone
-        ld      hl,D_28924
+        ld      hl,D_autobulldoze_tile_types
         ld      bc,7
         cpir    
         pop     bc
@@ -3261,7 +3267,7 @@ auto_bulldoze_nun_columns:
         ret     
 .L714b  push    hl
         push    bc
-        ld      hl,D_28922
+        ld      hl,D_autobulldoze_free_tiles
         ld      bc,2
         cpir    
         pop     bc
@@ -3384,11 +3390,11 @@ L71bc:
         jp      soundfx2
 
 ;71ff/29183
-D_29183:
+D_neighbour_type_index:                 ; $71FF / 29183 - 4-bit neighbour bitmask -> join-type index (0=no join)
         defb    $00, $01, $02, $00, $03, $00, $00, $00
         defb    $04, $00, $00, $00, $00, $00, $00, $00
 
-D_29199:
+D_join_tile_triplets:                   ; $720F / 29199 - join-type -> (E, D, fn) triplet for tile placement
         defb    $00, $00, $00, $00, $FF, $0C, $FF, $00 
         defb    $0B, $01, $00, $0B, $00, $01, $0C
         
@@ -3406,7 +3412,7 @@ L721e:
 
         ld      e,a
         ld      d,0
-        ld      hl,D_29183
+        ld      hl,D_neighbour_type_index
         add     hl,de
         ld      a,(hl)
         and     a
@@ -3416,7 +3422,7 @@ L721e:
         add     a,a
         add     a,b
         ld      e,a
-        ld      hl,D_29199
+        ld      hl,D_join_tile_triplets
         add     hl,de
         ld      e,(hl)
         inc     hl
@@ -3441,7 +3447,7 @@ SMC_29270:
 
 
 ;726b/29291
-D_29291:
+D_joinable_tile_list:                   ; $726B / 29291 - tile IDs that accept road/rail/power joins; searched by cpir
         defb    $2c, $2d, $1f, $20
         defb    $12, $13, $57,$58
 
@@ -3461,7 +3467,7 @@ action_zone_bulldoze:
         cp      87
         jp      c,L7367                 ;RIC in the centre
 
-.L7288  ld      hl,D_29291
+.L7288  ld      hl,D_joinable_tile_list
         ld      bc,8
         cpir    
         jr      z,L72ca                 ; (56)
@@ -3528,7 +3534,8 @@ action_zone_bulldoze:
 
 
 ; Zone bulldoze costs
-D_7301:
+D_bulldoze_costs:                        ; $7301 / 29441
+                        ; $7301 / 29441
         defb    0
         defb    1
         defb    4
@@ -3554,7 +3561,7 @@ D_7301:
         and     7
         ld      c,a
         ld      b,0
-        ld      hl,D_7301
+        ld      hl,D_bulldoze_costs
         add     hl,de
         ld      e,(hl)
         ld      d,0
@@ -3915,7 +3922,7 @@ tile_to_flags:
         jr      L75ac                   ; (8)
 .L75a4  ld      c,a
         ld      b,0
-        ld      hl,D_28572              ;Tile flag table
+        ld      hl,D_tile_flags              ;Tile flag table
         add     hl,bc
         ld      a,(hl)
 .L75ac  pop     hl
@@ -4118,7 +4125,8 @@ l_mult_hlxde:                               ; $7657 / 30295
         djnz    L766c                   ; (-21)
         ret     
 
-D_30338:
+D_special_zone_types:                        ; $7682 / 30338
+                        ; $7682 / 30338
         defb    $00         ;Police
         defb    $01         ;Fire
         defb    $02         ;Church
@@ -4156,7 +4164,7 @@ D_30338:
 .L76a7  ld      a,(ix+1)
         and     63
         ld      e,a
-        ld      hl,D_34835
+        ld      hl,D_zone_handler_config
         ld      bc,4
 
 .L76b3  ld      a,(hl)
@@ -4170,7 +4178,7 @@ D_30338:
 .L76bd  inc     hl
         ld      c,(hl)
         ld      b,0
-        ld      hl,D_30338
+        ld      hl,D_special_zone_types
         add     hl,bc
         ld      a,(hl)
         pop     bc
@@ -4193,7 +4201,7 @@ D_30338:
         scf     
         ret     
 
-D_30428:    
+D_cardinal_offsets:                     ; $76DC / 30428 - (dx, dy) pairs for 4 cardinal directions: N, E, S, W
         defb    $00, $ff
         defb    $01, $00
         defb    $00,$01
@@ -4211,14 +4219,14 @@ D_30428:
         ret     
 
 
-; Add direction offset (from D_30428 table) to bc coordinates
+; Add direction offset (from D_cardinal_offsets table) to bc coordinates
 ; Entry: a = direction index, bc = coordinates
 ; Exit:  bc = coordinates + offset for that direction
 .coords_add_direction_offset
 .L76ed  add     a,a
         ld      e,a
         ld      d,0
-        ld      hl,D_30428
+        ld      hl,D_cardinal_offsets
         add     hl,de
         ld      a,c
         add     a,(hl)
@@ -4979,7 +4987,8 @@ SMC_31705:
 
 
 ; Represents the influence of police/fire station
-D_31727:
+D_station_influence_kernel:                        ; $7BEF / 31727
+                        ; $7BEF / 31727
         defb    $09, $09, $02, $09, $09 
         defb    $09, $02, $01, $02, $09
         defb    $02, $01, $01, $01, $02 
@@ -4990,7 +4999,7 @@ D_31727:
 V_31752:    defb        0       ;VAR 31752/7c08
 
 .L7c09  ld      bc,(V_map_iter_xy)
-        ld      ix,D_31727
+        ld      ix,D_station_influence_kernel
         call    L7591           ;Fire map
         ld      de,50
         and     a
@@ -5013,7 +5022,7 @@ V_31752:    defb        0       ;VAR 31752/7c08
 V_31793:    defb    0       ;VAR 31793/7c31
 
 .L7c32  ld      bc,(V_map_iter_xy)
-        ld      ix,D_31727
+        ld      ix,D_station_influence_kernel
         call    L7589           ;Get police minimap address
         ld      de,50           ;Go 8 tiles up and two left??
         and     a
@@ -5057,7 +5066,8 @@ V_31793:    defb    0       ;VAR 31793/7c31
         ret     
 
 
-D_31863:
+D_stadium_effect_kernel:                        ; $7C77 / 31863
+                        ; $7C77 / 31863
         defb    $09, $04, $04, $04, $04, $09
         defb    $04, $03, $02, $02, $03, $04
         defb    $04, $02, $01, $01, $02, $04
@@ -5075,7 +5085,7 @@ V_traffic_bfs_steps:    defb    $ff       ;VAR 31935/7cbf - traffic BFS step lim
 
 
 .L7cc0  ld      bc,(V_map_iter_xy)
-        ld      ix,D_31863 
+        ld      ix,D_stadium_effect_kernel 
 
 .L7cc8  call    L7579       ;minimaps+2304
         ld      de,98
@@ -5972,8 +5982,8 @@ initialise_simulation_variables:
 ;      - V_ZonePwrFlg=1 if powered, 0 if not
 ;   b) Tiles $51-$56 (compact R/I/C variants): call check_ric_power
 ;      - updates tile to powered/unpowered variant (e.g. 81<->84)
-;   c) Dispatch via D_34835 lookup (tile type -> handler index)
-;      then D_34811 jump table -> zone handler
+;   c) Dispatch via D_zone_handler_config lookup (tile type -> handler index)
+;      then D_zone_handler_table jump table -> zone handler
 ;
 ; ZONE HANDLERS:
 ;   DoResidential / DoCommercial / DoIndustrial:
@@ -6535,7 +6545,7 @@ create_police_fire_minimaps:
 
 V_ZonePwrFlg: defb    0       ;VAR - zone is powered this cell (1=yes, 0=no)
 V_zone_proc_type: defb    0       ;VAR - zone processing type (1=big zone centre, 2=compact RIC tile)
-V_CChr: defb    0       ;VAR - raw tile type of the zone centre tile (used to index D_34835)
+V_CChr: defb    0       ;VAR - raw tile type of the zone centre tile (used to index D_zone_handler_config)
 V_zone_unpow_tile: defb    0       ;VAR - unpowered tile variant for check_ric_power
 
 ; Scan full 96x96 map; evaluate zone tiles and dispatch to zone handlers
@@ -6565,7 +6575,7 @@ process_ric_zones:
         jr      nz,L8703                ; (10)
         ld      a,(V_zone_proc_type)
         and     a
-        call    nz,L8789                ;Big zone: look up in D_34835, dispatch via D_34811
+        call    nz,L8789                ;Big zone: look up in D_zone_handler_config, dispatch via D_zone_handler_table
         call    L8898                   ;Handle road/rail/radioactive/flood tiles
 .L8703  inc     hl
         inc     e
@@ -6727,8 +6737,8 @@ dispatch_compact_ric:
         jp      z,L8c5b
         ret
 
-; Zone handler jump table, indexed by D_34835 byte 1
-D_34811:
+; Zone handler jump table, indexed by D_zone_handler_config byte 1
+D_zone_handler_table:                   ; $87FB / 34811 - dispatch table of function pointers for special zone processors
         defw    DoPolice        ;0
         defw    DoFire          ;1
         defw    DoChurch        ;2
@@ -6745,10 +6755,10 @@ D_34811:
 
 ; Zone lookup table: 4 bytes per entry
 ;   byte 0 = tile type (V_CChr) to match
-;   byte 1 = D_34811 handler index (*2 for word table offset)
+;   byte 1 = D_zone_handler_table handler index (*2 for word table offset)
 ;   byte 2 = V_34921+1 (zone sub-type parameter)
 ;   byte 3 = V_34921+0 (zone density/population scale factor)
-D_34835:
+D_zone_handler_config:                  ; $8813 / 34835 - per-zone config: (tile-type, handler-idx, ?, budget) 4 bytes each
         defb    0,0,0,10                ;police
         defb    1,1,0,10                ;fire
         defb    2,2,0,5                 ;church
@@ -6773,12 +6783,12 @@ D_34835:
         defb    $ff,$ff                 ;sentinel
 
 V_34921:
-        defb    $00, $00         ;VAR 8869/34921 - density/sub-type from D_34835 for current zone
+        defb    $00, $00         ;VAR 8869/34921 - density/sub-type from D_zone_handler_config for current zone
 
-; Dispatch zone handler: search D_34835 for V_CChr (tile type), load V_34921
-; parameters, then jump via D_34811 to the appropriate DoXxx handler
+; Dispatch zone handler: search D_zone_handler_config for V_CChr (tile type), load V_34921
+; parameters, then jump via D_zone_handler_table to the appropriate DoXxx handler
 dispatch_zone_handler:
-.L886b  ld      hl,D_34835
+.L886b  ld      hl,D_zone_handler_config
         ld      bc,4
         ld      a,(V_CChr)
         ld      e,a
@@ -6800,7 +6810,7 @@ dispatch_zone_handler:
         ld      (V_34921),a
         sla     c
         ld      b,0
-        ld      hl,D_34811
+        ld      hl,D_zone_handler_table
         add     hl,bc
         ld      a,(hl)
         inc     hl
@@ -7027,7 +7037,7 @@ V_35226:    defb    0       ;VAR 35226/899a
 .L89f3  bit     7,(hl)
         jp      nz,L7b86
         push    hl
-        ld      hl,D_29291
+        ld      hl,D_joinable_tile_list
         ld      bc,8
         cpir    
         pop     hl
@@ -7037,7 +7047,7 @@ V_35226:    defb    0       ;VAR 35226/899a
         ret     
 
 
-D_35336:
+D_fire_spread_tiles:                    ; $8A08 / 35336 - 8-neighbour fire spread: (dy, dx, fire-tile) triplets, indexed by (rand & 7)*3
 ;8a08
         defb    $FF, $FF, $49, $FF, $00, $4A, $FF, $01
         defb    $4B, $00, $FF, $50, $00, $01, $4C, $01
@@ -7054,7 +7064,7 @@ D_35336:
         add     a,c
         ld      c,a
         ld      b,0
-        ld      ix,D_35336
+        ld      ix,D_fire_spread_tiles
         add     ix,bc
         ld      a,(V_map_iter_xy)
         add     a,(ix+1)
@@ -7275,7 +7285,7 @@ sim_place_zone_3x3:
         ld      bc,$0303
         jp      place_zone_direct
 
-D_35770:
+D_density_class_table:                  ; $8BBA / 35770 - population count index -> density class 0-3
         defb    $00, $00, $01, $01, $01, $02
         defb    $02, $03, $03, $03
         
@@ -7335,7 +7345,7 @@ L8be0:
         dec     a
         ld      c,a
         ld      b,0
-        ld      hl,D_35770
+        ld      hl,D_density_class_table
         add     hl,bc
         ld      a,(hl)
         ld      bc,(V_map_iter_xy)
@@ -7796,7 +7806,7 @@ census_church_hosp:
         ld      (V_church_demand),a       ;church demand
         ret     
 
-; V_36711: 5-byte speed-control block, copied from D_8f6c each tick
+; V_36711: 5-byte speed-control block, copied from D_sim_speed_params each tick
 ;   +0 = DoChurch/DoHospital random downgrade mask (and X)
 ;   +1 = DoResidential/DoCommercial/DoIndustrial random mask (and X)
 ;   +2 = mask for zone growth random check
@@ -7805,14 +7815,15 @@ census_church_hosp:
 V_36711:  defb    $08, $07, $07, $07, $01     ;VAR 36711 (default = NORMAL speed)
 
 ; Speed settings table: 5 bytes per row, indexed by V_simulation_speed (0=FAST..3=PAUSED)
-D_8f6c:
+D_sim_speed_params:                        ; $8F6C / 36716
+                        ; $8F6C / 36716
         defb    $08, $01, $0f, $01, $00     ;FAST   (month every tick)
         defb    $04, $03, $1f, $03, $01     ;NORMAL (month every 2 ticks)
         defb    $03, $07, $3f, $07, $03     ;SLOW   (month every 4 ticks)
         defb    $ff, $ff, $ff, $ff, $ff     ;PAUSED (never advance month)
 
 
-; Copy D_8f6c row for current speed into V_36711
+; Copy D_sim_speed_params row for current speed into V_36711
 .set_simulation_speed
 .L8f80  ld      a,(V_simulation_speed)
         ld      b,a
@@ -7821,7 +7832,7 @@ D_8f6c:
         add     a,b
         ld      c,a
         ld      b,0
-        ld      hl,D_8f6c
+        ld      hl,D_sim_speed_params
         add     hl,bc
         ld      de,V_36711
         ld      bc,5
@@ -8432,11 +8443,11 @@ print_budget_amounts:
 
 
 ;950a/38154
-D_38154:
+D_funding_effect_mask:                  ; $950A / 38154 - funding ratio index -> road effect bitmask (16 levels)
         defb    $0F, $1F, $1F, $3F, $3F, $7F, $7F, $FF
         defb    $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF
 
-D_38170:
+D_funding_effect_level:                 ; $951A / 38170 - funding ratio index -> service effectiveness 0-15 (16 levels)
         defb    $00, $03, $06, $07, $08, $0A, $0C, $0F
         defb    $0F, $0F, $0F, $0F, $0F, $0F, $0F, $0F
         
@@ -8459,7 +8470,7 @@ D_38170:
         call    L_div16x16
         ld      c,l
         ld      b,0
-        ld      hl,D_38154
+        ld      hl,D_funding_effect_mask
         add     hl,bc
         ld      a,(hl)
 .L9555  ld      (V_35013),a
@@ -8482,7 +8493,7 @@ D_38170:
         call    L_div16x16
         ld      c,l
         ld      b,0
-        ld      hl,D_38170
+        ld      hl,D_funding_effect_level
         add     hl,bc
         ld      a,(hl)
 
@@ -8505,7 +8516,7 @@ D_38170:
         call    L_div16x16
         ld      c,l
         ld      b,0
-        ld      hl,D_38170
+        ld      hl,D_funding_effect_level
         add     hl,bc
         ld      a,(hl)
 
@@ -8602,7 +8613,8 @@ print_stats:                                ; $9737 / 38711
 
 ; 9750, 38746
 ; Population sizes to transition
-D_population_boundaries:
+D_population_boundaries:                        ; $9750 / 38736
+                        ; $9750 / 38736
         defb    $d0, $07, $00       ;2000
         defb    $10, $27, $00       ;10000
         defb    $50, $c3, $00       ;50000
@@ -9151,7 +9163,7 @@ set_alert_message:
         ret     
 
 ; 39758/9b4e
-D_39758:
+D_minimap_section_coords:               ; $9B4E / 39758 - (row, col) char-cell pairs for 9 minimap section flash highlight positions
         defb    $4, $3
         defb    $4, $4
         defb    $4, $5
@@ -9167,7 +9179,7 @@ D_39758:
         add     a,a
         ld      c,a
         ld      b,0
-        ld      hl,D_39758
+        ld      hl,D_minimap_section_coords
         add     hl,bc
         ld      b,(hl)
         inc     hl
@@ -9321,7 +9333,8 @@ V_minimap_xy:    defw    0       ;VAR 9c31/39985 - xypos in minimap being printe
 ; Address within the levelmap that 0-8 keys correspond to
 
 ;39987
-D_minimap_offsets:
+D_minimap_offsets:                        ; $9C33 / 39987
+                        ; $9C33 / 39987
         defw    levelmap
         defw    levelmap+24
         defw    levelmap+48
@@ -9434,7 +9447,7 @@ D_minimap_offsets:
 
 
 ; Attributes related to minimap?
-D_40186:
+D_minimap_attr_intensity:               ; $9CFA / 40186 - attribute intensity scale for minimap overlay (0..127, 8 levels)
         defb    $00, $49, $52, $5b, $64, $6d, $76, $7f
 
 ; Print the attribute intensity for a zone
@@ -9444,7 +9457,7 @@ do_minimap_attr_intensity:
         ret     z
         ld      c,a
         ld      b,0
-        ld      hl,D_40186
+        ld      hl,D_minimap_attr_intensity
         add     hl,bc
         ld      c,(hl)
 .L9d0c  ld      hl,(SMC_39894+1)
@@ -10642,7 +10655,7 @@ V_tapeheader:
 V_tape_money:    defs    8               ;VAR 43324/
    
 
-D_43332:    defm        "HERESVILLE  "
+D_43332:    defm        "HERESVILLE  "          ; $A944 / 43332 - default city name
 
 
 ; End of tape header
