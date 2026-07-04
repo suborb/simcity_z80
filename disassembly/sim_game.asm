@@ -103,7 +103,7 @@
 
 V_kempston:   defb    1       ;VAR 23423 - kempston enabled or not
 
-read_kempston:
+read_kempston:                              ; $5B80 / 23424
 .L5b80
         ld      a,(V_kempston)
         and     a
@@ -121,11 +121,11 @@ L5b88:  cpl
         defb        8
         defm        "LKJH .MNB"
 
-.V_23474        defb        0        ;VAR - holds key pressed value
+.V_key_pressed        defb        0        ;VAR - holds key pressed value
 
 ; Munch up the previously read keys and make something
 ; meaningful out of them
-; It seems that V_23474 will hold the key status...
+; It seems that V_key_pressed will hold the key status...
 
 .munchkeys  
         ld      hl,keystore
@@ -143,18 +143,18 @@ L5bbb:  ld      a,(hl)
         inc     hl
         djnz    L5bbb                   ; (-16)
         ld      a,255
-        ld      (V_23474),a
+        ld      (V_key_pressed),a
         scf     
         ret     
 .L5bd2  rrca    
         jr      nc,L5bdb                ; (6)
         ld      a,c
-        ld      (V_23474),a
+        ld      (V_key_pressed),a
 .L5bd9  or      a
         ret     
 .L5bdb  inc     c
         jr      L5bd2                   ; (-12)
-        nop     
+        defb    0               ; padding
 
 ; Return the key just pressed
 ; Returns an ASCII code - I'm sure this code is just generic z80 with 
@@ -166,7 +166,7 @@ L5bbb:  ld      a,(hl)
 .getkeyval  
         call    munchkeys
         ret     c
-        ld      a,(V_23474)
+        ld      a,(V_key_pressed)
         ld      e,a
         ld      d,0
         ld      hl,keytab
@@ -342,7 +342,7 @@ L5bbb:  ld      a,(hl)
 V_random_seed: defw        $fc03        ;VAR 23748 - random seed
 
 ; Random number generator?
-get_random_number:
+get_random_number:                          ; $5CC6 / 23750
 .L5cc6
         push    hl
         push    de
@@ -386,8 +386,8 @@ get_random_number:
         srl        b
         srl        c
         call    xypos
-        ld      (V_23868),hl
-        ld      ix,V_23860
+        ld      (V_pointer_xy_prev),hl
+        ld      ix,V_pointer_underlay
         ld      iy,D_23796
         ld      de,D_23788
         ld      b,8
@@ -406,12 +406,12 @@ get_random_number:
         djnz    L5d1d                   ; (-22)
         ret     
 
-.V_23860        defs        8        ;VAR - used to hold what was under pointer
-.V_23868        defw        0        ;VAR - old pointer posn
+.V_pointer_underlay        defs        8        ;VAR - used to hold what was under pointer
+.V_pointer_xy_prev        defw        0        ;VAR - old pointer posn
 
 .blankpointer  
-        ld      hl,(V_23868)
-        ld      de,V_23860
+        ld      hl,(V_pointer_xy_prev)
+        ld      de,V_pointer_underlay
         ld      b,8
 .L5d46  ld      a,(de)
         ld      (hl),a
@@ -420,20 +420,20 @@ get_random_number:
         djnz    L5d46                   ; (-8)
         ret     
 
-.V_23887        defw        $0101        ;VAR 23887 - zone size related
-.V_23889        defw        0        ;VAR - unknown
-.V_23891        defw        0        ;VAR - unknown
+.V_zone_cursor_size        defw        $0101        ;VAR 23887 - zone size related
+.V_map_cursor_cell        defw        0        ;VAR - map character-cell coordinates of cursor (b=row, c=col, derived from pixel pointer)
+.V_cursor_validity        defw        0        ;VAR - byte 0 = raw cursor Y pixel; byte 1 = cursor in-map validity flag (1=valid, 0=outside map)
 
 ; Some pointer control routine
 
 .L5d55  xor     a
-        ld      (V_23891),a
-        ld      (V_23891+1),a
+        ld      (V_cursor_validity),a
+        ld      (V_cursor_validity+1),a
         ld      bc,(V_pointerxy)
         ld      a,b
         cp      64
         ret     c
-        ld      (V_23891),a
+        ld      (V_cursor_validity),a
         ld      a,b
         sub     64
         srl     a
@@ -443,11 +443,11 @@ get_random_number:
         ld      a,c
         srl     a
         ld      c,a
-        ld      (V_23889),bc
+        ld      (V_map_cursor_cell),bc
         ld      a,b
         add     a,8
         ld      b,a
-        ld      hl,(V_23887)
+        ld      hl,(V_zone_cursor_size)
         ld      a,b
         add     a,h
         cp      25
@@ -457,9 +457,9 @@ get_random_number:
         cp      33
         ret     nc
         ld      a,1
-        ld      (V_23891+1),a
+        ld      (V_cursor_validity+1),a
 .L5d8f  call    xypos
-        ld      bc,(V_23887)
+        ld      bc,(V_zone_cursor_size)
         sla     b
         sla     b
         sla     b
@@ -632,7 +632,7 @@ replace_with_direct_prchar_call:
         ret     
 
 
-endctrl:
+endctrl:                                    ; $5E78 / 24184
 .L5e78
         inc     hl
         jp      (hl)
@@ -659,7 +659,7 @@ endctrl:
         add     hl,de
         jp      nxtctrl
 
-.V_24213        defw        $1020                ;VAR - holds textxy
+.V_text_col_width        defw        $1020                ;VAR - holds textxy
 
 
 .L5e97  ld      b,(hl)
@@ -670,14 +670,14 @@ endctrl:
         inc     hl
         ld      d,(hl)
         ld      (textxy),bc
-        ld      (V_24213),de
+        ld      (V_text_col_width),de
         ld      a,(textxy)
         ld      (SMC_24334+1),a
         ld      a,56
         ld      b,57
         ld      c,58
         call    L5ed3
-        ld      a,(V_24213+1)
+        ld      a,(V_text_col_width+1)
         sub     2
         ld      b,a
 
@@ -697,6 +697,9 @@ endctrl:
 .L24274
         defb        $01
 
+; Print one horizontal row of zone UDGs
+; Entry: a = left-edge UDG, b = middle UDG, c = right-edge UDG
+.print_zone_tile_row                        ; $5ED3 / 24275
 .L5ed3
         ld      (SMC_24296+1),a
         ld      a,b
@@ -709,7 +712,7 @@ endctrl:
 SMC_24296:
         ld      a,64
         call    prudg
-        ld      a,(V_24213)
+        ld      a,(V_text_col_width)
         sub     2
         ld      b,a
 
@@ -805,7 +808,7 @@ text_months:
 
 ; Print the date on screen
 ; Routine $5fae
-print_date:
+print_date:                                 ; $5FAE / 24494
 .L5fae
         ld      a,(V_month)
         ld      hl,text_months
@@ -878,6 +881,7 @@ L6088:
         defb    ' ' + 128
 
 ; Code 24
+.alert_msg_demand_zones                     ; $60C2 / 24770
 .L60c2
         defm    "MORE RESIDENTIAL ZONES NEEDE"      ;24
         defb    'D' + 128
@@ -885,6 +889,7 @@ L6088:
         defb    'D' + 128
         defm    "MORE INDUSTRIAL ZONES NEEDE"       ;26
         defb    'D' + 128
+.alert_msg_demand_infra                     ; $6117 / 24855
 .L6117
         defm    "NEED BIGGER ROAD NETWOR"           ;28
         defb    'K' + 128
@@ -892,6 +897,7 @@ L6088:
         defb    'M' + 128
         defm    "NEED A POWER PLAN"                 ;32
         defb    'T' + 128
+.alert_msg_demand_special                   ; $6158 / 24920
 .L6158
         defm    "THE PEOPLE WANT A STADIU"          ;34
         defb    'M'+128
@@ -901,6 +907,7 @@ L6088:
         defb    'T' + 128
         defm    "PEOPLE DEMAND FIRE DEP"
         defb    'T' + 128
+.alert_msg_demand_services                  ; $61BA / 25018
 .L61ba
         defm    "PEOPLE DEMAND POLICE DEP"
         defb    'T' + 128
@@ -914,6 +921,7 @@ L6088:
         defb    'S' + 128
         defm    "ZONES NEED POWE"
         defb    'R' + 128
+.alert_msg_disasters                        ; $6248 / 25160
 .L6248
         defm    "BROWNOUTS DETECTE"
         defb    'D' + 128
@@ -936,10 +944,11 @@ L6088:
         defm    "TORNADO DETECTE"
         defb    'D' + 128
 
-; $6305
+; $6305 - look up current tool name from text_table and print it
+.print_selected_tool_name
 L6305:
         ld      hl,text_table  ;table above
-        ld      a,(V_27984)
+        ld      a,(V_selected_tool)
         call    get_word_from_table
         ld      bc,$0401
         ld      a,19
@@ -1072,8 +1081,7 @@ pointer_down:
         jp      draw_map
 
 V_pointer_charxy:   defw        0   ;VAR 25545/63c9 - pointer coords reduced to chars
-        nop     
-        nop     
+        defb    0, 0            ; padding
 
 .L63cd  ld      a,(keystore+7)
         and     1       ;'SPACE'
@@ -1125,11 +1133,11 @@ handle_menus:
         ld      ix,menu_windows     ;42178
         jp      L66f2
 
-V_25651:    defb    0       ;VAR 256511/6433
+V_road_tile_variant:    defb    0       ;VAR 25651/6433 - road tile variant selector (bit 4 of current tile's flags; picks between two medium-traffic graphics)
 
 .L6434  ld      a,(V_36767)
         and     16
-        ld      (V_25651),a
+        ld      (V_road_tile_variant),a
         ld      a,(V_36767)
         and     15
         add     a,8
@@ -1137,7 +1145,7 @@ V_25651:    defb    0       ;VAR 256511/6433
         ld      c,0
         call    xypos
         ld      (SMC_print_tile_hl+1),hl
-        ld      bc,(V_25863)
+        ld      bc,(V_view_topleft)
         ld      a,(V_36767)      
         and     15
         add     a,b
@@ -1215,7 +1223,7 @@ update_road_tile_for_traffic:
 .L64b5  push    hl
         push    de
         push    bc
-        ld      hl,(V_25865)
+        ld      hl,(V_map_render_ptr)
         call    L7635           ;Get coords of address
         call    get_traffic_density_value
         ld      a,(hl)
@@ -1226,14 +1234,14 @@ update_road_tile_for_traffic:
         jr      nc,L64d3                ; (10)
         cp      150
         ret     c
-        ld      a,(V_25651)
+        ld      a,(V_road_tile_variant)
         and     a
         jr      z,L64d3                 ; (1)
         inc     b
 .L64d3  ld      l,b
-        ret     
+        ret
 
-        nop     
+        defb    0               ; padding
 
 .L64d6  ld      hl,V_current_zone_width_to_print
         dec     (hl)
@@ -1260,16 +1268,16 @@ update_road_tile_for_traffic:
 V_tile_colour_offset:   defw    0       ;6505/25861 offset to colour for tiles
 
 ;6507
-.V_25863        defb    $1e, $25        ;VAR  6507/25863 coordinates of top left of view
+.V_view_topleft        defb    $1e, $25        ;VAR  6507/25863 coordinates of top left of view
 
 ;6509
-V_25865:    defw    0       ;VAR 25865/6509
+V_map_render_ptr:    defw    0       ;VAR 25865/6509 - current map render address (pointer into level map, kept in sync with screen tile printer)
         
 ; draw level on screen?
 .draw_map
 .L650b  ld      hl,18432
         ld      (SMC_print_tile_hl+1),hl          ;SMC code nobbling
-        ld      bc,(V_25863)          ;Coordinates for mapview top left corner
+        ld      bc,(V_view_topleft)          ;Coordinates for mapview top left corner
         call    levelmap_xypos
         ld      de,64
         ld      b,16                ;16 rows to show
@@ -1280,7 +1288,7 @@ V_25865:    defw    0       ;VAR 25865/6509
         ld      a,(hl)
         cp      128
         call    nc,L655b                ;
-.L652b  ld      (V_25865),hl              ;Holds the map pointer?
+.L652b  ld      (V_map_render_ptr),hl              ;Holds the map pointer?
         exx     
         ld      hl,udgs + 3296
         ld      (V_tile_colour_offset),hl
@@ -1313,13 +1321,13 @@ V_left_tile_index:    defw    0   ;VAR 6559/25945 - index for furthest left tile
 .L655b  push    hl
         pop     ix          ;ix = position on map
         xor     a
-        ld      (V_26002),a
+        ld      (V_zone_x_offset),a
         exx     
         ld      a,(ix+0)
         cp      192
         call    nc,find_left_edge_of_zone
             ;ix = map coordinate of furthest left column of zone
-        ld      a,(V_26002)
+        ld      a,(V_zone_x_offset)
         ld      c,a
         ld      b,0
         ld      a,(ix+0)
@@ -1342,11 +1350,11 @@ V_left_tile_index:    defw    0   ;VAR 6559/25945 - index for furthest left tile
         exx     
         ret     
 
-V_26002:    defb    0       ;VAR 26002 - how far the current x coordiante is in the zone
+V_zone_x_offset:    defb    0       ;VAR 26002 - how far the current x coordiante is in the zone
 
 ; Steps back in X to find the start of a special zone
 find_left_edge_of_zone:
-.L6593  ld      hl,V_26002
+.L6593  ld      hl,V_zone_x_offset
 .L6596  ld      a,(ix+0)
         and     192
         cp      192
@@ -1355,7 +1363,7 @@ find_left_edge_of_zone:
         dec     ix
         jr      L6596                   ; (-13)
 
-V_26019:    defw    $40bd          ;VAR 26019/65a3 - holds xy coords temporarily?
+V_print_end_pos:    defw    $40bd          ;VAR 26019/65a3 - saved screen address after last printed number (textpos at end of prt24bit_cde)
 
 
 ; Print a 16 bit number with sign
@@ -1390,8 +1398,8 @@ V_26019:    defw    $40bd          ;VAR 26019/65a3 - holds xy coords temporarily
 
 prt24bit_cde:
 .L65c1  xor     a
-        ld      (V_26189),a
-        ld      (V_26189+1),a
+        ld      (V_num_print_state),a
+        ld      (V_num_print_state+1),a
         call    prneg24
         push    hl
         push    bc
@@ -1434,8 +1442,8 @@ prt24bit_cde:
         ld      b,l
         call    L666f
         ld      hl,(textpos)
-        ld      (V_26019),hl
-        ld      a,(V_26189+1)
+        ld      (V_print_end_pos),hl
+        ld      a,(V_num_print_state+1)
         and     a
         ret     z
 
@@ -1479,7 +1487,7 @@ prt24bit_cde:
         pop     hl
         ret     
 
-V_26189:        defw       $0202       ;VAR 26189/664d
+V_num_print_state:        defw       $0202       ;VAR 26189/664d - number printing state: byte 0 = leading-zero suppression flag (0=still suppressing); byte 1 = count of suppressed leading zeros (printed as trailing spaces)
 
 
 .L664f  ld      b,0
@@ -1498,13 +1506,13 @@ V_26189:        defw       $0202       ;VAR 26189/664d
         ld      c,a
         exx     
         dec     b
-        ld      a,(V_26189)
+        ld      a,(V_num_print_state)
         and     a
         jr      nz,L666f                ; (7)
         ld      a,b
         and     a
         jr      z,L667b                 ; (15)
-        ld      (V_26189),a
+        ld      (V_num_print_state),a
 
 .L666f  ld      a,b
         add     a,48
@@ -1512,7 +1520,7 @@ V_26189:        defw       $0202       ;VAR 26189/664d
         call    replace_with_direct_prchar_call
         jp      incprpos
 
-.L667b  ld      hl,V_26189+1
+.L667b  ld      hl,V_num_print_state+1
         inc     (hl)
         ret     
 
@@ -1668,8 +1676,8 @@ print_routine_ix:
         ret
 
 ;6757/26439
-V_26439:    defw    0       ;VAR 26439
-V_26441:    defb    0       ;VAR 26441
+V_cmd_stream_base:    defw    0       ;VAR 26439 - saved IX register (base pointer into current display command stream)
+V_status_row:    defb    0       ;VAR 26441 - current status panel row (initialised from command stream, incremented each row)
 
 
 ; Zeros...
@@ -1679,17 +1687,17 @@ V_26442:
 
         defs        107       ;What's up here? - Selection table? LOOK!
 
-V_26562:    defb    0       ;VAR 26562
+V_update_slot_count:    defb    0       ;VAR 26562 - count of registered display-update slots (incremented by L6806 each time an item is registered)
 
 .L67c3  ld      iy,V_26442
-        ld      (V_26439),ix
+        ld      (V_cmd_stream_base),ix
         xor     a
-        ld      (V_26562),a
+        ld      (V_update_slot_count),a
         ld      a,(ix+0)
-        ld      (V_26441),a
+        ld      (V_status_row),a
         inc     ix
 
-.L67d7  ld      hl,V_26441
+.L67d7  ld      hl,V_status_row
         inc     (hl)
         ld      a,1
         ld      (textxy),a
@@ -1716,7 +1724,9 @@ V_26562:    defb    0       ;VAR 26562
         ret     
 
 
-.L6806  ld      a,(V_26441)
+; Save current row and IX into update slots table, increment slot count
+.register_update_slot
+.L6806  ld      a,(V_status_row)
         ld      (iy+0),a
         push    ix
         pop     hl
@@ -1724,7 +1734,7 @@ V_26562:    defb    0       ;VAR 26562
         ld      (iy+2),h
         ld      de,3
         add     iy,de
-        ld      hl,V_26562
+        ld      hl,V_update_slot_count
         inc     (hl)
         ret     
 
@@ -1739,31 +1749,31 @@ V_26562:    defb    0       ;VAR 26562
         jr      L67d7                   ; (-88)
 
 .L682f  inc     ix
-        ld      a,(V_26441)
+        ld      a,(V_status_row)
         ld      b,a
         ld      c,0
         ld      (textxy),bc
         ld      a,32
-        ld      (V_24213),a
+        ld      (V_text_col_width),a
         ld      a,64
         ld      b,65
         ld      c,66
         call    L5ed3
         jr      L67d7                   ; (-116)
 
-V_26699:    defb    0   ;VAR 26699/684b
+V_setting_display_val:    defb    0   ;VAR 26699/684b - temp: boolean setting value read from map, used to print ON/OFF in status panel
 
 .L684c  call    L6806
         inc     ix
         ld      l,(ix+0)
         ld      h,(ix+1)
         ld      a,(hl)
-        ld      (V_26699),a
+        ld      (V_setting_display_val),a
         inc     ix
         inc     ix
         call    L6882
         call    L6922
-        ld      a,(V_26699)
+        ld      a,(V_setting_display_val)
         and     a
         jr      z,L6876                 ; (11)
         call    prt_ctrl
@@ -1778,7 +1788,7 @@ V_26699:    defb    0   ;VAR 26699/684b
         inc     ix
         jp      L67d7
 
-.L6882  ld      a,(V_26441)
+.L6882  ld      a,(V_status_row)
         ld      b,a
         ld      c,1
         call    xypos
@@ -1849,7 +1859,7 @@ V_26699:    defb    0   ;VAR 26699/684b
         ret     
 
 
-.L6910  ld      a,(V_26441)
+.L6910  ld      a,(V_status_row)
         call    L6905
         ld      a,(textxy)
         ld      (hl),a
@@ -1862,7 +1872,7 @@ V_26699:    defb    0   ;VAR 26699/684b
         ret     
 
 
-.L6922  ld      a,(V_26441)
+.L6922  ld      a,(V_status_row)
         ld      b,a
         ld      c,24
         ld      (textxy),bc
@@ -1881,9 +1891,11 @@ V_26699:    defb    0   ;VAR 26699/684b
         djnz    L693a                   ; (-7)
         ret     
 
-.V_26496        defw        0                ;VAR - sommat with printing address
+.V_menu_draw_hook        defw        0                ;VAR - sommat with printing address
 
-.L6944  ld      a,(V_26562)
+; Menu interaction loop: Q=up, A=down, SPACE=select
+.run_menu
+.L6944  ld      a,(V_update_slot_count)
         and     a
         ret     z
         xor     a
@@ -2004,6 +2016,8 @@ V_27029:    defb    0       ;VAR 27029/6995
         call    L6a16
         jp      L6950
 
+; Print the menu item count (from V_27025) at the menu position
+.print_menu_item_count
 .L6a16  ld      bc,(V_27027)
         call    xypos
         ld      (textpos),hl
@@ -2014,7 +2028,9 @@ V_27029:    defb    0       ;VAR 27029/6995
         ret     
 
 
-.L6a2a  ld      hl,(V_26496)
+; Call the display hook stored in V_menu_draw_hook (if non-zero)
+.invoke_display_hook
+.L6a2a  ld      hl,(V_menu_draw_hook)
         ld      a,h
         or      l
         ret     z
@@ -2061,6 +2077,8 @@ menu_up:
         ret     z
         call    L6a60
         ld      (hl),a
+; XOR screen attributes on the current menu selection row (highlight/unhighlight)
+.toggle_menu_row_highlight
 .L6a60  push    hl
         push    af
         call    L6a7e
@@ -2071,7 +2089,7 @@ menu_up:
         ret     
 
 menu_down:
-.L6a6c  ld      a,(V_26562)
+.L6a6c  ld      a,(V_update_slot_count)
         ld      b,a
         ld      hl,V_menu_selection
         ld      a,(hl)
@@ -2085,6 +2103,8 @@ menu_down:
 
 V_menu_selection:    defb        0   ;VAR 6a7d/27261 - Current menu selection
 
+; Return hl = pointer into update slots table for current menu selection (selection * 3)
+.get_menu_slot_ptr
 .L6a7e  ld      a,(V_menu_selection)
         ld      b,a
         add     a,a
@@ -2096,83 +2116,141 @@ V_menu_selection:    defb        0   ;VAR 6a7d/27261 - Current menu selection
         ret     
 
 V_InitialSeed:   defw    3       ;VAR 6a8c/27276 - initial random seed
- 
+
+; ============================================================
+; LANDSCAPE GENERATION
+; ============================================================
+;
+; The map is 96x96 cells.  Generation runs in three passes:
+;
+; PASS 1 - LAND BLOBS
+;   The map is zeroed (all TILE_WATER).  paint_landscape_strokes is
+;   called to lay down 128 filled elliptical blobs of TILE_DIRT.
+;   No constraint is set, so blobs paint over water freely.
+;   Together the overlapping blobs form the main landmasses and
+;   coastlines.
+;
+; PASS 2 - SHORELINE SMOOTHING  (smooth_shoreline_tiles)
+;   Every TILE_WATER cell that borders land is replaced with one of
+;   five water-edge tiles (1-5) chosen by looking up the 8-neighbour
+;   dirt pattern in the two-part table D_27425.  First half of that
+;   table (66 entries) holds bitmasks; second half holds the matching
+;   replacement tile.  This gives visually smooth coastlines.
+;
+; PASS 3 - TREE COVERAGE
+;   paint_landscape_strokes is called again for 32 blobs, this time
+;   painting tile 6 (trees) but ONLY over existing TILE_DIRT cells
+;   (V_stroke_constraint = TILE_DIRT acts as the constraint).  This scatters
+;   woodland across the interior of landmasses.
+;
+; STROKE ALGORITHM  (draw_filled_ellipse_stroke)
+;   Each blob is a filled ellipse drawn without multiplication or
+;   trigonometry, using a discretised rotation update:
+;
+;     dx_new = dx - (dy >> w) - 1
+;     dy_new = dy + (dx_new >> h) + 1
+;
+;   (dx, dy) are 16-bit signed fixed-point (8.8) accumulators,
+;   initialised to (0, s) where s = random step size 2-7.
+;   w and h are the per-axis divisor exponents chosen from D_27347:
+;     (4,4) square-ish,  (5,3) wide,  (3,5) tall.
+;   The high bytes of (dx, dy) give the integer map offset from the
+;   blob centre.  Because the update equations approximate a rotation,
+;   (dx_high, dy_high) traces an ellipse over 49 steps.
+;   At each step a horizontal span of width = -2*dx_high cells is
+;   painted at row (y_center + dy_high), giving the filled interior.
+; ============================================================
+
 create_landscape:
 .L6a8e  call    initialise_simulation_variables
-        ld      hl,levelmap
+        ld      hl,levelmap         ; zero the whole map → all TILE_WATER
         ld      de,levelmap+1
         ld      bc,9215
         ld      (hl),0
-        ldir    
+        ldir
         ld      ix,text_generating_landscape
         call    cls_map
         call    cls_print_topbox
         call    L67c3
         ld      hl,(V_InitialSeed)
-        ld      (V_random_seed),hl
+        ld      (V_random_seed),hl  ; seed RNG from saved initial seed
+        ; --- Pass 1: land blobs (128 strokes, TILE_DIRT, no constraint)
         xor     a
-        ld      (V_27654),a
-        ld      bc,32770
-        ld      e,7
-        call    L6adb
+        ld      (V_stroke_constraint),a         ; constraint=0: paint anywhere
+        ld      bc,32770            ; b=128 strokes, c=TILE_DIRT
+        ld      e,7                 ; step-size mask (produces 2-7)
+        call    paint_landscape_strokes
+        ; --- Pass 2: shoreline smoothing
         ld      a,2
-        ld      (V_27653),a
-        call    L6ba5           ;Generate part f the map
+        ld      (V_stroke_tile),a         ; tile=TILE_DIRT (used by smooth_shoreline_tiles)
+        call    smooth_shoreline_tiles
+        ; --- Pass 3: tree coverage (32 strokes, tile 6=trees, only over dirt)
         ld      a,2
-        ld      (V_27654),a
-        ld      bc,$2006
-        ld      e,3
-        call    L6adb
+        ld      (V_stroke_constraint),a         ; constraint=TILE_DIRT: only overwrite land
+        ld      bc,$2006            ; b=32 strokes, c=6 (trees)
+        ld      e,3                 ; step-size mask (produces 2-3, smaller blobs)
+        call    paint_landscape_strokes
         ret     
 
+; Ellipse shape table: pairs of (w exponent, h exponent) for draw_filled_ellipse_stroke.
+; Larger exponent = more compression in that axis.
+; Randomly indexed by (rand & 3)*2, giving one of: (4,4) square, (5,3) wide, (3,5) tall.
 D_27347:
-        defb    $04, $04, $05, $03, $03, $05, $04, $04
+        defb    $04, $04    ; square-ish
+        defb    $05, $03    ; wide
+        defb    $03, $05    ; tall
+        defb    $04, $04    ; square-ish
 
 
 
+; Paint b filled ellipse blobs of tile c onto the map.
+; Entry: b = number of strokes, c = tile to paint, e = step-size mask (ANDed with random, min 2)
+.paint_landscape_strokes
 .L6adb  ld      a,c
-        ld      (V_27653),a
+        ld      (V_stroke_tile),a         ; set tile type for draw_filled_ellipse_stroke
         ld      a,e
-        ld      (SMC_27367+1),a
+        ld      (SMC_27367+1),a     ; patch the AND mask used for step size
 
-.L6ae3  push    bc
+.L6ae3  push    bc                  ; save stroke counter and tile
+        ; randomise step size (2-7)
         call    get_random_number
 SMC_27367:
-        and     7
+        and     7                   ; SMC: mask = e parameter (7 or 3)
         cp      2
-        jr      nc,L6aef                ; (2)
-        ld      a,2
-
-.L6aef  ld      (V_27652),a
+        jr      nc,L6aef
+        ld      a,2                 ; clamp minimum step size to 2
+.L6aef  ld      (V_stroke_step),a
+        ; randomise centre x (16-79)
         call    get_random_number
         and     63
         add     a,16
-        ld      (V_27650),a
+        ld      (V_stroke_center),a         ; x centre
+        ; randomise centre y (16-79)
         call    get_random_number
         and     63
         add     a,16
-        ld      (V_27650+1),a
+        ld      (V_stroke_center+1),a       ; y centre
+        ; pick random shape from D_27347: (4,4), (5,3) or (3,5)
         call    get_random_number
         and     3
-        add     a,a
+        add     a,a                 ; index = (rand & 3) * 2
         ld      c,a
         ld      b,0
         ld      hl,D_27347
         add     hl,bc
-        ld      de,V_27655
-        ldi     
-        ldi     
-        call    L6c09
+        ld      de,V_stroke_dims
+        ldi                         ; copy w exponent to V_stroke_dims
+        ldi                         ; copy h exponent to V_stroke_dims+1
+        call    draw_filled_ellipse_stroke
         pop     bc
-        djnz    L6ae3                   ; (-61)
+        djnz    L6ae3               ; repeat for all b strokes
         ret     
 
 
-; 6b21/27425
-
-; Split into two tables:
-; 65 bytes - what dirt surrounds
-; 65 bytes - get converted into this character
+; Two-part shoreline lookup table used by smooth_shoreline_tiles.
+; First 66 bytes: 8-neighbour dirt bitmasks (bits 0-7 = NW,N,NE,W,E,SW,S,SE are dirt).
+; Second 66 bytes: replacement water-edge tile for the matching pattern.
+; Tiles 1,3,4,5 are the diagonal/curved water-edge graphics; 2=TILE_DIRT.
 D_27425:
         defb    $FE, $EB, $F5, $CB, $76, $6E, $DB
         defb    $7E, $E9, $7C, $3E, $D1, $8B, $F4, $8F 
@@ -2195,39 +2273,42 @@ D_27425:
         defb    $04, $04, $04, $02, $02
 
 
-; Part of the map generation routine?
-
+; Scan the entire 96x96 map and replace water cells that border land with
+; appropriate shoreline tile graphics, using the D_27425 lookup table.
+; For each TILE_WATER cell: get the 8-neighbour dirt bitmask, search D_27425
+; first half for a matching pattern, then write the corresponding edge tile.
+smooth_shoreline_tiles:
 .L6ba5  ld      b,96
 .L6ba7  ld      c,96
 .L6ba9  push    bc
         push    bc
-        call    levelmap_xypos_with_check   ;OPT: might as well skip check
+        call    levelmap_xypos_with_check
         pop     bc
         ld      a,(hl)
         and     a
-        jr      nz,L6bd3                ; (32)
-        call    L6c84                   ; Check for a dirt surround
+        jr      nz,L6bd3                ; skip non-water cells
+        call    get_dirt_neighbour_mask ; d = 8-neighbour dirt bitmask
         ld      a,d
         and     a
-        jr      z,L6bd3                 ; Dirt does not surround this square
+        jr      z,L6bd3                 ; no dirt neighbours: leave as water
         push    bc
         ld      hl,D_27425
         ld      bc,66
-        cpir    
+        cpir                            ; search first half of D_27425 for bitmask d
         pop     bc
-        jr      nz,L6bd3                ; (13)
+        jr      nz,L6bd3                ; pattern not in table: leave as water
         ld      de,65
-        add     hl,de
+        add     hl,de                   ; step into second half: replacement tile
         ld      e,(hl)
-        call    levelmap_xypos_with_check    ;OPT: might as well skip check
+        call    levelmap_xypos_with_check
         ld      a,(hl)
         and     a
-        jr      nz,L6bd3                ; (1)
-        ld      (hl),e
+        jr      nz,L6bd3                ; only overwrite if cell still empty
+        ld      (hl),e                  ; place shoreline tile
 .L6bd3  pop     bc
         dec     c
-        jr      nz,L6ba9                ; (-46)
-        djnz    L6ba7                   ; (-50)
+        jr      nz,L6ba9
+        djnz    L6ba7
         ret     
 
 V_27610:   defb        0   ; 6dda/27610 - ?? unused?
@@ -2246,7 +2327,7 @@ V_27610:   defb        0   ; 6dda/27610 - ?? unused?
 ;
 ; Entry: b = y, c =x
 ; Exit:  hl = address, carry set
-levelmap_xypos:
+levelmap_xypos:                             ; $6BE6 / 27622
 .L6be6  
         ld      l,b
         ld      h,0
@@ -2273,85 +2354,110 @@ levelmap_xypos:
         ret
 
 
-V_27650:        defw    0           ;VAR 6c02/2760
-V_27652:        defb    $05         ;VAR 6c04/27652
-V_27653:        defb    $02         ;VAR 6c05/27653
-V_27654:        defb    $00         ;VAR 6c06/27654
-V_27655:        defw    $0404       ;VAR 6c07/27655 (ldi into here)
+V_stroke_center:        defw    0           ;VAR 6c02/27650 - landscape stroke center (x,y), random 16-79
+V_stroke_step:        defb    $05         ;VAR 6c04/27652 - landscape stroke step size (random 2-7, controls drawing density)
+V_stroke_tile:        defb    $02         ;VAR 6c05/27653 - landscape stroke tile type to paint (TILE_DIRT=2 for land pass, TILE_WATER=0 for water pass)
+V_stroke_constraint:        defb    $00         ;VAR 6c06/27654 - landscape stroke constraint tile (0=paint anywhere; else only overwrite cells containing this tile)
+V_stroke_dims:        defw    $0404       ;VAR 6c07/27655 - landscape stroke half-dimensions (w,h) loaded via ldi from D_27347
 
 
 
-.L6c09  ld      a,(V_27652)
+; Draw one filled ellipse blob centred at V_stroke_center, painting V_stroke_tile.
+; Uses a trigonometry-free incremental rotation to trace the ellipse perimeter,
+; then fills each row with a horizontal span.
+;
+; Algorithm:
+;   Two 16-bit signed fixed-point (8.8) accumulators (dx, dy) are maintained.
+;   Each of 49 steps applies a discretised rotation:
+;     dx_new = dx - (dy >> w) - 1
+;     dy_new = dy + (dx_new >> h) + 1
+;   where w = V_stroke_dims low byte, h = V_stroke_dims high byte (shape exponents from D_27347).
+;   Initial state: dx=0, dy=s (step size from V_stroke_step, range 2-7).
+;   The high bytes of (dx, dy) give the integer cell offset from the centre.
+;   At each step, a horizontal span of (-2 * dx_high) cells is painted at
+;   row (y_center + dy_high), producing the filled ellipse interior.
+;
+; V_stroke_constraint = 0: paint unconditionally.
+; V_stroke_constraint != 0: only paint cells that currently contain that tile (e.g. TILE_DIRT).
+.draw_filled_ellipse_stroke
+.L6c09  ld      a,(V_stroke_step)     ; step size s (2-7): controls initial dy magnitude
         ld      h,a
         ld      l,0
-        ld      (SMC_27676+1),hl
+        ld      (SMC_27676+1),hl ; initialise dy = s (high byte), dx low byte = 0
         ld      h,l
-        ld      (SMC_27673+1),hl
-        ld      b,49
+        ld      (SMC_27673+1),hl ; initialise dx = 0
+        ld      b,49             ; 49 steps traces one full ellipse path
 
-.L6c18  push    bc
+.L6c18  push    bc              ; save outer loop counter
 SMC_27673:
-        ld      hl,0            ;SMC 27674
+        ld      hl,0            ; SMC: current dx (updated each iteration)
 SMC_27676:
-        ld      de,0            ;SMC 27677
+        ld      de,0            ; SMC: current dy (updated each iteration)
+        ; --- compute dx_new = dx - (dy >> w) - 1 ---
         ld      b,d
-        ld      c,e
-        ld      a,(V_27655)
+        ld      c,e             ; bc = dy
+        ld      a,(V_stroke_dims)     ; w = x-axis shape exponent
 
 .L6c24  sra     b
         rr      c
         dec     a
-        jr      nz,L6c24                ; (-7)
-        inc     bc
+        jr      nz,L6c24        ; bc = dy >> w (arithmetic, preserves sign)
+        inc     bc              ; bc = (dy >> w) + 1
         and     a
-        sbc     hl,bc
-        ex      de,hl
+        sbc     hl,bc           ; hl (dx) = dx - (dy >> w) - 1
+
+        ; --- compute dy_new = dy + (dx_new >> h) + 1 ---
+        ex      de,hl           ; hl = old dy, de = new dx
         ld      b,d
-        ld      c,e
-        ld      a,(V_27655+1)
+        ld      c,e             ; bc = new dx
+        ld      a,(V_stroke_dims+1)   ; h = y-axis shape exponent
 
 .L6c35  sra     b
         rr      c
         dec     a
-        jr      nz,L6c35                ; (-7)
-        inc     bc
-        add     hl,bc
-        ex      de,hl
-        ld      (SMC_27673+1),hl
-        ld      (SMC_27676+1),de
-        ld      bc,(V_27650)
-        ld      a,d
-        add     a,b
-        ld      b,a
-        ld      a,h
-        add     a,c
-        ld      c,a
-        ld      a,(SMC_27673+2)
-        neg     
-        add     a,a
-        ld      d,a
+        jr      nz,L6c35        ; bc = dx_new >> h
+        inc     bc              ; bc = (dx_new >> h) + 1
+        add     hl,bc           ; hl (dy) = dy + (dx_new >> h) + 1
 
+        ex      de,hl           ; de = new dy, hl = new dx
+        ld      (SMC_27673+1),hl ; save updated dx for next iteration
+        ld      (SMC_27676+1),de ; save updated dy for next iteration
+
+        ; --- compute map position and span width for this step ---
+        ld      bc,(V_stroke_center)    ; bc = (y_center, x_center)
+        ld      a,d             ; dy high byte = row offset
+        add     a,b
+        ld      b,a             ; b = y_center + dy_high
+        ld      a,h             ; dx high byte = col offset (negative at equator)
+        add     a,c
+        ld      c,a             ; c = x_center + dx_high (left edge of span)
+        ld      a,(SMC_27673+2) ; dx_high (high byte of stored dx)
+        neg
+        add     a,a
+        ld      d,a             ; d = -2 * dx_high = span width (positive when dx_high < 0)
+
+        ; --- paint horizontal span of d cells ---
 .L6c57  push    bc
         call    levelmap_xypos_with_check
         pop     bc
-        ld      a,(V_27654)
+        ld      a,(V_stroke_constraint)     ; constraint tile
         and     a
-        jr      z,L6c69                 ; (7)
+        jr      z,L6c69         ; constraint=0: always paint
         push    bc
         ld      b,a
         ld      a,(hl)
-        cp      b
+        cp      b               ; check if cell matches constraint tile
         pop     bc
-        jr      nz,L6c6d                ; (4)
+        jr      nz,L6c6d        ; mismatch: skip this cell
 
-.L6c69  ld      a,(V_27653)
-        ld      (hl),a
+.L6c69  ld      a,(V_stroke_tile)
+        ld      (hl),a          ; paint tile
 
-.L6c6d  inc     c
+.L6c6d  inc     c               ; move one cell right
         dec     d
-        jr      nz,L6c57                ; (-26)
+        jr      nz,L6c57        ; repeat for full span width
         pop     bc
-        djnz    L6c18                   ; (-92)
+        djnz    L6c18           ; next ellipse step
         ret     
 
 
@@ -2374,15 +2480,15 @@ map_check_dirt:
 .L6c82  scf     
         ret     
 
-; Check the squares around a coordinate to see if they are empty
+; Build 8-neighbour dirt bitmask for the cell at bc.
+; Checks all 8 surrounding cells and sets a bit for each one that is TILE_DIRT.
+; Entry: bc = coordinates
+; Exit:  d = bitmask (bit 0=NW, 1=N, 2=NE, 3=W, 4=E, 5=SW, 6=S, 7=SE)
 ;
-; Entry:    bc = coordinates
-; Exit:      d = clearness:
-; Bit numbers:
-;
-;  765
-;  4 3
-;  210
+;  012
+;  3 4
+;  567
+.get_dirt_neighbour_mask
 .L6c84  push    bc
         ld      d,0
         dec     b
@@ -2451,7 +2557,7 @@ do_view_change:
         jr      nz,L6ccd                ; (-53)
         jp      wait_for_space_key_release
 
-.L6d05  ld      hl,V_25863
+.L6d05  ld      hl,V_view_topleft
         ld      a,(hl)
         dec     a
         cp      255
@@ -2460,7 +2566,7 @@ do_view_change:
         ret     
 
 
-.L6d0f  ld      hl,V_25863
+.L6d0f  ld      hl,V_view_topleft
         ld      a,(hl)
         inc     a
         cp      64
@@ -2469,7 +2575,7 @@ do_view_change:
         ret     
 
 
-.L6d19  ld      hl,V_25863+1
+.L6d19  ld      hl,V_view_topleft+1
         ld      a,(hl)
         dec     a
         cp      255
@@ -2478,7 +2584,7 @@ do_view_change:
         ret     
 
 
-.L6d23  ld      hl,V_25863+1
+.L6d23  ld      hl,V_view_topleft+1
         ld      a,(hl)
         inc     a
         cp      80
@@ -2512,9 +2618,9 @@ do_view_change:
         jr      L6d6d                   ; (29)
 
 ;6d50
-V_27984:    defb        1       ;VAR 6d50/27984 
+V_selected_tool:    defb        1       ;VAR 6d50/27984 - currently selected build tool/zone type index (0=bulldoze,1=road,2=power,3=rail,4=park,5=residential,6=commercial,7=industrial,8=police,9=fire,10=stadium,11=power plant,12=seaport,13=airport)
 
-;6d51
+.try_select_build_tool                      ; $6D51 / 27985
 .L6d51
         ld      bc,(V_pointer_charxy)
         ld      a,b
@@ -2544,26 +2650,26 @@ V_27984:    defb        1       ;VAR 6d50/27984
         and     a
         ret     m
 
-        ld      a,(V_27984)
+        ld      a,(V_selected_tool)
         cp      b
         ret     z
 
         ld      a,b
-        ld      (V_27984),a
+        ld      (V_selected_tool),a
         call    doicons
         call    L6305
 
-.L6d90  ld      a,(V_27984)
+.L6d90  ld      a,(V_selected_tool)
         sla     a
         add     a,2
         ld      c,a
         ld      b,1
         ld      de,$0202
-        ld      (V_23887),de
+        ld      (V_zone_cursor_size),de
         call    L5d8f
         call    L6dda
         call    get_zone_size
-        ld      (V_23887),de
+        ld      (V_zone_cursor_size),de
         ret     
 
 
@@ -2588,7 +2694,7 @@ D_zone_sizes:
 ; Exit: e = zone size x
 ;       d = zone size y
 .get_zone_size
-.L6dcb  ld      a,(V_27984)
+.L6dcb  ld      a,(V_selected_tool)
         add     a,a
         ld      e,a
         ld      d,0
@@ -2705,22 +2811,26 @@ get_cost_for_zone:
         ret     
 
 
-V_28263:    defw    0       ;VAR 28263/6e67
-V_28265:    defb    0       ;VAR 28265/6e69
+V_cursor_map_coords:    defw    0       ;VAR 28263/6e67 - cursor map coordinates saved by levelmap_xypos_from_cursor (appears written but not read back; possibly vestigial)
+V_raw_coords_flag:    defb    0       ;VAR 28265/6e69 - raw-coordinates flag: when set, view offset is NOT added (use absolute map coords rather than view-relative)
 
 ; Gets coordinates on the levelmap - based on ccursor?
 .levelmap_xypos_from_cursor
 .L6e6a  call    L6e74
-        ld      (V_28263),bc
+        ld      (V_cursor_map_coords),bc
         jp      levelmap_xypos
 
+; Load cursor character-cell coordinates into bc
+.get_cursor_charxy
 .L6e74  ld      bc,(V_pointer_charxy)
 
-; Possibly the 
-.L6e78  ld      a,(V_28265)
+; Add view scroll offset to convert cursor char coords to map coords
+; (skipped if V_raw_coords_flag raw-coordinates flag is set)
+.cursor_to_map_coords
+.L6e78  ld      a,(V_raw_coords_flag)
         and     a
         ret     nz
-        ld      hl,V_25863    ;
+        ld      hl,V_view_topleft    ;
         ld      a,c
         add     a,(hl)
         ld      c,a
@@ -2733,10 +2843,10 @@ V_28265:    defb    0       ;VAR 28265/6e69
 
 
 .L6e8a  ld      a,1
-        ld      (V_28265),a
+        ld      (V_raw_coords_flag),a
         call    L6e9b
         xor     a
-        ld      (V_28265),a
+        ld      (V_raw_coords_flag),a
         ret     
 
 ; Join up neighbour paths for power cables, road, rail
@@ -2746,7 +2856,7 @@ join_up_neighbour_cells:
         push    de
         push    bc
         call    L6ebe
-        ld      (V_28432),a
+        ld      (V_tile_conn_flags),a
         call    L6ee3
         dec     b
         call    L6ee3
@@ -2820,8 +2930,8 @@ D_28371:
 .L6f0e  pop     bc
         ret     
 
-V_28432:    defb        0   ;VAR 28432/6f10
-V_28433:    defb        0   ;VAR 28433/6f11
+V_tile_conn_flags:    defb        0   ;VAR 28432/6f10 - current tile connection flags bitmask (from tile_to_flags, used in path-joining neighbour check)
+V_force_tile_match:    defb        0   ;VAR 28433/6f11 - force tile-type match flag: when set, get_neighbours bypasses connection flags and compares tile type directly
 
 .L6f12  push    bc
         call    levelmap_xypos_with_check
@@ -2842,12 +2952,12 @@ V_28433:    defb        0   ;VAR 28433/6f11
         ret     
 
 
-.L6f2a  ld      a,(V_28433)
+.L6f2a  ld      a,(V_force_tile_match)
         and     a
         jr      nz,L6f3a                ; (10)
         ld      a,(hl)
         call    tile_to_flags
-        ld      hl,V_28432
+        ld      hl,V_tile_conn_flags
         and     (hl)
         jr      nz,L6f28                ; (-18)
 .L6f3a  or      a
@@ -2881,8 +2991,8 @@ get_neighbours:
         pop     bc
         ret     
 
-V_28508:    defw    0       ;VAR 28508/6f5c
-V_28510:    defb    0       ;VAR 28510/6f5e
+V_path_tile_coords:    defw    0       ;VAR 28508/6f5c - map coords of last-placed path tile (saved for subsequent join_up_neighbour_cells call)
+V_path_tile_type:    defb    0       ;VAR 28510/6f5e - tile type to place in path routine (0=plain tile, neighbour_tile+11=crossing variant)
 
 .L6f5f  call    L6e74
 
@@ -2906,7 +3016,7 @@ V_28510:    defb    0       ;VAR 28510/6f5e
         ret     
 
 
-.L6f7d  ld      a,(V_28510)
+.L6f7d  ld      a,(V_path_tile_type)
         ld      (hl),a
         and     a
         jr      z,L6f8e                 ; (10)
@@ -2917,7 +3027,7 @@ V_28510:    defb    0       ;VAR 28510/6f5e
         ret     c
 
 
-.L6f8e  ld      (V_28508),bc
+.L6f8e  ld      (V_path_tile_coords),bc
         ld      a,b
         add     a,d
         ld      b,a
@@ -2975,7 +3085,7 @@ zone_action_jump_table:
 .L7012  ld      a,(V_pointer_charxy+1)
         cp      8
         ret     c
-        ld      a,(V_23891+1)
+        ld      a,(V_cursor_validity+1)
         and     a
         ret     z
         call    place_joinables
@@ -2985,7 +3095,7 @@ zone_action_jump_table:
         call    L71e4
         jp      L7042
 
-.L702d  ld      a,(V_27984)
+.L702d  ld      a,(V_selected_tool)
         add     a,a
         ld      c,a
         ld      b,0
@@ -3037,7 +3147,7 @@ D_28794:
 
 ; Place a joinable (road,rail,power) 
 place_joinables:
-.L7086  ld      a,(V_27984)
+.L7086  ld      a,(V_selected_tool)
         and     a
         jp      z,L709c
         cp      1
@@ -3105,7 +3215,7 @@ D_28922:
 D_28924:
         defb    $03, $01, $05, $04, $06, $02
  
-V_28930:    defb        0       ;VAR 28930/7102
+V_auto_bulldoze_flag:    defb        0       ;VAR 28930/7102 - auto-bulldoze mode flag (2=large zone needs bulldoze check, 0=small tool; written but not subsequently read - possibly vestigial)
 
 .L7103  call    levelmap_xypos_from_cursor
         ld      a,(hl)      ;Is it empty?
@@ -3116,14 +3226,14 @@ V_28930:    defb        0       ;VAR 28930/7102
         jp      z,check_can_place_zone
 
 .L7113  ld      a,2
-        ld      (V_28930),a
-        ld      a,(V_27984)
+        ld      (V_auto_bulldoze_flag),a
+        ld      a,(V_selected_tool)
         and     a
         jp      z,L7171
         cp      4
         jp      nc,L7129
         ld      a,0
-        ld      (V_28930),a
+        ld      (V_auto_bulldoze_flag),a
 
 .L7129  call    get_zone_size
         push    de
@@ -3202,7 +3312,7 @@ SMC_29056:
 
 ; Place a zone:
 ; Entry:    ix = tiles to place
-place_zone:
+place_zone:                                 ; $7197 / 29079
 .L7197  
         call    get_zone_size
         push    de
@@ -3286,10 +3396,10 @@ D_29199:
 L721e:
         call    L6e74
         ld      a,1
-        ld      (V_28433),a
+        ld      (V_force_tile_match),a
         call    get_neighbours
         xor     a
-        ld      (V_28433),a
+        ld      (V_force_tile_match),a
         ld      a,d
         and     a
         ret     z
@@ -3315,17 +3425,17 @@ L721e:
         ld      a,(hl)
         ld      (SMC_29270+1),a
         ld      a,0
-        ld      (V_28510),a
+        ld      (V_path_tile_type),a
         call    L6f5f
         ret     nc
 
         ld      a,(V_neighbour_tile_to_check)
 SMC_29270:
         add     a,11
-        ld      (V_28510),a
+        ld      (V_path_tile_type),a
         call    L6f5f
         call    join_up_neighbour_cells
-        ld      bc,(V_28508)
+        ld      bc,(V_path_tile_coords)
         call    L6e8a
         jp      draw_map
 
@@ -3398,6 +3508,8 @@ action_zone_bulldoze:
         ld      (hl),58
         jr      L72af                   ; (-62)
 
+; If V_demolish_wait is set, wait for SPACE key release or timeout before continuing
+.wait_if_demolish_pending
 .L72ed  ld      a,(V_demolish_wait)
         and     a
         ret     z
@@ -3540,7 +3652,7 @@ action_zone_power:
         ld      a,33    ;power
         jp      place_zone_1x1
 
-        nop     
+        defb    0               ; padding
 
 ;73d4
 action_zone_park:
@@ -3812,6 +3924,8 @@ tile_to_flags:
         ret     
 
 
+; Write 3 zone tile + screen-address entries to the printer buffer (entry*9 offset into de table)
+.write_zone_print_entries
 .L75b0  ld      l,a
         add     a,a
         add     a,a
@@ -3831,16 +3945,19 @@ tile_to_flags:
         ret     
 
 
+; Write one tile + packed screen-address pair to printer buffer, advance both pointers
+; Entry: a = tile value, hl = dest in buffer, de = screen coords
+.write_print_entry
 .L75cd  ld      (hl),a
         inc     hl
         ld      b,d
         ld      a,e
         srl     b
-        rra     
+        rra
         srl     b
-        rra     
+        rra
         srl     b
-        rra     
+        rra
         or      192
         ld      (hl),a
         inc     hl
@@ -3901,7 +4018,10 @@ get_power_map_addr:
         pop     bc
         ret     
 
-;Get address for power minimap
+; Convert map address to power minimap byte address + bit mask
+; Entry: hl = map address
+; Exit:  hl = address in power minimap, e = bit to set, d = exclusion mask
+.map_addr_to_power_minimap
 .L7615  ld      de,65536 - levelmap
         add     hl,de
         ld      a,l
@@ -3925,10 +4045,10 @@ get_power_map_addr:
         add     hl,bc
         ret     
 
-; Convert map address into coordinates
+; Convert map address into row/column coordinates
 ; Entry: hl = pointer into level map
-; Exit:  b = rows from top
-;        l = column?
+; Exit:  b = row, c = column
+.map_addr_to_xy
 .L7635  ld      de,65536 - levelmap
         add     hl,de
         xor     a
@@ -3962,7 +4082,7 @@ L_div_hl_a:
 
 
 ; Unused???
-l_mult_hlxde:
+l_mult_hlxde:                               ; $7657 / 30295
 .L7657
         ld      c,h
         ld      a,l
@@ -3976,9 +4096,9 @@ l_mult_hlxde:
 .L7665  djnz    L765e                  ; (-9)
         ret     
 
-;Does something on a minimap 50%
-;
-;Exit: a = ???
+; Return maximum value across a 2x2 minimap block (48-byte row stride)
+; Exit: a = maximum value found
+.minimap_max_2x2_block
 .L7668  ld      d,0
         ld      b,2
 .L766c  ld      c,2
@@ -4091,6 +4211,10 @@ D_30428:
         ret     
 
 
+; Add direction offset (from D_30428 table) to bc coordinates
+; Entry: a = direction index, bc = coordinates
+; Exit:  bc = coordinates + offset for that direction
+.coords_add_direction_offset
 .L76ed  add     a,a
         ld      e,a
         ld      d,0
@@ -4105,27 +4229,33 @@ D_30428:
         ld      b,a
         ret     
 
-V_30461:    defb        0       ;VAR 30461/76fd
+V_PowerStackNum:    defb        0       ;VAR 30461/76fd - power BFS queue tail index (2 bytes per entry, wraps within queue)
 
-.L76fe  ld      hl,V_30461
+; Push bc coordinates onto the power BFS queue
+.powerqueue_push
+.L76fe  ld      hl,V_PowerStackNum
         inc     (hl)
         call    L7714
         ld      (hl),c
         inc     hl
         ld      (hl),b
-        ret     
+        ret
 
 
+; Pop bc coordinates from the power BFS queue
+.powerqueue_pop
 .L7709  call    L7714
         ld      c,(hl)
         inc     hl
         ld      b,(hl)
-        ld      hl,V_30461
+        ld      hl,V_PowerStackNum
         dec     (hl)
-        ret     
+        ret
 
 
-.L7714  ld      a,(V_30461)
+; Return hl = address of current power queue entry (V_PowerStackNum * 2 + queue base)
+.powerqueue_entry_addr
+.L7714  ld      a,(V_PowerStackNum)
         add     a,a
         ld      e,a
         ld      d,0
@@ -4153,7 +4283,7 @@ V_30461:    defb        0       ;VAR 30461/76fd
 ; Sprite printing?
 ; Entry: a = sprite number
 display_transport_sprite:
-.L7735  ld      hl,(V_25863)
+.L7735  ld      hl,(V_view_topleft)
         ld      e,a
         ld      a,b
         cp      h
@@ -4232,90 +4362,90 @@ display_transport_sprite:
         ret     
 
 ; Does something with the transport sprite
-.L778f  ld      a,(V_30678)
+.L778f  ld      a,(V_transport_active)
         and     a
         jr      z,L77b3                 ; (30)
-        ld      bc,(V_30675)
+        ld      bc,(V_transport_pos)
         call    levelmap_xypos_with_check
         ld      a,(hl)
         cp      31
         jr      z,L77b3                 ; (18)
         cp      32
         jr      z,L77b3                 ; (14)
-        ld      a,(V_30678)
+        ld      a,(V_transport_active)
         and     a
-        ld      bc,(V_30675)
-        ld      a,(V_30677)
+        ld      bc,(V_transport_pos)
+        ld      a,(V_transport_sprite)
         call    nz,display_transport_sprite
 
-.L77b3  ld      a,(V_30841)
+.L77b3  ld      a,(V_aircrash_active)
         and     a
-        ld      bc,(V_30842)
+        ld      bc,(V_CrashXY)
         ld      a,0
         call    nz,display_transport_sprite
         ld      a,r
         and     1
         inc     a
         ld      d,a
-        ld      a,(V_31127)
+        ld      a,(V_tornado_active)
         and     a
-        ld      bc,(V_31125)
+        ld      bc,(V_tornado_pos)
         ld      a,d
         call    nz,display_transport_sprite
         ret     
 
-V_30675:    defw    0       ;VAR 30675/77d3
+V_transport_pos:    defw    0       ;VAR 30675/77d3 - transport sprite current map position (b=y, c=x)
 
-V_30677:    defb    0       ;VAR 30677/77d5
+V_transport_sprite:    defb    0       ;VAR 30677/77d5 - transport sprite type index (passed to display_transport_sprite)
 
-V_30678:    defb        0       ;VAR 30678/77d6
-V_30679:    defb        0       ;VAR 30679/77d7
-V_30680:    defb        0       ;VAR 30680/77d8
-V_30681:    defb        0       ;VAR 30681/77d9
-V_30682:    defb        0       ;VAR 30682/77da
-V_30683:    defb        0       ;VAR 30683/77db
+V_transport_active:    defb        0       ;VAR 30678/77d6 - transport sprite active (1=train/tram moving, 0=idle)
+V_transport_prev_dir:    defb        0       ;VAR 30679/77d7 - previous direction taken (prevents U-turns)
+V_transport_dir:    defb        0       ;VAR 30680/77d8 - current direction being evaluated (0-3)
+V_transport_new_dir:    defb        0       ;VAR 30681/77d9 - confirmed next direction after rail check
+V_transport_steps:    defb        0       ;VAR 30682/77da - steps remaining before direction re-roll
+V_transport_wander:    defb        0       ;VAR 30683/77db - wander counter (decrements; sprite despawns at 0)
 
 
-.L77dc  ld      a,(V_30678)
+.L77dc  ld      a,(V_transport_active)
         and     a
         ret     z
-        ld      bc,(V_30675)
+        ld      bc,(V_transport_pos)
         call    levelmap_xypos
         ld      a,(hl)
         call    tile_to_flags
         and     2                       ;rail?
         jr      nz,L77f5                ; (5)
         xor     a
-        ld      (V_30678),a
+        ld      (V_transport_active),a
         ret     
 
 
-.L77f5  ld      bc,(V_30675)
+.L77f5  ld      bc,(V_transport_pos)
         call    get_random_number
         and     3
-        ld      (V_30680),a
+        ld      (V_transport_dir),a
         ld      a,4
-        ld      (V_30682),a
+        ld      (V_transport_steps),a
 
-.L7806  ld      a,(V_30680)
+.L7806  ld      a,(V_transport_dir)
         and     3
-        ld      (V_30681),a
-        ld      hl,V_30679
+        ld      (V_transport_new_dir),a
+        ld      hl,V_transport_prev_dir
         cp      (hl)
         jr      z,L7822                 ; (14)
-        ld      a,(V_30681)               ;Direction to look in
+        ld      a,(V_transport_new_dir)               ;Direction to look in
         call    L76e4                   ;Move in direction
         ld      a,(hl)
         call    tile_to_flags
         and     2
         jr      nz,L783d                ; (27)
 
-.L7822  ld      hl,V_30680
+.L7822  ld      hl,V_transport_dir
         inc     (hl)
-        ld      hl,V_30682
+        ld      hl,V_transport_steps
         dec     (hl)
         jr      nz,L7806                ; (-38)
-        ld      hl,V_30683
+        ld      hl,V_transport_wander
         ld      a,(hl)
         inc     a
         ld      (hl),a
@@ -4324,30 +4454,30 @@ V_30683:    defb        0       ;VAR 30683/77db
 
         ld      (hl),0
         ld      a,5
-        ld      (V_30679),a
+        ld      (V_transport_prev_dir),a
         ret     
 
 
-.L783d  ld      a,(V_30681)
+.L783d  ld      a,(V_transport_new_dir)
         call    L76ed               ;Move coords in direction
-        ld      a,(V_30681)
+        ld      a,(V_transport_new_dir)
         add     a,2
         and     3
-        ld      (V_30679),a
-        ld      (V_30675),bc
+        ld      (V_transport_prev_dir),a
+        ld      (V_transport_pos),bc
         ld      c,3
         and     1
         jr      nz,L7858                ; (1)
         inc     c
 
 .L7858  ld      a,c
-        ld      (V_30677),a
+        ld      (V_transport_sprite),a
         ret     
 
 
 .L785d  ld      a,(37650)
         cp      8
-        ld      a,(V_30678)
+        ld      a,(V_transport_active)
         and     a
         ret     nz
 
@@ -4356,33 +4486,33 @@ V_30683:    defb        0       ;VAR 30683/77db
         ret     nz
 
         ld      hl,(V_map_iter_xy)
-        ld      (V_30675),hl
+        ld      (V_transport_pos),hl
         ld      a,1
-        ld      (V_30678),a
+        ld      (V_transport_active),a
         ret     
 
-V_30841:    defb        0       ;VAR 30841/787a
-V_30842:    defw        0       ;VAR 30842/787b
-V_30844:    defb        0       ;VAR 30844/787d
-V_30845:    defb        0       ;VAR 30845/787e
+V_aircrash_active:    defb        0       ;VAR 30841/787a - aircrash in progress (1=active, 0=none)
+V_CrashXY:    defw        0       ;VAR 30842/787b - aircrash current map position (b=y, c=x)
+V_aircrash_col:    defb        0       ;VAR 30844/787d - aircrash target display column
+V_aircrash_countdown:    defb        0       ;VAR 30845/787e - aircrash movement timer (decrements each tick)
 
 
-.L787e  ld      a,(V_30841)
+.L787e  ld      a,(V_aircrash_active)
         and     a
         ret     z
-        ld      a,(V_30842)
-        ld      hl,V_30844
+        ld      a,(V_CrashXY)
+        ld      hl,V_aircrash_col
         cp      (hl)
         jr      z,L78af                 ; (35)
-        ld      hl,V_30842
+        ld      hl,V_CrashXY
         dec     (hl)
-        ld      hl,V_30845
+        ld      hl,V_aircrash_countdown
         ld      a,(hl)
         and     a
         ret     z
         dec     (hl)
         ret     nz
-        ld      bc,(V_30842)          ;And here we start an aircrash?
+        ld      bc,(V_CrashXY)          ;And here we start an aircrash?
         call    L78b4
         inc     c
         call    L78b4
@@ -4393,10 +4523,12 @@ V_30845:    defb        0       ;VAR 30845/787e
         call    L78b4
         call    L78bd
 .L78af  xor     a
-        ld      (V_30841),a
+        ld      (V_aircrash_active),a
         ret     
 
 
+; Get map address for bc coords and ignite cell if flammable
+.set_cell_on_fire
 .L78b4  push    bc
         call    levelmap_xypos
         call    L90c4
@@ -4415,7 +4547,9 @@ V_30845:    defb        0       ;VAR 30845/787e
         ret     
 
 
-.L78ca  ld      a,(V_30841)
+; Randomly trigger a fire or flood event at the current simulation position
+.sim_maybe_start_fire_or_flood
+.L78ca  ld      a,(V_aircrash_active)
         and     a
         ret     nz
 
@@ -4428,19 +4562,19 @@ V_30845:    defb        0       ;VAR 30845/787e
         jr      z,L78f0                 ; (20)
         ld      bc,(V_map_iter_xy)
         ld      a,c
-        ld      (V_30844),a
+        ld      (V_aircrash_col),a
         ld      c,96
-        ld      (V_30842),bc
+        ld      (V_CrashXY),bc
 
 .L78ea  ld      a,1
-        ld      (V_30841),a
+        ld      (V_aircrash_active),a
         ret     
 
 
 .L78f0  ld      bc,(V_map_iter_xy)
         xor     a
-        ld      (V_30844),a
-        ld      (V_30842),bc
+        ld      (V_aircrash_col),a
+        ld      (V_CrashXY),bc
         jr      L78ea                   ; (-20)
 
 .sim_start_aircrash
@@ -4452,7 +4586,7 @@ V_30845:    defb        0       ;VAR 30845/787e
         call    get_random_number
         and     15
         add     a,7
-        ld      (V_30845),a
+        ld      (V_aircrash_countdown),a
         ret     
 
 .sim_start_meltdown
@@ -4520,7 +4654,7 @@ place_fallout:
 .L796c  ld      a,26
         call    set_alert_message
         ld      a,1
-        ld      (V_31127),a
+        ld      (V_tornado_active),a
 
 .L7976  call    get_random_number       ;Get a starting coordinate in 64x64 grid
         and     63
@@ -4536,26 +4670,26 @@ place_fallout:
         ld      a,(hl)
         cp      TILE_DIRT               ;DIRT
         jr      nz,L7976                ; (-26)
-        ld      (V_31125),bc
+        ld      (V_tornado_pos),bc
         ret     
 
-V_31125:    defw    0       ;VAR 31125/7995
-V_31127:    defb    0       ;VAR 31127/7997
+V_tornado_pos:    defw    0       ;VAR 31125/7995 - tornado current map position (b=y, c=x); random dirt start
+V_tornado_active:    defb    0       ;VAR 31127/7997 - tornado active (1=in progress, 0=none); cleared with 1/256 chance each tick
 
 ; Something to do with parks?
-.L7998  ld      a,(V_31127)
+.L7998  ld      a,(V_tornado_active)
         and     a
         ret     z
         call    get_random_number
         and     a
         jr      nz,L79a7                ; (4)
         xor     a
-        ld      (V_31127),a
-.L79a7  ld      bc,(V_31125)
+        ld      (V_tornado_active),a
+.L79a7  ld      bc,(V_tornado_pos)
         call    get_random_number
         and     7
         jr      nz,L79ea                ; (56)
-        ld      hl,(V_33954)
+        ld      hl,(V_CCxy)
         ld      a,h
         sub     b
         jr      z,L79be                 ; (5)
@@ -4576,7 +4710,7 @@ V_31127:    defb    0       ;VAR 31127/7997
         ld      a,(hl)
         cp      0
         ret     z
-        ld      (V_31125),bc
+        ld      (V_tornado_pos),bc
 .L79d4  inc     c
         inc     b
         call    levelmap_xypos_with_check
@@ -4601,7 +4735,7 @@ V_31127:    defb    0       ;VAR 31127/7997
         ld      a,(hl)
         cp      0
         ret     z
-        ld      (V_31125),bc
+        ld      (V_tornado_pos),bc
         jr      L79d4                   ; (-45)
 
 ; Converts kempston into directional keypresses
@@ -4724,6 +4858,7 @@ V_31127:    defb    0       ;VAR 31127/7997
         defb        T_SETXY,16,0
         defm        "CRIME"
         defb        T_END
+.draw_minimap_legend                        ; $7B09 / 31497
 .L7b09
         call        prt_ctrl
         defb        T_SETCOL,70
@@ -4746,6 +4881,7 @@ V_31127:    defb    0       ;VAR 31127/7997
         defb        T_SETCOL,100
         defb        T_SETXY,20,1
         defm        " "
+.draw_minimap_legend_colours                ; $7B42 / 31554
 .L7b42
         defb        T_SETCOL,82
         defb        T_SETXY,21,1
@@ -4935,7 +5071,7 @@ D_31863:
         defb    $09, $09, $05, $05, $09, $09
         defb    $09, $09, $09, $09, $09, $09
 
-V_31935:    defb    $ff       ;VAR 31935/7cbf
+V_traffic_bfs_steps:    defb    $ff       ;VAR 31935/7cbf - traffic BFS step limit (initialised to 5, decremented per step; $ff = inactive)
 
 
 .L7cc0  ld      bc,(V_map_iter_xy)
@@ -4961,7 +5097,7 @@ V_31935:    defb    $ff       ;VAR 31935/7cbf
         ret     
 
 
-.L7ce8  ld      a,(V_31935)
+.L7ce8  ld      a,(V_traffic_bfs_steps)
         ld      b,(ix+0)
         dec     b
         jr      z,L7cf5                 ; (4)
@@ -4979,26 +5115,26 @@ V_31935:    defb    $ff       ;VAR 31935/7cbf
 .L7cfe  ld      bc,(V_map_iter_xy)
         call    L7579
         call    L7668
-        ld      (V_32447),a
+        ld      (V_zone_landval_local),a
         ld      e,a
         ld      d,0
-        ld      hl,(V_33914)
+        ld      hl,(V_pollution_sum)
         add     hl,de
-        ld      (V_33914),hl
-        ld      hl,(V_33916)
+        ld      (V_pollution_sum),hl
+        ld      hl,(V_pollution_count)
         inc     hl
-        ld      (V_33916),hl
+        ld      (V_pollution_count),hl
         ret     
 
 
 .L7d1d  ld      bc,(V_map_iter_xy)
         call    get_traffic_density_value
         call    L7668
-        ld      (V_32448),a
+        ld      (V_zone_traffic_density),a
         ret     
 
 
-V_32043:    defw        0       ;VAR 32043/7d2b
+V_zone_best_coords:    defw        0       ;VAR 32043/7d2b - map coords of highest-value zone tile (candidate for upgrade)
 
 
 V_zone_size_to_scan:    defw    0       ;VAR 32045/7d2d - size of zone to scan
@@ -5006,18 +5142,19 @@ V_zone_size_to_scan:    defw    0       ;VAR 32045/7d2d - size of zone to scan
 .L7d2f  ld      (V_zone_size_to_scan),hl
         jr      L7d3a                   ; (6)
 
-;scan 3x3 zone
+; Scan a 3x3 zone, accumulating cell-type counts into zone stat variables
+.scan_3x3_zone
 .L7d34  ld      hl,$0303
         ld      (V_zone_size_to_scan),hl
 
 .L7d3a  xor     a
-        ld      (V_32282),a
-        ld      (V_32279),a
-        ld      (V_32280),a
-        ld      (V_32281),a
-        ld      (V_32283),a
+        ld      (V_zone_transport_count),a
+        ld      (V_zone_parks),a
+        ld      (V_zone_seas),a
+        ld      (V_zone_trees),a
+        ld      (V_zone_transport_score),a
         ld      hl,$ffff
-        ld      (V_32043),hl
+        ld      (V_zone_best_coords),hl
         push    bc
         dec     b
         ld      a,(V_zone_size_to_scan)
@@ -5058,6 +5195,9 @@ V_zone_size_to_scan:    defw    0       ;VAR 32045/7d2d - size of zone to scan
         ret     
 
 
+; Categorise one map cell and update zone stat counters (road/park/sea/transport)
+; Entry: bc = map coordinates
+.scan_zone_cell
 .L7d88  push    bc
         call    levelmap_xypos_with_check
         pop     bc
@@ -5077,43 +5217,43 @@ V_zone_size_to_scan:    defw    0       ;VAR 32045/7d2d - size of zone to scan
         call    tile_to_flags
         and     6                       ;Check for transport
         ret     z
-        ld      hl,V_32282
+        ld      hl,V_zone_transport_count
         inc     (hl)
         call    L7dd8
         ld      l,12
 
-.L7db2  ld      a,(V_32283)
+.L7db2  ld      a,(V_zone_transport_score)
         add     a,l
         cp      128
         jr      c,L7dbc                 ; (2)
         ld      a,127
 
-.L7dbc  ld      (V_32283),a
+.L7dbc  ld      (V_zone_transport_score),a
         ret     
 
 
-.L7dc0  ld      hl,V_32280
+.L7dc0  ld      hl,V_zone_seas
         inc     (hl)
         ld      l,16
         jr      L7db2                   ; (-22)
 
-.L7dc8  ld      hl,V_32279
+.L7dc8  ld      hl,V_zone_parks
         inc     (hl)
         ld      l,14
         jr      L7db2                   ; (-30)
 
-.L7dd0  ld      hl,V_32281
+.L7dd0  ld      hl,V_zone_trees
         inc     (hl)
         ld      l,16
         jr      L7db2                   ; (-38)
 
-.L7dd8  ld      a,(V_32043)
+.L7dd8  ld      a,(V_zone_best_coords)
         cp      255
         jr      z,L7de5                 ; (6)
         call    get_random_number
         and     1
         ret     z
-.L7de5  ld      (V_32043),bc
+.L7de5  ld      (V_zone_best_coords),bc
         ret     
 
 
@@ -5135,7 +5275,7 @@ V_zone_size_to_scan:    defw    0       ;VAR 32045/7d2d - size of zone to scan
         ret     
 
 
-.L7e03  ld      hl,(V_33954)
+.L7e03  ld      hl,(V_CCxy)
         ld      a,h
         sub     b
         jp      p,L7e0d
@@ -5150,21 +5290,21 @@ V_zone_size_to_scan:    defw    0       ;VAR 32045/7d2d - size of zone to scan
 .L7e15  add     a,e
         ret     
 
-V_32279:    defb        0       ;VAR 32279/7e17
-V_32280:    defb        0       ;VAR 32280/7e18
-V_32281:    defb        0       ;VAR 32281/7e19
-V_32282:    defb        0       ;VAR 32282/7e1a
-V_32283:    defb        0       ;VAR 32283/7e1b
-V_32284:    defb        0       ;VAR 32284/7e1c
+V_zone_parks:    defb        0       ;VAR 32279/7e17 - park tile count within 3x3 zone scan
+V_zone_seas:    defb        0       ;VAR 32280/7e18 - sea/water tile count within 3x3 zone scan
+V_zone_trees:    defb        0       ;VAR 32281/7e19 - tree tile count within 3x3 zone scan
+V_zone_transport_count:    defb        0       ;VAR 32282/7e1a - transport tile count within 3x3 zone scan
+V_zone_transport_score:    defb        0       ;VAR 32283/7e1b - accumulated transport score (capped at 127)
+V_zone_land_value_base:    defb        0       ;VAR 32284/7e1c - combined land value base score (parks + transport - pollution)
 
 
-.L7e1d  ld      a,(V_34501)
+.L7e1d  ld      a,(V_ZonePwrFlg)
         and     a
         jr      z,L7e54                 ; (49)
-        ld      a,(V_32282)
+        ld      a,(V_zone_transport_count)
         and     a
         jr      z,L7e54                 ; (43)
-        ld      a,(V_34152)
+        ld      a,(V_traffic_active)
         and     a
         jr      nz,L7e36                ; (7)
         call    L7d1d
@@ -5172,24 +5312,24 @@ V_32284:    defb        0       ;VAR 32284/7e1c
         jr      c,L7e54                 ; (30)
 
 .L7e36  call    L7e5a
-        ld      hl,V_32283
+        ld      hl,V_zone_transport_score
         add     a,(hl)
-        ld      hl,V_32284
+        ld      hl,V_zone_land_value_base
         ld      (hl),a
         ld      e,a
         ld      d,0
-        ld      hl,(V_33906)
+        ld      hl,(V_landval_num)
         add     hl,de
         ret     c
-        ld      (V_33906),hl
-.L7e4c  ld      hl,(V_33908)
+        ld      (V_landval_num),hl
+.L7e4c  ld      hl,(V_landval_den)
         inc     hl
-        ld      (V_33908),hl
+        ld      (V_landval_den),hl
         ret     
 
 
 .L7e54  xor     a
-        ld      (V_32284),a
+        ld      (V_zone_land_value_base),a
         jr      L7e4c                   ; (-14)
 
 .L7e5a  ld      bc,(V_map_iter_xy)
@@ -5200,16 +5340,16 @@ V_32284:    defb        0       ;VAR 32284/7e1c
         ret     nc
 
         xor     a
-        ret     
+        ret
 
-        nop
+        defb    0               ; padding
 
-V_32361:    defb    0       ;VAR 32361/7e69
+V_zone_police_score:    defb    0       ;VAR 32361/7e69 - police coverage score for zone (proximity to police station)
 
 .L7e6a  ld      bc,(V_map_iter_xy)
         call    L7589
         ld      c,a
-        ld      hl,V_32284
+        ld      hl,V_zone_land_value_base
         ld      a,255
         sub     (hl)
         srl     a
@@ -5220,84 +5360,87 @@ V_32361:    defb    0       ;VAR 32361/7e69
         jr      nc,L7e84                ; (1)
         xor     a
 
-.L7e84  ld      (V_32361),a
+.L7e84  ld      (V_zone_police_score),a
         ld      e,a
         ld      d,0
-        ld      hl,(V_33902)
+        ld      hl,(V_police_cov_num)
         add     hl,de
         ret     c
 
-        ld      (V_33902),hl
-        ld      hl,(V_33904)
+        ld      (V_police_cov_num),hl
+        ld      hl,(V_police_cov_den)
         inc     hl
-        ld      (V_33904),hl
+        ld      (V_police_cov_den),hl
         ret     
 
-V_32410:    defb        0       ;VAR 32410/7e9a
+V_zone_tax_penalty:    defb        0       ;VAR 32410/7e9a - tax rate * 8 + difficulty bonus; subtracted from zone land value
 
 .L7e9b  ld      a,(SMC_tax_rate)           ;Tax rate
         ld      b,a
         add     a,a
         add     a,a
         add     a,a
-        ld      (V_32410),a
+        ld      (V_zone_tax_penalty),a
         ld      a,(V_difficulty)
         and     a
         ret     z
 
-        ld      a,(V_32410)
+        ld      a,(V_zone_tax_penalty)
         add     a,b
-        ld      (V_32410),a
+        ld      (V_zone_tax_penalty),a
         ld      a,(V_difficulty)
         cp      2
         ret     z
 
-        ld      a,(V_32410)
+        ld      a,(V_zone_tax_penalty)
         add     a,b
-        ld      (V_32410),a
+        ld      (V_zone_tax_penalty),a
         ret     
 
-V_32447:    defb        0       ;VAR 32447/7ebf
-V_32448:    defb        0       ;VAR 32448/7ec0
-V_32449:    defb        0       ;VAR 32449/7ec1
-V_32450:    defw        0       ;VAR 32450/7ec2
+V_zone_landval_local:    defb        0       ;VAR 32447/7ebf - zone's local land value from the land value minimap
+V_zone_traffic_density:    defb        0       ;VAR 32448/7ec0 - zone's traffic density from traffic minimap
+V_zone_landval_final:    defb        0       ;VAR 32449/7ec1 - final computed land value for this zone (0-255)
+V_zone_landval_mult:    defw        0       ;VAR 32450/7ec2 - land value demand multiplier (scales growth/shrink probability)
 
+; Compute zone land value from surrounding stats (pollution, crime, etc.)
+; Exit: V_zone_landval_final = land value (0-255)
+.calculate_zone_land_value
 .L7ec4  call    L7e1d
         call    L7e6a
         call    L7e9b
-        ld      a,(V_32447)
+        ld      a,(V_zone_landval_local)
         cp      28
         jr      nc,L7eff                ; (43)
-        ld      a,(V_32284)
+        ld      a,(V_zone_land_value_base)
         and     a
         jr      z,L7eff                 ; (37)
-        ld      hl,V_32447
+        ld      hl,V_zone_landval_local
         sub     (hl)
         jr      nc,L7ee1                ; (1)
         xor     a
 
-.L7ee1  ld      hl,V_32361
+.L7ee1  ld      hl,V_zone_police_score
         sub     (hl)
         jr      nc,L7ee8                ; (1)
         xor     a
 
-.L7ee8  ld      hl,V_32410
+.L7ee8  ld      hl,V_zone_tax_penalty
         sub     (hl)
         jr      nc,L7eef                ; (1)
         xor     a
 
 .L7eef  ld      l,a
         ld      h,0
-        ld      de,(V_32450)
+        ld      de,(V_zone_landval_mult)
         add     hl,de
         call    L7f04
         ld      a,l
-        ld      (V_32449),a
+        ld      (V_zone_landval_final),a
         ret     
 
 
 .L7eff  xor     a
-        ld      (V_32449),a
+        ld      (V_zone_landval_final),a
         ret     
 
 
@@ -5310,14 +5453,17 @@ V_32450:    defw        0       ;VAR 32450/7ec2
 .L7f0d  ld      l,255
         ret     
 
-V_32528:    defb    0       ;VAR 32528/7f10
-V_32529:    defb    0       ;VAR 32529/7f11
+V_zone_growth_factor:    defb    0       ;VAR 32528/7f10 - zone growth probability factor (land value based)
+V_zone_half_landval:    defb    0       ;VAR 32529/7f11 - half of zone land value (used in population growth threshold)
 
+; Derive zone population growth from land value (calls calculate_zone_land_value)
+; Exit: V_zone_growth_factor = growth factor, V_zone_half_landval = half land value
+.update_zone_population
 .L7f12  call    L7ec4
-        ld      a,(V_32449)
+        ld      a,(V_zone_landval_final)
         srl     a
-        ld      (V_32529),a
-        ld      a,(V_32449)
+        ld      (V_zone_half_landval),a
+        ld      a,(V_zone_landval_final)
         sub     128
         jr      nc,L7f26                ; (2)
         ld      a,255
@@ -5327,8 +5473,8 @@ V_32529:    defb    0       ;VAR 32529/7f11
         srl     a
         srl     a
         ld      b,a
-        ld      (V_32528),a
-        ld      a,(V_32449)
+        ld      (V_zone_growth_factor),a
+        ld      a,(V_zone_landval_final)
         cp      128
         ret     c
 
@@ -5338,7 +5484,7 @@ V_32529:    defb    0       ;VAR 32529/7f11
         add     a,a
         add     a,a
         add     a,80
-        ld      (V_32529),a
+        ld      (V_zone_half_landval),a
         ret     
 
 V_32579:    defb    0       ;VAR 32579/7f43
@@ -5346,7 +5492,7 @@ V_32580:    defb    0       ;VAR 32580/7f4f - unused?
 
 
 .L7f45  call    L7ec4
-        ld      a,(V_32449)
+        ld      a,(V_zone_landval_final)
         ld      l,a
         ld      h,0
         ld      a,25
@@ -5363,7 +5509,7 @@ V_32606:    defb    0       ;VAR 32606/7f5e - unused?
 
 
 .L7f5f  call    L7ec4
-        ld      a,(V_32449)
+        ld      a,(V_zone_landval_final)
         ld      l,a
         ld      h,0
         ld      a,31
@@ -5378,10 +5524,10 @@ V_32606:    defb    0       ;VAR 32606/7f5e - unused?
 
 
 ; Holds result f searching the map - address within map?
-V_32632:    defs        32          ;VAR: 32632/7f78 - ??
+V_powerstation_list:    defs        32          ;VAR: 32632/7f78 - list of map addresses for all power stations (16 x 2-byte entries, zero-terminated)
 
 
-.L7f98  ld      ix,V_32632
+.L7f98  ld      ix,V_powerstation_list
         ld      hl,levelmap         ;Search for a power station
         ld      bc,9216             ;somehow we know it exists?
 .L7fa2  ld      a,$b4
@@ -5418,7 +5564,7 @@ generate_power_map:
         ldir    
         xor     a
         ld      (V_brownout_detected),a
-        ld      ix,V_32632                  ;Map address of power stations
+        ld      ix,V_powerstation_list                  ;Map address of power stations
 .L7fe5  ld      l,(ix+0)
         ld      h,(ix+1)
         ld      a,h
@@ -5433,9 +5579,9 @@ generate_power_map:
         jr      z,L7ffd                 ; (3)
         ld      de,450                      ;Coal power is a lot less
 
-.L7ffd  ld      (V_32793),de              ;Power available
+.L7ffd  ld      (V_power_units_left),de              ;Power available
         call    L7635
-        ld      (V_32791),bc              ;Current coordinates
+        ld      (V_power_bfs_pos),bc              ;Current coordinates
         push    ix
         call    L811d                   ;Start tracing the connections
         pop     ix
@@ -5444,10 +5590,10 @@ generate_power_map:
         jr      L7fe5                   ; (-48)
 
 ;8015
-V_32789:        defb    0       ;VAR 32789/8015
-V_32790:        defb    0       ;VAR 32790/8016
-V_32791:        defw    0       ;VAR 32791/8017
-V_32793: defw    0          ;VAR 32793/8019 - power available from power station we are processing
+V_power_bfs_down:        defb    0       ;VAR 32789/8015 - power BFS downward traversal flag (set if going south, prevents backtrack)
+V_power_bfs_up:        defb    0       ;VAR 32790/8016 - power BFS upward traversal flag (set if going north, prevents backtrack)
+V_power_bfs_pos:        defw    0       ;VAR 32791/8017 - power BFS current map coordinates (b=y, c=x)
+V_power_units_left: defw    0          ;VAR 32793/8019 - power units remaining from current station (coal=450, nuclear=1350; decrements each powered tile)
 V_powersp:  defw    0       ;VAR 32795/801b - saved stack when aborting power search 
 
 V_powerqueue:   defs    256 ;VAR 32797/801c - list of coordinates to check for power connection
@@ -5460,7 +5606,7 @@ V_powerqueue:   defs    256 ;VAR 32797/801c - list of coordinates to check for p
         ld      (V_powersp),sp
         ld      bc,$ffff        ;Place an endmarker
         call    L8177          
-        ld      bc,(V_32791)      ;Current coordinate we're dealing with
+        ld      bc,(V_power_bfs_pos)      ;Current coordinate we're dealing with
         call    L8177
 .L8136  call    L818f           ;Get next cell 
         ld      a,b             ;Check if we're at the end
@@ -5475,15 +5621,15 @@ V_powerqueue:   defs    256 ;VAR 32797/801c - list of coordinates to check for p
         call    check_tile_needs_power
         jr      nz,L8136                ;Power not needed, go get next starting point
         xor     a
-        ld      (V_32789),a           ;Down power check indicator
-        ld      (V_32790),a           ;Up power check indicator
+        ld      (V_power_bfs_down),a           ;Down power check indicator
+        ld      (V_power_bfs_up),a           ;Up power check indicator
 .L8152  call    set_tile_as_powered ;Turns power on for tile
         dec     b                   ;Up a row
-        ld      hl,V_32789
+        ld      hl,V_power_bfs_down
         call    L816d
         inc     b                   ;And then below
         inc     b
-        ld      hl,V_32790
+        ld      hl,V_power_bfs_up
         call    L816d
         dec     b                   ;And then to the right
         inc     c
@@ -5563,9 +5709,9 @@ set_tile_as_powered:
         or      e
         ld      (hl),a
         pop     bc
-        ld      hl,(V_32793)          ;We have one less tile we can give power to
+        ld      hl,(V_power_units_left)          ;We have one less tile we can give power to
         dec     hl
-        ld      (V_32793),hl
+        ld      (V_power_units_left),hl
         ld      a,h
         or      l
         ret     nz
@@ -5621,6 +5767,8 @@ calculate_city_score:
         ld      hl,(V_NuclearPop)     ;NuclearPop
         ld      de,6000               
 
+; Multiply hl by de (weight) and add result to V_city_score
+.score_add_weighted_population
 .L824f  call    L_mult_24_16x16
         ld      de,(V_city_score)
         ld      a,(V_city_score+2)
@@ -5631,7 +5779,7 @@ calculate_city_score:
         ld      (V_city_score+2),a
         ret     
 
-V_33381:    defw    0       ;VAR 33381/8265 - unemployment?
+V_unemployment:    defw    0       ;VAR 33381/8265 - unemployment level (derived from industrial demand; feeds concern score)
 
 
 ; (Res-(Com+Ind))*4
@@ -5645,15 +5793,18 @@ set_unemployment:
         sbc     hl,de
         add     hl,hl
         add     hl,hl
-        ld      (V_33381),hl      ;unemployment
+        ld      (V_unemployment),hl      ;unemployment
         ret     
 
 
-V_33404:    defw    0       ;VAR 33404/827c
-V_33406:    defw    0       ;VAR 33406/827e
-V_33408:    defw    0       ;VAR 33408/8280
+V_RValve:    defw    0       ;VAR 33404/827c - residential demand index (positive = demand, negative = surplus)
+V_CValve:    defw    0       ;VAR 33406/827e - commercial demand index
+V_IValve:    defw    0       ;VAR 33408/8280 - industrial demand index
 
 
+; Calculate economic balance indices (unemployment, commercial/industrial balance, etc.)
+; Results stored in V_RValve, V_CValve, V_IValve
+.calculate_economic_indices
 .L8282  ld      de,(V_ComZPop)
         ld      hl,(V_IndZPop)
         add     hl,de
@@ -5671,7 +5822,7 @@ V_33408:    defw    0       ;VAR 33408/8280
         add     hl,de
         ld      de,-26
         add     hl,de
-        ld      (V_33404),hl
+        ld      (V_RValve),hl
 
         ld      de,(V_ResZPop)
         ld      hl,(V_IndZPop)
@@ -5692,7 +5843,7 @@ V_33408:    defw    0       ;VAR 33408/8280
         add     hl,de
         ld      de,-30
         add     hl,de
-        ld      (V_33406),hl  ;(airport *4) + ((((res + ind) / 2) - com) * 8) - 30
+        ld      (V_CValve),hl  ;(airport *4) + ((((res + ind) / 2) - com) * 8) - 30
 
         ld      de,(V_ComZPop)
         ld      hl,(V_ResZPop)
@@ -5713,7 +5864,7 @@ V_33408:    defw    0       ;VAR 33408/8280
         add     hl,de
         ld      de,-30
         add     hl,de
-        ld      (V_33408),hl
+        ld      (V_IValve),hl
         ret     
 
 
@@ -5726,13 +5877,13 @@ V_33408:    defw    0       ;VAR 33408/8280
         add     hl,hl       ;*16
         ex      de,hl
         ld      b,0
-        ld      hl,(V_33859)
-        ld      a,(V_33859+2)
+        ld      hl,(V_CityPop)
+        ld      a,(V_CityPop+2)
         ld      c,a
         call    l_add24
-        ld      (V_33859),hl
+        ld      (V_CityPop),hl
         ld      a,c
-        ld      (V_33859+2),a
+        ld      (V_CityPop+2),a
         pop     bc
         pop     hl
         ret     
@@ -5777,31 +5928,130 @@ initialise_simulation_variables:
         ret     
 
 
-;Simulation code runs here
+; ============================================================
+; SIMULATION ENGINE
+; ============================================================
+; Runs as a separate cooperative task (IM2 scheduler), interleaved
+; with the UI process.  Each iteration of the main loop is one
+; simulation tick.  The month advances only every N ticks, where N
+; is controlled by V_36711+4 according to the chosen speed:
+;   FAST=8  NORMAL=4  SLOW=3  PAUSED=ff (never)
+;
+; PER-TICK PIPELINE (start_simulation loop):
+;   1. reset_simulation_vars     - zero all per-tick population/fund counters
+;   2. set_simulation_speed      - reload V_36711 table from V_simulation_speed
+;   3. generate_power_map        - BFS from each power station; mark powered tiles
+;   4. L86c9 (process_ric_zones) - scan 96x96 map; evaluate all zone tiles
+;   5. create_police_fire_minimaps - (every 4 ticks) rebuild police/fire coverage
+;   6. L84de (decay_pollution)   - (every other tick) decay pollution minimap
+;   7. DecTrafficMem             - decay traffic density minimap; compute avg
+;   8. calculate_economic_indices- demand indices for R/C/I; drives zone growth
+;   9. L8f05                     - compute crime/house-price concern scores
+;  10. calculate_city_score      - weighted sum of all infrastructure populations
+;  11. set_unemployment          - (Res-(Com+Ind))*4 -> V_unemployment
+;  12. census_church_hosp        - compute hospital/church demand from ResZPop
+;  13. SendMessages              - post advisor messages based on city state
+;  14. L84a4 (update_stats)      - save safe copies of NuclearPop/AirportPop,
+;                                  compute tornado centroid, average land values
+;  -- monthly (when sim_loop_counter & speed_mask == 0) --
+;  15. DoBudget                  - collect tax, set money; wait for UI confirmation
+;  16. increment_month           - advance V_month/V_year
+;
+; POWER PROPAGATION (generate_power_map / L811d):
+;   For each entry in V_powerstation_list (power station map addresses):
+;     - Coal gives 450 units, Nuclear gives 1350 units (V_power_units_left)
+;     - BFS via V_powerqueue (256-byte queue of BC coords)
+;     - set_tile_as_powered marks power minimap bit; decrements unit counter
+;     - If units reach 0 before BFS completes: abort via saved SP,
+;       increment V_brownout_detected
+;
+; ZONE SCANNER (L86c9 / process_ric_zones):
+;   Full 96x96 scan.  For each cell:
+;   a) Tiles $a0-$bf (zone centre tiles): call set_zone_power_state
+;      - clears/sets bit 4 of map tile to reflect power minimap
+;      - V_ZonePwrFlg=1 if powered, 0 if not
+;   b) Tiles $51-$56 (compact R/I/C variants): call check_ric_power
+;      - updates tile to powered/unpowered variant (e.g. 81<->84)
+;   c) Dispatch via D_34835 lookup (tile type -> handler index)
+;      then D_34811 jump table -> zone handler
+;
+; ZONE HANDLERS:
+;   DoResidential / DoCommercial / DoIndustrial:
+;     - Increment *Pop counter (e.g. V_ResZPop)
+;     - Add density * 16 to V_CityPop (cumulative population for budget)
+;     - Check transport access; conditionally call sim_update_traffic
+;     - Drive zone upgrade/downgrade via L8a40/L8a70/sim_place_zone_3x3
+;   DoPolice / DoFire:
+;     - Add 100 to fund counter (V_PoliceFund / V_FireFund)
+;     - Increment *Pop if powered
+;   DoCoal / DoNuclear:
+;     - Increment *Pop; call place_fallout on meltdown flag
+;   DoStadium / DoPort / DoAirport:
+;     - Require power; check 4x4/4x4/6x6 surrounding area for road access
+;     - Random chance to trigger sim_start_aircrash (airport)
+;   DoChurch / DoHospital:
+;     - Increment *Pop; randomly downgrade to residential if overpopulated
+;
+; ECONOMIC INDICES (calculate_economic_indices):
+;   V_RValve = (Com+Ind-Res)*8 + StadiumPop*4 - 26   (residential demand)
+;   V_CValve = ((Res+Ind)/2 - Com)*8 + AirportPop*4 - 30 (commercial demand)
+;   V_IValve = ((Com+Res)/2 - Ind)*8 + PortPop*4 - 30   (industrial demand)
+;   These drive whether zones upgrade (+) or downgrade (-).
+;
+; DISASTERS:
+;   sim_maybe_start_fire_or_flood  - 1-in-4 chance each airport tick
+;   sim_start_aircrash             - sets flight counter (V_aircrash_countdown); L787e
+;                                    ignites 2x2 cell block after countdown
+;   sim_start_meltdown             - sets V_meltdown_triggered; place_fallout
+;                                    scatters TILE_RADIOACTIVE in 45x45 region
+;   sim_start_tornado              - wanders map, bulldozes zone tiles
+;
+; TRAFFIC SIMULATION (sim_update_traffic):
+;   Random walk from zone centre; finds road/rail network
+;   Increments traffic density minimap cell by 20 (capped at 240)
+;   DecTrafficMem decays every cell each tick:
+;     value<24 -> 0;  24-199 -> -24;  200+ -> -34
+;   Average traffic density stored in V_TrafficAverage
+;
+; BUDGET (DoBudget - runs in November, month==11):
+;   Copies current population/fund figures to budget panel variables
+;   If auto_budget off: sets V_wait_for_budget_confirm=1 and busy-loops
+;   until UI thread clears the flag (user confirms budget in menu)
+;   Then reads V_money_after_budget written by UI into V_money
+;
+; KEY POPULATION VARIABLES (zeroed each tick by reset_simulation_vars):
+;   V_CityPop  - cumulative population (24-bit, for tax calc)
+;   V_ResZPop, V_ComZPop, V_IndZPop  - zone populations
+;   V_PolicePop, V_FirePop, V_HospitalPop, V_ChurchPop
+;   V_NuclearPop, V_CoalPop, V_StadiumPop, V_AirportPop, V_PortPop
+;   V_PoliceFund, V_FireFund  - funding requested this tick
+;   V_RoadTotal, V_RailTotal  - road/rail tile counts
+; ============================================================
+
 .V_33629            defb        0       ;VAR 835e/33629
 .V_sim_loop_counter defb       0       ;VAR 835e/33630 - loop counter for simulation (increments each time through)
 
 start_simulation:
-        call    L83a1                           ;Initialise all simulation vars
-.L8362  call    reset_simulation_vars           ;Clears simulation loop variables
+        call    L83a1                           ;Initialise all simulation vars (minimaps, disaster flags, budgets)
+.L8362  call    reset_simulation_vars           ;Zero all per-tick population/fund counters
         call    set_simulation_speed
-        call    generate_power_map              ;Power minimap + brownout detection
-        call    L86c9                           ;Process zones
-        call    create_police_fire_minimaps     ;Create minimaps for police/fire
-        call    L84de                           ;Generate pollution map
-        call    DecTrafficMem                   ;Traffic?
-        call    L8282                           ;Determines demand for stadium etc?
-        call    L8f05                           ;Some stats...
-        call    calculate_city_score
-        call    set_unemployment
-        call    census_church_hosp
-        call    SendMessages
-        call    L84a4                           ;More stats?
+        call    generate_power_map              ;BFS from each power station; populate power minimap
+        call    L86c9                           ;Scan 96x96 map: evaluate zones, dispatch zone handlers
+        call    create_police_fire_minimaps     ;Every 4 ticks: rebuild police/fire coverage minimaps
+        call    L84de                           ;Every other tick: decay pollution minimap; avg -> V_PolluteAverage
+        call    DecTrafficMem                   ;Decay traffic density; compute average -> V_TrafficAverage
+        call    calculate_economic_indices      ;R/C/I demand indices -> V_RValve/6/8
+        call    L8f05                           ;Crime/house-price concern scores -> V_concern_crime/10
+        call    calculate_city_score            ;Weighted infrastructure sum -> V_city_score
+        call    set_unemployment                ;(Res-(Com+Ind))*4 -> V_unemployment
+        call    census_church_hosp              ;Hospital/church demand -> V_hospital_demand/church_demand
+        call    SendMessages                    ;Post advisor alerts based on city state
+        call    L84a4                           ;Save safe NuclearPop/AirportPop; compute land-value centroid
         ld      a,(V_sim_loop_counter)
-        ld      hl,V_36711+4
+        ld      hl,V_36711+4                    ;Speed-dependent month-advance mask
         and     (hl)
         jr      nz,L839b                ; (6)
-        call    DoBudget
+        call    DoBudget                        ;Collect tax, update money; wait for UI budget confirm
         call    increment_month
 .L839b  ld      hl,V_sim_loop_counter
         inc     (hl)
@@ -5809,7 +6059,7 @@ start_simulation:
 
 ; Initialises the simulation variables
 .L83a1  ld      hl,8224
-        ld      (V_33954),hl
+        ld      (V_CCxy),hl
         ld      hl,minimaps
         ld      de,minimaps+1
         ld      bc,6911
@@ -5822,18 +6072,18 @@ start_simulation:
         ld      (V_31793),a
         ld      (V_31752),a
         xor     a
-        ld      (V_36610),a
-        ld      (V_36609),a
-        ld      (V_34074),a
+        ld      (V_concern_house_price),a
+        ld      (V_concern_crime),a
+        ld      (V_TrafficAverage),a
         ld      (V_sim_loop_counter),a
         ld      (V_wait_for_budget_confirm),a
         ld      (V_hospital_demand),a
         ld      (V_church_demand),a
-        ld      (V_30678),a
-        ld      (V_30841),a
-        ld      (V_30845),a
+        ld      (V_transport_active),a
+        ld      (V_aircrash_active),a
+        ld      (V_aircrash_countdown),a
         ld      (V_meltdown_triggered),a
-        ld      (V_31127),a
+        ld      (V_tornado_active),a
         ld      (V_33629),a
         ld      hl,0
         ld      (V_Transport_Funding_Requested),hl
@@ -5842,14 +6092,14 @@ start_simulation:
         ld      (V_Transport_Funding_Allocated),hl
         ld      (V_Police_Funding_Allocated),hl
         ld      (V_Fire_Funding_Allocated),hl
-        ld      (V_33381),hl
-        ld      (V_36611),hl
+        ld      (V_unemployment),hl
+        ld      (V_transport_total),hl
         ld      (V_safe_AirportPop),hl
         ld      (V_safe_NuclearPop),hl
-        ld      (V_33948),hl
-        ld      (V_33404),hl
-        ld      (V_33406),hl
-        ld      (V_33408),hl
+        ld      (V_LVAverage),hl
+        ld      (V_RValve),hl
+        ld      (V_CValve),hl
+        ld      (V_IValve),hl
         ld      c,0
         ld      h,0
         ld      l,0
@@ -5871,7 +6121,7 @@ start_simulation:
         ret     
 
 ;8443, 33859
-V_33859: defb        0,0,0       ;VAR
+V_CityPop: defb        0,0,0       ;VAR - 24-bit cumulative population total (summed per tick for tax revenue calculation)
 
 V_ResZPop: defw        0       ;VAR
 V_ComZPop: defw        0       ;VAR
@@ -5891,80 +6141,82 @@ V_AirportPop:  defw        0       ;VAR 33882  - Airport popluation
 
 V_PortPop:  defw        0       ;VAR 33884 - Port population
 
-V_33886:    defw        0       ;VAR 33886/845e
-V_33888:    defw        0       ;VAR 33888/8460
-V_33890:    defw        0       ;VAR 33890/8462
-V_33892:    defw        0       ;VAR 33892/8464
+V_unPwrdZCnt:    defw        0       ;VAR 33886 - count of unpowered zone tiles this tick
+V_PwrdZCnt:    defw        0       ;VAR 33888 - count of powered zone tiles this tick
+V_transport_fund:    defw        0       ;VAR 33890 - transport funding requested (road+rail+zone contributions)
+V_transport_util:    defw        0       ;VAR 33892 - transport utilisation score (road 4/rail 3/station 6 per tile)
 
-V_PoliceFund:   defw        0   ;VAR 33894 - police funding needed
-V_FireFund:     defw        0   ;VAR 33896 - fire funding needed
-V_RailTotal:    defw        0   ;VAR 33898 - rail total
-V_RoadTotal:    defw        0   ;VAR 33900 - road total
+V_PoliceFund:   defw        0   ;VAR 33894 - police funding requested this tick (100 per station)
+V_FireFund:     defw        0   ;VAR 33896 - fire funding requested this tick (100 per station)
+V_RailTotal:    defw        0   ;VAR 33898 - count of rail tiles
+V_RoadTotal:    defw        0   ;VAR 33900 - count of road tiles
 
 
-V_33902:        defw        0   ;VAR 33902/846e
+V_police_cov_num:        defw        0   ;VAR 33902 - police coverage numerator (for crime concern score)
 
-V_33904:        defw        0   ;VAR 33904/8470
-V_33906:        defw        0   ;VAR 33906/8472
-V_33908:        defw        0   ;VAR 33908/8474
-V_33910:        defw        0   ;VAR 33910/8476
-V_33912:        defw        0   ;VAR 33912/8478
-V_33914:        defw        0   ;VAR 33914/847a
-V_33916:        defw        0   ;VAR 33916/847c
-V_33918:        defw        0   ;VAR 33918/847e
+V_police_cov_den:        defw        0   ;VAR 33904 - police coverage denominator
+V_landval_num:        defw        0   ;VAR 33906 - land value numerator (for house-price concern score)
+V_landval_den:        defw        0   ;VAR 33908 - land value denominator
+V_traffic_sum:        defw        0   ;VAR 33910 - traffic density accumulator (sum, for average)
+V_traffic_count:        defw        0   ;VAR 33912 - traffic tile count (denominator for average)
+V_pollution_sum:        defw        0   ;VAR 33914 - pollution accumulator (sum, for average)
+V_pollution_count:        defw        0   ;VAR 33916 - pollution tile count (denominator for average)
+V_landval_accum:        defw        0   ;VAR 33918 - land value accumulator (used by L84a4 for tornado centroid)
 
       
 ;33920
 reset_simulation_vars:
-.L8480  ld      hl,V_33859           ;wipe out all populations
-        ld      de,V_33859+1
+.L8480  ld      hl,V_CityPop           ;wipe out all populations
+        ld      de,V_CityPop+1
         ld      bc,60
         ld      (hl),0
         ldir    
         xor     a
-        ld      (V_34760),a
-        ld      (V_34760+2),a
+        ld      (V_zone_extent),a
+        ld      (V_zone_extent+2),a
         cpl     
-        ld      (V_34760+1),a
-        ld      (V_34760+3),a
+        ld      (V_zone_extent+1),a
+        ld      (V_zone_extent+3),a
         ret     
 
-V_33948:     defw    0           ;VAR 33948/8e9c
+V_LVAverage:     defw    0           ;VAR 33948/8e9c - land value total snapshot (copy of V_landval_accum; used for display)
 
 V_safe_AirportPop:        defw    0           ;VAR 33950/849e - 
 V_safe_NuclearPop:        defw    0           ;VAR 33952/849e - 
 
-;V_33954
-V_33954:    defb $20, $20       ;VAR 33954/84a2
+;V_CCxy
+V_CCxy:    defb $20, $20       ;VAR 33954/84a2 - midpoint of active zone extent (x,y); used as tornado spawn target
 
 
-.L84a4  ld      a,(V_34760)
-        ld      hl,V_34760+1
+; Update safe copies of airport/nuclear pop, land value centroid, pollution average
+update_stats:
+.L84a4  ld      a,(V_zone_extent)             ;V_zone_extent tracks min/max X of active zones
+        ld      hl,V_zone_extent+1
         add     a,(hl)
         srl     a
-        ld      (V_33954),a
-        ld      a,(V_34760+2)
-        ld      hl,V_34760+3
+        ld      (V_CCxy),a             ;V_CCxy = midpoint X of zone extent (tornado target)
+        ld      a,(V_zone_extent+2)
+        ld      hl,V_zone_extent+3
         add     a,(hl)
         srl     a
-        ld      (V_33954+1),a
-        ld      hl,(V_33918)
-        ld      (V_33948),hl
+        ld      (V_CCxy+1),a           ;V_CCxy+1 = midpoint Y of zone extent
+        ld      hl,(V_landval_accum)
+        ld      (V_LVAverage),hl            ;V_LVAverage = land value total (for display)
         ld      hl,(V_NuclearPop)
-        ld      (V_safe_NuclearPop),hl
+        ld      (V_safe_NuclearPop),hl  ;Snapshot for disaster probability check
         ld      hl,(V_AirportPop)
-        ld      (V_safe_AirportPop),hl
-        ld      hl,(V_33914)
-        ld      de,(V_33916)
+        ld      (V_safe_AirportPop),hl  ;Snapshot for aircrash probability check
+        ld      hl,(V_pollution_sum)
+        ld      de,(V_pollution_count)
         call    L_div16x16
         ld      a,l
-        ld      (V_34013),a
-        ret     
+        ld      (V_PolluteAverage),a             ;V_PolluteAverage = average pollution level
+        ret
 
-V_34013:    defb        0       ;VAR 34013/84dd
+V_PolluteAverage:    defb        0       ;VAR 34013/84dd - average pollution level city-wide (V_pollution_sum / V_pollution_count)
 
 
-; Dosomething with pollution?
+; Decay pollution minimap and compute average (runs every other tick)
 .L84de  ld      a,(V_sim_loop_counter)
         and     1
         ret     z
@@ -5982,13 +6234,13 @@ V_34013:    defb        0       ;VAR 34013/84dd
         or      c
         jr      nz,L84ed                ; (-12)
 
-        ld      hl,(V_33914)
-        ld      de,(V_33916)
+        ld      hl,(V_pollution_sum)
+        ld      de,(V_pollution_count)
         call    L_div16x16
         ld      a,l
         srl     a
         srl     a
-        ld      (V_34013),a
+        ld      (V_PolluteAverage),a
         ret     
 
 
@@ -5999,9 +6251,10 @@ V_34013:    defb        0       ;VAR 34013/84dd
         ldir    
         ret     
 
-V_34074:    defb        0       ;VAR 34074/851a
+V_TrafficAverage:    defb        0       ;VAR 34074/851a - average traffic density city-wide (rolling average from DecTrafficMem)
 
-; DecTrafficMem - s_sim
+; Decay traffic density minimap every tick; compute rolling average -> V_TrafficAverage
+; Decay tiers: value<24 -> 0, 24-199 -> sub 24, 200-255 -> sub 34
 DecTrafficMem:
 .L851b  ld      hl,minimaps+3456
         ld      bc,2304
@@ -6012,13 +6265,13 @@ DecTrafficMem:
         jr      z,L8539                 ; (19)
         ld      e,a
         ld      d,0
-        ld      hl,(V_33910)
+        ld      hl,(V_traffic_sum)
         add     hl,de
         jr      c,L8539                 ; (10)
-        ld      (V_33910),hl
-        ld      hl,(V_33912)
+        ld      (V_traffic_sum),hl
+        ld      hl,(V_traffic_count)
         inc     hl
-        ld      (V_33912),hl
+        ld      (V_traffic_count),hl
 
 .L8539  exx     
         ld      a,(hl)
@@ -6041,50 +6294,54 @@ DecTrafficMem:
         ld      a,b
         or      c
         jr      nz,L8521                ; (-52)
-        ld      hl,(V_33910)
-        ld      de,(V_33912)
+        ld      hl,(V_traffic_sum)
+        ld      de,(V_traffic_count)
         call    L_div16x16
         ld      a,l
         srl     a
         srl     a
-        ld      (V_34074),a
+        ld      (V_TrafficAverage),a
         ret     
 
-V_34152:    defb    0       ;VAR 34152/8568
-V_34153:    defb    0       ;VAR 34153/8569
+V_traffic_active:    defb    0       ;VAR 34152/8568 - traffic BFS active (1=road traffic, 2=rail traffic)
+V_Zsource:    defb    0       ;VAR 34153/8569 - tile connection type bitmask for current traffic BFS (road=1, rail=2)
 
+; Initiate traffic density BFS update from zone center
+.sim_update_traffic
 .L856a  xor     a
-        ld      (V_34152),a
-        ld      a,(V_32282)
+        ld      (V_traffic_active),a
+        ld      a,(V_zone_transport_count)
         and     a
         ret     z
 
-        ld      bc,(V_32043)
+        ld      bc,(V_zone_best_coords)
         push    bc
         call    levelmap_xypos
         pop     bc
         ld      a,(hl)
         call    tile_to_flags
         and     6
-        ld      (V_34153),a
+        ld      (V_Zsource),a
         xor     a
-        ld      (V_30461),a
+        ld      (V_PowerStackNum),a
         call    L76fe
         call    L85d6
         ret     c
 
         ld      a,1
-        ld      (V_34152),a
+        ld      (V_traffic_active),a
         call    L8599
         ret     
 
 
-.L8599  ld      a,(V_34153)
+; Process traffic density update for connected road/rail cells (BFS queue loop)
+.process_traffic_from_connections
+.L8599  ld      a,(V_Zsource)
         bit     2,a
         ret     z
 
 
-.L859f  ld      a,(V_30461)
+.L859f  ld      a,(V_PowerStackNum)
         and     a
         ret     z
 
@@ -6100,29 +6357,29 @@ V_34153:    defb    0       ;VAR 34153/8569
 
 .L85b5  ld      (hl),a
         ld      a,5
-        ld      (V_31935),a
+        ld      (V_traffic_bfs_steps),a
         ld      ix,31899
         call    L7cc8
         jr      L859f                   ; (-37)
         xor     a
-        ld      (V_34152),a
-        ld      hl,(V_33890)
+        ld      (V_traffic_active),a
+        ld      hl,(V_transport_fund)
         inc     hl
         ld      a,h
         or      l
         jr      z,L85d3                 ; (3)
-        ld      (V_33890),hl
+        ld      (V_transport_fund),hl
 
 .L85d3  ret     
 
-V_34260:    defb    0       ;VAR 34260/85d4
-V_34261:    defb    0       ;VAR 34261/85d5
+V_LDir:    defb    0       ;VAR 34260/85d4 - traffic BFS previous direction (prevents immediate U-turns)
+V_PosStackN:    defb    0       ;VAR 34261/85d5 - traffic BFS steps taken so far (trip ends at 30)
 
 
 .L85d6  ld      a,5
-        ld      (V_34260),a
+        ld      (V_LDir),a
         xor     a
-        ld      (V_34261),a
+        ld      (V_PosStackN),a
 
 .L85df  call    L8609
         jr      c,L85ea                 ; (6)
@@ -6131,68 +6388,68 @@ V_34261:    defb    0       ;VAR 34261/85d5
 
         jr      L85f6                   ; (12)
 
-.L85ea  ld      a,(V_30461)
+.L85ea  ld      a,(V_PowerStackNum)
         and     a
         jr      z,L8604                 ; (20)
         dec     a
-        ld      (V_30461),a
+        ld      (V_PowerStackNum),a
         jr      L85fd                   ; (7)
 
-.L85f6  ld      hl,V_34261
+.L85f6  ld      hl,V_PosStackN
         ld      a,(hl)
         add     a,1
         ld      (hl),a
 
-.L85fd  ld      a,(V_34261)
+.L85fd  ld      a,(V_PosStackN)
         sub     30
         jr      c,L85df                 ; (-37)
 
 .L8604  scf     
         ret     
 
-V_34310:    defb    0       ;VAR 34310/8606
-V_34311:    defb    0       ;VAR 34311/8607
-V_34312:    defb    0       ;VAR 34312/8608
+V_traffic_rand_dir:    defb    0       ;VAR 34310/8606 - traffic BFS initial random direction (0-3) for this step
+V_traffic_cur_dir:    defb    0       ;VAR 34311/8607 - traffic BFS current direction being tried
+V_traffic_attempts:    defb    0       ;VAR 34312/8608 - traffic BFS attempts remaining before step fails (tries all 4 directions)
 
 
 .L8609  call    get_random_number
         and     3
-        ld      (V_34310),a
+        ld      (V_traffic_rand_dir),a
         ld      a,4
-        ld      (V_34312),a
+        ld      (V_traffic_attempts),a
 
-.L8616  ld      a,(V_34310)
+.L8616  ld      a,(V_traffic_rand_dir)
         and     3
-        ld      (V_34311),a
-        ld      hl,V_34260
+        ld      (V_traffic_cur_dir),a
+        ld      hl,V_LDir
         cp      (hl)
         jr      z,L8638                 ; (20)
-        ld      a,(V_34311)
+        ld      a,(V_traffic_cur_dir)
         call    L76e4                   ;Get cell in direction
         ld      a,(hl)
         bit     7,a
         jr      nz,L8638                ; (9)
         call    tile_to_flags
-        ld      hl,V_34153
+        ld      hl,V_Zsource
         and     (hl)
         jr      nz,L8644                ; (12)
 
-.L8638  ld      hl,V_34310
+.L8638  ld      hl,V_traffic_rand_dir
         inc     (hl)
-        ld      hl,V_34312
+        ld      hl,V_traffic_attempts
         dec     (hl)
         jr      nz,L8616                ; (-44)
         scf     
         ret     
 
 
-.L8644  ld      a,(V_34311)
+.L8644  ld      a,(V_traffic_cur_dir)
         call    L76ed               ;Move coords in direction
-        ld      a,(V_34311)
+        ld      a,(V_traffic_cur_dir)
         add     a,2
         and     3
-        ld      (V_34260),a
-        ld      a,(V_34261)
+        ld      (V_LDir),a
+        ld      a,(V_PosStackN)
         and     1
         call    z,L76fe
         or      a
@@ -6276,38 +6533,40 @@ create_police_fire_minimaps:
         exx     
         ret     
 
-V_34501: defb    0       ;VAR - powered???
-V_34502: defb    0       ;VAR
-V_34503: defb    0       ;VAR
-V_34504: defb    0       ;VAR
+V_ZonePwrFlg: defb    0       ;VAR - zone is powered this cell (1=yes, 0=no)
+V_zone_proc_type: defb    0       ;VAR - zone processing type (1=big zone centre, 2=compact RIC tile)
+V_CChr: defb    0       ;VAR - raw tile type of the zone centre tile (used to index D_34835)
+V_zone_unpow_tile: defb    0       ;VAR - unpowered tile variant for check_ric_power
 
-; Process RIC zones
+; Scan full 96x96 map; evaluate zone tiles and dispatch to zone handlers
+; Called once per simulation tick
+process_ric_zones:
 .L86c9  ld      hl,levelmap
         ld      b,96
         ld      d,0
 .L86d0  ld      c,96
         ld      e,0
 .L86d4  xor     a
-        ld      (V_34501),a
-        ld      (V_34502),a
-        ld      (V_34504),a
-        ld      (V_34503),a
+        ld      (V_ZonePwrFlg),a             ;Reset per-cell zone state
+        ld      (V_zone_proc_type),a
+        ld      (V_zone_unpow_tile),a
+        ld      (V_CChr),a
         ld      a,(hl)
         and     $e0
-        cp      $a0                     ;Grabs $aX and $bX zones - unpowered?
-        call    z,set_zone_power_state  ;Check the power for the zone, bit 4,(hl) indicates power
-        ld      a,(hl)                  ;$
+        cp      $a0                     ;$a0-$bf = multi-tile zone centre (big zones)
+        call    z,set_zone_power_state  ;Check power minimap, update bit 4 of tile, set V_ZonePwrFlg
+        ld      a,(hl)
         cp      $51
-        jr      c,L86f3                 ; "Regular tile"
+        jr      c,L86f3                 ; <$51 = infrastructure tile, skip zone dispatch
         cp      $57
-        call    c,check_ric_power       ;Process RIC
-.L86f3  ld      a,(V_33629)             ;?? When does this ever get set?
+        call    c,check_ric_power       ;$51-$56 = compact R/I/C; update powered/unpowered variant
+.L86f3  ld      a,(V_33629)             ;V_33629 is set externally to suppress zone dispatch (unused in practice)
         and     a
         jr      nz,L8703                ; (10)
-        ld      a,(V_34502)
+        ld      a,(V_zone_proc_type)
         and     a
-        call    nz,L8789
-        call    L8898
+        call    nz,L8789                ;Big zone: look up in D_34835, dispatch via D_34811
+        call    L8898                   ;Handle road/rail/radioactive/flood tiles
 .L8703  inc     hl
         inc     e
         dec     c
@@ -6320,7 +6579,7 @@ V_34504: defb    0       ;VAR
 ;Check power for zone
 set_zone_power_state:
 .L870c  ld      a,1
-        ld      (V_34502),a
+        ld      (V_zone_proc_type),a
         push    hl
         push    hl
         exx     
@@ -6328,7 +6587,7 @@ set_zone_power_state:
         pop     ix
         ld      a,(ix+1)
         and     63
-        ld      (V_34503),a
+        ld      (V_CChr),a
         cp      6
         jr      z,L8739                 ; (22)
         cp      8
@@ -6340,7 +6599,7 @@ set_zone_power_state:
         jr      z,L8739                 ;Doesn't have power....
         set     4,(ix+0)                ;We've got power!
         ld      a,1
-        ld      (V_34501),a
+        ld      (V_ZonePwrFlg),a
 .L8739  exx     
         ret     
 
@@ -6350,7 +6609,7 @@ V_34619: defb    0   ;VAR
 ; Process RIC characters
 check_ric_power:
 .L873c  ld      a,2
-        ld      (V_34502),a
+        ld      (V_zone_proc_type),a
         push    hl
         push    hl
         exx     
@@ -6373,7 +6632,7 @@ check_ric_power:
         ld      e,83
 
 .L8760  ld      a,d                     ;Unpowered version
-        ld      (V_34504),a
+        ld      (V_zone_unpow_tile),a
         ld      (V_34619),a
         push    de
         call    L7615                   ;Get minimap power map+mask
@@ -6384,7 +6643,7 @@ check_ric_power:
         ld      a,e                     ;Set powr flag
         ld      (V_34619),a
         ld      a,1
-        ld      (V_34501),a
+        ld      (V_ZonePwrFlg),a
 .L8779  exx     
         ld      a,(V_34619)
         cp      (ix+0)
@@ -6404,7 +6663,7 @@ V_map_iter_addr: defw    0       ;VAR 34695 - map address whilst iterating
         push    hl
         call    L87aa
         call    L87cc
-        ld      a,(V_34502)
+        ld      a,(V_zone_proc_type)
         cp      2
         jr      z,L87e4                 ; Handling RIC
         cp      1
@@ -6415,35 +6674,35 @@ L8789_return:
         ret     
 
 
-.L87aa  ld      a,(V_34501)
+.L87aa  ld      a,(V_ZonePwrFlg)
         and     a
         jr      z,L87bc                 ; (12)
-        ld      hl,(V_33888)
+        ld      hl,(V_PwrdZCnt)
         inc     hl
         ld      a,h
         or      l
         jr      z,L87bb                 ; (3)
-        ld      (V_33888),hl
+        ld      (V_PwrdZCnt),hl
 .L87bb  ret     
 
 
-.L87bc  ld      hl,(V_33886)
+.L87bc  ld      hl,(V_unPwrdZCnt)
         inc     hl
         ld      a,h
         or      l
         jr      z,L87c7                 ; (3)
-        ld      (V_33886),hl
+        ld      (V_unPwrdZCnt),hl
 .L87c7  ret     
 
-V_34760:    defb    0, 255, 0, 255      ;VAR 34760/87c8
+V_zone_extent:    defb    0, 255, 0, 255      ;VAR 34760/87c8 - zone bounding box: minX, maxX, minY, maxY (reset to 0,255,0,255 each tick)
 
 
 
 .L87cc  ld      a,(V_map_iter_xy)
-        ld      hl,V_34760
+        ld      hl,V_zone_extent
         call    L87db
         ld      a,(V_map_iter_xy+1)
-        ld      hl,V_34760+2
+        ld      hl,V_zone_extent+2
 .L87db  cp      (hl)
         jr      c,L87df                 ; (1)
         ld      (hl),a
@@ -6454,39 +6713,42 @@ V_34760:    defb    0, 255, 0, 255      ;VAR 34760/87c8
         ret     
 
 
+; Dispatch compact RIC tile (tiles $51-$56) to the appropriate powered zone handler
+; V_zone_unpow_tile holds the unpowered tile variant determined by check_ric_power
+dispatch_compact_ric:
 .L87e4  xor     a
         ld      (V_34921),a
-        ld      a,(V_34504)
-        cp      84          ;residential powered
+        ld      a,(V_zone_unpow_tile)
+        cp      84          ;84 = unpowered residential -> DoResidential (powered path)
         jp      z,L8aa3
-        cp      85          ;commercial powered
+        cp      85          ;85 = unpowered commercial -> DoCommercial (powered path)
         jp      z,L8bc4
-        cp      86          ;industrial powered
+        cp      86          ;86 = unpowered industrial -> DoIndustrial (powered path)
         jp      z,L8c5b
-        ret     
+        ret
 
-; 87fb/34811
-; Actions - increasing density etc?
+; Zone handler jump table, indexed by D_34835 byte 1
 D_34811:
-        defw    DoPolice        ;0  police?
-        defw    DoFire          ;1  fire
-        defw    DoChurch        ;   residential
+        defw    DoPolice        ;0
+        defw    DoFire          ;1
+        defw    DoChurch        ;2
         defw    DoHospital      ;3
-        defw    DoStadium       ;   stadium
-        defw    DoCoal          ;5  coal
-        defw    DoNuclear       ;   nuclear
-        defw    DoPort          ;7  port
-        defw    DoAirport       ;   airport
-        defw    DoResidential   ;9  residential
-        defw    DoCommercial    ;   commercial
+        defw    DoStadium       ;4
+        defw    DoCoal          ;5
+        defw    DoNuclear       ;6
+        defw    DoPort          ;7
+        defw    DoAirport       ;8
+        defw    DoResidential   ;9
+        defw    DoCommercial    ;a
         defw    DoIndustrial    ;b
 
 
+; Zone lookup table: 4 bytes per entry
+;   byte 0 = tile type (V_CChr) to match
+;   byte 1 = D_34811 handler index (*2 for word table offset)
+;   byte 2 = V_34921+1 (zone sub-type parameter)
+;   byte 3 = V_34921+0 (zone density/population scale factor)
 D_34835:
-        ;   db XX - compared with 34503
-        ;   db index of handler in table above
-        ;   db -> 34922
-        ;   db -> 34921
         defb    0,0,0,10                ;police
         defb    1,1,0,10                ;fire
         defb    2,2,0,5                 ;church
@@ -6495,28 +6757,30 @@ D_34835:
         defb    6,5,0,10                ;coal
         defb    8,6,0,10                ;nuclear
         defb    10,7,0,$1e              ;port
-        defb    $0c, $08, $00, $28      ;airport
-        defb    $11, $09, $00, $60      ;residential
-        defb    $12, $09, $01, $80      ;residential
-        defb    $13, $09, $02, $a0      ;residential
-        defb    $14, $09, $03, $c0      ;residential
-        defb    $15, $0a, $00, $0a      ;commercial
-        defb    $16, $0a, $01, $14      ;commercial
-        defb    $17, $0a, $02, $1e      ;commercial
-        defb    $18, $0a, $03, $28      ;commercial
-        defb    $1a, $0b, $00, $10      ;industrial
-        defb    $1b, $0b, $01, $20      ;industrial
-        defb    $1c, $0b, $02, $30      ;industrial
-        defb    $1d, $0b, $03, $40      ;industrial
-        defb    $ff, $ff
+        defb    $0c,$08,$00,$28         ;airport
+        defb    $11,$09,$00,$60         ;residential density 1
+        defb    $12,$09,$01,$80         ;residential density 2
+        defb    $13,$09,$02,$a0         ;residential density 3
+        defb    $14,$09,$03,$c0         ;residential density 4
+        defb    $15,$0a,$00,$0a         ;commercial density 1
+        defb    $16,$0a,$01,$14         ;commercial density 2
+        defb    $17,$0a,$02,$1e         ;commercial density 3
+        defb    $18,$0a,$03,$28         ;commercial density 4
+        defb    $1a,$0b,$00,$10         ;industrial density 1
+        defb    $1b,$0b,$01,$20         ;industrial density 2
+        defb    $1c,$0b,$02,$30         ;industrial density 3
+        defb    $1d,$0b,$03,$40         ;industrial density 4
+        defb    $ff,$ff                 ;sentinel
 
 V_34921:
-        defb    $00, $00         ;VAR 8869/34921
+        defb    $00, $00         ;VAR 8869/34921 - density/sub-type from D_34835 for current zone
 
-;Some zone processing stuff?
+; Dispatch zone handler: search D_34835 for V_CChr (tile type), load V_34921
+; parameters, then jump via D_34811 to the appropriate DoXxx handler
+dispatch_zone_handler:
 .L886b  ld      hl,D_34835
         ld      bc,4
-        ld      a,(V_34503)
+        ld      a,(V_CChr)
         ld      e,a
 .L8875  ld      a,(hl)
         cp      255
@@ -6544,26 +6808,29 @@ V_34921:
         ld      l,a
         jp      (hl)
 
+; Process infrastructure / environmental tiles (non-zone tiles <128)
+; Handles: radioactive decay, flood tile, max-residential cap, rail counts, road counts
+process_infra_tile:
 .L8898  ld      a,(hl)
         cp      128
-        ret     nc
+        ret     nc                      ;Zone tile (bit 7 set) - nothing to do here
 
         ld      (V_map_iter_addr),hl
         ld      (V_map_iter_xy),de
-        exx     
+        exx
         ld      hl,L8898_return
         push    hl
         cp      TILE_RADIOACTIVE
-        jp      z,L8942
+        jp      z,L8942                 ;Radioactive: random chance to decay back to dirt
         cp      69
-        jp      z,L8962
-        cp      68          ;Max residential
-        jp      z,L8986
+        jp      z,L8962                 ;Flood tile: increment flood counter; chance to spread or clear
+        cp      68
+        jp      z,L8986                 ;Max-density residential: random downgrade
         call    tile_to_flags
         bit     2,a
-        jr      nz,L88c6                ; (8)
+        jr      nz,L88c6                ; Rail tile: count rail, count transport funding
         bit     1,a
-        jr      nz,L8903                ; (65)
+        jr      nz,L8903                ; Road tile: count road, count transport funding
         pop     hl
 L8898_return:
         exx     
@@ -6586,12 +6853,12 @@ V_35013:    defb    $FF         ;VAR 35013/88c5
         jr      z,L88df                 ; (3)
         ld      (V_RailTotal),hl
 
-.L88df  ld      hl,(V_33892)
+.L88df  ld      hl,(V_transport_util)
         inc     hl
         ld      a,h
         or      l
         jr      z,L88ea                 ; (3)
-        ld      (V_33892),hl
+        ld      (V_transport_util),hl
 
 .L88ea  ld      hl,(V_map_iter_addr)
         ld      a,(hl)
@@ -6601,11 +6868,11 @@ V_35013:    defb    $FF         ;VAR 35013/88c5
         ret     nz
 
 
-.L88f5  ld      hl,(V_33892)
+.L88f5  ld      hl,(V_transport_util)
         ld      de,3
         add     hl,de
         jr      c,L8901                 ; (3)
-        ld      (V_33892),hl
+        ld      (V_transport_util),hl
 
 .L8901  ret     
 
@@ -6626,11 +6893,11 @@ V_35074:    defb    0       ;VAR 35704/8902
         jr      z,L891b                 ; (3)
         ld      (V_RoadTotal),hl
 
-.L891b  ld      hl,(V_33892)
+.L891b  ld      hl,(V_transport_util)
         ld      de,4
         add     hl,de
         jr      c,L8927                 ; (3)
-        ld      (V_33892),hl
+        ld      (V_transport_util),hl
 
 .L8927  call    L785d
         ld      hl,(V_map_iter_addr)
@@ -6641,11 +6908,11 @@ V_35074:    defb    0       ;VAR 35704/8902
         ret     nz
 
 
-.L8935  ld      hl,(V_33892)
+.L8935  ld      hl,(V_transport_util)
         ld      de,6
         add     hl,de
         jr      c,L8941                 ; (3)
-        ld      (V_33892),hl
+        ld      (V_transport_util),hl
 
 .L8941  ret     
 
@@ -6658,7 +6925,7 @@ V_35074:    defb    0       ;VAR 35704/8902
         or      l
         jr      z,L8956                 ; (8)
         ld      a,64
-        ld      (V_31935),a
+        ld      (V_traffic_bfs_steps),a
         jp      L7cc0
 
 .L8956  ld      hl,(V_map_iter_addr)
@@ -6671,12 +6938,12 @@ place_dirt:
         ret     
 
 
-.L8962  ld      hl,(V_33918)
+.L8962  ld      hl,(V_landval_accum)
         inc     hl
         ld      a,h
         or      l
         jr      z,L896d                 ; (3)
-        ld      (V_33918),hl
+        ld      (V_landval_accum),hl
 
 .L896d  call    L7591
         inc     a
@@ -6694,6 +6961,7 @@ place_dirt:
 
 V_35205:  defb    $32         ;VAR 8985/35205
 
+.decay_radioactive_tile                     ; $8986 / 35206
 .L8986
         ld      hl,V_35205
         ld      a,(hl)
@@ -6885,8 +7153,8 @@ D_35336:
         ld      e,a
         ld      d,0
         call    L82ee                   ;Adds de to (33859..61)
-        ld      a,(V_32282)
-        ld      (V_34152),a
+        ld      a,(V_zone_transport_count)
+        ld      (V_traffic_active),a
         call    get_random_number
         and     63
         ld      hl,V_34921
@@ -6896,8 +7164,8 @@ D_35336:
         ld      (V_34398),hl
         call    L856a                   ;Some transport check?
 .L8ada  call    L7cfe
-        ld      hl,(V_33404)
-        ld      (V_32450),hl
+        ld      hl,(V_RValve)
+        ld      (V_zone_landval_mult),hl
         call    L7f12
         ld      a,(V_34921)
         cp      16
@@ -6905,7 +7173,7 @@ D_35336:
 .L8aed  ld      a,(V_34921)
         cp      63
         jr      nc,L8afe                ; (10)
-        ld      hl,V_32529
+        ld      hl,V_zone_half_landval
         cp      (hl)
         jp      c,L8a40
         jp      L8a70
@@ -6954,8 +7222,8 @@ L8b37:
         ld      e,a
         ld      d,0
         call    L82ee
-        ld      a,(V_32282)
-        ld      (V_34152),a
+        ld      a,(V_zone_transport_count)
+        ld      (V_traffic_active),a
         call    get_random_number
         and     127
         ld      hl,V_34921
@@ -6965,8 +7233,8 @@ L8b37:
         ld      (V_34398),hl
         call    L856a
 .L8b6c  call    L7cfe
-        ld      a,(V_33404)
-        ld      (V_32450),a
+        ld      a,(V_RValve)
+        ld      (V_zone_landval_mult),a
         call    L7f12
         call    get_random_number
         ld      hl,V_36711+1
@@ -6975,7 +7243,7 @@ L8b37:
         ld      a,(hl)
         cp      255
         ret     z
-        ld      a,(V_32528)
+        ld      a,(V_zone_growth_factor)
         cp      8
         jr      nc,L8ba9                ; (30)
         srl     a
@@ -7019,7 +7287,7 @@ D_35770:
         jr      z,L8bcf                 ; (3)
         ld      (V_ComZPop),hl
 
-.L8bcf  ld      a,(V_34501)
+.L8bcf  ld      a,(V_ZonePwrFlg)
         and     a
         ret     z
 
@@ -7039,8 +7307,8 @@ L8be0:
         ld      (V_ComZPop),hl
 .L8beb  ld      bc,(V_map_iter_xy)
         call    L7d34
-        ld      a,(V_32282)
-        ld      (V_34152),a
+        ld      a,(V_zone_transport_count)
+        ld      (V_traffic_active),a
         call    get_random_number
         and     31
         ld      hl,V_34921
@@ -7050,8 +7318,8 @@ L8be0:
         ld      (V_34398),hl
         call    L856a
 .L8c0c  call    L7cfe
-        ld      hl,(V_33406)
-        ld      (V_32450),hl
+        ld      hl,(V_CValve)
+        ld      (V_zone_landval_mult),hl
         call    L7f45
         call    get_random_number
         ld      hl,V_36711+2
@@ -7094,7 +7362,7 @@ commercial_zone_1:
         jr      z,L8c66                 ; (3)
         ld      (V_IndZPop),hl
 
-.L8c66  ld      a,(V_34501)
+.L8c66  ld      a,(V_ZonePwrFlg)
         and     a
         ret     z
 
@@ -7117,8 +7385,8 @@ L8c77:
 
 .L8c82  ld      bc,(V_map_iter_xy)
         call    L7d34
-        ld      a,(V_32282)
-        ld      (V_34152),a
+        ld      a,(V_zone_transport_count)
+        ld      (V_traffic_active),a
         call    get_random_number
         and     63
         ld      hl,V_34921
@@ -7128,10 +7396,10 @@ L8c77:
         ld      (V_34398),hl
         call    L856a
 
-.L8ca3  ld      hl,(V_33408)
-        ld      (V_32450),hl
+.L8ca3  ld      hl,(V_IValve)
+        ld      (V_zone_landval_mult),hl
         xor     a
-        ld      (V_32447),a
+        ld      (V_zone_landval_local),a
         call    L7f5f
         call    get_random_number
         ld      hl,V_36711+1
@@ -7153,7 +7421,7 @@ L8c77:
 .L8cd5  ld      a,(V_32605)
         add     a,a
         add     a,a
-        ld      (V_31935),a
+        ld      (V_traffic_bfs_steps),a
         jp      L7cc0
 
 .L8ce0  push    af
@@ -7194,14 +7462,14 @@ L8d0b:
         ld      (V_CoalPop),hl
 
 .L8d16  xor     a
-        ld      (V_32450),a
-        ld      (V_32447),a
-        ld      (V_32283),a
+        ld      (V_zone_landval_mult),a
+        ld      (V_zone_landval_local),a
+        ld      (V_zone_transport_score),a
         inc     a
-        ld      (V_34152),a
+        ld      (V_traffic_active),a
         call    L7ec4
         ld      a,255
-        ld      (V_31935),a
+        ld      (V_traffic_bfs_steps),a
         jp      L7cc0
 
 DoNuclear:
@@ -7214,15 +7482,15 @@ L8d2f:
         ld      (V_NuclearPop),hl
 
 .L8d3a  xor     a
-        ld      (V_32450),a
-        ld      (V_32447),a
-        ld      (V_32283),a
+        ld      (V_zone_landval_mult),a
+        ld      (V_zone_landval_local),a
+        ld      (V_zone_transport_score),a
         inc     a
-        ld      (V_34152),a
+        ld      (V_traffic_active),a
         call    L7ec4
         call    place_fallout
         ld      a,48
-        ld      (V_31935),a
+        ld      (V_traffic_bfs_steps),a
         jp      L7cc0
 
 DoPolice:
@@ -7232,7 +7500,7 @@ L8d56:
         add     hl,de
         jr      c,L8d62                 ; (3)
         ld      (V_PoliceFund),hl
-.L8d62  ld      a,(V_34501)
+.L8d62  ld      a,(V_ZonePwrFlg)
         and     a
         ret     z
         ld      hl,(V_PolicePop)
@@ -7250,7 +7518,7 @@ L8d73:
         add     hl,de
         jr      c,L8d7f                 ; (3)
         ld      (V_FireFund),hl
-.L8d7f  ld      a,(V_34501)
+.L8d7f  ld      a,(V_ZonePwrFlg)
         and     a
         ret     z
         ld      hl,(V_FirePop)
@@ -7277,7 +7545,7 @@ L8d90:
         ld      a,(hl)
         cp      255
         ret     z
-        ld      a,(V_34501)
+        ld      a,(V_ZonePwrFlg)
         and     a
         jr      nz,L8db4                ; (7) TODO: Oopt
         ld      ix,residential_zone_2
@@ -7301,7 +7569,7 @@ DoHospital:
         ld      a,(hl)
         cp      255
         ret     z
-        ld      a,(V_34501)
+        ld      a,(V_ZonePwrFlg)
         and     a
         jr      nz,L8dd9                ; TODO: OPT
         ld      ix,residential_zone_2
@@ -7311,22 +7579,22 @@ DoHospital:
 
 DoStadium:
 L8dda:
-        ld      a,(V_34501)
+        ld      a,(V_ZonePwrFlg)
         and     a
         ret     z
         ld      bc,(V_map_iter_xy)
         ld      hl,$0404
         call    L7d2f
-        ld      a,(V_32282)
+        ld      a,(V_zone_transport_count)
         and     a
         ret     z
-        ld      (V_34152),a
+        ld      (V_traffic_active),a
         ld      hl,$0909
         ld      (V_34398),hl
         call    get_random_number
         and     31
         call    z,L856a
-        ld      a,(V_34152)
+        ld      a,(V_traffic_active)
         and     a
         ret     z
         ld      hl,(V_StadiumPop)
@@ -7339,25 +7607,25 @@ L8dda:
 
 DoPort:
 L8e10:
-        ld      a,(V_34501)
+        ld      a,(V_ZonePwrFlg)
         and     a
         ret     z
         ld      bc,(V_map_iter_xy)
         ld      hl,$0404
         call    L7d2f
-        ld      a,(V_32280)
+        ld      a,(V_zone_seas)
         and     a
         ret     z
-        ld      a,(V_32282)
+        ld      a,(V_zone_transport_count)
         and     a
         ret     z
-        ld      (V_34152),a
+        ld      (V_traffic_active),a
         ld      hl,$0b0b
         ld      (V_34398),hl
         call    get_random_number
         and     31
         call    z,L856a
-        ld      a,(V_34152)
+        ld      a,(V_traffic_active)
         and     a
         ret     z
         ld      hl,(V_PortPop)
@@ -7367,27 +7635,27 @@ L8e10:
         jr      z,L8e4a                 ; (3)
         ld      (V_PortPop),hl
 .L8e4a  ld      a,96
-        ld      (V_31935),a
+        ld      (V_traffic_bfs_steps),a
         jp      L7cc0
 
 DoAirport:
 L8e52:
-        ld      a,(V_34501)
+        ld      a,(V_ZonePwrFlg)
         and     a
         ret     z
         ld      bc,(V_map_iter_xy)
         ld      hl,$0606
         call    L7d2f
-        ld      a,(V_32282)
+        ld      a,(V_zone_transport_count)
         and     a
         ret     z
-        ld      (V_34152),a
+        ld      (V_traffic_active),a
         ld      hl,$0a0a
         ld      (V_34398),hl
         call    get_random_number
         and     31
         call    z,L856a
-        ld      a,(V_34152)
+        ld      a,(V_traffic_active)
         and     a
         ret     z
         ld      hl,(V_AirportPop)
@@ -7399,9 +7667,9 @@ L8e52:
 .L8e87  jp      L78ca
 
 
-V_36490:        defb    0,0,0        ;VAR 36490/8e8a
-V_36493:        defb    0,0,0        ;VAR 36493/8e8d
-V_population:   defb    0,0,0   ;VAR 8e90/36496 - population
+V_36490:        defb    0,0,0        ;VAR 36490/8e8a - current cumulative population (copy for budget display)
+V_36493:        defb    0,0,0        ;VAR 36493/8e8d - previous year's population (for budget comparison)
+V_population:   defb    0,0,0        ;VAR 8e90/36496 - running population snapshot (updated each November)
 
 
 
@@ -7409,31 +7677,33 @@ V_population:   defb    0,0,0   ;VAR 8e90/36496 - population
 .V_wait_for_budget_confirm defb    0   ;VAR 8e93/36499 - set waiting for budget to complete
 
 
-; Think this triggers in November for the budget?
-.DoBudget
-.L8e94  
-        ld      hl,(V_33859)
-        ld      a,(V_33859+2)
+; Budget processing - runs every tick to update V_36490 (current pop for display);
+; on month==11 triggers the annual budget: copies fund requests to budget panel,
+; then either processes auto-budget or busy-waits for UI confirmation.
+.DoBudget                                   ; $8E94 / 36500
+.L8e94
+        ld      hl,(V_CityPop)
+        ld      a,(V_CityPop+2)
         ld      c,a
-        ld      (V_36490),hl
+        ld      (V_36490),hl                    ;Update current-population display copy every tick
         ld      a,c
         ld      (V_36490+2),a
         ld      a,(V_month)
         cp      11
-        ret     nz
+        ret     nz                              ;Only do full budget in November
         ld      hl,(V_population)
         ld      a,(V_population+2)
         ld      c,a
         ld      (V_36493),hl
         ld      a,c
         ld      (V_36493+2),a
-        ld      hl,(V_33859)
-        ld      a,(V_33859+2)
+        ld      hl,(V_CityPop)
+        ld      a,(V_CityPop+2)
         ld      c,a
         ld      (V_population),hl
         ld      a,c
         ld      (V_population+2),a
-        ld      hl,(V_33892)
+        ld      hl,(V_transport_util)
         ld      (V_Transport_Funding_Requested),hl
         ld      hl,(V_PoliceFund)
         ld      (V_Budget_Police_Funding_Requested),hl
@@ -7464,29 +7734,34 @@ V_population:   defb    0,0,0   ;VAR 8e90/36496 - population
         ret     
 
 
-V_36609:    defb    0       ;VAR 36609/8f01 - crime concern
-V_36610:    defb    0       ;VAR 36610/8f01 - house price concern
+V_concern_crime:    defb    0       ;VAR 36609/8f01 - crime concern
+V_concern_house_price:    defb    0       ;VAR 36610/8f01 - house price concern
 
-V_36611:    defw    0       ;VAR 36611/8f03 
+V_transport_total:    defw    0       ;VAR 36611/8f03 - road/transport total (for city score display)
 
 
-.L8f05  ld      hl,(V_33902)
-        ld      de,(V_33904)
+; Compute city concern scores from per-tick accumulators
+; V_concern_crime = crime concern = (police coverage sum / count) * 2
+; V_concern_house_price = house price concern = (land value sum / count) / 8
+; V_transport_total = transport score (copy of V_transport_fund)
+compute_concern_scores:
+.L8f05  ld      hl,(V_police_cov_num)
+        ld      de,(V_police_cov_den)
         call    L_div16x16
         ld      a,l
         add     a,a
-        ld      (V_36609),a       ;Police factor
-        ld      hl,(V_33906)
-        ld      de,(V_33908)
+        ld      (V_concern_crime),a             ;Crime concern: police coverage ratio * 2
+        ld      hl,(V_landval_num)
+        ld      de,(V_landval_den)
         call    L_div16x16
         ld      a,l
         srl     a
         srl     a
         srl     a
-        ld      (V_36610),a       ;House price concern
-        ld      hl,(V_33890)
-        ld      (V_36611),hl
-        ret     
+        ld      (V_concern_house_price),a             ;House price concern: land value ratio / 8
+        ld      hl,(V_transport_fund)
+        ld      (V_transport_total),hl            ;Transport score for display
+        ret
 
 
 V_hospital_demand:    defb    0       ;VAR 36655/8f2f - hopsital demand
@@ -7521,26 +7796,27 @@ census_church_hosp:
         ld      (V_church_demand),a       ;church demand
         ret     
 
-; Setup the simulation speed
-V_36711:  defb    $08, $07, $07, $07, $01     ;VAR 36711
+; V_36711: 5-byte speed-control block, copied from D_8f6c each tick
+;   +0 = DoChurch/DoHospital random downgrade mask (and X)
+;   +1 = DoResidential/DoCommercial/DoIndustrial random mask (and X)
+;   +2 = mask for zone growth random check
+;   +3 = mask for zone shrink random check
+;   +4 = month-advance mask (budget fires when sim_loop_counter & this == 0)
+V_36711:  defb    $08, $07, $07, $07, $01     ;VAR 36711 (default = NORMAL speed)
 
-;8f6c, 36716
+; Speed settings table: 5 bytes per row, indexed by V_simulation_speed (0=FAST..3=PAUSED)
 D_8f6c:
-    ;+0
-    ;+1
-    ;+2
-    ;+3
-    ;+4 = simulation iterations per month?
-        defb    $08, $01, $0f, $01, $00     ;FAST
-        defb    $04, $03, $1f, $03, $01     ;NORMAL
-        defb    $03, $07, $3f, $07, $03     ;SLOW
-        defb    $ff, $ff, $ff, $ff, $ff     ;PAUSED
-        
+        defb    $08, $01, $0f, $01, $00     ;FAST   (month every tick)
+        defb    $04, $03, $1f, $03, $01     ;NORMAL (month every 2 ticks)
+        defb    $03, $07, $3f, $07, $03     ;SLOW   (month every 4 ticks)
+        defb    $ff, $ff, $ff, $ff, $ff     ;PAUSED (never advance month)
 
+
+; Copy D_8f6c row for current speed into V_36711
 .set_simulation_speed
-.L8f80  ld      a,(V_simulation_speed)       ;simulation speed (from menu)
+.L8f80  ld      a,(V_simulation_speed)
         ld      b,a
-        add     a,a         ;*5
+        add     a,a         ;speed * 5
         add     a,a
         add     a,b
         ld      c,a
@@ -7549,8 +7825,8 @@ D_8f6c:
         add     hl,bc
         ld      de,V_36711
         ld      bc,5
-        ldir    
-        ret     
+        ldir
+        ret
 
 ; We have a few variables here 7 I think
 
@@ -7558,7 +7834,7 @@ V_money:       defb  0,0,0   ; VAR - money!! - 8f99
             defb    0       ;UNUSED
 V_month:     defb  0       ; VAR 36763 (8f9b) - Month
 V_year:      defw  1902    ; VAR 36764 (8f9c) - Year
-V_8f9e:      defb  0       ;VAR 36766/8f9e
+V_8f9e:      defb  0       ;VAR 36766/8f9e - unreferenced, likely struct padding
 V_36767:      defb  0       ;VAR 36767 - tick counter for ui thread
 
 
@@ -7703,6 +7979,9 @@ change_fire_tile:
         or      c
         jr      nz,L90b5                ; (-14)
         ret     
+; Set cell to TILE_FIRE if it is flammable (skips zones, trees, and non-flammable tiles)
+; Entry: hl = map address
+.ignite_cell_if_flammable
 .L90c4  ld      a,(hl)      ;Don't start fire in pd,fd,stadium etc?
         bit     7,a
         ret     nz
@@ -7840,11 +8119,11 @@ show_budget:
         call    L9358
         ld      hl,37702        ;TODO - in budget screen
 
-.L91a2  ld      (V_26496),hl
+.L91a2  ld      (V_menu_draw_hook),hl
         ld      ix,text_budget
         call    print_routine_ix
         ld      hl,0
-        ld      (V_26496),hl
+        ld      (V_menu_draw_hook),hl
         xor     a
         ld      (V_simulation_disabled),a
         ld      (V_wait_for_budget_confirm),a
@@ -7958,9 +8237,9 @@ V_money_after_budget:            defb    0,0,0           ;VAR 37670/9326 money a
         ld      a,69
 
 .L9353  ld      (textcol),a
-        ret     
+        ret
 
-        nop     
+        defb    0               ; padding
 
 .L9358  ld      hl,(V_money)
         ld      a,(V_money+2)
@@ -8239,11 +8518,11 @@ L95b8:
         ld      a,1
         ld      (V_simulation_disabled),a
         ld      hl,print_stats        
-        ld      (V_26496),hl
+        ld      (V_menu_draw_hook),hl
         ld      ix,text_evaluation    
         call    print_routine_ix
         ld      hl,0
-        ld      (V_26496),hl
+        ld      (V_menu_draw_hook),hl
         xor     a
         ld      (V_simulation_disabled),a
         jp      draw_map
@@ -8304,7 +8583,7 @@ L95b8:
         defb        4        ;inc b
 
 ; 38711
-print_stats:
+print_stats:                                ; $9737 / 38711
 .L9737
         call    determine_city_class    ;VILLAGE, TOWN etc etc
         call    print_evaluation_stats
@@ -8394,7 +8673,7 @@ print_evaluation_stats:
         ld      hl,V_previous_city_score        ;Assessed value (*1000)
         ld      bc,$1114
         call    prt24bit
-        ld      hl,(V_26019)
+        ld      hl,(V_print_end_pos)
         ld      (textpos),hl
         call    L97f8           ;Print 3 trailing 0s to multiply by 1000
         call    L97f8
@@ -8407,7 +8686,7 @@ print_evaluation_stats:
 .V_38913        defw        0        ;VAR - unknown
 
 print_evaluation_concerns:
-.L9803  ld      a,(V_34074)           ;Traffic concern
+.L9803  ld      a,(V_TrafficAverage)           ;Traffic concern
         srl     a
         ld      l,a
         ld      h,0
@@ -8415,7 +8694,7 @@ print_evaluation_concerns:
         ld      (V_38913),hl
         ld      bc,$0A09
         call    prstat
-        ld      a,(V_34013)           ;Pollution concern
+        ld      a,(V_PolluteAverage)           ;Pollution concern
         srl     a
         ld      l,a
         ld      h,0
@@ -8427,7 +8706,7 @@ print_evaluation_concerns:
         ld      de,(V_38913)
         add     hl,de
         ld      (V_38913),hl
-        ld      a,(V_36609)           ;Crime concern
+        ld      a,(V_concern_crime)           ;Crime concern
         srl     a
         srl     a
         ld      l,a
@@ -8440,7 +8719,7 @@ print_evaluation_concerns:
         ld      de,(V_38913)
         add     hl,de
         ld      (V_38913),hl
-        ld      a,(V_33948)           ;Fire concern
+        ld      a,(V_LVAverage)           ;Fire concern
         ld      l,a
         ld      h,0
         ld      d,h
@@ -8473,7 +8752,7 @@ print_evaluation_concerns:
         ld      de,(V_38913)
         add     hl,de
         ld      (V_38913),hl
-        ld      a,(V_36610)           ;House prices concern
+        ld      a,(V_concern_house_price)           ;House prices concern
         ld      l,a
         ld      h,0
         call    ckpercent
@@ -8484,7 +8763,7 @@ print_evaluation_concerns:
         ld      de,(V_38913)
         add     hl,de
         ld      (V_38913),hl
-        ld      hl,(V_33381)          ;Unemployment concern
+        ld      hl,(V_unemployment)          ;Unemployment concern
         call    ckpercent
         push    hl
         ld      bc,$0d1b
@@ -8493,7 +8772,7 @@ print_evaluation_concerns:
         ld      de,(V_38913)
         add     hl,de
         ld      (V_38913),hl
-        ld      de,(V_33886)
+        ld      de,(V_unPwrdZCnt)
         srl     d
         rr      e
         srl     d
@@ -8643,7 +8922,7 @@ V_alertmessage: defb    0       ;VAR 9996/39318 - alert message
         ld      a,29
         ld      bc,$0601
         jp      print_string
-        nop     
+        defb    0               ; padding
 
 
 V_TotalZPop:    defw    0       ;VAR 99ab/39339 - TotalZPop used for sending alert messages
@@ -8840,7 +9119,7 @@ SendMessages:
         ld      a,15
         jp      nz,set_alert_message
 
-.L9b14  ld      hl,(V_33886)
+.L9b14  ld      hl,(V_unPwrdZCnt)
         ld      de,10
         and     a
         sbc     hl,de
@@ -8851,16 +9130,16 @@ SendMessages:
         ld      a,17            ;BROWNOUT DETECTED
         jp      nz,set_alert_message
 
-        ld      a,(V_34013)
+        ld      a,(V_PolluteAverage)
         cp      60
         ld      a,19
         call    nc,set_alert_message
-        ld      a,(V_36609)
+        ld      a,(V_concern_crime)
         cp      20
 
 .L9b3a  ld      a,20
         call    nc,set_alert_message
-        ld      a,(V_34074)
+        ld      a,(V_TrafficAverage)
         cp      60
         ld      a,21
         call    nc,set_alert_message
@@ -8986,7 +9265,7 @@ SMC_39894:
         jr      L9bd6                   ; (-34)
 
 
-        nop     
+        defb    0               ; padding
 
 
 ; This does the traffic effect for roads?
@@ -9031,9 +9310,7 @@ SMC_39894:
 
 ;9c2b/39979
 V_minimap_section:    defb        0       ;VAR 9c2b/39979 - selected minimap quadrant
-
-        nop     
-        nop     
+        defb    0, 0            ; padding ($9C2C-$9C2D / 39980-39981, unreferenced)
 
 V_39982:        defw    0       ;VAR 39982/9c2e
 
@@ -9072,7 +9349,7 @@ D_minimap_offsets:
         xor     a
         ld      (V_39984),a
         ld      a,16
-        ld      (V_25651),a
+        ld      (V_road_tile_variant),a
         ld      a,(V_minimap_section)
         add     a,a
         ld      c,a
@@ -9107,7 +9384,7 @@ D_minimap_offsets:
         cp      128
         call    nc,L655b
 
-.L9c9f  ld      (V_25865),hl
+.L9c9f  ld      (V_map_render_ptr),hl
         exx     
         call    L9bc3                   ;Mark traffic on the map
         ld      c,33                    ;White paper, blue ink
@@ -9217,7 +9494,7 @@ do_minimap_attr_intensity:
 V_minimap_selection_index:  defb    $06     ;VAR 9d43/40259 - which minimap is selected
 
 
-check_if_minimaps_should_be_displayed:
+check_if_minimaps_should_be_displayed:      ; $9D44 / 40260
 .L9d44
         ld      a,$43
         sbc     l
@@ -9252,7 +9529,7 @@ minimap_return:
         ret     
 
 ; Think this one is crime...
-.L9d7f  ld      hl,(V_25865)
+.L9d7f  ld      hl,(V_map_render_ptr)
         ld      a,(hl)
         call    tile_to_flags
         bit     4,a
@@ -9291,9 +9568,9 @@ minimap_return:
         ret     z
         jp      L9d1a
 
-.do_minimap_transport  
+.do_minimap_transport                       ; $9DC4 / 40388
 .L9dc4
-        ld      hl,(V_25865)
+        ld      hl,(V_map_render_ptr)
         ld      a,(hl)
         call    tile_to_flags
         and     6
@@ -9474,7 +9751,7 @@ L9e89:
 
 .V_power_type_chosen        defb        0        ;VAR - which power station has been chosen
 
-menu_power:
+menu_power:                                 ; $9F41 / 40769
 .L40769
         defb        8,0
         defm        "          SELECT TYP"
@@ -9503,12 +9780,12 @@ action_power_none:
         ld      (V_power_type_chosen),a
         ret 
 
-action_power_nuclear:   
+action_power_nuclear:                       ; $9FC3 / 40899
 .L9fc3
         ld      a,1
         ld      (V_power_type_chosen),a
         ret     
-action_power_coal:
+action_power_coal:                          ; $9FCA / 40906
 .L9fca
         ld      a,2
         ld      (V_power_type_chosen),a
@@ -9542,7 +9819,7 @@ set_carry:
         ret
 
 .La02b
-menu_system:
+menu_system:                                ; $A02B / 41003
         defb        8,0
         defm        "            SYSTE"
         defb        'M'+128
@@ -9678,7 +9955,7 @@ La247:
 
     
 
-menu_enter_filename:
+menu_enter_filename:                        ; $A29A / 41626
 .La29a  call    print_routine
         defb    $0c, 00
         defm    "        TYPE FILE NAM"
@@ -9941,7 +10218,7 @@ La4ef:
 ;a511
 V_show_mini_maps:   defb    0       ;VAR a511/42257 - set to show mini maps
 
-action_set_show_maps:
+action_set_show_maps:                       ; $A512 / 42258
 .La512
         ld      a,1
         ld      (V_show_mini_maps),a
@@ -9952,7 +10229,7 @@ V_difficulty:   defb    0       ;VAR (42264) - difficulty level
 
 menu_difficulty:
 .La519  call    print_routine
-menu_difficulty_text:
+menu_difficulty_text:                       ; $A51C / 42268
 .L42268
         defb        8,0
         defm        "    SELECT DIFFICULTY LEVE"
@@ -9984,7 +10261,7 @@ La56d:
         defb        4
 
 .La5a9
-action_difficulty:
+action_difficulty:                          ; $A5A9 / 42409
         ld      a,(V_menu_selection)
         ld      (V_difficulty),a
         ret     
@@ -10372,7 +10649,7 @@ D_43332:    defm        "HERESVILLE  "
 
 ; La950      
 ; At $a94e
-minimaps:
+minimaps:                                   ; $A950 / 43344
 .La950
         defs        6912
 ;
