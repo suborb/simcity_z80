@@ -564,7 +564,7 @@ replace_with_direct_prchar_call:
         pop     hl
 
 .nxtctrl  inc     hl
-        jr      prt_ctrl                   ; (-34)
+        jr      L5df0                   ; (-34)
 
 .incprpos  
         ld      hl,(textpos)
@@ -975,7 +975,7 @@ L6305:
 .L6325  inc     hl
         ret     
 .L6327  inc     hl
-        jr      get_word_from_table                   ; (-14)
+        jr      L631c                   ; (-14)
 
 
 
@@ -1004,7 +1004,7 @@ print_string:
         jr      nz,L634a                ; (4)
         inc     hl
         dec     c
-        jr      print_string                   ; (-21)
+        jr      L6335                   ; (-21)
 .L634a  ld      a,c
         and     a
         ret     z
@@ -1159,13 +1159,13 @@ draw_scrolling_map_row:                                    ; $6434 / 25652 - Set
         call    levelmap_xypos
         ld      de,64
         ld      b,1
-        jp      draw_map
+        jp      L651d
 
 V_current_tile:        defb        $37,$00                ; VAR $6462 / 25698 - current tile being printed
 
 L6464:
         ld      l,$3b
-        jr      print_tile
+        jr      L6475
 
 ; Print a tile
 ; Entry: a = tile number
@@ -1315,7 +1315,7 @@ draw_map_screen_addr:
         xor     a
         ld      (V_current_zone_width_to_print),a
         add     hl,de
-        djnz    draw_map                   ; (-58)
+        djnz    L651d                   ; (-58)
         ret     
 
 V_current_zone_width_to_print:  defb    0   ; VAR $6558 / 25944 - how much of the current zone width to print
@@ -1367,7 +1367,7 @@ find_left_edge_of_zone:
         ret     nz
         inc     (hl)
         dec     ix
-        jr      find_left_edge_of_zone                   ; (-13)
+        jr      L6596                   ; (-13)
 
 V_print_end_pos:    defw    $40bd          ; VAR $65A3 / 26019 - saved screen address after last printed number (textpos at end of prt24bit_cde)
 
@@ -1826,11 +1826,11 @@ print_status_string_at_row:                                    ; $6882 / 26754 -
         call    prchar
         call    incprpos
         inc     ix
-        jr      print_status_string_at_row                   ; (-41)
+        jr      L688e                   ; (-41)
 
 .L68b7  call    set_textpos_to_status_end
         inc     ix
-        jr      print_status_string_at_row                   ; (-48)
+        jr      L688e                   ; (-48)
 
 .L68be  ld      a,(ix+1)
         and     a
@@ -1840,7 +1840,7 @@ print_status_string_at_row:                                    ; $6882 / 26754 -
         call    prtthou
         ld      de,6
         add     ix,de
-        jr      print_status_string_at_row                   ; (-71)
+        jr      L688e                   ; (-71)
 
 .L68d5  ld      a,(ix+1)
         and     a
@@ -1850,7 +1850,7 @@ print_status_string_at_row:                                    ; $6882 / 26754 -
         call    prhund
         ld      de,4
         add     ix,de
-        jr      print_status_string_at_row                   ; (-93)
+        jr      L688e                   ; (-93)
 
 .L68eb  ld      a,(ix+1)
         and     a
@@ -1931,7 +1931,7 @@ toggle_status_row_attrs:                                    ; $6933 / 26931 - XO
         ld      a,(keystore+7)
         and     1           ;'SPACE'
         jr      z,L6971                 ; (2)
-        jr      run_menu                   ; (-30)
+        jr      L6953                   ; (-30)
 
 .L6971  ld      a,(keystore+7)
         and     1           ;'SPACE'
@@ -2032,7 +2032,7 @@ menu_interaction_loop:                                    ; $69C0 / 27072 - Main
         ld      a,71
         ld      (textcol),a
         call    print_menu_item_count
-        jp      run_menu
+        jp      L6950
 
 ; Print the menu item count (from V_menu_selection_ptr) at the menu position
 .print_menu_item_count
@@ -2870,7 +2870,7 @@ V_raw_coords_flag:    defb    0       ; VAR $6E69 / 28265 - raw-coordinates flag
 join_neighbour_cells_raw:                                    ; $6E8A / 28298 - join_up_neighbour_cells bypassing cursor-to-map scroll offset (raw coords)
 .L6e8a  ld      a,1
         ld      (V_raw_coords_flag),a
-        call    join_up_neighbour_cells
+        call    L6e9b
         xor     a
         ld      (V_raw_coords_flag),a
         ret     
@@ -4976,7 +4976,7 @@ show_mini_maps:
         call    handle_minimap_key_input
         ld      hl,V_minimap_frame_counter
         inc     (hl)
-        jr      show_mini_maps                   ; (-37)
+        jr      L7b58                   ; (-37)
 
 .L7b7d  call    cls_white
         call    ingame_scrdraw
@@ -4992,7 +4992,7 @@ fill_zone_with_tile:                                    ; $7B86 / 31622 - Find t
 .L7b8f  bit     5,(ix+0)
         jr      nz,L7b99                ; (4)
         add     ix,de
-        jr      fill_zone_with_tile                   ; (-10)
+        jr      L7b8f                   ; (-10)
 
 .L7b99  ld      a,(ix+0)
         and     7
@@ -5108,7 +5108,7 @@ apply_police_station_kernel:                                    ; $7C32 / 31794 
 
 add_police_kernel_value:                                    ; $7C5A / 31834 - Add scaled police effectiveness (V_PoliceEffect >> kernel weight) to police minimap cell; cap at 15
 .L7c5a  ld      a,(V_PoliceEffect)
-        jr      add_fire_kernel_value                   ; (3)
+        jr      L7c62                   ; (3)
 
 add_fire_kernel_value:                                    ; $7C5F / 31839 - Add scaled fire effectiveness (V_FireEffect >> kernel weight) to fire minimap cell; cap at 15
 .L7c5f  ld      a,(V_FireEffect)
@@ -5231,7 +5231,7 @@ V_zone_size_to_scan:    defw    0       ; VAR $7D2D / 32045 - size of zone to sc
 
 scan_zone_with_size:                                    ; $7D2F / 32047 - Store HL as zone scan size in V_zone_size_to_scan, then enter zone scan loop
 .L7d2f  ld      (V_zone_size_to_scan),hl
-        jr      scan_3x3_zone                   ; (6)
+        jr      L7d3a                   ; (6)
 
 ;
 ; Survey the surroundings of a zone.  Used by every R/C/I handler, and (through
@@ -6252,7 +6252,7 @@ start_simulation:
         call    increment_month
 .L839b  ld      hl,V_sim_loop_counter
         inc     (hl)
-        jr      start_simulation                   ; (-63)
+        jr      L8362                   ; (-63)
 
 ; Initialises the simulation variables
 zero_simulation_state:                                    ; $83A1 / 33697 - Zero minimaps, reset all simulation variables (CCxy, funding, populations, disaster flags)
@@ -6585,7 +6585,7 @@ V_Zsource:    defb    0       ; VAR $8569 / 34153 - tile-flag mask for the traff
         ld      (V_traffic_bfs_steps),a
         ld      ix,31899
         call    apply_stadium_kernel
-        jr      process_traffic_from_connections                   ; (-37)
+        jr      L859f                   ; (-37)
         xor     a
         ld      (V_traffic_active),a
         ld      hl,(V_transport_fund)
@@ -7037,7 +7037,7 @@ dispatch_zone_handler:
         cp      e
         jr      z,L887f                 ; (3)
         add     hl,bc
-        jr      dispatch_zone_handler                   ; (-10)
+        jr      L8875                   ; (-10)
 
 .L887f  inc     hl
         ld      c,(hl)
@@ -8387,8 +8387,8 @@ play_falling_tone:                                    ; $9116 / 37142 - Play 127
         pop     bc
         inc     c
         djnz    L912e                   ; (-17)
-        call    sim_start_fire
-        jr      sim_start_flood                   ; (-103)
+        call    L90af
+        jr      L90dd                   ; (-103)
 
 .L9144  ld      a,(42045)
         and     a
@@ -9882,7 +9882,7 @@ check_if_minimaps_should_be_displayed:      ; $9D44 / 40260
         cp      6           ;Transport
         jr      z,do_minimap_transport                 ; (80)
                             ;Crime?
-        jr      minimap_return                   ; (9)
+        jr      L9d7f                   ; (9)
 minimap_return:
         pop     hl
         ld      (V_minimap_start),hl
@@ -9943,7 +9943,7 @@ minimap_return:
 
 .do_minimap_traffic  
         ld      hl,minimaps+3456        ;46800
-        jr      do_minimap_pollution                   ; (3)
+        jr      L9ddb                   ; (3)
 
 .do_minimap_pollution  
         ld      hl,minimaps+1152
@@ -9959,7 +9959,7 @@ minimap_return:
 
 .do_minimap_fire  
         ld      hl,minimaps
-        jr      do_minimap_police                   ; (3)
+        jr      L9dfa                   ; (3)
 
 .do_minimap_police  
         ld      hl,minimaps+576
@@ -10352,7 +10352,7 @@ save_and_wait_for_keypress:
 .La303  in      a,($fe)
 .La305  rra     
         ret     nc
-.La307  jr      save_and_wait_for_keypress                  ; (-8)
+.La307  jr      La301                  ; (-8)
 
 
 
@@ -10705,7 +10705,7 @@ La672:
         pop     de
         ld      a,d
         ld      (V_menu_selection),a
-        jp      run_menu
+        jp      L6950
 
 text_generating_landscape:
         defb     $0d, $00
@@ -10768,7 +10768,7 @@ input_entry:
         ld      hl,V_input_cursor_pos
         ld      a,b
         cp      56
-        jr      z,input_cursor_left                 ; (97)
+        jr      z,La799                 ; (97)
         ld      a,b
         cp      53
         jr      z,input_cursor_left                 ; (86)
@@ -10796,11 +10796,11 @@ input_entry:
 
 input_set_zero_and_redraw:                                    ; $A75D / 42845 - Set input value to 0, store in buffer, redraw input field; used for budget input reset
 .La75d  call    redraw_input_field
-        jr      input_entry                   ; (-88)
+        jr      La70a                   ; (-88)
         ld      hl,1000
         ld      (42735),hl
         call    redraw_input_field
-        jr      input_entry                   ; (-99)
+        jr      La70a                   ; (-99)
 
 .La76d  ld      a,(V_input_cursor_pos)
         ld      e,a
@@ -10809,7 +10809,7 @@ input_set_zero_and_redraw:                                    ; $A75D / 42845 - 
         add     hl,de
         ld      (hl),b
         ld      hl,V_input_cursor_pos
-        jr      input_cursor_left                   ; (28)
+        jr      La799                   ; (28)
 
 .La77d  call    input_clear_cursor_char
         ld      hl,V_input_cursor_pos
@@ -10989,7 +10989,7 @@ input_buffer_to_hl:                                    ; $A854 / 43092 - Convert
         call    isnumber
         ccf     
         ret     nc
-        jr      input_buffer_to_hl                   ; (-39)
+        jr      La85b                   ; (-39)
 
 .La882  scf     
         ret     
