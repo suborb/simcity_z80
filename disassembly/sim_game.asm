@@ -5043,7 +5043,11 @@ SMC_31705:
         ret     
 
 
-; Represents the influence of police/fire station
+; 5x5 attenuation kernel for police and fire stations.  Each entry is a SHIFT
+; COUNT: the station's effectiveness (V_PoliceEffect/V_FireEffect, 0-15) is
+; shifted right by (value-1) before being added to the coverage minimap, so
+; 1 = full strength at the centre, 2 = half, and 9 = shifted away to nothing.
+; Cells are capped at 15.
 D_station_influence_kernel:                        ; $7BEF / 31727
                         ; $7BEF / 31727
         defb    $09, $09, $02, $09, $09 
@@ -5127,6 +5131,12 @@ add_fire_kernel_value:                                    ; $7C5F / 31839 - Add 
         ret     
 
 
+; Two 6x6 attenuation kernels back to back, used by apply_stadium_kernel with
+; the same shift-count encoding as D_station_influence_kernel.  The first (large)
+; one is used by polluters - coal/nuclear/port/industrial and radioactive tiles;
+; the second (tighter, only 1 and 5) is used for the light pollution of road traffic
+; (IX=31899 in process_traffic_from_connections).  The amount spread is
+; V_traffic_bfs_steps (despite the name, it is the source strength here).
 D_stadium_effect_kernel:                        ; $7C77 / 31863
                         ; $7C77 / 31863
         defb    $09, $04, $04, $04, $04, $09
@@ -5149,7 +5159,11 @@ apply_stadium_kernel_from_iter:                                    ; $7CC0 / 319
 .L7cc0  ld      bc,(V_map_iter_xy)
         ld      ix,D_stadium_effect_kernel 
 
-apply_stadium_kernel:                                    ; $7CC8 / 31944 - Apply D_stadium_effect_kernel to land-value minimap around current map position
+; NB the target is "get_land_value_minimap_value" = minimaps+2304, while the minimap
+; viewer (do_minimap_pollution) and the decay routine both use minimaps+1152.
+; The two bases differ by 24 rows of the 48x48 map - either the label is wrong
+; or this is a quirk of the original; worth checking in an emulator.
+apply_stadium_kernel:                                    ; $7CC8 / 31944
 .L7cc8  call    get_land_value_minimap_value       ;minimaps+2304
         ld      de,98
         and     a
@@ -5219,7 +5233,26 @@ scan_zone_with_size:                                    ; $7D2F / 32047 - Store 
 .L7d2f  ld      (V_zone_size_to_scan),hl
         jr      scan_3x3_zone                   ; (6)
 
-; Scan a 3x3 zone, accumulating cell-type counts into zone stat variables
+;
+; Survey the surroundings of a zone.  Used by every R/C/I handler, and (through
+; scan_zone_with_size) by the stadium, port and airport.
+;
+; Entry: bc = top-left cell of the zone body (b=y, c=x)
+;        V_zone_size_to_scan = (rows, width) of the body - $0303 for scan_3x3_zone
+;
+; Two kinds of cell are visited:
+;   * the one-cell border running round the outside of the body, corners
+;     excluded (scan_zone_cell) - this is what the zone is "next to": roads and
+;     rails, parks, sea and trees are counted and scored there;
+;   * the body itself (accumulate_land_value_demand) - for a residential zone
+;     this adds up the development stages of the houses (see zone_ring_grow).
+;
+; Results (all reset first):
+;   V_zone_transport_count / V_zone_transport_score
+;   V_zone_parks / V_zone_seas / V_zone_trees
+;   V_zone_best_coords      a randomly chosen adjacent road/rail cell ($FFFF if
+;                           none) - the starting point for the traffic walk
+;   V_zone_handler_params   += house stages found in the body
 .scan_3x3_zone
 .L7d34  ld      hl,$0303
         ld      (V_zone_size_to_scan),hl
@@ -5272,7 +5305,13 @@ scan_zone_with_size:                                    ; $7D2F / 32047 - Store 
         ret     
 
 
-; Categorise one map cell and update zone stat counters (road/park/sea/transport)
+; Categorise one border cell of a zone and update the stat counters.
+; Cells off the map and cells that are part of a zone (bit 7) are ignored.
+;   park ($38/$39)  : parks++,     score +14
+;   trees (6)       : trees++,     score +16
+;   sea (0)         : seas++,      score +16
+;   road or rail    : transport++, score +12 (and maybe becomes V_zone_best_coords)
+; The score is a "pleasant surroundings / accessibility" figure, capped at 127.
 ; Entry: bc = map coordinates
 .scan_zone_cell
 .L7d88  push    bc
@@ -5325,7 +5364,10 @@ accumulate_transport_score:                                    ; $7DB2 / 32178 -
         ld      l,16
         jr      accumulate_transport_score                   ; (-38)
 
-maybe_update_best_transport_coords:                                    ; $7DD8 / 32216 - Randomly (1:2) update V_zone_best_coords to current BC if not already set
+; Reservoir-style pick: the first road/rail cell found is always remembered,
+; later ones replace it with probability 1/2.  (Biased towards the last cells
+; scanned, but cheap and good enough to give the walk varied starting points.)
+maybe_update_best_transport_coords:                                    ; $7DD8 / 32216
 .L7dd8  ld      a,(V_zone_best_coords)
         cp      255
         jr      z,L7de5                 ; (6)
@@ -5336,7 +5378,11 @@ maybe_update_best_transport_coords:                                    ; $7DD8 /
         ret     
 
 
-accumulate_land_value_demand:                                    ; $7DEA / 32234 - If cell is residential zone tile, add (tile-$3B + V_zone_handler_params) to land demand accumulator
+; Called for each cell of the zone body.  If the cell is a house tile (flag bit 6,
+; i.e. tiles 60..67 - see zone_ring_grow) add its stage, tile-59 = 1..8, to
+; V_zone_handler_params.  An empty compact zone starts with params = 0, so on
+; return params is the zone's population measure: the sum of its house stages.
+accumulate_land_value_demand:                                    ; $7DEA / 32234
 .L7dea  push    bc
         call    levelmap_xypos_with_check
         pop     bc
@@ -5379,7 +5425,17 @@ V_zone_transport_score:    defb        0       ; VAR $7E1B / 32283 - accumulated
 V_zone_land_value_base:    defb        0       ; VAR $7E1C / 32284 - combined land value base score (parks + transport - pollution)
 
 
-calc_land_value_transport:                                    ; $7E1D / 32285 - If zone powered and has transport: compute proximity + transport score -> land value
+;
+; First stage of the land-value calculation: a zone only has any value if it is
+; powered AND touches a road/rail that carries traffic.
+;   base = (127 - manhattan distance from the zone to the city centre V_CCxy,
+;           floored at 0)  +  V_zone_transport_score
+; i.e. central, well-connected, pleasant (parks/water/trees) sites score high.
+; Traffic counts as present when V_traffic_active is non-zero (the last random
+; traffic walk succeeded) or the traffic minimap already reads >= 50 here.
+; Otherwise base = 0.  Result in V_zone_land_value_base; every zone also adds
+; to the V_landval_num/den running average that becomes the house-price concern.
+calc_land_value_transport:                                    ; $7E1D / 32285
 .L7e1d  ld      a,(V_ZonePwrFlg)
         and     a
         jr      z,L7e54                 ; (49)
@@ -5430,7 +5486,13 @@ proximity_score_to_centroid:                                    ; $7E5A / 32346 
 
 V_zone_police_score:    defb    0       ; VAR $7E69 / 32361 - police coverage score for zone (proximity to police station)
 
-calc_police_coverage_score:                                    ; $7E6A / 32362 - Compute police coverage score for zone from police minimap and land value base
+; Despite the name this produces a CRIME figure for the zone, later subtracted
+; from its land value:
+;     crime = max(0, (255 - land_value_base) / 16  -  police coverage)
+; Low-value areas breed crime (up to 15); police coverage (0..15, from the
+; police minimap) cancels it point for point.  Averaged over all zones into
+; V_police_cov_num/den, which compute_concern_scores doubles into V_concern_crime.
+calc_police_coverage_score:                                    ; $7E6A / 32362
 .L7e6a  ld      bc,(V_map_iter_xy)
         call    get_police_minimap_value
         ld      c,a
@@ -5460,7 +5522,10 @@ calc_police_coverage_score:                                    ; $7E6A / 32362 -
 
 V_zone_tax_penalty:    defb        0       ; VAR $7E9A / 32410 - tax rate * 8 + difficulty bonus; subtracted from zone land value
 
-calc_tax_penalty:                                    ; $7E9B / 32411 - Compute tax penalty = tax_rate * 8, scaled by difficulty level
+; penalty = tax_rate * 8, plus one more tax_rate for difficulty 1 and 2, plus a
+; second one for difficulty 1 only (so *8, *10, *9 for difficulty 0, 1, 2 - the
+; ordering of 1 and 2 looks odd but is what the code does).
+calc_tax_penalty:                                    ; $7E9B / 32411
 .L7e9b  ld      a,(SMC_tax_rate)           ;Tax rate
         ld      b,a
         add     a,a
@@ -5488,7 +5553,16 @@ V_zone_traffic_density:    defb        0       ; VAR $7EC0 / 32448 - zone's traf
 V_zone_landval_final:    defb        0       ; VAR $7EC1 / 32449 - final computed land value for this zone (0-255)
 V_zone_landval_mult:    defw        0       ; VAR $7EC2 / 32450 - land value demand multiplier (scales growth/shrink probability)
 
-; Compute zone land value from surrounding stats (pollution, crime, etc.)
+; Compute the final land value of the zone being processed (0-255).
+;
+;   if pollution >= 28 or land_value_base == 0 :  value = 0
+;   else value = base - pollution - crime - tax_penalty     (each step floored at 0)
+;                      + V_zone_landval_mult                (the R/C/I demand valve)
+;   clamped to 0..255.
+;
+; V_zone_landval_mult is set by the caller to the relevant demand index
+; (V_RValve / V_CValve / V_IValve), so a zone type in high demand gets a boost
+; and one in oversupply is pushed down - this is how demand drives growth.
 ; Exit: V_zone_landval_final = land value (0-255)
 .calculate_zone_land_value
 .L7ec4  call    calc_land_value_transport
@@ -5543,8 +5617,14 @@ clamp_h_to_byte:                                    ; $7F04 / 32516 - If H=0 ret
 V_zone_growth_factor:    defb    0       ; VAR $7F10 / 32528 - zone growth probability factor (land value based)
 V_zone_half_landval:    defb    0       ; VAR $7F11 / 32529 - half of zone land value (used in population growth threshold)
 
-; Derive zone population growth from land value (calls calculate_zone_land_value)
-; Exit: V_zone_growth_factor = growth factor, V_zone_half_landval = half land value
+; Derive the residential growth thresholds from land value.
+;   V_zone_half_landval = value / 2                     (value < 128)
+;                       = 80 + 16 * ((value-128) / 16)  (value >= 128)
+;   V_zone_growth_factor = (value - 128) / 16, or 15 if value < 128
+;                          (the SUB wraps/flags NC; preserved quirk of the original)
+; DoResidential compares the zone's population measure against half_landval to
+; decide whether the zone's ring should grow or shrink.
+; Exit: V_zone_growth_factor = growth factor, V_zone_half_landval = threshold
 .update_zone_population
 .L7f12  call    calculate_zone_land_value
         ld      a,(V_zone_landval_final)
@@ -5692,7 +5772,25 @@ V_powerqueue:   defs    256 ; VAR $801D / 32797 - list of coordinates to check f
 
 
 
-power_bfs_start:                                    ; $811D / 33053 - Initialise power BFS queue, push sentinel + start coords, enter expand loop
+;
+; Power distribution for ONE power station - a scan-line flood fill over every
+; tile that conducts power (check_tile_needs_power: not yet powered AND either a
+; zone or a tile with flag bit 3, i.e. power line / station).
+;
+;   1. seed the queue with a $FFFF end marker and the station's coordinates
+;   2. pop a seed; run LEFT until the next tile does not conduct
+;   3. run RIGHT along the row: power each tile (set_tile_as_powered) and look at
+;      the tiles directly above and below (power_bfs_expand_row).  A neighbour
+;      that conducts is queued as a new seed - but only once per run, tracked
+;      by V_power_bfs_up / V_power_bfs_down - so a long wire running alongside
+;      is not queued for every cell.
+;   4. repeat until the end marker is popped.
+;
+; Each powered tile uses up one unit of the station's budget (V_power_units_left:
+; 450 coal, 1350 nuclear).  When it hits zero set_tile_as_powered abandons the
+; whole search by reloading SP from V_powersp - which makes this routine return
+; straight to its caller - and bumps V_brownout_detected.
+power_bfs_start:                                    ; $811D / 33053
 .L811d  call    check_tile_needs_power
         ret     nz              ;We don't need power
         ld      ix,V_powerqueue            ;801d
@@ -5832,13 +5930,13 @@ calculate_city_score:
         ld      (V_previous_city_score),hl
         ld      a,c
         ld      (V_previous_city_score+2),a
-        ld      hl,(V_RoadTotal)      ;RoadTotal
+        ld      hl,(V_RailTotal)      ;RoadTotal
         ld      de,5
         call    L_mult_24_16x16
         ld      (V_city_score),hl
         ld      a,c
         ld      (V_city_score+2),a
-        ld      hl,(V_RailTotal)      ;RailTotal
+        ld      hl,(V_RoadTotal)      ;RailTotal
         ld      de,10
         call    score_add_weighted_population
         ld      hl,(V_PolicePop)     ;PolicePop
@@ -6079,7 +6177,7 @@ initialise_simulation_variables:
 ;     - Increment *Pop counter (e.g. V_ResZPop)
 ;     - Add density * 16 to V_CityPop (cumulative population for budget)
 ;     - Check transport access; conditionally call sim_update_traffic
-;     - Drive zone upgrade/downgrade via L8a40/fire_extinguish_ticks/sim_place_zone_3x3
+;     - Drive zone upgrade/downgrade via zone_ring_grow_ticks/zone_ring_shrink_ticks/sim_place_zone_3x3
 ;   DoPolice / DoFire:
 ;     - Add 100 to fund counter (V_PoliceFund / V_FireFund)
 ;     - Increment *Pop if powered
@@ -6124,7 +6222,7 @@ initialise_simulation_variables:
 ;   V_PolicePop, V_FirePop, V_HospitalPop, V_ChurchPop
 ;   V_NuclearPop, V_CoalPop, V_StadiumPop, V_AirportPop, V_PortPop
 ;   V_PoliceFund, V_FireFund  - funding requested this tick
-;   V_RoadTotal, V_RailTotal  - road/rail tile counts
+;   V_RailTotal, V_RoadTotal  - road/rail tile counts
 ; ============================================================
 
 .V_zone_dispatch_suppress            defb        0       ; VAR $835D / 33629 -
@@ -6248,8 +6346,8 @@ V_transport_util:    defw        0       ; VAR $8464 / 33892 - transport utilisa
 
 V_PoliceFund:   defw        0   ; VAR $8466 / 33894 - police funding requested this tick (100 per station)
 V_FireFund:     defw        0   ; VAR $8468 / 33896 - fire funding requested this tick (100 per station)
-V_RailTotal:    defw        0   ; VAR $846A / 33898 - count of rail tiles
-V_RoadTotal:    defw        0   ; VAR $846C / 33900 - count of road tiles
+V_RoadTotal:    defw        0   ; VAR $846A / 33898 - count of road tiles (tile flag bit 2; 1 transport_util each)
+V_RailTotal:    defw        0   ; VAR $846C / 33900 - count of rail tiles (tile flag bit 1; 4 transport_util each)
 
 
 V_police_cov_num:        defw        0   ; VAR $846E / 33902 - police coverage numerator (for crime concern score)
@@ -6407,9 +6505,28 @@ traffic_decay_loop_next:                                    ; $854F / 34127 - Ad
         ret     
 
 V_traffic_active:    defb    0       ; VAR $8568 / 34152 - traffic BFS active (1=road traffic, 2=rail traffic)
-V_Zsource:    defb    0       ; VAR $8569 / 34153 - tile connection type bitmask for current traffic BFS (road=1, rail=2)
+V_Zsource:    defb    0       ; VAR $8569 / 34153 - tile-flag mask for the traffic walk: the transport bits (4=road, 2=rail) of the start tile; only neighbours sharing a bit are walkable
 
-; Initiate traffic density BFS update from zone center
+;
+; TRAFFIC MODEL.  Not a true BFS: each call sends a single "commuter" on a
+; random walk along the road (or rail) network to see whether the zone is
+; actually connected to a suitable destination, and lays down traffic density
+; along the way.
+;
+;   * start cell  : V_zone_best_coords (an adjacent road/rail cell chosen by
+;                   scan_zone_cell); V_Zsource = that tile's road/rail bits
+;   * destination : any zone whose get_zone_handler_type is one of the two bytes
+;                   in V_zone_neighbour_filter (set by the caller: residential
+;                   looks for commercial/industrial etc.)
+;   * limit       : 30 steps (V_PosStackN)
+;   * success     : V_traffic_active = 1, then every other cell visited has 20
+;                   added to the traffic minimap (capped 240) and a little
+;                   pollution is spread round it
+;   * failure     : V_traffic_active = 0 - which calc_land_value_transport reads
+;                   as "no traffic route", dragging the zone's land value to 0
+;
+; The path so far is kept on the (shared) V_powerqueue with V_PowerStackNum as its
+; depth, so a dead end can back up one step instead of failing outright.
 .sim_update_traffic
 .L856a  xor     a
         ld      (V_traffic_active),a
@@ -6437,7 +6554,12 @@ V_Zsource:    defb    0       ; VAR $8569 / 34153 - tile connection type bitmask
         ret     
 
 
-; Process traffic density update for connected road/rail cells (BFS queue loop)
+; Replay the recorded path: pop each cell, add 20 to its traffic density and
+; spread a pollution kernel (strength 5) round it.  Rail trips (V_Zsource bit 2
+; clear) leave no density behind.
+; NB the six instructions after the JR below are unreachable (the JR loops back
+; until the stack empties and the RET Z above is the only way out).  They look
+; like a vestige of a "transport funding" increment.
 .process_traffic_from_connections
 .L8599  ld      a,(V_Zsource)
         bit     2,a
@@ -6479,7 +6601,14 @@ V_LDir:    defb    0       ; VAR $85D4 / 34260 - traffic BFS previous direction 
 V_PosStackN:    defb    0       ; VAR $85D5 / 34261 - traffic BFS steps taken so far (trip ends at 30)
 
 
-traffic_bfs_init:                                    ; $85D6 / 34262 - Initialise traffic BFS: set LDir=5 (no prev dir), PosStackN=0, enter BFS step loop
+;
+; The walk loop.  Each iteration:
+;   traffic_bfs_try_step    - move one cell; carry set = blocked in all 4 directions
+;   blocked  : back up one entry of the saved path (fail if the path is empty)
+;   moved    : look for a destination zone next to the new cell (success: NC)
+;   then     : ++steps, and give up (SCF) when steps reaches 30
+; Exit: nc = destination found, c = failed
+traffic_bfs_init:                                    ; $85D6 / 34262
 .L85d6  ld      a,5
         ld      (V_LDir),a
         xor     a
@@ -6518,7 +6647,14 @@ V_traffic_cur_dir:    defb    0       ; VAR $8607 / 34311 - traffic BFS current 
 V_traffic_attempts:    defb    0       ; VAR $8608 / 34312 - traffic BFS attempts remaining before step fails (tries all 4 directions)
 
 
-traffic_bfs_try_step:                                    ; $8609 / 34313 - Pick random direction; try all 4 avoiding U-turn; if road/rail found advance and return NC
+;
+; One step of the random walk.  Start from a random direction and try all four in
+; rotation.  A direction is rejected if it is the way we just came from (V_LDir),
+; is a zone tile, or does not share a transport bit with V_Zsource.  The first
+; acceptable direction is taken: BC moves, V_LDir becomes the reverse of the move,
+; and on every second step the new cell is pushed onto the path stack.
+; Exit: nc = moved, c = no way forward
+traffic_bfs_try_step:                                    ; $8609 / 34313
 .L8609  call    get_random_number
         and     3
         ld      (V_traffic_rand_dir),a
@@ -6564,11 +6700,12 @@ traffic_bfs_try_step:                                    ; $8609 / 34313 - Pick 
 
 V_zone_neighbour_filter:    defw    0           ; VAR $865E / 34398 -
 
-;
+; Look at the four cells orthogonally around BC; if any belongs to a zone whose
+; handler type (get_zone_handler_type) matches either byte of
+; V_zone_neighbour_filter, the walk has reached a destination.
 ; Entry: bc = coordinates
-; Exit:  bc = coordinate
-;         c =
-;        nc = 
+; Exit:  nc = destination found
+;         c = none of the neighbours match
 find_zone_neighbour_of_type:                                    ; $8660 / 34400 - Scan 4 cardinal directions; return first neighbour matching V_zone_neighbour_filter zone type, else SCF
 .L8660  ld      e,4
 .L8662  push    de
@@ -6920,8 +7057,17 @@ dispatch_zone_handler:
         ld      l,a
         jp      (hl)
 
-; Process infrastructure / environmental tiles (non-zone tiles <128)
-; Handles: radioactive decay, flood tile, max-residential cap, rail counts, road counts
+; Per-tick processing of every non-zone tile (< 128).
+;   89 TILE_RADIOACTIVE : may decay to rubble, otherwise pollutes its surroundings
+;   69 TILE_FIRE        : burns out (more likely near a fire station) or spreads
+;   68 TILE_FLOOD       : spreads; all flood tiles vanish when V_flood_timer expires
+;   tile flag bit 2     : ROAD - counted in V_RoadTotal, costs 1 transport_util (+3 for
+;                         bridge tiles 18/19), may spawn a traffic sprite
+;   tile flag bit 1     : RAIL - counted in V_RailTotal, costs 4 transport_util (+6 for
+;                         the 31/32 crossings)
+; For road and rail, the funding-dependent upgrade mask (alloc_funding_levels)
+; gives an underfunded tile a 1 in (mask+1) chance each tick of crumbling to
+; rubble (crumble_to_rubble).
 process_infra_tile:
 .L8898  ld      a,(hl)
         cp      128
@@ -6933,16 +7079,16 @@ process_infra_tile:
         ld      hl,L8898_return
         push    hl
         cp      TILE_RADIOACTIVE
-        jp      z,L8942                 ;Radioactive: random chance to decay back to dirt
+        jp      z,L8942                 ; Radioactive: may decay to rubble, else pollutes
         cp      69
-        jp      z,L8962                 ;Flood tile: increment flood counter; chance to spread or clear
+        jp      z,L8962                 ; Fire: counted, may burn out (fire cover) or spread
         cp      68
-        jp      z,L8986                 ;Max-density residential: random downgrade
+        jp      z,L8986                 ; Flood: spreads until V_flood_timer runs out
         call    tile_to_flags
         bit     2,a
-        jr      nz,L88c6                ; Rail tile: count rail, count transport funding
+        jr      nz,L88c6                ; Road tile (bit 2): count road, add upkeep
         bit     1,a
-        jr      nz,L8903                ; Road tile: count road, count transport funding
+        jr      nz,L8903                ; Rail tile (bit 1): count rail, add upkeep, maybe spawn sprite
         pop     hl
 L8898_return:
         exx     
@@ -6958,12 +7104,12 @@ V_rail_upgrade_mask:    defb    $FF         ; VAR $88C5 / 35013 -
         and     (hl)
         jp      z,L8956
 
-.L88d4  ld      hl,(V_RailTotal)
+.L88d4  ld      hl,(V_RoadTotal)
         inc     hl
         ld      a,h
         or      l
         jr      z,L88df                 ; (3)
-        ld      (V_RailTotal),hl
+        ld      (V_RoadTotal),hl
 
 .L88df  ld      hl,(V_transport_util)
         inc     hl
@@ -6998,12 +7144,12 @@ V_road_upgrade_mask:    defb    0       ; VAR $8902 / 35074 -
         and     (hl)
         jr      z,L8956                 ; (70)
 
-.L8910  ld      hl,(V_RoadTotal)
+.L8910  ld      hl,(V_RailTotal)
         inc     hl
         ld      a,h
         or      l
         jr      z,L891b                 ; (3)
-        ld      (V_RoadTotal),hl
+        ld      (V_RailTotal),hl
 
 .L891b  ld      hl,(V_transport_util)
         ld      de,4
@@ -7029,7 +7175,10 @@ V_road_upgrade_mask:    defb    0       ; VAR $8902 / 35074 -
 .L8941  ret     
 
 
-; Decay radioactive?
+; Radioactive tile: a 1 in 4096 chance per tick of decaying to rubble (the
+; test is on the low 12 bits of the freshly stepped random seed); otherwise it
+; spreads strength-64 pollution round itself.
+.process_radioactive_tile
 .L8942  call    get_random_number
         ld      hl,(V_random_seed)
         ld      a,h
@@ -7040,6 +7189,7 @@ V_road_upgrade_mask:    defb    0       ; VAR $8902 / 35074 -
         ld      (V_traffic_bfs_steps),a
         jp      apply_stadium_kernel_from_iter
 
+.crumble_to_rubble
 .L8956  ld      hl,(V_map_iter_addr)
         ld      (hl),58
         ret     
@@ -7050,6 +7200,11 @@ place_dirt:
         ret     
 
 
+; Fire tile (69).  Counted in V_landval_accum (this is the fire count that feeds
+; the "fire concern" in the evaluation).  Fire-station coverage c (0..15, from the
+; fire minimap) gives a (c+1)/16 chance per tick of burning out to rubble.
+; Otherwise it spreads: fill tile 69, fill mode 0 (see fire_spread_to_neighbours).
+.process_fire_tile
 .L8962  ld      hl,(V_landval_accum)
         inc     hl
         ld      a,h
@@ -7071,11 +7226,11 @@ place_dirt:
 .L8980  ld      (V_fill_mode_flag),a
         jr      fire_spread_to_neighbours                   ; (22)
 
-V_radioactive_decay_timer:  defb    $32         ; VAR $8985 / 35205 -
+V_flood_timer:  defb    $32         ; VAR $8985 / 35205 -
 
-.decay_radioactive_tile                     ; $8986 / 35206
+.process_flood_tile                     ; $8986 / 35206
 .L8986
-        ld      hl,V_radioactive_decay_timer
+        ld      hl,V_flood_timer
         ld      a,(hl)
         and     a
         jr      z,place_dirt                 ; (-49)
@@ -7151,7 +7306,13 @@ bulldoze_or_fill_zone_tile:                                    ; $89EA / 35306 -
         ret     
 
 
-D_fire_spread_tiles:                    ; $8A08 / 35336 - 8-neighbour fire spread: (dy, dx, fire-tile) triplets, indexed by (rand & 7)*3
+;
+; The eight cells ringing the centre tile of a 3x3 zone.  Each entry is
+;   (dy, dx, ring tile)
+; where "ring tile" is the tile that sits in that position in a freshly placed,
+; empty zone (see residential_zone_2: $49 $4A $4B / $50 [$51] $4C / $4F $4E $4D).
+; Indexed by (random & 7) * 3 in zone_pick_ring_cell.
+D_zone_ring_offsets:                    ; $8A08 / 35336
 ;8a08
         defb    $FF, $FF, $49, $FF, $00, $4A, $FF, $01
         defb    $4B, $00, $FF, $50, $00, $01, $4C, $01
@@ -7161,7 +7322,12 @@ D_fire_spread_tiles:                    ; $8A08 / 35336 - 8-neighbour fire sprea
         defb    $01, $4D
 
 
-fire_spread_pick_neighbour:                                    ; $8A20 / 35360 - Pick random fire-spread direction from D_fire_spread_tiles; return target BC coords
+;
+; Pick one of the eight cells around the zone centre at random.
+; Entry: V_map_iter_xy = zone centre
+; Exit:  bc = coordinates of the chosen cell (b=y, c=x)
+;        ix -> its D_zone_ring_offsets entry, so (ix+2) is the ring tile that belongs there
+zone_pick_ring_cell:                                    ; $8A20 / 35360
 .L8a20  call    get_random_number
         and     7
         ld      c,a
@@ -7169,7 +7335,7 @@ fire_spread_pick_neighbour:                                    ; $8A20 / 35360 -
         add     a,c
         ld      c,a
         ld      b,0
-        ld      ix,D_fire_spread_tiles
+        ld      ix,D_zone_ring_offsets
         add     ix,bc
         ld      a,(V_map_iter_xy)
         add     a,(ix+1)
@@ -7180,22 +7346,44 @@ fire_spread_pick_neighbour:                                    ; $8A20 / 35360 -
         ret     
 
 
-.L8a40  ld      a,(V_sim_speed_block)
+;
+; Make up to V_sim_speed_block[0] attempts at growing a random ring cell by one
+; stage (the count differs with sim speed).  Stops after the first attempt that
+; actually changes a cell (zone_ring_grow returns nc).  Called from DoResidential
+; when the zone's density is below half its land value; the shrink twin is
+; zone_ring_shrink_ticks.  Nothing happens when paused ($FF).
+zone_ring_grow_ticks:
+.L8a40
+        ld      a,(V_sim_speed_block)
         cp      255
         ret     z
 
         ld      b,a
 
 .L8a47  push    bc
-        call    fire_spread_pick_neighbour
-        call    fire_spread_grow
+        call    zone_pick_ring_cell
+        call    zone_ring_grow
         pop     bc
         ret     nc
         djnz    L8a47                   ; (-11)
         ret     
 
 
-fire_spread_grow:                                    ; $8A53 / 35411 - At target cell: if flammable, advance fire tile or set to stage-0 fire
+;
+; Develop one cell of the ring around a zone by a single stage.
+;
+; Tiles 60..67 are the "built" states of a ring cell ($D9 in D_tile_flags: bit 4
+; set = part of a developable ring, bit 6 = residential).  Growth walks the cell
+; through them:
+;     ring tile (empty)  ->  60  ->  61  -> ... ->  67
+; A cell that is already at 67 is left alone.  Cells whose tile flags do not
+; have bit 4 set (roads, water, other zones...) are ignored too.
+;
+; Entry: bc = cell, ix -> D_zone_ring_offsets entry (ix+2 = empty ring tile)
+; Exit:  nc = the cell was advanced one stage - the caller is finished
+;        c  = nothing changed (ignored cell or already fully built); the
+;             caller picks another random cell and tries again
+zone_ring_grow:                                    ; $8A53 / 35411
 .L8a53  call    levelmap_xypos
         ld      a,(hl)
         call    tile_to_flags
@@ -7218,21 +7406,31 @@ fire_spread_grow:                                    ; $8A53 / 35411 - At target
         ret     
 
 
-fire_extinguish_ticks:                                    ; $8A70 / 35440 - If sim not paused, attempt V_sim_speed_block fire-shrink steps via fire_spread_pick_neighbour
+;
+; Mirror of zone_ring_grow_ticks: make up to V_sim_speed_block[0] attempts at
+; shrinking a random ring cell by one stage.  Stops after the first attempt that
+; actually changes a cell (zone_ring_shrink returns nc).  Does nothing when the
+; simulation is paused (speed block value $FF).
+zone_ring_shrink_ticks:                                    ; $8A70 / 35440
 .L8a70  ld      a,(V_sim_speed_block)
         cp      255
         ret     z
         ld      b,a
 .L8a77  push    bc
-        call    fire_spread_pick_neighbour
-        call    fire_spread_shrink
+        call    zone_pick_ring_cell
+        call    zone_ring_shrink
         pop     bc
         ret     nc
         djnz    L8a77                   ; (-11)
         ret     
 
 
-fire_spread_shrink:                                    ; $8A83 / 35459 - At target cell: if flammable, decrement fire tile; if at minimum set initial tile
+;
+; Reverse of zone_ring_grow: take one stage of development off a ring cell.
+;     67 -> 66 -> ... -> 60 -> (59 = sentinel, replaced by) the empty ring tile
+; If the cell already holds the empty ring tile there is nothing left to remove.
+; Entry/Exit as zone_ring_grow: nc = a stage was removed, c = nothing changed.
+zone_ring_shrink:                                    ; $8A83 / 35459
 .L8a83  call    levelmap_xypos
         ld      a,(hl)
         call    tile_to_flags
@@ -7294,7 +7492,7 @@ fire_spread_shrink:                                    ; $8A83 / 35459 - At targ
         ld      hl,V_zone_half_landval
         cp      (hl)
         jp      c,L8a40
-        jp      fire_extinguish_ticks
+        jp      zone_ring_shrink_ticks
 
 
 .L8afe  ld      a,(V_hospital_demand)
@@ -8145,7 +8343,7 @@ change_fire_tile:
         or      c
         jr      nz,L90e3                ; (-31)
         ld      a,50
-        ld      (V_radioactive_decay_timer),a
+        ld      (V_flood_timer),a
         ret     
 
 
@@ -8578,7 +8776,18 @@ D_funding_effect_level:                 ; $951A / 38170 - funding ratio index ->
         defb    $0F, $0F, $0F, $0F, $0F, $0F, $0F, $0F
         
 
-alloc_funding_levels:                                    ; $952A / 38186 - Convert requested funding percentages to effectiveness levels via D_funding_effect_mask/level tables
+;
+; Turn the budget's allocated/requested figures into in-game effectiveness.
+; ratio = allocated / (requested / 8), so full funding gives 8; the result indexes
+; the two 16-entry tables above:
+;   transport -> V_road_upgrade_mask / V_rail_upgrade_mask (crumble mask:
+;                $FF = never crumbles, $0F = 1 in 16 per tile per tick)
+;   police    -> V_PoliceEffect (0..15)    fire -> V_FireEffect (0..15)
+; A service with a request below 20 is left at its best setting (mask $FF / level 15).
+; SUSPECT: the fire section tests V_Transport_Funding_Requested rather than
+; V_Budget_Fire_Funding_Requested for its "< 20" check (copy/paste from the first
+; block) - so fire effectiveness is gated on the transport request.
+alloc_funding_levels:                                    ; $952A / 38186
 .L952a  ld      a,255
         ld      hl,(V_Transport_Funding_Requested)
         ld      de,20
@@ -9141,7 +9350,7 @@ SendMessages:
         sbc     hl,de
         jr      c,L9a3a                 ; (15)
         ld      hl,(V_TotalZPop)
-        ld      de,(V_RailTotal)
+        ld      de,(V_RoadTotal)
         and     a
         sbc     hl,de
         ld      a,4
@@ -9154,7 +9363,7 @@ SendMessages:
         sbc     hl,de
         jr      c,L9a54                 ; (15)
         ld      hl,(V_TotalZPop)
-        ld      de,(V_RoadTotal)
+        ld      de,(V_RailTotal)
         and     a
         sbc     hl,de
         ld      a,5
@@ -9233,8 +9442,8 @@ SendMessages:
         jp      nc,set_alert_message
 
 
-        ld      hl,(V_RoadTotal)
-        ld      de,(V_RailTotal)
+        ld      hl,(V_RailTotal)
+        ld      de,(V_RoadTotal)
         add     hl,de
         ld      a,h
         or      l
@@ -10813,6 +11022,14 @@ D_43332:    defm        "HERESVILLE  "          ; $A944 / 43332 - default city n
 
 ; La950      
 ; At $a94e
+; Coverage/density minimaps, 6912 bytes.  Cell (x,y) of the 96x96 level map lives at
+; (y/N)*W + x/N, N = 4 for the 24x24 maps and 2 for the 48x48 ones:
+;   +0     fire coverage      24x24  (   576)  0..15
+;   +576   police coverage    24x24  (   576)  0..15
+;   +1152  pollution          48x48  (  2304)  decays every other tick
+;   +3456  traffic density    48x48  (  2304)  +20 per trip, decays every tick
+;   +5760  power              1 bit per tile, 12 bytes per row (1152)
+; (see the note at apply_stadium_kernel about the +2304 "land value" base)
 minimaps:                                   ; $A950 / 43344
 .La950
         defs        6912
