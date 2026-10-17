@@ -3250,7 +3250,7 @@ D_autobulldoze_free_tiles:              ; $70FA / 28922 - tiles that do not need
         defb    TILE_DIRT, TILE_WATER            ;DIRT, WATER
 ;70fc/28944
 D_autobulldoze_tile_types:              ; $70FC / 28924 - tile types auto-bulldozeable; searched by cpir in bulldoze check
-        defb    $03, $01, $05, $04, $06, $02
+        defb    $02, $03, $01, $05, $04, $06
  
 V_auto_bulldoze_flag:    defb        0       ; VAR $7102 / 28930 - auto-bulldoze mode flag (2=large zone needs bulldoze check, 0=small tool; written but not subsequently read - possibly vestigial)
 
@@ -3486,7 +3486,7 @@ D_joinable_tile_list:                   ; $726B / 29291 - tile IDs that accept r
 
 ;7273/29299
 unbulldozeable_tiles:
-        defb    TILE_WATER, TILE_DIRT, TILE_NEED_POWER
+        defb    TILE_WATER, TILE_DIRT, TILE_RADIOACTIVE
         
 
 
@@ -3636,7 +3636,7 @@ SMC_bulldoze_zone_width:
         ld      de,9            ;3x3 RIC zone = $9 to bulldoze
         call    spend_money
         ret     c
-        ld      bc,-96
+        ld      bc,-97
         add     hl,bc
         push    hl
         pop     ix
@@ -3785,7 +3785,7 @@ action_zone_fire:
 
 default_stadium_tiles:
         defb    $a4, $c4, $c4, $c0
-        defb    $c5, $c0, $c0, $c0
+        defb    $84, $c5, $c0, $c0
         defb    $84, $c5, $c4, $c0
         defb    $84, $c6, $c0, $c0
 
@@ -3924,7 +3924,7 @@ minimap_xypos_25:
 
 
 get_land_value_minimap_value:                                    ; $7579 / 30073 - Point V_minimap_start at land-value minimap and read value at current map pos
-.L7579  ld      hl,minimaps+2304
+.L7579  ld      hl,minimaps+1152
         ld      (V_minimap_start),hl
         jr      minimap_xypos_50                   ; (-67)
 
@@ -5159,10 +5159,9 @@ apply_stadium_kernel_from_iter:                                    ; $7CC0 / 319
 .L7cc0  ld      bc,(V_map_iter_xy)
         ld      ix,D_stadium_effect_kernel 
 
-; NB the target is "get_land_value_minimap_value" = minimaps+2304, while the minimap
-; viewer (do_minimap_pollution) and the decay routine both use minimaps+1152.
-; The two bases differ by 24 rows of the 48x48 map - either the label is wrong
-; or this is a quirk of the original; worth checking in an emulator.
+; NB the target is returned by get_land_value_minimap_value; despite that name it is
+; the POLLUTION minimap (minimaps+1152), the same one decay_pollution_minimap and
+; do_minimap_pollution use.
 apply_stadium_kernel:                                    ; $7CC8 / 31944
 .L7cc8  call    get_land_value_minimap_value       ;minimaps+2304
         ld      de,98
@@ -7858,7 +7857,7 @@ L8d90:
         ld      (V_ChurchPop),hl
         ; This code downgrades the hospital into residential randomly
 .L8d9b  call    get_random_number
-        ld      hl,V_sim_speed_block
+        ld      hl,V_sim_speed_block+1
         and     (hl)
         ret     nz
         ld      a,(hl)
@@ -8117,10 +8116,11 @@ census_church_hosp:
         ret     
 
 ; V_sim_speed_block: 5-byte speed-control block, copied from D_sim_speed_params each tick
-;   +0 = DoChurch/DoHospital random downgrade mask (and X)
-;   +1 = DoResidential/DoCommercial/DoIndustrial random mask (and X)
-;   +2 = mask for zone growth random check
-;   +3 = mask for zone shrink random check
+;   +0 = number of ring-cell attempts per call in zone_ring_grow_ticks/zone_ring_shrink_ticks;
+;        $FF means the simulation is paused
+;   +1 = random mask (and X) for DoResidential, DoIndustrial, DoChurch and DoHospital
+;   +2 = random mask for DoCommercial
+;   +3 = not referenced by this code (the CPC version uses it in DoIndustrial)
 ;   +4 = month-advance mask (budget fires when sim_loop_counter & this == 0)
 V_sim_speed_block:  defb    $08, $07, $07, $07, $01     ; VAR $8F67 / 36711 - 5-byte simulation speed control block (default = NORMAL speed)
 
@@ -8899,7 +8899,7 @@ L95b8:
         defm        "Fire 000"
         defb        '%'+128
         defb        0
-        defm        "  Taxes 000% House Prices 000"
+        defm        "  Taxes 000% House prices 000"
         defb        '%'+128
         defb        0
         defm        "             Unemployment 000"
@@ -8914,7 +8914,7 @@ L95b8:
         defm        "ASSESSED VALUE    "
         defb        '$'+128
         defb        3,0
-        defm        "CATEGORY   :"
+        defm        "CATAGORY   :"
         defb        '-'+128
         defb        0
         defm        "GAME LEVEL :"
@@ -9049,7 +9049,7 @@ print_evaluation_concerns:
         ld      h,0
         call    ckpercent
         push    hl
-        ld      bc,$0a16
+        ld      bc,$0a1b
         call    prstat
         pop     hl                  
         ld      de,(V_eval_concern_total)
@@ -9430,7 +9430,7 @@ SendMessages:
         and     a
         jr      nz,L9ad2                ; (14)
         ld      hl,(V_TotalZPop)
-        ld      de,19
+        ld      de,25
         and     a
         sbc     hl,de
         ld      a,11
@@ -9858,8 +9858,7 @@ V_minimap_selection_index:  defb    $06     ; VAR $9D43 / 40259 - which minimap 
 
 check_if_minimaps_should_be_displayed:      ; $9D44 / 40260
 .L9d44
-        ld      a,$43
-        sbc     l
+        ld      a,(V_minimap_selection_index)
         cp      0
         ret     z
         ld      a,1
@@ -10017,7 +10016,7 @@ action_load:
         call    cls_black
         call    prt_ctrl
         defb        T_BOX,0,0,32,24
-        defb        T_SETXY,8,11
+        defb        T_SETXY,9,11
         defm        "SEARCHING"
         defb        T_END
 L9e89:
@@ -10095,7 +10094,7 @@ load_city_from_tape:                                    ; $9EBE / 40638 - Print 
 
 print_tape_found_header:                                    ; $9F1A / 40730 - Print 'FOUND :- ' then the 12-char tape header name at textpos
 .L9f1a  call    prt_ctrl
-        defb        T_SETXY,8,9
+        defb        T_SETXY,11,9
         defm        "FOUND :- "
         defb        T_END
 
@@ -10256,7 +10255,7 @@ La140:
         defm    "SPECTRUM PROGRAMMING  A.R.Lil"
         defb    'l'+128, 0
 La15f:
-        defm    "SPECTRUM GRAPHICS A.Lill & J "
+        defm    "SPECTRUM GRAPHICS A.Lill & J."
         defb    'L'+128, 3, 0
 La17f:
         defm    "FOR MORE INFO :- INFOGRAME"
@@ -10760,7 +10759,7 @@ input_entry:
         ld      (42735),hl
         jr      input_set_zero_and_redraw                   ; (56)
 
-.La725  ld      hl,La76d
+.La725  ld      hl,La762
         push    hl
         ld      a,(keystore)
         and     1       ;'SHIFT'
@@ -10797,7 +10796,7 @@ input_entry:
 input_set_zero_and_redraw:                                    ; $A75D / 42845 - Set input value to 0, store in buffer, redraw input field; used for budget input reset
 .La75d  call    redraw_input_field
         jr      La70a                   ; (-88)
-        ld      hl,1000
+.La762  ld      hl,1000
         ld      (42735),hl
         call    redraw_input_field
         jr      La70a                   ; (-99)
@@ -10900,7 +10899,7 @@ input_value_to_digits:                                    ; $A7ED / 42989 - Conv
         ld      b,5
         ld      de,-10000
         call    extract_decimal_digit
-        ld      de,-10000
+        ld      de,-1000
         call    extract_decimal_digit
         ld      de,-100
         call    extract_decimal_digit
@@ -11029,7 +11028,7 @@ D_43332:    defm        "HERESVILLE  "          ; $A944 / 43332 - default city n
 ;   +1152  pollution          48x48  (  2304)  decays every other tick
 ;   +3456  traffic density    48x48  (  2304)  +20 per trip, decays every tick
 ;   +5760  power              1 bit per tile, 12 bytes per row (1152)
-; (see the note at apply_stadium_kernel about the +2304 "land value" base)
+; (get_land_value_minimap_value is a misnomer: it addresses the pollution map)
 minimaps:                                   ; $A950 / 43344
 .La950
         defs        6912
