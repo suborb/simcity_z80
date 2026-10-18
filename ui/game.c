@@ -435,15 +435,17 @@ static const struct field status_help[] = {
     { 6,  0, F_STR,  0, &st_line[2] },
 };
 static const struct field status_map[] = {
-    { 5,  0, F_TEXT, 0, "MAP:" },
-    { 5,  5, F_STR,  0, &st_line[1] },
-    { 6,  0, F_TEXT, 0, "M NEXT MAP  X BACK TO CITY" },
+    { 4,  0, F_TEXT, 0, "MAP:" },
+    { 4,  5, F_STR,  0, &st_line[1] },
+    { 5,  0, F_TEXT, 0, "M NEXT MAP  X BACK TO CITY" },
+    { 6,  0, F_TEXT, 0, "" },
 };
 
 /* The status panel: five lines, so it fits the top third of even a 16 row screen. */
 static void draw_status(void)
 {
     char buf[41];
+    uint8_t icons = panel_h >= 8 && plat_has_icons();   /* the tools as pictures in the bottom two rows */
 
     if (!panel_w)
         return;
@@ -463,15 +465,17 @@ static void draw_status(void)
 #ifdef HAVE_MINIMAP
     if (map_view) {
         st_line[1] = minimap_names[map_view];
-        plat_text_puts(0, 4, "                                        ");
         fmt_fields(status_map, sizeof(status_map) / sizeof(struct field));
-        return;
-    }
+    } else
 #endif
-    st_line[0] = help_page[panel_h >= 7 ? 0 : (frame >> 6) % 3];
-    st_line[1] = help_page[1];
-    st_line[2] = help_page[2];
-    fmt_fields(status_help, panel_h >= 7 ? 3 : 1);
+    {
+        st_line[0] = help_page[panel_h >= 7 ? 0 : (frame >> 6) % 3];
+        st_line[1] = icons ? ", . TOOL  0-9 PICK  H PAUSE  X QUIT" : help_page[1];
+        st_line[2] = help_page[2];
+        fmt_fields(status_help, icons ? 2 : panel_h >= 7 ? 3 : 1);
+    }
+    if (icons)
+        plat_icons(tool);
 }
 #else
 static uint8_t append(char *buf, uint8_t n, const char *s)

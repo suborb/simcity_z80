@@ -63,6 +63,12 @@ extern uint8_t  plat_text_rows(void);
 extern void     plat_text_clear(void);
 extern void     plat_text_puts(uint8_t col, uint8_t row, const char *s);
 
+/* The tool icons.  A platform that can show the tools as small pictures in the text area (the Z88, with
+   user defined characters in its text window) returns 1 from plat_has_icons(); plat_icons() then draws the
+   14 icons in the bottom two rows of the text area, tool `selected` highlighted. */
+extern uint8_t  plat_has_icons(void);
+extern void     plat_icons(uint8_t selected);
+
 /* Tile graphics.  A platform that can show the game's 8x8 pictures returns 1
    from plat_has_tiles() and draws one in a character cell with plat_put_tile();
    the rest get characters from plat_put().

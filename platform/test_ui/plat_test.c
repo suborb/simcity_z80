@@ -100,6 +100,16 @@ void plat_text_clear(void) { plat_clear(); }
 void plat_text_puts(uint8_t col, uint8_t row, const char *s) { plat_puts(col, row, s); }
 #endif
 
+#ifdef TEST_PANEL
+uint8_t test_icons_selected = 255;      /* the tool plat_icons() was last asked to highlight */
+uint16_t test_icons_calls;
+uint8_t plat_has_icons(void) { return 1; }
+void plat_icons(uint8_t selected) { test_icons_selected = selected; ++test_icons_calls; }
+#else
+uint8_t plat_has_icons(void) { return 0; }
+void plat_icons(uint8_t selected) { (void)selected; }
+#endif
+
 #ifdef TEST_SPRITES
 /* With TEST_SPRITES the game draws the map from pictures, which the test reads back from test_bitmap. */
 uint8_t plat_has_tiles(void) { return 1; }

@@ -74,5 +74,23 @@ bad = [(n, name, code) for n, ((_, (name, code)), tool) in enumerate(zip(tool_it
        if code != tool0 + n or not (name.lower().replace('-', ' ').startswith(tool.lower()[:5]) or tool.lower().startswith(name.lower()[:5]))]
 check('tool item n sends CMD_TOOL + n and is named like tool n', not bad, str(bad[:3]))
 
+# The icons the text window shows: the Spectrum's 16x16 tool icons, frame cut off, as 2x2 Z88 cells of 6x8.
+icons = open(os.path.join(ROOT, 'assets', 'z88_icons.bin'), 'rb').read()
+udgs = open(os.path.join(ROOT, 'assets', 'udgs.bin'), 'rb').read()
+check('the icon file is 14 icons of 4 cells of 8 rows', len(icons) == 14 * 4 * 8)
+bad = []
+for icon in range(14):
+    for y in range(16):
+        for x in range(12):
+            cell = (y // 8) * 2 + x // 6                                # which of the four cells
+            z88 = icons[icon * 32 + cell * 8 + y % 8] >> (5 - x % 6) & 1
+            zx_x, zx_y = x + 2, y                                       # the frame is two pixels wide
+            zx = 0
+            if 2 <= zx_y <= 13:
+                zx = udgs[(icon * 4 + (zx_y // 8) * 2 + zx_x // 8) * 8 + zx_y % 8] >> (7 - zx_x % 8) & 1
+            if z88 != zx:
+                bad.append((icon, x, y))
+check('every icon pixel is the Spectrum icon pixel (the picture inside the frame, 12x12 of the 16x16)', not bad, str(bad[:4]))
+check('no icon cell uses bits above the six pixels', all(b < 64 for b in icons))
 print('FAILED: ' + ', '.join(failures) if failures else 'Z88 menus agree with the game commands')
 sys.exit(1 if failures else 0)

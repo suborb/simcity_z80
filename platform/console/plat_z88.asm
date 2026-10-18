@@ -10,6 +10,13 @@
         PUBLIC  _z88_sop
         INCLUDE "stdio.def"
 
+; The 14 tool icons as OZ character rows (tools/make_z88_icons.py): 4 cells of 8 rows each.
+        SECTION rodata_user
+        PUBLIC  _z88_icons
+_z88_icons:
+        BINARY  "assets/z88_icons.bin"
+
+        SECTION code_clib
 _z88_sop:
         call_oz (gn_sop)                ;HL = the string; preserves IX and IY
         ret

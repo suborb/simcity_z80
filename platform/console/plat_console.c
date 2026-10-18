@@ -50,6 +50,62 @@ extern void z88_sop(const char *s) __z88dk_fastcall;    /* plat_z88.asm: OZ GN_S
 #define Z88_MAP_COLS    32      /* the 256 pixel map, in 8 pixel cells */
 #define Z88_MAP_ROWS    8
 static char z88_text[5 + Z88_TEXT_COLS + 1];
+
+/* ---- the tool icons: OZ user defined characters 64..119, four to an icon ----
+   1,138,'=',code,r0..r7 defines a character (the rows with bit 7 set), 1,'2','?',code prints it. */
+extern const uint8_t z88_icons[];           /* platform/console/plat_z88.asm */
+#define ICON_FIRST_CHAR 64
+#define NUM_ICONS       14
+static uint8_t icons_ok;                    /* the characters are defined */
+static char icon_text[5 + NUM_ICONS * 12 + 1];
+
+static void define_icons(void)
+{
+    char d[13];
+    uint8_t c, r;
+
+    d[0] = 1; d[1] = (char)138; d[2] = '=';
+    d[12] = 0;
+    for (c = 0; c < NUM_ICONS * 4; ++c) {
+        d[3] = (char)(ICON_FIRST_CHAR + c);
+        for (r = 0; r < 8; ++r)
+            d[4 + r] = (char)(z88_icons[c * 8 + r] | 0x80);
+        z88_sop(d);
+    }
+    icons_ok = 1;
+}
+
+uint8_t plat_has_icons(void) { return 1; }
+
+/* The icons, two rows of 14 icons of 2 cells, in the bottom two rows of the text window; the selected one in reverse. */
+void plat_icons(uint8_t selected)
+{
+    uint8_t i, r, n;
+    char c;
+
+    if (!icons_ok)
+        define_icons();
+    for (r = 0; r < 2; ++r) {
+        icon_text[0] = 1; icon_text[1] = '3'; icon_text[2] = '@';
+        icon_text[3] = 32;
+        icon_text[4] = (char)(32 + Z88_TEXT_ROWS - 2 + r);
+        n = 5;
+        for (i = 0; i < NUM_ICONS; ++i) {
+            if (i == selected) {
+                icon_text[n++] = 1; icon_text[n++] = 'R';
+            }
+            for (c = 0; c < 2; ++c) {
+                icon_text[n++] = 1; icon_text[n++] = '2'; icon_text[n++] = '?';
+                icon_text[n++] = (char)(ICON_FIRST_CHAR + i * 4 + r * 2 + c);
+            }
+            if (i == selected) {
+                icon_text[n++] = 1; icon_text[n++] = 'R';
+            }
+        }
+        icon_text[n] = 0;
+        z88_sop(icon_text);
+    }
+}
 static uint16_t z88_mode;
 #endif
 
@@ -246,6 +302,8 @@ void plat_text_puts(uint8_t col, uint8_t row, const char *s)
     z88_sop(z88_text);
 }
 #else
+uint8_t plat_has_icons(void) { return 0; }
+void plat_icons(uint8_t selected) { (void)selected; }
 uint8_t plat_has_text_window(void) { return 0; }
 uint8_t plat_text_cols(void) { return plat_cols(); }
 uint8_t plat_text_rows(void) { return plat_rows(); }
@@ -404,6 +462,7 @@ void handlecmds(int cmd)
 
 void redrawscreen(void)
 {
+    icons_ok = 0;                       /* the user defined characters may have gone too */
     queue_cmd(CMD_REDRAW);
 }
 

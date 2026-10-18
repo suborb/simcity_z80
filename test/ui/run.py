@@ -220,10 +220,17 @@ def main():
     check('text window: the game ran and quit cleanly', mem[psyms['_test_done']] == 1)
     check('text window: the status is in the text window', any('FUNDS $10000' in r for r in text) and any('ROAD $10' in r for r in text),
           '\n'.join(text))
-    check('text window: all three help lines fit', sum(1 for r in text if 'MOVE' in r or 'PICK' in r or 'QUIT' in r) == 3, '\n'.join(text))
+    check('text window: the two help lines fit (the bottom two rows are the tool icons)',
+          sum(1 for r in text if 'MOVE' in r or 'PICK' in r or 'QUIT' in r) == 2 and not text[6].strip() and not text[7].strip(), '\n'.join(text))
+    check('text window: the icons are drawn with the tool in use highlighted (the road, tool 1, to start with)',
+          mem[psyms['_test_icons_selected']] == 1 and mem[psyms['_test_icons_calls']] > 0)
     check('text window: the map is only the map (no text on it)',
           not any(w in r for r in mapp for w in ('FUNDS', 'POP', 'ROAD', 'MOVE', 'JAN', 'MORE')), '\n'.join(mapp))
     check('text window: the map fills all 8 rows of the console', all(r.strip() for r in mapp), '\n'.join(mapp))
+    mem = run(pbin, psyms, [LEVEL_MEDIUM, CMD_TOOL + 5, 0, 0])
+    check('text window: choosing a tool moves the icon highlight to it', mem[psyms['_test_icons_selected']] == 5)
+    mem = run(pbin, psyms, [LEVEL_MEDIUM, ord('9'), 0, 0])
+    check('text window: so does a digit key', mem[psyms['_test_icons_selected']] == 9)
     mem = run(pbin, psyms, [LEVEL_MEDIUM, CMD_TOOL + 5, 0, 0])
     check('text window: a menu command updates the text window', any('RESIDENTIAL' in r for r in panes(mem)[1]))
     mem = run(pbin, psyms, [LEVEL_MEDIUM, CMD_NEW_CITY, ord('3'), 0, 0])
