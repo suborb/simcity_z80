@@ -45,11 +45,12 @@ check('every item has a command code', all(c is not None for _, c in items.value
 codes = [c for _, c in items.values()]
 check('no two items send the same command', len(codes) == len(set(codes)))
 tool0 = cmds['CMD_TOOL']
-singles = {n: v for n, v in cmds.items() if n not in ('CMD_TOOL', 'CMD_REDRAW')}
+map0 = cmds['CMD_MAP']
+singles = {n: v for n, v in cmds.items() if n not in ('CMD_TOOL', 'CMD_MAP', 'CMD_REDRAW')}
 sent = set(codes)
 check('every game command has a menu item', all(v in sent for v in singles.values()),
       str([n for n, v in singles.items() if v not in sent]))
-known = set(singles.values()) | {tool0 + n for n in range(14)}
+known = set(singles.values()) | {tool0 + n for n in range(14)} | {map0 + n for n in range(6)}
 check('every menu item sends a command the game knows', sent <= known, str(sorted(hex(c) for c in sent - known)))
 check('command codes are in the range OZ gives menu commands (0x81..0xB0)', all(0x81 <= c <= 0xB0 for c in sent | set(cmds.values())))
 seqs = list(shortcuts.values())

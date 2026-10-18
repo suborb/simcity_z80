@@ -30,6 +30,9 @@ extern const uint8_t view_tile_art[];           /* Spectrum-style attribute byte
 
 /* ---- the map ---- */
 extern uint8_t levelmap[MAP_W * MAP_H];
+/* The coverage and density maps (engine/engine_defs or the disassembly's minimaps): fire 24x24 at +0, police 24x24
+   at +576, pollution 48x48 at +1152, traffic 48x48 at +3456, power 1 bit a tile (12 bytes a row) at +5760. */
+extern uint8_t minimaps[6912];
 
 /* ---- state ---- */
 extern uint8_t  V_month;            /* 0..11 */

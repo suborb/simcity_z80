@@ -29,7 +29,7 @@ uint8_t test_text[TEXT_ROWS][TEXT_COLS];    /* the separate text window */
 uint16_t test_put_count;                /* plat_put calls: cells and characters drawn */
 
 /* Keys fed to the game, one per frame; 0 = no key.  The harness patches this. */
-uint8_t test_script[512] = { '2', 0 };
+uint8_t test_script[1024] = { '2', 0 };
 uint16_t test_script_pos;
 
 void plat_init(void) { }
@@ -62,10 +62,10 @@ uint8_t plat_key(void)
 {
     uint8_t k;
     if (test_script_pos >= sizeof(test_script))
-        return 'x';
+        return CMD_QUIT;                /* not 'x': that leaves a mini map instead of quitting */
     k = test_script[test_script_pos];
     if (k == 0xFF)                      /* end of script: quit */
-        return 'x';
+        return CMD_QUIT;
     ++test_script_pos;
     return k;
 }
@@ -106,6 +106,34 @@ void plat_put_tile(uint8_t col, uint8_t row, const uint8_t *art, uint8_t attr, u
     (void)col; (void)row; (void)art; (void)attr; (void)inverse;
 }
 
+#ifdef TEST_PANEL
+uint8_t test_bitmap[ROWS][COLS][8];     /* what plat_put_bitmap drew in each cell */
+uint8_t plat_has_bitmap(void) { return 1; }
+void plat_put_bitmap(uint8_t col, uint8_t row, const uint8_t *art)
+{
+    uint8_t i;
+    if (col < COLS && row < ROWS)
+        for (i = 0; i < 8; ++i)
+            test_bitmap[row][col][i] = art[i];
+}
+#else
+uint8_t plat_has_bitmap(void) { return 0; }
+void plat_put_bitmap(uint8_t col, uint8_t row, const uint8_t *art) { (void)col; (void)row; (void)art; }
+#endif
+
 uint16_t plat_clock(void) { return 0x1234; }
 void plat_idle(void) { }
+#ifdef TEST_PANEL
+/* The mini map tests want something in the coverage maps, which a city has none of until it has run
+   for a year.  After the new city is made (the first frames), fill them with a pattern. */
+extern uint8_t minimaps[6912];
+void plat_flush(void)
+{
+    uint16_t i;
+    if (++test_frames == 3)
+        for (i = 0; i < sizeof(minimaps); ++i)
+            minimaps[i] = (uint8_t)(i * 37u + (i >> 8) * 11u) & (i < 1152 ? 15 : 255);   /* coverage is 0..15 */
+}
+#else
 void plat_flush(void) { ++test_frames; }
+#endif

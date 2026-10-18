@@ -32,6 +32,8 @@
 #define CMD_AUTOBULLDOZE_OFF 0x9A
 #define CMD_QUIT            0x9B
 #define CMD_REDRAW          0x9C    /* the screen was overwritten (OZ asks for a redraw) */
+#define CMD_MAP             0x9D    /* + view 0..5 (0x9D..0xA2): show that mini map (see ui/minimap.h) */
+#define CMD_MAP_OFF         0xA3    /* back to the city */
 
 extern void     plat_init(void);
 extern void     plat_exit(void);
@@ -66,5 +68,11 @@ extern void     plat_text_puts(uint8_t col, uint8_t row, const char *s);
      inverse  1 for the blinking cursor: the picture with its pixels inverted */
 extern uint8_t  plat_has_tiles(void);
 extern void     plat_put_tile(uint8_t col, uint8_t row, const uint8_t *art, uint8_t attr, uint8_t inverse);
+
+/* Pictures of the game's own making, for the mini maps.  A platform that can show them returns 1
+   from plat_has_bitmap(); plat_put_bitmap() then draws 8 bytes of 1bpp art (a byte a pixel row,
+   bit 7 on the left) in a character cell.  Without it the game has no mini maps. */
+extern uint8_t  plat_has_bitmap(void);
+extern void     plat_put_bitmap(uint8_t col, uint8_t row, const uint8_t *art);
 
 #endif

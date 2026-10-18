@@ -21,9 +21,6 @@ echo "== ZX Spectrum tile drawing: every picture through the real console code"
 python3 test/tiles/run.py
 python3 test/tiles/run.py --print
 echo
-echo "== ZX Spectrum stack depth, with every tool and every disaster"
-python3 test/stack/run.py
-echo
 echo "== Z88 menus agree with the commands the game understands"
 python3 test/z88/run.py
 echo

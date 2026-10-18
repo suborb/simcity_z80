@@ -8,7 +8,7 @@
    checks).
 
    Shortcuts: the user presses the [] (square) key and then types the letters of the item's KEY.  The letters are up to the application: here the first is the menu's initial
-   (Game, Tools, Speed, Options) and the rest name the item, with no sequence the start of
+   (Game, Tools, Speed, Options, Maps) and the rest name the item, with no sequence the start of
    another (test/z88 checks that too). */
 #include <dor.h>
 
@@ -108,5 +108,29 @@
 #define TOPIC4_6             "Auto-bulldoze off"
 #define TOPIC4_6KEY          "OBF"
 #define TOPIC4_6CODE         0x9A
+
+/* ---- Maps: CMD_MAP + the view (ui/minimap.h), then back to the city ---- */
+#define TOPIC5               "Maps"
+#define TOPIC5_1             "City"
+#define TOPIC5_1KEY          "MC"
+#define TOPIC5_1CODE         0x9D
+#define TOPIC5_2             "Pollution"
+#define TOPIC5_2KEY          "MU"
+#define TOPIC5_2CODE         0x9E
+#define TOPIC5_3             "Police coverage"
+#define TOPIC5_3KEY          "MO"
+#define TOPIC5_3CODE         0x9F
+#define TOPIC5_4             "Fire coverage"
+#define TOPIC5_4KEY          "MF"
+#define TOPIC5_4CODE         0xA0
+#define TOPIC5_5             "Traffic"
+#define TOPIC5_5KEY          "MT"
+#define TOPIC5_5CODE         0xA1
+#define TOPIC5_6             "Power"
+#define TOPIC5_6KEY          "MW"
+#define TOPIC5_6CODE         0xA2
+#define TOPIC5_7             "Back to the city"
+#define TOPIC5_7KEY          "MX"
+#define TOPIC5_7CODE         0xA3
 
 #include <application.h>

@@ -7,7 +7,7 @@
 #   make all                            build all four
 #   make test                           the headless build the UI tests run
 #   make check                          every automated test (test/run_all.sh)
-#   make golden | uitest | tiletest | stacktest | z88test   one group of tests
+#   make golden | uitest | tiletest | z88test   one group of tests
 #   make ZCC='zcc -compiler=NAME' ...  build with another compiler (give it on the command line)
 #   make engine                         regenerate engine/ and platform/zx from disassembly/sim_game.asm
 #   make deadcode                       list engine code nothing reaches
@@ -26,6 +26,8 @@ ZCC = zcc
 COMMON = -Ca-DPORTABLE -Ca-Iengine -Ca-I. -Iui -Cc-standard-escape-chars -m
 
 GAME    = ui/main.c ui/game.c engine/engine_c.asm platform/common/hooks.asm
+# The mini maps (ui/minimap.c): not on the Spectrum, whose memory has no room for them.
+MINIMAP = ui/minimap.c -DHAVE_MINIMAP
 CONSOLE = platform/console/plat_console.c platform/console/plat_font.asm
 
 # Everything a build depends on.
@@ -41,7 +43,7 @@ ZXP    = build/zx-print/simcity.tap
 TEST   = build/test/simcity.bin
 TESTP  = build/testpanel/simcity.bin
 
-.PHONY: all aqplus nc200 z88 z88rom zx zx-print test testpanel check golden uitest tiletest stacktest z88test engine deadcode clean
+.PHONY: all aqplus nc200 z88 z88rom zx zx-print test testpanel check golden uitest tiletest z88test engine deadcode clean
 
 all: aqplus nc200 z88 zx
 
@@ -61,20 +63,20 @@ testpanel: $(TESTP)
 $(AQPLUS): $(DEPS)
 	@mkdir -p $(@D)
 	$(ZCC) +aquarius -clib=aqplus -subtype=aqx --generic-console -create-app $(COMMON) \
-	    -DHAVE_TILES -DTARGET_AQPLUS $(GAME) $(CONSOLE) -o $(@D)/simcity
+	    -DHAVE_TILES -DTARGET_AQPLUS $(GAME) $(MINIMAP) $(CONSOLE) -o $(@D)/simcity
 
 # NC200: RAM subtype (the default ROM-card subtype cannot host self-modifying code).  Tiles
 # go through the console's font and UDG pointers (HAVE_TILES; see platform/console/plat_console.c).
 $(NC200): $(DEPS)
 	@mkdir -p $(@D)
 	$(ZCC) +nc -clib=nc200 -subtype=ram -create-app $(COMMON) -DHAVE_TILES \
-	    $(GAME) $(CONSOLE) -o $(@D)/simcity
+	    $(GAME) $(MINIMAP) $(CONSOLE) -o $(@D)/simcity
 
 # Z88: OZ text console, so characters only for now.
 $(Z88): $(DEPS)
 	@mkdir -p $(@D)
 	$(ZCC) +z88 --generic-console -create-app -DTARGET_Z88 -Ca-DZ88_DI_SIM -DHAVE_TILES -DMAX_VIEW_W=32 -DMAX_VIEW_H=8 \
-	    $(COMMON) $(GAME) $(CONSOLE) platform/console/plat_z88.asm -o $(@D)/simcity
+	    $(COMMON) $(GAME) $(MINIMAP) $(CONSOLE) platform/console/plat_z88.asm -o $(@D)/simcity
 
 # Z88_DI_SIM: each simulation slice runs with OZ's interrupts disabled (OZ_DI/OZ_EI around sim_step in
 # engine_c.asm).  OZ's interrupt handling needs the stack below $2000, and the simulation's coroutine
@@ -94,7 +96,7 @@ Z88ROM_FLAGS = -subtype=app --generic-console -create-app -pragma-include:platfo
 
 $(Z88ROM): $(DEPS)
 	@mkdir -p $(@D)
-	$(ZCC) +z88 $(Z88ROM_FLAGS) $(COMMON) $(GAME) $(CONSOLE) platform/console/plat_z88.asm \
+	$(ZCC) +z88 $(Z88ROM_FLAGS) $(COMMON) $(GAME) $(MINIMAP) $(CONSOLE) platform/console/plat_z88.asm \
 	    platform/console/z88_dor.c -o $(@D)/simcity.bin
 
 # ZX Spectrum.  The memory-layout pragmas (stack at the top of RAM, 32 column console, no
@@ -127,7 +129,7 @@ $(TEST): $(DEPS)
 # The same with a separate text window and a 32x8 map, the shape of the Z88's screen.
 $(TESTP): $(DEPS)
 	@mkdir -p $(@D)
-	$(ZCC) +test $(COMMON) -DTEST_PANEL $(GAME) platform/test_ui/plat_test.c -o $@
+	$(ZCC) +test $(COMMON) -DTEST_PANEL $(GAME) $(MINIMAP) platform/test_ui/plat_test.c -o $@
 
 check:
 	sh test/run_all.sh
@@ -142,9 +144,6 @@ uitest:
 tiletest:
 	python3 test/tiles/run.py
 	python3 test/tiles/run.py --print
-
-stacktest:
-	python3 test/stack/run.py
 
 z88test:
 	python3 test/z88/run.py

@@ -22,7 +22,7 @@ TICKS = os.path.join(Z88DK, 'bin', 'z88dk-ticks')
 OUT = os.path.join(ROOT, 'build', 'test')
 ROWS, COLS = 24, 64
 MAP_W = 96
-SCRIPT_LEN = 512
+SCRIPT_LEN = 1024
 END = 0xFF
 
 
@@ -156,6 +156,7 @@ def main():
     CMD_FAST, CMD_NORMAL, CMD_SLOW = 0x92, 0x93, 0x94
     CMD_COAL, CMD_NUCLEAR, CMD_DIS_ON, CMD_DIS_OFF, CMD_BULL_ON, CMD_BULL_OFF = 0x95, 0x96, 0x97, 0x98, 0x99, 0x9A
     CMD_QUIT, CMD_REDRAW = 0x9B, 0x9C
+    CMD_MAP, CMD_MAP_OFF = 0x9D, 0xA3
     byte = lambda mem, name: mem[syms[name]]
 
     mem = run(binary, syms, [LEVEL_MEDIUM, CMD_TOOL + 5, 0, 0])
@@ -211,6 +212,95 @@ def main():
     check('text window: a new city goes through the title and back (hard level, status and map drawn)',
           mem[psyms['_V_difficulty']] == 2 and any('FUNDS' in r for r in text) and all(r.strip() for r in mapp),
           '\n'.join(text))
+
+    # --- 6. the mini maps (on the 32x8 platform, which can draw bitmaps) ---
+    def bitmaps(mem):
+        """The 192x64 picture the game drew: the 24x8 cells at console column 4, as rows of 0/1."""
+        base = psyms['_test_bitmap']
+        rows = []
+        for py in range(64):
+            row = []
+            for cx in range(24):
+                b = mem[base + ((py // 8) * 32 + 4 + cx) * 8 + py % 8]
+                row += [(b >> (7 - i)) & 1 for i in range(8)]
+            rows.append(row)
+        return rows
+
+    BAYER2 = [0, 2, 3, 1]
+    BAYER4 = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5]
+    flags_at = psyms['_D_tile_flags']
+
+    def reference(mem, view, top):
+        """The same picture worked out from the engine's memory, pixel by pixel (a tile is 2x2 pixels)."""
+        lm, mm = psyms['_levelmap'], psyms['_minimaps']
+
+        def tile_level(t):
+            if t & 0x80: return 4
+            if t == 2: return 0
+            if t == 6: return 2
+            if t <= 5 or t == 68: return 1
+            return 3 if t < 56 and mem[flags_at + t] & 0x0E else 4
+
+        level16 = lambda v: min(16, v >> 2)
+        out = []
+        for py in range(64):
+            y = top + py
+            row = []
+            for x in range(192):
+                tile = mem[lm + (y // 2) * 96 + x // 2]
+                if view == 1:
+                    v = tile_level(tile) > BAYER2[(y & 1) * 2 + (x & 1)]
+                elif view == 6:
+                    tx = x // 2
+                    powered = mem[mm + 5760 + (y // 2) * 12 + tx // 8] >> (7 - tx % 8) & 1
+                    level = 4 if powered else min(1, tile_level(tile))
+                    v = level > BAYER2[(y & 1) * 2 + (x & 1)]
+                elif view in (2, 5):
+                    base = mm + (1152 if view == 2 else 3456)
+                    v = level16(mem[base + (y // 4) * 48 + x // 4]) > BAYER4[(y & 3) * 4 + (x & 3)]
+                else:
+                    base = mm + (576 if view == 3 else 0)
+                    v = mem[base + (y // 8) * 24 + x // 8] > BAYER4[((y & 7) >> 1) * 4 + ((x & 7) >> 1)]
+                row.append(1 if v else 0)
+            out.append(row)
+        return out
+
+    def differences(got, want, top=64, cursor_y=48):
+        """Pixels that differ, ignoring the 2x2 the cursor inverts (the cursor is at map 48, cursor_y)."""
+        cursor = {(96 + i, 2 * cursor_y - top + j) for i in (0, 1) for j in (0, 1)}
+        return [(x, y) for y in range(64) for x in range(192) if got[y][x] != want[y][x] and (x, y) not in cursor]
+
+    KEY_M = ord('m')
+    for view, name in ((1, 'city'), (2, 'pollution'), (3, 'police'), (4, 'fire'), (5, 'traffic'), (6, 'power')):
+        mem = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE] + [KEY_M] * view + [0] * 12)
+        got = bitmaps(mem)
+        d = differences(got, reference(mem, view, 64))
+        check(f'mini map {view}: {name} is drawn as the engine data says', not d, f'{len(d)} pixels differ, first {d[:4]}')
+        if view > 1:        # the harness fills the coverage maps with a pattern, so something must show
+            lit = sum(map(sum, got))
+            check(f'mini map {view}: {name} has lit and dark pixels', 300 < lit < 192 * 64 - 300, f'{lit} of 12288 lit')
+        _, text = panes(mem)
+        check(f'mini map {view}: the text window names it', any(minimap_name in r for r in text for minimap_name in [name.upper()]),
+              '\n'.join(text))
+    mem = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE, KEY_M] + [0] * 12)
+    lit = sum(map(sum, bitmaps(mem)))
+    check('mini map: the city view shows the water', 100 < lit < 192 * 64 - 100, f'{lit} of 12288 pixels lit')
+    # the cursor in the top half: the picture shows the top of the city, and the cursor's pixel is in it
+    for view in (1, 3):
+        mem = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE] + [ord('Q')] * 5 + [KEY_M] * view + [0] * 12)
+        d = differences(bitmaps(mem), reference(mem, view, 0), 0, 8)
+        check(f'mini map {view}: with the cursor in the top half the top of the city is shown', not d, f'{len(d)} pixels differ, first {d[:4]}')
+
+    mem = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE, KEY_M, ord('x'), 0, 0])
+    mapp, text = panes(mem)
+    check('mini map: x goes back to the city instead of quitting', mem[psyms['_test_done']] == 1 and any('~' in r for r in mapp)
+          and not any('MAP:' in r for r in text), '\n'.join(mapp))
+    mem = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE] + [KEY_M] * 7 + [0, 0])
+    check('mini map: m cycles through the views and back to the city', any('~' in r for r in panes(mem)[0]))
+    mem = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE, CMD_MAP + 1, 0, 0])
+    check('mini map: a menu command shows its view', any('POLLUTION' in r for r in panes(mem)[1]))
+    mem = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE, CMD_MAP + 1, CMD_MAP_OFF, 0, 0])
+    check('mini map: the menu can go back to the city', any('~' in r for r in panes(mem)[0]) and not any('MAP:' in r for r in panes(mem)[1]))
 
     print()
     print('\n'.join(scr))

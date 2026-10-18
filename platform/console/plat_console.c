@@ -294,6 +294,34 @@ void plat_put_tile(uint8_t col, uint8_t row, const uint8_t *art, uint8_t attr, u
 #endif
 }
 
+uint8_t plat_has_bitmap(void)
+{
+#ifdef HAVE_TILES
+    return 1;
+#else
+    return 0;
+#endif
+}
+
+/* A picture of the game's own: the same as a tile, through the scratch UDG (or straight to the screen). */
+void plat_put_bitmap(uint8_t col, uint8_t row, const uint8_t *art)
+{
+#if defined(TILE_BLIT)
+    zx_blit8(zx_cxy2saddr(col, row), art, 0);
+#elif defined(TILE_PRINT)
+    uint8_t i;
+
+    for (i = 0; i < 8; ++i)
+        cursor_art[i] = art[i];
+    set_udgs(cursor_art);
+    tile_mode = 1;
+    gotoxy(col, row);
+    fputc_cons(128);
+#else
+    (void)col; (void)row; (void)art;
+#endif
+}
+
 #ifdef TARGET_Z88
 /* ---- Z88: keys and menus come from OZ ------------------------------------------------
    in_Inkey reads the keyboard matrix directly, which OZ never sees, so no menu would ever

@@ -16,6 +16,9 @@
 #include "engine.h"
 #include "platform.h"
 #include "text.h"
+#ifdef HAVE_MINIMAP
+#include "minimap.h"
+#endif
 #include "game.h"
 
 #define NUM_TOOLS   14
@@ -42,12 +45,14 @@ static uint8_t quit;
 static uint8_t restart;                 /* quit this city and start another */
 static uint8_t redraw;                  /* the screen was overwritten: draw everything again */
 static uint8_t power_nuclear;           /* what the power plant tool builds */
+static uint8_t map_view;                /* 0: the city; else the mini map shown (MM_CITY..) */
+static uint8_t map_full;                /* the mini map needs drawing from scratch */
 /* Everything the status panel shows, to tell when it needs redrawing. */
 struct status {
     uint32_t money, pop;
     int16_t rv, cv, iv;
     uint16_t year;
-    uint8_t month, tool, speed, alert, page;
+    uint8_t month, tool, speed, alert, page, map_view;
 };
 
 /* Layout, decided from the screen size at start-up. */
@@ -249,6 +254,76 @@ static void invalidate_view(void)
         shadow[i] = 0;
 }
 
+#ifdef HAVE_MINIMAP
+/* ---- the mini maps ---------------------------------------------------------------
+   The map window shows the city two pixels a tile, 192x64 of its 192x192 (see ui/minimap.h): the
+   third of it with the cursor.  A cell row is redrawn every few frames to follow the simulation
+   (a row of 24 cells is a lot of work), and the cursor's cell every frame (it blinks, as in the
+   city view). */
+#define MM_COL 4                            /* 24 cells wide, in the middle of 32 */
+#define MM_ROW 0
+
+static uint8_t mm_top;                      /* the pixel row shown at the top */
+
+static void draw_minimap_cell(uint8_t cx, uint8_t cy)
+{
+    uint8_t art[8];
+
+    minimap_cell(map_view, cx, cy, mm_top, cur_x, cur_y, (frame & 4) != 0, art);
+    plat_put_bitmap((uint8_t)(MM_COL + cx), (uint8_t)(map_row + MM_ROW + cy), art);
+}
+
+static void draw_minimap(uint8_t full)
+{
+    static uint8_t refresh_row, last_cx_, last_cy_;
+    uint8_t cx, cy, top = minimap_top(cur_y);
+
+    if (top != mm_top) {                    /* the cursor crossed to the other half of the city */
+        mm_top = top;
+        full = 1;
+    }
+    if (full) {
+        for (cy = 0; cy < MM_CELLS_H; ++cy)
+            for (cx = 0; cx < MM_CELLS_W; ++cx)
+                draw_minimap_cell(cx, cy);
+    } else {
+        if (!(frame & 3)) {
+            if (++refresh_row >= MM_CELLS_H)
+                refresh_row = 0;
+            for (cx = 0; cx < MM_CELLS_W; ++cx)
+                draw_minimap_cell(cx, refresh_row);
+        }
+        draw_minimap_cell(last_cx_, last_cy_);
+    }
+    last_cx_ = (uint8_t)(cur_x >> 2);
+    last_cy_ = (uint8_t)((cur_y * 2u - mm_top) >> 3);
+    draw_minimap_cell(last_cx_, last_cy_);
+}
+
+/* Show mini map v (1..MM_VIEWS), or 0 for the city again. */
+static void set_map_view(uint8_t v)
+{
+    if (v && (!plat_has_bitmap() || view_w < MM_COL + MM_CELLS_W || view_h < MM_ROW + MM_CELLS_H))
+        return;                             /* nowhere to draw it */
+    if (v == map_view)
+        return;
+    map_view = v;
+    plat_clear();                           /* the map window starts again either way */
+    if (v) {
+        map_full = 1;
+        mm_top = minimap_top(cur_y);
+    } else {
+        invalidate_view();
+        last_cx = 255;                      /* a full pass over the city */
+    }
+}
+
+#else
+#define MM_VIEWS 0
+#define draw_minimap(full)
+#define set_map_view(v)
+#endif
+
 /* "R   |## " : a letter, three cells for shortfall, a bar, three cells for demand. */
 static void demand_bar(char *b, char name, int16_t v)
 {
@@ -313,6 +388,16 @@ static void draw_status(void)
     line(2, buf, 0, 0);
     line(3, V_alertmessage < sizeof(text_alerts) / sizeof(text_alerts[0]) ?
             text_alerts[V_alertmessage] : "", 0, 0);
+#ifdef HAVE_MINIMAP
+    if (map_view) {
+        line(4, "", 0, 0);
+        n = append(buf, 0, "MAP: ");
+        n = append(buf, n, minimap_names[map_view]);
+        buf[n] = 0;
+        line(5, buf, 0, 0);
+        line(6, "M NEXT MAP  X BACK TO CITY", 0, 0);
+    } else
+#endif
     if (panel_h >= 7) {                     /* room for all the help at once */
         line(4, help_page[0], 0, 0);
         line(5, help_page[1], 0, 0);
@@ -388,7 +473,12 @@ static void handle_key(uint8_t k)
     case '-':
         if (V_simulation_speed < 2) ++V_simulation_speed;
         break;
-    case 'x': case KEY_ESC: case CMD_QUIT: quit = 1; break;
+    case 'm': set_map_view((uint8_t)(map_view < MM_VIEWS ? map_view + 1 : 0)); break;
+    case 'x': case KEY_ESC:
+        if (map_view) set_map_view(0); else quit = 1;
+        break;
+    case CMD_QUIT: quit = 1; break;
+    case CMD_MAP_OFF: set_map_view(0); break;
     case CMD_NEW_CITY:         restart = quit = 1; break;
     case CMD_PAUSE:            V_simulation_speed = (V_simulation_speed == 3) ? 1 : 3; break;
     case CMD_SPEED_FAST:       V_simulation_speed = 0; break;
@@ -402,7 +492,9 @@ static void handle_key(uint8_t k)
     case CMD_AUTOBULLDOZE_OFF: V_auto_bulldoze = 0; break;
     case CMD_REDRAW:           redraw = 1; break;
     default:
-        if (k >= '0' && k <= '9')
+        if (k >= CMD_MAP && k < CMD_MAP + MM_VIEWS)
+            set_map_view((uint8_t)(k - CMD_MAP + 1));
+        else if (k >= '0' && k <= '9')
             set_tool((uint8_t)(k - '0'));
         else if (k >= CMD_TOOL && k < CMD_TOOL + NUM_TOOLS)
             set_tool((uint8_t)(k - CMD_TOOL));
@@ -470,6 +562,7 @@ static void play_city(void)
     SMC_tax_rate = 7;
     SMC_transport_percent = SMC_police_percent = SMC_fire_percent = 100;
     sim_new_city();
+    map_view = 0;
 
     cur_x = cur_y = MAP_W / 2;
     origin_x = (uint8_t)(cur_x - view_w / 2);
@@ -519,11 +612,17 @@ static void play_city(void)
             invalidate_view();
             memset(&last_st, 0xFF, sizeof(last_st));
             last_cx = 255;
+            map_full = 1;
         }
         full = origin_x != last_ox || origin_y != last_oy || last_cx == 255;
         last_ox = origin_x;
         last_oy = origin_y;
-        draw_view(full, map_dirty);
+        if (map_view) {
+            draw_minimap(map_full);
+            map_full = 0;
+        } else {
+            draw_view(full, map_dirty);
+        }
 
         /* the status panel only when something it shows has changed */
         st.money = money();
@@ -536,6 +635,7 @@ static void play_city(void)
         st.tool = tool;
         st.speed = V_simulation_speed;
         st.alert = V_alertmessage;
+        st.map_view = map_view;
         st.page = (panel_h >= 7) ? 0 : (uint8_t)((frame >> 6) % 3);
         if (memcmp(&st, &last_st, sizeof(st))) {
             last_st = st;
