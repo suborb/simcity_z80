@@ -28,7 +28,7 @@ def build():
     os.makedirs(OUT, exist_ok=True)
     env = dict(os.environ, ZCCCFG=os.path.join(Z88DK, 'lib', 'config'),
                PATH=os.path.join(Z88DK, 'bin') + os.pathsep + os.environ['PATH'])
-    cmd = ['zcc', '+zx', f'-zorg={ZORG}', '-pragma-define:REGISTER_SP=0xFF57', '-pragma-define:CLIB_ZX_CONIO32=1', '-Ca-DPORTABLE',
+    cmd = ['zcc', '+zx', f'-zorg={ZORG}', '-pragma-include:platform/console/zpragma_zx.inc', '-Ca-DPORTABLE',
            '-Ca-Iengine', '-Ca-I.', '-Iui', '-Cc-standard-escape-chars', '-m',
            '-DTARGET_ZX', '-Ca-DTARGET_ZX', '-DHAVE_TILES'] + (['-DZX_PRINT'] if PRINT else []) + [ '-DMAX_VIEW_W=32', '-DMAX_VIEW_H=16',
            'test/tiles/main.c', 'engine/engine_c.asm', 'platform/common/hooks.asm',

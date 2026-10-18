@@ -1,7 +1,8 @@
 #!/bin/sh
 # Run every automated check:
 #   1. the Spectrum build assembled from the split files is byte-identical to the original
-#   2. the portable engine behaves exactly like the original (simulation, tools, map view)
+#   2. the portable engine behaves exactly like the original (simulation, tools, map view),
+#      and writes nothing below the start of its RAM sections (so it can run from ROM)
 #   3. the game core, with the engine, plays correctly under scripted keys
 #   4. every platform builds
 # Needs z88dk (Z88DK, default ~/z88dk).
@@ -13,9 +14,15 @@ echo
 echo "== golden master again, ticking in cooperative slices (sim_step)"
 python3 test/golden/run.py --ticks 60 --views --coop
 echo
+echo "== engine is ROM-clean: no stores into its own code"
+python3 tools/find_dead.py --smc
+echo
 echo "== ZX Spectrum tile drawing: every picture through the real console code"
 python3 test/tiles/run.py
 python3 test/tiles/run.py --print
+echo
+echo "== ZX Spectrum stack depth, with every tool and every disaster"
+python3 test/stack/run.py
 echo
 echo "== UI: game core under scripted keys"
 python3 test/ui/run.py | grep -E "^(PASS|FAIL)|passed|FAILED"

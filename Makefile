@@ -6,7 +6,7 @@
 #   make all                            build all four
 #   make test                           the headless build the UI tests run
 #   make check                          every automated test (test/run_all.sh)
-#   make golden | uitest | tiletest     one group of tests
+#   make golden | uitest | tiletest | stacktest   one group of tests
 #   make engine                         regenerate engine/ and platform/zx from disassembly/sim_game.asm
 #   make deadcode                       list engine code nothing reaches
 #   make clean
@@ -37,7 +37,7 @@ ZX     = build/zx/simcity.tap
 ZXP    = build/zx-print/simcity.tap
 TEST   = build/test/simcity.bin
 
-.PHONY: all aqplus nc200 z88 zx zx-print test check golden uitest tiletest engine deadcode clean
+.PHONY: all aqplus nc200 z88 zx zx-print test check golden uitest tiletest stacktest engine deadcode clean
 
 all: aqplus nc200 z88 zx
 
@@ -69,16 +69,14 @@ $(Z88): $(DEPS)
 	@mkdir -p $(@D)
 	$(ZCC) +z88 -create-app $(COMMON) $(GAME) $(CONSOLE) -o $(@D)/simcity
 
-# ZX Spectrum.
-#   CLIB_ZX_CONIO32  UDGs and 8x8 cells need the console's 32 column mode (32x24: the original's
-#                    8 row panel above a 32x16 map).
+# ZX Spectrum.  The memory-layout pragmas (stack at the top of RAM, 32 column console, no
+# 64 column font) are in platform/console/zpragma_zx.inc, which the tests use too.
 #   -zorg=24000      below about that appmake embeds the program in a BASIC REM line at 23760
 #                    instead of using a separate loader, so the code would not be where it was linked.
-#   REGISTER_SP      stack at the top of RAM, below the UDG area, not in the small gap under the
-#                    code that CLEAR leaves.
 #   HAVE_TILES       draw the map with the real pictures, blitted to screen memory.
-ZX_FLAGS = -zorg=24000 -pragma-define:REGISTER_SP=0xFF57 -pragma-define:CLIB_ZX_CONIO32=1 \
-           -create-app $(COMMON) -DTARGET_ZX -Ca-DTARGET_ZX -DHAVE_TILES -DMAX_VIEW_W=32 -DMAX_VIEW_H=16
+ZX_PRAGMAS = platform/console/zpragma_zx.inc
+ZX_FLAGS = -zorg=24000 -pragma-include:$(ZX_PRAGMAS) -create-app $(COMMON) \
+           -DTARGET_ZX -Ca-DTARGET_ZX -DHAVE_TILES -DMAX_VIEW_W=32 -DMAX_VIEW_H=16
 
 $(ZX): $(DEPS)
 	@mkdir -p $(@D)
@@ -108,6 +106,10 @@ uitest:
 
 tiletest:
 	python3 test/tiles/run.py
+	python3 test/tiles/run.py --print
+
+stacktest:
+	python3 test/stack/run.py
 
 engine:
 	python3 tools/split_engine.py
