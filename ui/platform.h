@@ -38,6 +38,8 @@
 #define CMD_EVALUATION      0xA5    /* the evaluation screen: how the mayor is doing */
 #define CMD_SAVE            0xA6    /* save the city to a file */
 #define CMD_LOAD            0xA7    /* load a city from a file */
+#define CMD_AUTOBUDGET_ON   0xA8    /* the engine runs the annual budget itself */
+#define CMD_AUTOBUDGET_OFF  0xA9    /* the annual budget waits for the player */
 
 extern void     plat_init(void);
 extern void     plat_exit(void);
@@ -65,9 +67,14 @@ extern void     plat_text_puts(uint8_t col, uint8_t row, const char *s);
 
 /* The tool icons.  A platform that can show the tools as small pictures in the text area (the Z88, with
    user defined characters in its text window) returns 1 from plat_has_icons(); plat_icons() then draws the
-   14 icons in the bottom two rows of the text area, tool `selected` highlighted. */
+   14 icons in rows 3 and 4 of the text area, tool `selected` highlighted.  The status panel then has the
+   advisor message on row 6 and no key tips (a platform with icons has menus too). */
 extern uint8_t  plat_has_icons(void);
 extern void     plat_icons(uint8_t selected);
+
+/* A platform with menus of its own (the Z88's OZ menus) has quit among them, so the X key does not quit
+   there (ESC leaves a mini map). */
+extern uint8_t  plat_has_menus(void);
 
 /* Tile graphics.  A platform that can show the game's 8x8 pictures returns 1
    from plat_has_tiles() and draws one in a character cell with plat_put_tile();

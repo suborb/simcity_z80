@@ -220,8 +220,8 @@ def main():
     check('text window: the game ran and quit cleanly', mem[psyms['_test_done']] == 1)
     check('text window: the status is in the text window', any('FUNDS $10000' in r for r in text) and any('ROAD $10' in r for r in text),
           '\n'.join(text))
-    check('text window: the two help lines fit (the bottom two rows are the tool icons)',
-          sum(1 for r in text if 'MOVE' in r or 'PICK' in r or 'QUIT' in r) == 2 and not text[6].strip() and not text[7].strip(), '\n'.join(text))
+    check('text window: no key tips; rows 3, 4 (the icons), 5 and 7 are left empty',
+          not any('MOVE' in r or 'PICK' in r or 'QUIT' in r for r in text) and not any(text[i].strip() for i in (3, 4, 5, 7)), '\n'.join(text))
     check('text window: the icons are drawn with the tool in use highlighted (the road, tool 1, to start with)',
           mem[psyms['_test_icons_selected']] == 1 and mem[psyms['_test_icons_calls']] > 0)
     check('text window: the map is only the map (no text on it)',
@@ -317,16 +317,34 @@ def main():
         d = differences(bitmaps(mem), reference(mem, view, 0), 0, 8)
         check(f'mini map {view}: with the cursor in the top half the top of the city is shown', not d, f'{len(d)} pixels differ, first {d[:4]}')
 
-    mem = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE, KEY_M, ord('x'), 0, 0])
+    mem = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE, KEY_M, 27, 0, 0])
     mapp, text = panes(mem)
-    check('mini map: x goes back to the city instead of quitting', mem[psyms['_test_done']] == 1 and any('~' in r for r in mapp)
+    check('mini map: escape goes back to the city instead of quitting', mem[psyms['_test_done']] == 1 and any('~' in r for r in mapp)
           and not any('MAP:' in r for r in text), '\n'.join(mapp))
+    mem = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE, ord('x')] + [0] * 20)
+    check('a platform with menus: x does not quit (quit is in the menu)', mem[psyms['_test_frames']] >= 20, f"{mem[psyms['_test_frames']]} frames")
+    mem = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE, 27] + [0] * 20)
+    check('a platform with menus: escape does not quit either', mem[psyms['_test_frames']] >= 20, f"{mem[psyms['_test_frames']]} frames")
+    mem = run(pbin, psyms, [LEVEL_MEDIUM, ord('+')] + [0] * 250)
+    text = panes(mem)[1]
+    check('the advisor message is on row 6 (below the icons), where the Z88 shows it', text[6].strip() and not text[3].strip(), '\n'.join(text))
     mem = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE] + [KEY_M] * 7 + [0, 0])
     check('mini map: m cycles through the views and back to the city', any('~' in r for r in panes(mem)[0]))
     mem = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE, CMD_MAP + 1, 0, 0])
     check('mini map: a menu command shows its view', any('POLLUTION' in r for r in panes(mem)[1]))
     mem = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE, CMD_MAP + 1, CMD_MAP_OFF, 0, 0])
     check('mini map: the menu can go back to the city', any('~' in r for r in panes(mem)[0]) and not any('MAP:' in r for r in panes(mem)[1]))
+
+    # --- 6b. the budget can be automatic ---
+    CMD_AUTOBUDGET_ON, CMD_AUTOBUDGET_OFF = 0xA8, 0xA9
+    mem = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE, CMD_AUTOBUDGET_ON, 0, 0])
+    check('auto-budget: the menu turns it on', mem[psyms['_V_auto_budget']] == 1)
+    mem = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE, CMD_AUTOBUDGET_ON, CMD_AUTOBUDGET_OFF, 0, 0])
+    check('auto-budget: and off again', mem[psyms['_V_auto_budget']] == 0)
+    mem = run(pbin, psyms, [LEVEL_MEDIUM, ord('+'), CMD_AUTOBUDGET_ON] + [0] * 1500)
+    text = panes(mem)[1]
+    check('auto-budget: in November the engine runs the budget without stopping for the screen',
+          not any('FISCAL' in r for r in text) and any('FUNDS' in r for r in text), '\n'.join(text))
 
     # --- 7. the budget screen (the 32x8 platform has it too) ---
     CMD_BUDGET = 0xA4

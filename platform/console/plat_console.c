@@ -76,8 +76,9 @@ static void define_icons(void)
 }
 
 uint8_t plat_has_icons(void) { return 1; }
+uint8_t plat_has_menus(void) { return 1; }
 
-/* The icons, two rows of 14 icons of 2 cells, in the bottom two rows of the text window; the selected one in reverse. */
+/* The icons, two rows of 14 icons of 2 cells, in rows 3 and 4 of the text window; the selected one in reverse. */
 void plat_icons(uint8_t selected)
 {
     uint8_t i, r, n;
@@ -88,7 +89,7 @@ void plat_icons(uint8_t selected)
     for (r = 0; r < 2; ++r) {
         icon_text[0] = 1; icon_text[1] = '3'; icon_text[2] = '@';
         icon_text[3] = 32;
-        icon_text[4] = (char)(32 + Z88_TEXT_ROWS - 2 + r);
+        icon_text[4] = (char)(32 + 3 + r);                 /* rows 3 and 4 */
         n = 5;
         for (i = 0; i < NUM_ICONS; ++i) {
             if (i == selected) {
@@ -303,6 +304,7 @@ void plat_text_puts(uint8_t col, uint8_t row, const char *s)
 }
 #else
 uint8_t plat_has_icons(void) { return 0; }
+uint8_t plat_has_menus(void) { return 0; }
 void plat_icons(uint8_t selected) { (void)selected; }
 uint8_t plat_has_text_window(void) { return 0; }
 uint8_t plat_text_cols(void) { return plat_cols(); }

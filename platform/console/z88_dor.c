@@ -79,6 +79,12 @@
 #define TOPIC3_6             "Auto-bulldoze off"
 #define TOPIC3_6KEY          "OBF"
 #define TOPIC3_6CODE         0x9A
+#define TOPIC3_7             "Auto-budget on"
+#define TOPIC3_7KEY          "OAN"
+#define TOPIC3_7CODE         0xA8
+#define TOPIC3_8             "Auto-budget off"
+#define TOPIC3_8KEY          "OAF"
+#define TOPIC3_8CODE         0xA9
 
 /* ---- Views: the mini maps, CMD_MAP + the view (ui/minimap.h), then back to the city.  Not "Maps": its
    shortcuts would start with M, and the ENTER key is Ctrl-M (<>M), which OZ then takes for them ---- */

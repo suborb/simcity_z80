@@ -427,7 +427,13 @@ static const struct field status_top[] = {
 static const struct field status_tool[] = {
     { 2,  0, F_STR,  0, &st_tool },
     { 2, 21, F_STR,  0, &st_speed },
+};
+static const struct field status_alert[] = {
     { 3,  0, F_STR,  0, &st_alert },
+};
+static const struct field status_alert_low[] = {            /* with icons in rows 3 and 4 */
+    { 5,  0, F_TEXT, 0, "" },                               /* (where the map's name goes) */
+    { 6,  0, F_STR,  0, &st_alert },
 };
 static const struct field status_help[] = {
     { 4,  0, F_STR,  0, &st_line[0] },
@@ -439,6 +445,10 @@ static const struct field status_map[] = {
     { 4,  5, F_STR,  0, &st_line[1] },
     { 5,  0, F_TEXT, 0, "M NEXT MAP  X BACK TO CITY" },
     { 6,  0, F_TEXT, 0, "" },
+};
+static const struct field status_map_low[] = {              /* with icons: just the name, below them */
+    { 5,  0, F_TEXT, 0, "MAP:" },
+    { 5,  5, F_STR,  0, &st_line[1] },
 };
 
 /* The status panel: five lines, so it fits the top third of even a 16 row screen. */
@@ -462,6 +472,18 @@ static void draw_status(void)
         plat_text_puts(0, 1, buf);
     }
     fmt_fields(status_tool, sizeof(status_tool) / sizeof(struct field));
+    if (icons) {                                            /* rows 3 and 4 the icons, 6 the advisor, no key tips */
+        fmt_fields(status_alert_low, sizeof(status_alert_low) / sizeof(struct field));
+#ifdef HAVE_MINIMAP
+        if (map_view) {
+            st_line[1] = minimap_names[map_view];
+            fmt_fields(status_map_low, sizeof(status_map_low) / sizeof(struct field));
+        }
+#endif
+        plat_icons(tool);
+        return;
+    }
+    fmt_fields(status_alert, 1);
 #ifdef HAVE_MINIMAP
     if (map_view) {
         st_line[1] = minimap_names[map_view];
@@ -470,12 +492,10 @@ static void draw_status(void)
 #endif
     {
         st_line[0] = help_page[panel_h >= 7 ? 0 : (frame >> 6) % 3];
-        st_line[1] = icons ? "TAB TOOL  0-9 PICK  H PAUSE  X QUIT" : help_page[1];
+        st_line[1] = help_page[1];
         st_line[2] = help_page[2];
-        fmt_fields(status_help, icons ? 2 : panel_h >= 7 ? 3 : 1);
+        fmt_fields(status_help, panel_h >= 7 ? 3 : 1);
     }
-    if (icons)
-        plat_icons(tool);
 }
 #else
 static uint8_t append(char *buf, uint8_t n, const char *s)
@@ -668,8 +688,11 @@ static void handle_key(uint8_t k)
         if (V_simulation_speed < 2) ++V_simulation_speed;
         break;
     case 'm': set_map_view((uint8_t)(map_view < MM_VIEWS ? map_view + 1 : 0)); break;
-    case 'x': case KEY_ESC:
-        if (map_view) set_map_view(0); else quit = 1;
+    case 'x':
+        if (plat_has_menus())
+            break;                          /* quit is in the menu */
+    case KEY_ESC:
+        if (map_view) set_map_view(0); else if (!plat_has_menus()) quit = 1;
         break;
     case CMD_QUIT: quit = 1; break;
     case CMD_MAP_OFF: set_map_view(0); break;
@@ -688,6 +711,8 @@ static void handle_key(uint8_t k)
     case CMD_DISASTERS_OFF:    V_disaster_reset = 1; break;
     case CMD_AUTOBULLDOZE_ON:  V_auto_bulldoze = 1; break;
     case CMD_AUTOBULLDOZE_OFF: V_auto_bulldoze = 0; break;
+    case CMD_AUTOBUDGET_ON:    V_auto_budget = 1; break;
+    case CMD_AUTOBUDGET_OFF:   V_auto_budget = 0; break;
     case CMD_REDRAW:           redraw = 1; break;
     default:
         if (k >= CMD_MAP && k < CMD_MAP + MM_VIEWS)
