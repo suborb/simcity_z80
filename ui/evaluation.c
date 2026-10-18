@@ -17,7 +17,7 @@
 #include "text.h"
 #include "textfmt.h"
 #include "evaluation.h"
-
+#ifdef HAVE_EVALUATION
 static const uint8_t class_from[5][3] = {           /* population where each class starts, 24 bit */
     { 0xD0, 0x07, 0x00 },   /* 2000 */
     { 0x10, 0x27, 0x00 },   /* 10000 */
@@ -181,3 +181,5 @@ uint8_t evaluation_screen(void)
         }
     }
 }
+
+#endif

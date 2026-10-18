@@ -4,7 +4,7 @@
 #include "platform.h"
 #include "cityfile.h"
 #include "textfmt.h"
-
+#ifdef HAVE_FILES
 #define NAME_MAX 24
 
 static uint8_t header[CITY_HEADER];
@@ -109,3 +109,5 @@ uint8_t city_load(void)
     memcpy(V_money, header + 12, 7);
     return CITY_LOADED;
 }
+
+#endif

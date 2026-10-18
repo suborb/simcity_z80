@@ -75,9 +75,6 @@ static void define_icons(void)
     icons_ok = 1;
 }
 
-uint8_t plat_has_icons(void) { return 1; }
-uint8_t plat_has_menus(void) { return 1; }
-
 /* The icons, two rows of 14 icons of 2 cells, in rows 3 and 4 of the text window; the selected one in reverse. */
 void plat_icons(uint8_t selected)
 {
@@ -279,7 +276,6 @@ void plat_puts(uint8_t col, uint8_t row, const char *s)
 }
 
 #ifdef TARGET_Z88
-uint8_t plat_has_text_window(void) { return 1; }
 uint8_t plat_text_cols(void) { return Z88_TEXT_COLS; }
 uint8_t plat_text_rows(void) { return Z88_TEXT_ROWS; }
 
@@ -303,25 +299,13 @@ void plat_text_puts(uint8_t col, uint8_t row, const char *s)
     z88_sop(z88_text);
 }
 #else
-uint8_t plat_has_icons(void) { return 0; }
-uint8_t plat_has_menus(void) { return 0; }
-void plat_icons(uint8_t selected) { (void)selected; }
-uint8_t plat_has_text_window(void) { return 0; }
 uint8_t plat_text_cols(void) { return plat_cols(); }
 uint8_t plat_text_rows(void) { return plat_rows(); }
 void plat_text_clear(void) { plat_clear(); }
 void plat_text_puts(uint8_t col, uint8_t row, const char *s) { plat_puts(col, row, s); }
 #endif
 
-uint8_t plat_has_tiles(void)
-{
 #ifdef HAVE_TILES
-    return 1;
-#else
-    return 0;
-#endif
-}
-
 void plat_put_tile(uint8_t col, uint8_t row, const uint8_t *art, uint8_t attr, uint8_t inverse)
 {
 #if defined(TILE_BLIT)
@@ -356,10 +340,10 @@ void plat_put_tile(uint8_t col, uint8_t row, const uint8_t *art, uint8_t attr, u
     (void)col; (void)row; (void)art; (void)attr; (void)inverse;
 #endif
 }
+#endif
 
-#ifdef TARGET_Z88
+#ifdef HAVE_FILES
 /* ---- files: OZ's, through z88dk's open, read, write and close ---- */
-uint8_t plat_has_files(void) { return 1; }
 
 uint8_t plat_file_save(const char *name, const uint8_t *a, uint16_t alen, const uint8_t *b, uint16_t blen)
 {
@@ -385,29 +369,9 @@ uint8_t plat_file_load(const char *name, uint8_t *a, uint16_t alen, uint8_t *b, 
     close(fd);
     return r;
 }
-#else
-uint8_t plat_has_files(void) { return 0; }
-uint8_t plat_file_save(const char *name, const uint8_t *a, uint16_t alen, const uint8_t *b, uint16_t blen)
-{
-    (void)name; (void)a; (void)alen; (void)b; (void)blen;
-    return 1;
-}
-uint8_t plat_file_load(const char *name, uint8_t *a, uint16_t alen, uint8_t *b, uint16_t blen)
-{
-    (void)name; (void)a; (void)alen; (void)b; (void)blen;
-    return 1;
-}
 #endif
 
-uint8_t plat_has_bitmap(void)
-{
-#ifdef HAVE_TILES
-    return 1;
-#else
-    return 0;
-#endif
-}
-
+#ifdef HAVE_BITMAP
 /* A picture of the game's own: the same as a tile, through the scratch UDG (or straight to the screen). */
 void plat_put_bitmap(uint8_t col, uint8_t row, const uint8_t *art)
 {
@@ -426,6 +390,7 @@ void plat_put_bitmap(uint8_t col, uint8_t row, const uint8_t *art)
     (void)col; (void)row; (void)art;
 #endif
 }
+#endif
 
 #ifdef TARGET_Z88
 /* ---- Z88: keys and menus come from OZ ------------------------------------------------

@@ -16,7 +16,7 @@
 #include "platform.h"
 #include "budget.h"
 #include "textfmt.h"
-
+#ifdef HAVE_BUDGET
 #define MAX_TAX 20
 #define ROWS    8
 
@@ -111,3 +111,5 @@ uint8_t budget_screen(void)
         draw();
     }
 }
+
+#endif

@@ -71,7 +71,6 @@ uint8_t plat_key(void)
 }
 
 #ifdef TEST_PANEL
-uint8_t plat_has_text_window(void) { return 1; }
 uint8_t plat_text_cols(void) { return TEXT_COLS; }
 uint8_t plat_text_rows(void) { return TEXT_ROWS; }
 
@@ -93,28 +92,20 @@ void plat_text_puts(uint8_t col, uint8_t row, const char *s)
     }
 }
 #else
-uint8_t plat_has_text_window(void) { return 0; }
 uint8_t plat_text_cols(void) { return COLS; }
 uint8_t plat_text_rows(void) { return ROWS; }
 void plat_text_clear(void) { plat_clear(); }
 void plat_text_puts(uint8_t col, uint8_t row, const char *s) { plat_puts(col, row, s); }
 #endif
 
-#ifdef TEST_PANEL
+#ifdef HAVE_ICONS
 uint8_t test_icons_selected = 255;      /* the tool plat_icons() was last asked to highlight */
 uint16_t test_icons_calls;
-uint8_t plat_has_icons(void) { return 1; }
-uint8_t plat_has_menus(void) { return 1; }
 void plat_icons(uint8_t selected) { test_icons_selected = selected; ++test_icons_calls; }
-#else
-uint8_t plat_has_icons(void) { return 0; }
-uint8_t plat_has_menus(void) { return 0; }
-void plat_icons(uint8_t selected) { (void)selected; }
 #endif
 
-#ifdef TEST_SPRITES
+#ifdef HAVE_TILES
 /* With TEST_SPRITES the game draws the map from pictures, which the test reads back from test_bitmap. */
-uint8_t plat_has_tiles(void) { return 1; }
 extern uint8_t test_bitmap[ROWS][COLS][8];
 void plat_put_tile(uint8_t col, uint8_t row, const uint8_t *art, uint8_t attr, uint8_t inverse)
 {
@@ -124,15 +115,9 @@ void plat_put_tile(uint8_t col, uint8_t row, const uint8_t *art, uint8_t attr, u
         for (i = 0; i < 8; ++i)
             test_bitmap[row][col][i] = inverse ? (uint8_t)~art[i] : art[i];
 }
-#else
-uint8_t plat_has_tiles(void) { return 0; }
-void plat_put_tile(uint8_t col, uint8_t row, const uint8_t *art, uint8_t attr, uint8_t inverse)
-{
-    (void)col; (void)row; (void)art; (void)attr; (void)inverse;
-}
 #endif
 
-#ifdef TEST_PANEL
+#ifdef HAVE_FILES
 /* One file in memory, for the save and load tests.  The headless image is already close to the 64 KB
    a Z80 can address, so of the map it keeps only the rows the tests change (3600..6000, the middle). */
 #define KEEP_FROM 3600
@@ -140,7 +125,6 @@ void plat_put_tile(uint8_t col, uint8_t row, const uint8_t *art, uint8_t attr, u
 uint8_t test_file[31 + KEEP_TO - KEEP_FROM];
 char test_file_name[32];
 uint16_t test_file_len;
-uint8_t plat_has_files(void) { return 1; }
 
 uint8_t plat_file_save(const char *name, const uint8_t *a, uint16_t alen, const uint8_t *b, uint16_t blen)
 {
@@ -170,23 +154,10 @@ uint8_t plat_file_load(const char *name, uint8_t *a, uint16_t alen, uint8_t *b, 
         b[i] = test_file[alen + i - KEEP_FROM];
     return test_file_len < alen + blen ? 2 : 0;
 }
-#else
-uint8_t plat_has_files(void) { return 0; }
-uint8_t plat_file_save(const char *name, const uint8_t *a, uint16_t alen, const uint8_t *b, uint16_t blen)
-{
-    (void)name; (void)a; (void)alen; (void)b; (void)blen;
-    return 1;
-}
-uint8_t plat_file_load(const char *name, uint8_t *a, uint16_t alen, uint8_t *b, uint16_t blen)
-{
-    (void)name; (void)a; (void)alen; (void)b; (void)blen;
-    return 1;
-}
 #endif
 
-#ifdef TEST_PANEL
+#ifdef HAVE_BITMAP
 uint8_t test_bitmap[ROWS][COLS][8];     /* what plat_put_bitmap drew in each cell */
-uint8_t plat_has_bitmap(void) { return 1; }
 void plat_put_bitmap(uint8_t col, uint8_t row, const uint8_t *art)
 {
     uint8_t i;
@@ -194,9 +165,6 @@ void plat_put_bitmap(uint8_t col, uint8_t row, const uint8_t *art)
         for (i = 0; i < 8; ++i)
             test_bitmap[row][col][i] = art[i];
 }
-#else
-uint8_t plat_has_bitmap(void) { return 0; }
-void plat_put_bitmap(uint8_t col, uint8_t row, const uint8_t *art) { (void)col; (void)row; (void)art; }
 #endif
 
 uint16_t plat_clock(void) { return 0x1234; }

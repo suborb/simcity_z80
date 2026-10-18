@@ -19,7 +19,7 @@ def main():
     os.makedirs(OUT, exist_ok=True)
     env = os.environ
     binary = os.path.join(OUT, 'fmt.bin')
-    r = subprocess.run(ZCC.split() + ['+test', '-m', '-Iui', '-Ca-Iengine', '-Ca-I.', test_main(), 'ui/textfmt.c', 'ui/numfmt.asm',
+    r = subprocess.run(ZCC.split() + ['+test', '-m', '-Iui', '-Iplatform/test_ui', '-Ca-Iengine', '-Ca-I.', test_main(), 'ui/textfmt.c', 'ui/numfmt.asm',
                                       '-o', binary], cwd=ROOT, env=env, capture_output=True, text=True)
     if r.returncode:
         print(r.stdout, r.stderr)

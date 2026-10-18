@@ -2,8 +2,9 @@
    8 pixels, worked out from the engine's data a row at a time. */
 #include <stdint.h>
 #include "engine.h"
+#include "platform.h"
 #include "minimap.h"
-
+#ifdef HAVE_MINIMAP
 #define MM_POLLUTION_OFFSET 1152            /* into minimaps[] */
 #define MM_FIRE_OFFSET      0
 #define MM_POLICE_OFFSET    576
@@ -145,3 +146,5 @@ void minimap_cell(uint8_t v, uint8_t cx, uint8_t cy, uint8_t top, uint8_t cur_x,
         art[r + 1] ^= (uint8_t)(0xC0 >> ((cur_x & 3) * 2));
     }
 }
+
+#endif

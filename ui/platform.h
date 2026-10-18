@@ -5,6 +5,7 @@
 #define PLATFORM_H
 
 #include <stdint.h>
+#include "plat_config.h"       /* the platform's own: what it can do, and which features it has */
 
 /* Key codes returned by plat_key().  Printable keys return their ASCII code. */
 #define KEY_NONE   0
@@ -53,52 +54,63 @@ extern uint16_t plat_clock(void);               /* free running counter, for see
 extern void     plat_idle(void);                /* called once per frame: may wait */
 extern void     plat_flush(void);               /* end of frame: show what was drawn */
 
-/* The text area.  On most platforms the status text shares the screen with the map, in the top
-   third (the game's layout decides).  A platform with a text window of its own - the Z88's OZ
-   text window beside its map - says so with plat_has_text_window(): the map then gets the whole
-   console, and everything textual (the title, "generating landscape", the status panel) is drawn
-   with plat_text_puts() in the text window's own coordinates.  Elsewhere plat_text_puts() is
-   plat_puts() and plat_text_clear() is plat_clear(). */
-extern uint8_t  plat_has_text_window(void);
+/* What a platform is and has is set by its plat_config.h, which defines these macros:
+     HAVE_TEXT_WINDOW  a text window of its own beside the map (the Z88's OZ window): the map then gets the
+                       whole console and everything textual is drawn with plat_text_puts() in the window's
+                       coordinates.  Without it the text shares the screen, the top third.
+     HAVE_TILES        it can draw the game's own 8x8 pictures (plat_put_tile())
+     HAVE_BITMAP       it can draw pictures of the game's own making (plat_put_bitmap()); needed by HAVE_MINIMAP
+     HAVE_ICONS        the tools as small pictures in rows 3 and 4 of the text area (plat_icons()); the status
+                       panel then has the advisor message on row 6 and no key tips
+     HAVE_MENUS        menus of its own, which have quit: the X key does not quit there, and ESC leaves a mini map
+     HAVE_FILES        files, for saving and loading a city (plat_file_save()/plat_file_load())
+   and the optional features: HAVE_BUDGET, HAVE_EVALUATION, HAVE_MINIMAP, HAVE_SPRITES (see ui/*.c).  The
+   screens and the status panel drawn from tables of fields (HAVE_FIELDS) come with any of the screens. */
+#if defined(HAVE_BUDGET) || defined(HAVE_EVALUATION) || defined(HAVE_FILES) || defined(HAVE_ICONS)
+#ifndef HAVE_FIELDS
+#define HAVE_FIELDS
+#endif
+#endif
+#if defined(HAVE_MINIMAP) && !defined(HAVE_BITMAP)
+#error "the mini maps need HAVE_BITMAP"
+#endif
+#if defined(HAVE_ICONS) && !defined(HAVE_TEXT_WINDOW)
+#error "the icons need a text window"
+#endif
+
+/* The text area.  Where there is a text window the status text, the title and the screens go in it; elsewhere
+   plat_text_puts() is plat_puts() and plat_text_clear() is plat_clear(). */
 extern uint8_t  plat_text_cols(void);
 extern uint8_t  plat_text_rows(void);
 extern void     plat_text_clear(void);
 extern void     plat_text_puts(uint8_t col, uint8_t row, const char *s);
 
-/* The tool icons.  A platform that can show the tools as small pictures in the text area (the Z88, with
-   user defined characters in its text window) returns 1 from plat_has_icons(); plat_icons() then draws the
-   14 icons in rows 3 and 4 of the text area, tool `selected` highlighted.  The status panel then has the
-   advisor message on row 6 and no key tips (a platform with icons has menus too). */
-extern uint8_t  plat_has_icons(void);
+#ifdef HAVE_ICONS
+/* plat_icons() draws the 14 tool icons in rows 3 and 4 of the text area, tool `selected` highlighted. */
 extern void     plat_icons(uint8_t selected);
+#endif
 
-/* A platform with menus of its own (the Z88's OZ menus) has quit among them, so the X key does not quit
-   there (ESC leaves a mini map). */
-extern uint8_t  plat_has_menus(void);
-
-/* Tile graphics.  A platform that can show the game's 8x8 pictures returns 1
-   from plat_has_tiles() and draws one in a character cell with plat_put_tile();
-   the rest get characters from plat_put().
-     art      8 bytes of 1bpp art, as returned by view_fetch() (a pointer into the
-              engine's tile table, which the platform may use to tell tiles apart)
+#ifdef HAVE_TILES
+/* Tile graphics: plat_put_tile() draws one of the engine's 8x8 pictures in a character cell.
+     art      8 bytes of 1bpp art, as returned by view_fetch() (a pointer into the engine's tile table, which
+              the platform may use to tell tiles apart)
      attr     the Spectrum-format attribute for the picture (colour platforms)
      inverse  1 for the blinking cursor: the picture with its pixels inverted */
-extern uint8_t  plat_has_tiles(void);
 extern void     plat_put_tile(uint8_t col, uint8_t row, const uint8_t *art, uint8_t attr, uint8_t inverse);
+#endif
 
-/* Files, for saving and loading a city.  A platform that has them returns 1 from plat_has_files().
-   plat_file_save() writes the two blocks one after the other to the named file; it returns 0 if all
-   the bytes were written.  plat_file_load() reads them back: 0 if both were read in full, 1 if
-   nothing was read (no such file, or too short for the first block), 2 if the second block was cut
-   short (it has been partly overwritten). */
-extern uint8_t  plat_has_files(void);
+#ifdef HAVE_BITMAP
+/* plat_put_bitmap() draws 8 bytes of 1bpp art (a byte a pixel row, bit 7 on the left) in a character cell. */
+extern void     plat_put_bitmap(uint8_t col, uint8_t row, const uint8_t *art);
+#endif
+
+#ifdef HAVE_FILES
+/* plat_file_save() writes the two blocks one after the other to the named file; it returns 0 if all the
+   bytes were written.  plat_file_load() reads them back: 0 if both were read in full, 1 if nothing was read
+   (no such file, or too short for the first block), 2 if the second block was cut short (it has been
+   partly overwritten). */
 extern uint8_t  plat_file_save(const char *name, const uint8_t *a, uint16_t alen, const uint8_t *b, uint16_t blen);
 extern uint8_t  plat_file_load(const char *name, uint8_t *a, uint16_t alen, uint8_t *b, uint16_t blen);
-
-/* Pictures of the game's own making, for the mini maps.  A platform that can show them returns 1
-   from plat_has_bitmap(); plat_put_bitmap() then draws 8 bytes of 1bpp art (a byte a pixel row,
-   bit 7 on the left) in a character cell.  Without it the game has no mini maps. */
-extern uint8_t  plat_has_bitmap(void);
-extern void     plat_put_bitmap(uint8_t col, uint8_t row, const uint8_t *art);
+#endif
 
 #endif

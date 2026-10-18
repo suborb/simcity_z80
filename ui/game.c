@@ -7,7 +7,7 @@
    differ only in the platform file they link.
 
    Layout: the top third of the screen is the status panel, the rest is the map.
-   Platforms that can show the real tile graphics (plat_has_tiles) draw the
+   Platforms that can show the real tile graphics (HAVE_TILES) draw the
    map from view_fetch(), the engine's view_cell routine verified against the
    Spectrum's own rendering; the others draw a character per cell with glyph().
    ------------------------------------------------------------------------ */
@@ -366,7 +366,7 @@ static void draw_minimap(uint8_t full)
 /* Show mini map v (1..MM_VIEWS), or 0 for the city again. */
 static void set_map_view(uint8_t v)
 {
-    if (v && (!plat_has_bitmap() || view_w < MM_COL + MM_CELLS_W || view_h < MM_ROW + MM_CELLS_H))
+    if (v && (view_w < MM_COL + MM_CELLS_W || view_h < MM_ROW + MM_CELLS_H))
         return;                             /* nowhere to draw it */
     if (v == map_view)
         return;
@@ -455,7 +455,9 @@ static const struct field status_map_low[] = {              /* with icons: just 
 static void draw_status(void)
 {
     char buf[41];
-    uint8_t icons = panel_h >= 8 && plat_has_icons();   /* the tools as pictures in the bottom two rows */
+#ifdef HAVE_ICONS
+    uint8_t icons = panel_h >= 8;                           /* the tools as pictures in rows 3 and 4 */
+#endif
 
     if (!panel_w)
         return;
@@ -472,6 +474,7 @@ static void draw_status(void)
         plat_text_puts(0, 1, buf);
     }
     fmt_fields(status_tool, sizeof(status_tool) / sizeof(struct field));
+#ifdef HAVE_ICONS
     if (icons) {                                            /* rows 3 and 4 the icons, 6 the advisor, no key tips */
         fmt_fields(status_alert_low, sizeof(status_alert_low) / sizeof(struct field));
 #ifdef HAVE_MINIMAP
@@ -483,6 +486,7 @@ static void draw_status(void)
         plat_icons(tool);
         return;
     }
+#endif
     fmt_fields(status_alert, 1);
 #ifdef HAVE_MINIMAP
     if (map_view) {
@@ -634,8 +638,6 @@ static void game_evaluation(void)
 /* Save the city to a file, or load one. */
 static void game_save(void)
 {
-    if (!plat_has_files())
-        return;
     if (city_save() == CITY_QUIT)
         quit = 1;
     else
@@ -646,8 +648,6 @@ static void game_load(void)
 {
     uint8_t r;
 
-    if (!plat_has_files())
-        return;
     r = city_load();
     if (r == CITY_QUIT) {
         quit = 1;
@@ -688,12 +688,17 @@ static void handle_key(uint8_t k)
         if (V_simulation_speed < 2) ++V_simulation_speed;
         break;
     case 'm': set_map_view((uint8_t)(map_view < MM_VIEWS ? map_view + 1 : 0)); break;
+#ifdef HAVE_MENUS
     case 'x':
-        if (plat_has_menus())
-            break;                          /* quit is in the menu */
+        break;                              /* quit is in the menu */
     case KEY_ESC:
-        if (map_view) set_map_view(0); else if (!plat_has_menus()) quit = 1;
+        if (map_view) set_map_view(0);      /* (it does not quit either) */
         break;
+#else
+    case 'x': case KEY_ESC:
+        if (map_view) set_map_view(0); else quit = 1;
+        break;
+#endif
     case CMD_QUIT: quit = 1; break;
     case CMD_MAP_OFF: set_map_view(0); break;
     case 'b': case CMD_BUDGET: game_budget(); break;
@@ -731,14 +736,13 @@ static void choose_layout(void)
     cols = plat_cols();
     rows = plat_rows();
     view_w = cols < MAX_VIEW_W ? cols : MAX_VIEW_W;
-    if (plat_has_text_window()) {                   /* the text has a window of its own: the map is all of the console */
-        view_h = rows < MAX_VIEW_H ? rows : MAX_VIEW_H;
-        map_row = 0;
-        panel_col = panel_row = 0;
-        panel_w = plat_text_cols();
-        panel_h = plat_text_rows();
-        return;
-    }
+#ifdef HAVE_TEXT_WINDOW                             /* the text has a window of its own: the map is all of the console */
+    view_h = rows < MAX_VIEW_H ? rows : MAX_VIEW_H;
+    map_row = 0;
+    panel_col = panel_row = 0;
+    panel_w = plat_text_cols();
+    panel_h = plat_text_rows();
+#else
     view_h = (uint8_t)(rows - rows / 3);            /* the map takes the bottom two thirds */
     if (view_h > MAX_VIEW_H)
         view_h = MAX_VIEW_H;
@@ -746,6 +750,7 @@ static void choose_layout(void)
     panel_col = panel_row = 0;                      /* the status panel, the top third */
     panel_w = cols;
     panel_h = map_row;
+#endif
 }
 
 static void title_screen(void)

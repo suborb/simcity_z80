@@ -28,8 +28,8 @@ def build():
     env = os.environ
     cmd = os.environ.get('ZCC', 'zcc -compiler=80cc -fframe-pointer').split() + ['+zx', f'-zorg={ZORG}', '-pragma-include:platform/console/zpragma_zx.inc', '-Ca-DPORTABLE',
            '-Ca-Iengine', '-Ca-I.', '-Iui', '-Cc-standard-escape-chars', '-m',
-           '-DTARGET_ZX', '-Ca-DTARGET_ZX', '-DHAVE_TILES'] + (['-DZX_PRINT'] if PRINT else []) + [ '-DMAX_VIEW_W=32', '-DMAX_VIEW_H=16',
-           'test/tiles/main.c', 'ui/sprites.c', 'platform/console/plat_sprites.asm', 'engine/engine_c.asm', 'platform/common/hooks.asm',
+           '-Iplatform/console', '-DTARGET_ZX', '-Ca-DTARGET_ZX', '-DHAVE_SPRITES'] + (['-DZX_PRINT'] if PRINT else []) + [ '-DMAX_VIEW_W=32', '-DMAX_VIEW_H=16',
+           'test/tiles/main.c', 'ui/sprites.c', 'engine/engine_c.asm', 'platform/common/hooks.asm',
            'platform/console/plat_console.c', 'platform/console/plat_font.asm'] + \
           ([] if PRINT else ['platform/console/plat_zx_blit.asm']) + [
            '-o', os.path.join(OUT, 'tiles')]
