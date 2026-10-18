@@ -449,10 +449,10 @@ uint8_t plat_key(void)
             case 0xFF: return KEY_UP;
             case 9: return '.';         /* TAB: the next tool (the icons show it) */
             case 0xD2: return ',';      /* SHIFT-TAB: the one before */
-            case 0xF8: return 'O';      /* shift + cursor: eight cells */
-            case 0xF9: return 'P';
-            case 0xFA: return 'A';
-            case 0xFB: return 'Q';
+            case 0xF8: return KEY_FAR_LEFT;     /* shift + cursor: eight cells */
+            case 0xF9: return KEY_FAR_RIGHT;
+            case 0xFA: return KEY_FAR_DOWN;
+            case 0xFB: return KEY_FAR_UP;
             }
             if (c == 10)                /* getk() turns the ENTER key's CR into LF (standard escape chars) */
                 return KEY_ENTER;

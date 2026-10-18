@@ -666,14 +666,24 @@ static void game_load(void)
 static void handle_key(uint8_t k)
 {
     switch (k) {
-    case 'o': case KEY_LEFT:   move_cursor(-1, 0); break;
-    case 'p': case KEY_RIGHT:  move_cursor(1, 0);  break;
-    case 'q': case KEY_UP:     move_cursor(0, -1); break;
-    case 'a': case KEY_DOWN:   move_cursor(0, 1);  break;
+    case KEY_LEFT:   move_cursor(-1, 0); break;
+    case KEY_RIGHT:  move_cursor(1, 0);  break;
+    case KEY_UP:     move_cursor(0, -1); break;
+    case KEY_DOWN:   move_cursor(0, 1);  break;
+    case KEY_FAR_LEFT:  move_cursor(-8, 0); break;
+    case KEY_FAR_RIGHT: move_cursor(8, 0);  break;
+    case KEY_FAR_UP:    move_cursor(0, -8); break;
+    case KEY_FAR_DOWN:  move_cursor(0, 8);  break;
+#ifndef HAVE_MENUS                                  /* the letters, for keyboards without cursor keys */
+    case 'o': move_cursor(-1, 0); break;
+    case 'p': move_cursor(1, 0);  break;
+    case 'q': move_cursor(0, -1); break;
+    case 'a': move_cursor(0, 1);  break;
     case 'O': move_cursor(-8, 0); break;
     case 'P': move_cursor(8, 0);  break;
     case 'Q': move_cursor(0, -8); break;
     case 'A': move_cursor(0, 8);  break;
+#endif
     case ' ': case KEY_ENTER:  apply_tool(); break;
     case ',': set_tool((uint8_t)(tool ? tool - 1 : NUM_TOOLS - 1)); break;
     case '.': set_tool((uint8_t)(tool + 1 < NUM_TOOLS ? tool + 1 : 0)); break;

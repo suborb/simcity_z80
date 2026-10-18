@@ -69,9 +69,18 @@ def money(mem, syms):
     return mem[a] | mem[a + 1] << 8 | mem[a + 2] << 16
 
 
-def moves(dx, dy):
-    """Key presses that move the cursor by (dx, dy): 8-cell jumps then single steps."""
+KEY_LEFT, KEY_RIGHT, KEY_DOWN, KEY_UP = 8, 9, 10, 11
+KEY_FAR_LEFT, KEY_FAR_RIGHT, KEY_FAR_DOWN, KEY_FAR_UP = 28, 29, 30, 31
+
+
+def moves(dx, dy, cursor=False):
+    """Key presses that move the cursor by (dx, dy): 8-cell jumps then single steps.  The letters (O P Q A) on
+    the plain test platform, the cursor keys (shifted for the jumps) on one with menus, as the Z88."""
     k = []
+    if cursor:
+        k += [KEY_FAR_RIGHT if dx > 0 else KEY_FAR_LEFT] * (abs(dx) // 8) + [KEY_RIGHT if dx > 0 else KEY_LEFT] * (abs(dx) % 8)
+        k += [KEY_FAR_DOWN if dy > 0 else KEY_FAR_UP] * (abs(dy) // 8) + [KEY_DOWN if dy > 0 else KEY_UP] * (abs(dy) % 8)
+        return k
     k += [ord('P' if dx > 0 else 'O')] * (abs(dx) // 8) + [ord('p' if dx > 0 else 'o')] * (abs(dx) % 8)
     k += [ord('A' if dy > 0 else 'Q')] * (abs(dy) // 8) + [ord('a' if dy > 0 else 'q')] * (abs(dy) % 8)
     return k
@@ -313,7 +322,7 @@ def main():
     check('mini map: the city view shows the water', 100 < lit < 192 * 64 - 100, f'{lit} of 12288 pixels lit')
     # the cursor in the top half: the picture shows the top of the city, and the cursor's pixel is in it
     for view in (1, 3):
-        mem = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE] + [ord('Q')] * 5 + [KEY_M] * view + [0] * 12)
+        mem = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE] + [KEY_FAR_UP] * 5 + [KEY_M] * view + [0] * 12)
         d = differences(bitmaps(mem), reference(mem, view, 0), 0, 8)
         check(f'mini map {view}: with the cursor in the top half the top of the city is shown', not d, f'{len(d)} pixels differ, first {d[:4]}')
 
@@ -356,23 +365,23 @@ def main():
           '\n'.join(text))
     check('budget: it starts with the tax rate of 7%', any('TAX RATE  7%' in r for r in text), '\n'.join(text))
     check('budget: every line fits the 8 rows and 40 columns', all(len(r.rstrip()) <= 40 for r in text))
-    mem = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE, CMD_BUDGET, ord('p'), ord('p'), 0, 0])
+    mem = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE, CMD_BUDGET, KEY_RIGHT, KEY_RIGHT, 0, 0])
     check('budget: p raises the tax rate and the screen shows it',
           byte_p(mem, '_SMC_tax_rate') == 9 and any('TAX RATE  9%' in r for r in panes(mem)[1]))
-    mem = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE, CMD_BUDGET] + [ord('o')] * 9 + [0, 0])
+    mem = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE, CMD_BUDGET] + [KEY_LEFT] * 9 + [0, 0])
     check('budget: the tax rate stops at 0', byte_p(mem, '_SMC_tax_rate') == 0)
-    mem = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE, CMD_BUDGET] + [ord('p')] * 20 + [0, 0])
+    mem = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE, CMD_BUDGET] + [KEY_RIGHT] * 20 + [0, 0])
     check('budget: the tax rate stops at 20', byte_p(mem, '_SMC_tax_rate') == 20)
-    mem = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE, CMD_BUDGET, ord('a'), ord('o'), ord('a'), ord('o'), ord('o'), ord('a'), ord('o'), ord('o'), ord('o'), 0, 0])
+    mem = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE, CMD_BUDGET, KEY_DOWN, KEY_LEFT, KEY_DOWN, KEY_LEFT, KEY_LEFT, KEY_DOWN, KEY_LEFT, KEY_LEFT, KEY_LEFT, 0, 0])
     check('budget: a selects the next item and o lowers its funding by 10% (transport 90, police 80, fire 70)',
           (byte_p(mem, '_SMC_transport_percent'), byte_p(mem, '_SMC_police_percent'), byte_p(mem, '_SMC_fire_percent')) == (90, 80, 70))
-    mem = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE, CMD_BUDGET, ord('p'), 13, 0, 0])
+    mem = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE, CMD_BUDGET, KEY_RIGHT, 13, 0, 0])
     text = panes(mem)[1]
     check('budget: enter accepts it and the game goes on (status panel back, new rate kept)',
           any('FUNDS' in r for r in text) and not any('FISCAL' in r for r in text) and byte_p(mem, '_SMC_tax_rate') == 8, '\n'.join(text))
     check('budget: the game asks the player for the annual budget', byte_p(mem, '_V_auto_budget') == 0)
     # the engine's own request, in November: fast, until the year's tick; then the player changes the tax rate and accepts
-    mem = run(pbin, psyms, [LEVEL_MEDIUM, ord('+')] + [0] * 1500 + [ord('p'), ord('p'), 0, 0])
+    mem = run(pbin, psyms, [LEVEL_MEDIUM, ord('+')] + [0] * 1500 + [KEY_RIGHT, KEY_RIGHT, 0, 0])
     text = panes(mem)[1]
     check('budget: in November the game stops for the budget screen', any('FISCAL BUDGET' in r for r in text), '\n'.join(text))
     check('budget: the player can change the tax rate in it', byte_p(mem, '_SMC_tax_rate') == 9)
@@ -435,7 +444,7 @@ def main():
     check('sprites: they changed the pictures of those cells (not all: water is solid already)', sum(with_s[k] != without[k] for k in want) >= 4)
     other = [k for k in with_s if k not in want and k != (16, 4) and with_s[k] != without[k]]
     check('sprites: no other cell is touched', not other, str(other[:5]))
-    mem = run(sbin, ssyms, [LEVEL_MEDIUM, PAUSE] + [0] * 20 + [ord('p')] * 40 + [0] * 10)
+    mem = run(sbin, ssyms, [LEVEL_MEDIUM, PAUSE] + [0] * 20 + [KEY_RIGHT] * 40 + [0] * 10)
     moved = cells(mem)
     # the view scrolled right once the cursor passed its edge: the sprite must have moved on the screen with the map
     check('sprites: they scroll with the map (the cells where they were no longer hold them)',
@@ -456,12 +465,15 @@ def main():
     check('save: the file is 31 + 9216 bytes', int.from_bytes(rd(mem, '_test_file_len', 2), 'little') == 31 + 9216)
     spot = find_dirt_block(bytes(lm), 1)                   # somewhere a road can be built
     at = psyms['_levelmap'] + spot[1] * 96 + spot[0]
-    go = moves(spot[0] - 48, spot[1] - 48)
+    go = moves(spot[0] - 48, spot[1] - 48, cursor=True)
     money0 = mem[psyms['_V_money']] | mem[psyms['_V_money'] + 1] << 8
     # save, build a road there (costs $10), and see it built; then do the same and load the city back
     keys = [LEVEL_MEDIUM, PAUSE] + go + [CMD_SAVE, ord('a'), ord('b'), 13, ord(' '), ord(' ')]
     built = run(pbin, psyms, keys)
     check('(the road is built at the dirt spot if we do not load: so the next test can tell)', built[at] == 7 and built[at] != lm[spot[1] * 96 + spot[0]])
+    letters = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE] + moves(spot[0] - 48, spot[1] - 48) + [ord(' '), 0, 0])
+    check('a platform with menus: the letters O P Q A do not move the cursor (the cursor keys do: the road above)',
+          letters[at] == lm[spot[1] * 96 + spot[0]])
     mem = run(pbin, psyms, keys + [CMD_LOAD, ord('a'), ord('b'), 13, 0, 0])
     check('load: the map and the money are what they were when saved (the road is gone, $10 is back)',
           mem[at] == lm[spot[1] * 96 + spot[0]] and (mem[psyms['_V_money']] | mem[psyms['_V_money'] + 1] << 8) == money0)

@@ -7,7 +7,7 @@
       POLICE        500      500   100%
       FIRE          500      500   100%
       CASH FLOW $-123  FUNDS $10000>$9877
-      Q A SELECT  O P CHANGE  ENTER OK
+      Q A SELECT  O P CHANGE  ENTER OK   (the cursor keys on a platform with menus)
 
    The tax rate is 0..20 (the advisor complains from 12) and each funding level 0..100 in tens,
    as the Spectrum's.  Every change asks the engine for the figures again (budget_recalc). */
@@ -46,7 +46,11 @@ static const struct field fields[] = {
     { 6, 29, F_U24,  0,   V_previous_money },
     { 6, 29, F_TEXT, 0,   ">$" },
     { 6, 39, F_U24,  0,   V_money_after_budget },
+#ifdef HAVE_MENUS
+    { 7,  1, F_TEXT, 0,   "CURSORS SELECT AND CHANGE  ENTER OK" },
+#else
     { 7,  1, F_TEXT, 0,   "Q A SELECT  O P CHANGE  ENTER OK" },
+#endif
 };
 
 static void draw(void)
@@ -93,10 +97,16 @@ uint8_t budget_screen(void)
             continue;
         }
         switch (k) {
-        case 'q': case KEY_UP:    if (sel) --sel; break;
-        case 'a': case KEY_DOWN:  if (sel < 3) ++sel; break;
-        case 'o': case KEY_LEFT: case '-': change(-1); break;
-        case 'p': case KEY_RIGHT: case '+': change(1); break;
+        case KEY_UP:    if (sel) --sel; break;
+        case KEY_DOWN:  if (sel < 3) ++sel; break;
+        case KEY_LEFT: case '-': change(-1); break;
+        case KEY_RIGHT: case '+': change(1); break;
+#ifndef HAVE_MENUS
+        case 'q': if (sel) --sel; break;
+        case 'a': if (sel < 3) ++sel; break;
+        case 'o': change(-1); break;
+        case 'p': change(1); break;
+#endif
         case KEY_ENTER: case ' ': case KEY_ESC:
             plat_text_clear();
             return 0;

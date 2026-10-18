@@ -14,6 +14,10 @@
 #define KEY_DOWN   10
 #define KEY_UP     11
 #define KEY_ENTER  13
+#define KEY_FAR_LEFT  28            /* a platform with cursor keys sends these for shift + cursor: eight cells */
+#define KEY_FAR_RIGHT 29
+#define KEY_FAR_DOWN  30
+#define KEY_FAR_UP    31
 #define KEY_ESC    27
 
 /* Commands.  A platform with menus (the Z88's OZ menus) returns these from plat_key() just as it
@@ -62,7 +66,8 @@ extern void     plat_flush(void);               /* end of frame: show what was d
      HAVE_BITMAP       it can draw pictures of the game's own making (plat_put_bitmap()); needed by HAVE_MINIMAP
      HAVE_ICONS        the tools as small pictures in rows 3 and 4 of the text area (plat_icons()); the status
                        panel then has the advisor message on row 6 and no key tips
-     HAVE_MENUS        menus of its own, which have quit: the X key does not quit there, and ESC leaves a mini map
+     HAVE_MENUS        menus of its own, which have quit: the X key does not quit there, ESC leaves a mini map,
+                       and the cursor keys move (Q, A, O and P do not)
      HAVE_FILES        files, for saving and loading a city (plat_file_save()/plat_file_load())
    and the optional features: HAVE_BUDGET, HAVE_EVALUATION, HAVE_MINIMAP, HAVE_SPRITES (see ui/*.c).  The
    screens and the status panel drawn from tables of fields (HAVE_FIELDS) come with any of the screens. */
