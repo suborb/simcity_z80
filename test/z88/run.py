@@ -6,7 +6,7 @@
     every menu item sends a command that exists;
   * the Tools menu lists the game's tools in order: item n sends CMD_TOOL + n and is named
     like tool n in ui/text.h;
-  * the shortcut keys (typed after OZ's command-prefix key) are letter sequences, each different, none the
+  * the shortcut keys (typed after the [] key) are letter sequences, each different, none the
     start of another, and each begins with its menu's initial;
   * the menus stay within OZ's limits (7 topics, 24 items each, command codes 0x81..0xB0).
 

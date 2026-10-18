@@ -54,6 +54,14 @@ SIM_STACK_SIZE  equ     256             ; the engine nests a few calls deep, plu
         ENDM
 
 sim_task_reset:
+        IFDEF   SIM_STACK_FILL
+        ; test builds only: fill the stack with a pattern so test/stack can see how deep it went
+        ld      hl,sim_stack
+        ld      de,sim_stack+1
+        ld      bc,SIM_STACK_SIZE-1
+        ld      (hl),$a5
+        ldir
+        ENDIF
         ; Build the first frame of the simulation stack: nine zeroed register
         ; pairs (what SIM_RESTORE_REGS pops), then the address sim_main.
         ld      hl,sim_stack_top-1

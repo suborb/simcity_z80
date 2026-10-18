@@ -29,7 +29,7 @@ def build():
     env = dict(os.environ, ZCCCFG=os.path.join(Z88DK, 'lib', 'config'),
                PATH=os.path.join(Z88DK, 'bin') + os.pathsep + os.environ['PATH'])
     cmd = os.environ.get('ZCC', 'zcc').split() + ['+zx', f'-zorg={ZORG}', '-pragma-include:platform/console/zpragma_zx.inc', '-Ca-DPORTABLE', '-Ca-Iengine', '-Ca-I.', '-Iui',
-           '-Cc-standard-escape-chars', '-m', '-DHAVE_TILES', '-DMAX_VIEW_W=32', '-DMAX_VIEW_H=16',
+           '-Cc-standard-escape-chars', '-Ca-DSIM_STACK_FILL', '-m', '-DHAVE_TILES', '-DMAX_VIEW_W=32', '-DMAX_VIEW_H=16',
            'ui/main.c', 'ui/game.c', 'engine/engine_c.asm', 'platform/common/hooks.asm',
            'platform/test_ui/plat_test.c',
            '-o', os.path.join(OUT, 'stack')]
@@ -72,11 +72,17 @@ def run(binary, syms, disaster):
     subprocess.run([os.path.join(Z88DK, 'bin', 'z88dk-ticks'), '-pc', f'{ZORG:x}', '-end', f'{syms["__Exit"]:x}',
                     '-counter', '4000000000', '-output', dump, path], capture_output=True)
     mem = open(dump, 'rb').read()
+    # everything below the data sections is ROM-able: code, tables, strings, library
+    rom_end = syms['__DATA_head']
+    changed = [i for i in range(ZORG, rom_end) if mem[i] != image[i]]
+    if changed:
+        near = max(((v, k) for k, v in syms.items() if v <= changed[0] and not k.startswith('__')), default=(0, '?'))
+        print(f'  WRITTEN TO ROM: {len(changed)} bytes below {rom_end:#06x}, first at {changed[0]:#06x} (after {near[1]})')
     low = next((i for i in range(end, SP_TOP) if mem[i] != PATTERN), SP_TOP)
     sim_lo = syms['sim_stack']
     sim_top = sim_lo + 256
-    sim_used = next((sim_top - i for i in range(sim_lo, sim_top) if mem[i]), 0)
-    return SP_TOP - low, sim_used, mem[syms['_test_done']]
+    sim_used = next((sim_top - i for i in range(sim_lo, sim_top) if mem[i] != PATTERN), 0)
+    return SP_TOP - low, sim_used, mem[syms['_test_done']], len(changed)
 
 
 def real_free():
@@ -94,17 +100,18 @@ def main():
     # figures are meaningful; the free space is that of the real Spectrum build
     free, end = real_free()
     print(f'real build: image ends at {end:#06x}, stack top {SP_TOP:#06x}: {free} bytes free for the stack')
-    worst = worst_sim = 0
+    worst = worst_sim = total_rom_writes = 0
     for d, name in enumerate(['no forced disaster', 'fire', 'flood', 'earthquake', 'air crash', 'tornado', 'meltdown']):
-        used, sim, done = run(binary, syms, d)
+        used, sim, done, rom_writes = run(binary, syms, d)
+        total_rom_writes += rom_writes
         worst, worst_sim = max(worst, used), max(worst_sim, sim)
         print(f'  {name:20} main stack {used:4} bytes, simulation stack {sim:3} of 256'
               + ('' if done == 1 else '   (game did not exit cleanly)'))
     left = free - worst
     print(f'deepest main stack {worst} bytes, simulation stack {worst_sim} of 256; {left} of the free bytes unused')
     print('(the console and tile drawing add a little more than the headless platform shows)')
-    ok = left >= MARGIN and worst_sim <= 256 - 32
-    print(('PASS' if ok else 'FAIL') + f'  stack fits with a margin of {MARGIN} bytes (and the simulation stack with 32 spare)')
+    ok = left >= MARGIN and worst_sim <= 256 - 32 and not total_rom_writes
+    print(('PASS' if ok else 'FAIL') + f'  stack fits with a margin of {MARGIN} bytes (simulation stack with 32 spare), and nothing writes to ROM-able memory')
     sys.exit(0 if ok else 1)
 
 

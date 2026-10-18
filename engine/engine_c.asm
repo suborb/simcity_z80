@@ -68,7 +68,25 @@ _sim_tick:
 _sim_step:
         push    ix
         push    iy
+        IFDEF   Z88_DI_SIM
+        ; Z88: run the slice with OZ's interrupts off.  OZ's interrupt handling needs SP below $2000,
+        ; but the coroutine's stack is in application RAM, so an interrupt during a slice crashes.
+        ; OZ_DI/OZ_EI are plain calls into OZ's jump table, $0051 and $0054; OZ_DI returns the
+        ; previous state in AF, which OZ_EI wants back
+        call    $0051
+        push    af
+        pop     hl
+        ld      (z88_int_state),hl
+        ENDIF
         call    sim_step                ;L = 1 when a whole tick has completed
+        IFDEF   Z88_DI_SIM
+        push    hl                      ;the result
+        ld      hl,(z88_int_state)
+        push    hl
+        pop     af
+        call    $0054
+        pop     hl
+        ENDIF
         pop     iy
         pop     ix
         ret
@@ -105,6 +123,7 @@ _view_fetch:
         ret
 
         IN_DATA
+z88_int_state:  defw    0               ; OZ_DI's result, for OZ_EI (Z88 builds with Z88_DI_SIM)
 _engine_a:      defb    0
 _view_x:        defb    0
 _view_y:        defb    0

@@ -68,7 +68,7 @@ def build(tmp):
         shutil.copytree(os.path.join(ROOT, d), os.path.join(tmp, d), ignore=junk)
     run([Z80ASM, '-b', '-m', 'disassembly/sim_game.asm'], cwd=tmp)
     run([Z80ASM, '-b', '-m', 'platform/zx/zx_game.asm'], cwd=tmp)
-    run([Z80ASM, '-Iengine', '-DPORTABLE', '-b', '-m', 'platform/test/test_platform.asm'], cwd=tmp)
+    run([Z80ASM, '-Iengine', '-DPORTABLE', '-DSIM_STACK_FILL', '-b', '-m', 'platform/test/test_platform.asm'], cwd=tmp)
     ref = ('disassembly/sim_game.bin', 'disassembly/sim_game.map')
     po = ('platform/test/test_platform.bin', 'platform/test/test_platform.map')
     a = open(os.path.join(tmp, 'disassembly/sim_game.bin'), 'rb').read()
@@ -476,6 +476,9 @@ def run_scenario(name, ticks, files, tmp, view=None):
                             f'zx art={bad_cells[0][2]} attr={bad_cells[0][3]:02x} portable art={bad_cells[0][4]} attr={bad_cells[0][5]:02x}')
         nvars += 512
     if COOP:
+        lo, hi = po_syms['sim_stack'], po_syms['sim_stack_top']
+        used = next((hi - i for i in range(lo, hi) if po_dump[i] != 0xA5), 0)
+        SIM_STACK_USED[name] = max(SIM_STACK_USED.get(name, 0), used)
         steps = int.from_bytes(po_dump[po_syms['test_steps']:po_syms['test_steps'] + 2], 'little')
         # each tick is 96 map rows, so at least 96 slices per tick if it really yielded
         if steps < ticks * 96:
@@ -487,6 +490,7 @@ def run_scenario(name, ticks, files, tmp, view=None):
 
 
 COOP = False
+SIM_STACK_USED = {}         # scenario -> deepest the simulation's own stack went (coop runs)
 
 def main():
     global COOP
@@ -516,6 +520,9 @@ def main():
                 for p in problems:
                     print('        ', p)
                 bad += bool(problems)
+        if COOP and SIM_STACK_USED:
+            print('simulation stack depth in bytes (of 256), deepest per scenario: ' +
+                  ', '.join(f'{k} {v}' for k, v in SIM_STACK_USED.items()))
         if args.keep:
             print('scratch directory:', tmp)
         sys.exit(1 if bad else 0)

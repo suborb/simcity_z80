@@ -71,8 +71,11 @@ $(NC200): $(DEPS)
 # Z88: OZ text console, so characters only for now.
 $(Z88): $(DEPS)
 	@mkdir -p $(@D)
-	$(ZCC) +z88 -create-app -DTARGET_Z88 $(COMMON) $(GAME) $(CONSOLE) -o $(@D)/simcity
+	$(ZCC) +z88 -create-app -DTARGET_Z88 -Ca-DZ88_DI_SIM $(COMMON) $(GAME) $(CONSOLE) -o $(@D)/simcity
 
+# Z88_DI_SIM: each simulation slice runs with OZ's interrupts disabled (OZ_DI/OZ_EI around sim_step in
+# engine_c.asm).  OZ's interrupt handling needs the stack below $2000, and the simulation's coroutine
+# stack is in application RAM; an interrupt arriving while it is in use crashed the Z88 emulator.
 # Z88 as a ROM application for a 32 KB card (two 16 KB banks) with RAM for the data.  The engine
 # keeps code and tables apart from its variables (see engine/sections.asm), so the code and
 # tables go in ROM and the rest in the RAM OZ allocates.  platform/console/zpragma_z88rom.inc
@@ -80,7 +83,7 @@ $(Z88): $(DEPS)
 # shadow screen at 1 KB instead of 4 KB.  Output: simcity.epr (the ROM image) plus its banks;
 # z88dk prints how many pages of RAM the application will ask OZ for.  Not yet run on a Z88.
 Z88ROM_FLAGS = -subtype=app -create-app -pragma-include:platform/console/zpragma_z88rom.inc \
-               -DTARGET_Z88 -DMAX_VIEW_W=32 -DMAX_VIEW_H=16
+               -DTARGET_Z88 -Ca-DZ88_DI_SIM -DMAX_VIEW_W=32 -DMAX_VIEW_H=16
 
 $(Z88ROM): $(DEPS)
 	@mkdir -p $(@D)

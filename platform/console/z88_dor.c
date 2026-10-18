@@ -7,9 +7,7 @@
    CMD_* of ui/platform.h (the codes below are those values: keep them in step; test/z88
    checks).
 
-   Shortcuts: the user presses OZ's command-prefix key (the square or the diamond key: I have
-   not confirmed which, and nothing here depends on it) and then types the letters of the
-   item's KEY.  The letters are up to the application: here the first is the menu's initial
+   Shortcuts: the user presses the [] (square) key and then types the letters of the item's KEY.  The letters are up to the application: here the first is the menu's initial
    (Game, Tools, Speed, Options) and the rest name the item, with no sequence the start of
    another (test/z88 checks that too). */
 #include <dor.h>
