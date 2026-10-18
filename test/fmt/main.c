@@ -1,6 +1,6 @@
 /* Decimal printing: fmt_dec on a list of values, read back by test/fmt/run.py. */
 #include <stdint.h>
-#include "numfmt.h"
+#include "textfmt.h"
 
 #define N 24
 uint32_t fmt_in[N] = {0, 1, 9, 10, 11, 99, 100, 101, 999, 1000, 9999, 10000, 12345, 99999, 100000,

@@ -24,11 +24,11 @@
 #define DRAW_SPRITES
 #endif
 #ifdef HAVE_REPORTS
+#include "textfmt.h"
 #include "budget.h"
 #include "evaluation.h"
 #include "cityfile.h"
 #endif
-#include "numfmt.h"
 #include "game.h"
 
 #define NUM_TOOLS   14
@@ -92,6 +92,7 @@ static uint32_t citypop(void)
     return (uint32_t)V_CityPop[0] | ((uint32_t)V_CityPop[1] << 8) | ((uint32_t)V_CityPop[2] << 16);
 }
 
+#ifndef HAVE_REPORTS
 static uint8_t put_number(char *buf, uint32_t v)
 {
     return fmt_dec(buf, v);
@@ -115,6 +116,8 @@ static void line(uint8_t row, const char *s, uint32_t number, uint8_t with_numbe
     if (row < panel_h)
         plat_text_puts(panel_col, (uint8_t)(panel_row + row), buf);
 }
+
+#endif
 
 #ifndef HAVE_TILES
 /* ---- map glyphs --------------------------------------------------------- */
@@ -403,6 +406,70 @@ static const char *const help_page[3] = {
     "H PAUSE  + - SPEED  X QUIT",
 };
 
+#ifdef HAVE_REPORTS
+/* The status panel as tables of fields (ui/textfmt.h): the pointers are set from the game's state just
+   before it is drawn. */
+static const char *st_month, *st_tool, *st_speed, *st_alert, *st_line[3];
+static const char *const st_speeds[4] = { "FAST", "NORMAL", "SLOW", "PAUSED" };
+
+static const struct field status_top[] = {
+    { 0,  0, F_STR,  0, &st_month },
+    { 0,  8, F_U16,  0, &V_year },
+    { 0, 10, F_TEXT, 0, "FUNDS $" },
+    { 0, 17, F_L24,  0, V_money },
+    { 0, 27, F_TEXT, 0, "POP" },
+    { 0, 31, F_L24,  0, V_CityPop },
+};
+static const struct field status_tool[] = {
+    { 2,  0, F_STR,  0, &st_tool },
+    { 2, 21, F_STR,  0, &st_speed },
+    { 3,  0, F_STR,  0, &st_alert },
+};
+static const struct field status_help[] = {
+    { 4,  0, F_STR,  0, &st_line[0] },
+    { 5,  0, F_STR,  0, &st_line[1] },
+    { 6,  0, F_STR,  0, &st_line[2] },
+};
+static const struct field status_map[] = {
+    { 5,  0, F_TEXT, 0, "MAP:" },
+    { 5,  5, F_STR,  0, &st_line[1] },
+    { 6,  0, F_TEXT, 0, "M NEXT MAP  X BACK TO CITY" },
+};
+
+/* The status panel: five lines, so it fits the top third of even a 16 row screen. */
+static void draw_status(void)
+{
+    char buf[41];
+
+    if (!panel_w)
+        return;
+    st_month = text_months[V_month];
+    st_tool = text_tools[tool];
+    st_speed = st_speeds[V_simulation_speed & 3];
+    st_alert = V_alertmessage < sizeof(text_alerts) / sizeof(text_alerts[0]) ? text_alerts[V_alertmessage] : "";
+    fmt_fields(status_top, sizeof(status_top) / sizeof(struct field));
+    if (panel_h > 1) {
+        fmt_blank(buf);
+        demand_bar(buf, 'R', V_RValve);
+        demand_bar(buf + 10, 'C', V_CValve);
+        demand_bar(buf + 20, 'I', V_IValve);
+        plat_text_puts(0, 1, buf);
+    }
+    fmt_fields(status_tool, sizeof(status_tool) / sizeof(struct field));
+#ifdef HAVE_MINIMAP
+    if (map_view) {
+        st_line[1] = minimap_names[map_view];
+        plat_text_puts(0, 4, "                                        ");
+        fmt_fields(status_map, sizeof(status_map) / sizeof(struct field));
+        return;
+    }
+#endif
+    st_line[0] = help_page[panel_h >= 7 ? 0 : (frame >> 6) % 3];
+    st_line[1] = help_page[1];
+    st_line[2] = help_page[2];
+    fmt_fields(status_help, panel_h >= 7 ? 3 : 1);
+}
+#else
 static uint8_t append(char *buf, uint8_t n, const char *s)
 {
     while (*s)
@@ -462,6 +529,8 @@ static void draw_status(void)
         line(4, help_page[(frame >> 6) % 3], 0, 0);
     }
 }
+
+#endif
 
 /* ---- the cursor and the view -------------------------------------------------- */
 static void clamp_view(void)

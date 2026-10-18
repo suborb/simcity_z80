@@ -1,9 +1,17 @@
-/* Laying text out in fixed columns, for the screens that are tables of fields (budget, evaluation). */
+/* Numbers as text, and (with HAVE_REPORTS) the screens that are tables of fields. */
 #ifndef TEXTFMT_H
 #define TEXTFMT_H
 
 #include <stdint.h>
 
+/* v in decimal at b, no leading zeros ("0" for 0); returns the number of characters, up to 8.  There is
+   no 32 bit division in it: see numfmt.asm. */
+extern uint8_t fmt_dec(char *b, uint32_t v);
+
+/* The same for the 24 bit value in t[0..2] (little endian); t must have 7 bytes, which are overwritten. */
+extern uint8_t fmt_dec3(char *b, uint8_t *t);
+
+#ifdef HAVE_REPORTS
 extern uint8_t  fmt_str(char *b, uint8_t n, const char *s); /* s at b[n..]; returns the column after it */
 extern void     fmt_blank(char *b);                         /* 40 spaces and a NUL */
 
@@ -24,5 +32,6 @@ struct field {
 };
 
 extern void fmt_fields(const struct field *f, uint8_t n);
+#endif
 
 #endif

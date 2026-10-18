@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""fmt_dec (ui/numfmt.c, with the Z80 routine in numfmt.asm) prints every kind of number right:
+"""fmt_dec (ui/textfmt.c, with the Z80 routine in numfmt.asm) prints every kind of number right:
 no leading zeros, a lone 0, and all the way to the largest 24 bit value.
 
   usage: test/fmt/run.py
@@ -19,7 +19,7 @@ def main():
     os.makedirs(OUT, exist_ok=True)
     env = os.environ
     binary = os.path.join(OUT, 'fmt.bin')
-    r = subprocess.run(ZCC.split() + ['+test', '-m', '-Iui', '-Ca-Iengine', '-Ca-I.', test_main(), 'ui/numfmt.c', 'ui/numfmt.asm',
+    r = subprocess.run(ZCC.split() + ['+test', '-m', '-Iui', '-Ca-Iengine', '-Ca-I.', test_main(), 'ui/textfmt.c', 'ui/numfmt.asm',
                                       '-o', binary], cwd=ROOT, env=env, capture_output=True, text=True)
     if r.returncode:
         print(r.stdout, r.stderr)
