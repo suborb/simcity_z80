@@ -15,9 +15,10 @@ python3 test/golden/run.py --ticks 60 --views --coop
 echo
 echo "== ZX Spectrum tile drawing: every picture through the real console code"
 python3 test/tiles/run.py
+python3 test/tiles/run.py --print
 echo
 echo "== UI: game core under scripted keys"
 python3 test/ui/run.py | grep -E "^(PASS|FAIL)|passed|FAILED"
 echo
 echo "== builds"
-for t in aqplus nc200 z88 zx; do tools/build.sh $t >/dev/null && echo "built $t"; done
+for t in aqplus nc200 z88 zx zx-print; do make -s $t >/dev/null && echo "built $t"; done

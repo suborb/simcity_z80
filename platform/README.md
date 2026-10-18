@@ -12,7 +12,7 @@
 
 A C platform implements the functions in `ui/platform.h` and links
 `ui/*.c`, `engine/engine_c.asm` (assembled with `-DPORTABLE`) and
-`platform/common/hooks.asm`; `tools/build.sh` shows the command lines. To draw
+`platform/common/hooks.asm`; the `Makefile` shows the command lines. To draw
 the real tile graphics instead of characters, call `view_fetch()` for each
 visible cell: it returns 8 bytes of art and an attribute, exactly as the
 Spectrum draws them.

@@ -1,0 +1,119 @@
+# SimCity ports built with z88dk.
+#
+#   make aqplus | nc200 | z88 | zx      build one platform   (output in build/<name>/)
+#   make zx-print                       the Spectrum again, tiles drawn by printing characters
+#                                       (the same path as the other machines) to compare speed
+#   make all                            build all four
+#   make test                           the headless build the UI tests run
+#   make check                          every automated test (test/run_all.sh)
+#   make golden | uitest | tiletest     one group of tests
+#   make engine                         regenerate engine/ and platform/zx from disassembly/sim_game.asm
+#   make deadcode                       list engine code nothing reaches
+#   make clean
+#
+# z88dk is taken from $(Z88DK) (default ~/z88dk) and its bin directory goes first on PATH.
+
+Z88DK  ?= $(HOME)/z88dk
+export ZCCCFG ?= $(Z88DK)/lib/config
+export PATH := $(Z88DK)/bin:$(PATH)
+
+ZCC = zcc
+
+# -DPORTABLE selects the engine's portable build; the include paths are for the assembler
+# (engine, repository root for assets/) and the C compiler (ui).
+COMMON = -Ca-DPORTABLE -Ca-Iengine -Ca-I. -Iui -Cc-standard-escape-chars -m
+
+GAME    = ui/main.c ui/game.c engine/engine_c.asm platform/common/hooks.asm
+CONSOLE = platform/console/plat_console.c platform/console/plat_font.asm
+
+# Everything a build depends on.
+DEPS = Makefile $(wildcard ui/*.c ui/*.h engine/*.asm engine/*.h platform/common/*.asm \
+         platform/console/* platform/test_ui/*) assets/map_art.bin assets/udgs.bin
+
+AQPLUS = build/aqplus/simcity.aqx
+NC200  = build/nc200/SIMCITY.COM
+Z88    = build/z88/SIMCITY.BAS
+ZX     = build/zx/simcity.tap
+ZXP    = build/zx-print/simcity.tap
+TEST   = build/test/simcity.bin
+
+.PHONY: all aqplus nc200 z88 zx zx-print test check golden uitest tiletest engine deadcode clean
+
+all: aqplus nc200 z88 zx
+
+aqplus: $(AQPLUS)
+nc200:  $(NC200)
+z88:    $(Z88)
+zx:     $(ZX)
+zx-print: $(ZXP)
+test:   $(TEST)
+
+# Aquarius+: the .aqx loads from the Aquarius+ file browser.  --generic-console pulls in the
+# generic console driver, which can draw in the Aquarius+'s 320x200 bitmap mode (plat_init
+# switches to it, IOCTL_GENCON_SET_MODE 4).  There characters are drawn from font and UDG
+# pointers when printed, so the map gets the real tiles (HAVE_TILES) like the NC200.
+$(AQPLUS): $(DEPS)
+	@mkdir -p $(@D)
+	$(ZCC) +aquarius -clib=aqplus -subtype=aqx --generic-console -create-app $(COMMON) \
+	    -DHAVE_TILES -DTARGET_AQPLUS $(GAME) $(CONSOLE) -o $(@D)/simcity
+
+# NC200: RAM subtype (the default ROM-card subtype cannot host self-modifying code).  Tiles
+# go through the console's font and UDG pointers (HAVE_TILES; see platform/console/plat_console.c).
+$(NC200): $(DEPS)
+	@mkdir -p $(@D)
+	$(ZCC) +nc -clib=nc200 -subtype=ram -create-app $(COMMON) -DHAVE_TILES \
+	    $(GAME) $(CONSOLE) -o $(@D)/simcity
+
+# Z88: OZ text console, so characters only for now.
+$(Z88): $(DEPS)
+	@mkdir -p $(@D)
+	$(ZCC) +z88 -create-app $(COMMON) $(GAME) $(CONSOLE) -o $(@D)/simcity
+
+# ZX Spectrum.
+#   CLIB_ZX_CONIO32  UDGs and 8x8 cells need the console's 32 column mode (32x24: the original's
+#                    8 row panel above a 32x16 map).
+#   -zorg=24000      below about that appmake embeds the program in a BASIC REM line at 23760
+#                    instead of using a separate loader, so the code would not be where it was linked.
+#   REGISTER_SP      stack at the top of RAM, below the UDG area, not in the small gap under the
+#                    code that CLEAR leaves.
+#   HAVE_TILES       draw the map with the real pictures, blitted to screen memory.
+ZX_FLAGS = -zorg=24000 -pragma-define:REGISTER_SP=0xFF57 -pragma-define:CLIB_ZX_CONIO32=1 \
+           -create-app $(COMMON) -DTARGET_ZX -Ca-DTARGET_ZX -DHAVE_TILES -DMAX_VIEW_W=32 -DMAX_VIEW_H=16
+
+$(ZX): $(DEPS)
+	@mkdir -p $(@D)
+	$(ZCC) +zx $(ZX_FLAGS) $(GAME) $(CONSOLE) platform/console/plat_zx_blit.asm -o $(@D)/simcity
+
+# The same, but each tile is drawn by printing a character whose picture comes from the console's
+# font and UDG pointers, as on the NC200 and Aquarius+, instead of being copied to screen memory.
+# Slower (about 7000 T-states a tile against a few hundred); there to compare the two by eye.
+$(ZXP): $(DEPS)
+	@mkdir -p $(@D)
+	$(ZCC) +zx $(ZX_FLAGS) -DZX_PRINT $(GAME) $(CONSOLE) -o $(@D)/simcity
+
+# Headless: a scripted keyboard and a screen in RAM instead of the console, run under z88dk-ticks.
+$(TEST): $(DEPS)
+	@mkdir -p $(@D)
+	$(ZCC) +test $(COMMON) $(GAME) platform/test_ui/plat_test.c -o $@
+
+check:
+	sh test/run_all.sh
+
+golden:
+	python3 test/golden/run.py --ticks 60 --views
+	python3 test/golden/run.py --ticks 60 --views --coop
+
+uitest:
+	python3 test/ui/run.py
+
+tiletest:
+	python3 test/tiles/run.py
+
+engine:
+	python3 tools/split_engine.py
+
+deadcode: $(TEST)
+	python3 tools/find_dead.py
+
+clean:
+	rm -rf build

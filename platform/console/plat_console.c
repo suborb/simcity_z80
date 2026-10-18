@@ -13,7 +13,8 @@
    as much, which made scrolling and redraws take a second.  Text still goes
    through conio, in its 32 column mode (CLIB_ZX_CONIO32), where cells are 8x8.
 
-   Other bitmap consoles (NC200): the console looks a character's 8 bytes up in a
+   Other bitmap consoles (NC200, and the Aquarius+ once it is switched to its bitmap
+   mode, TARGET_AQPLUS): the console looks a character's 8 bytes up in a
    font or UDG table *when it is printed*, and the table is just a pointer, so the
    map is drawn without copying anything:
 
@@ -32,25 +33,38 @@
 
 static uint16_t clock_count;
 
-#if defined(HAVE_TILES) && defined(TARGET_ZX)
+/* How tiles are drawn.  TILE_BLIT: copy to screen memory (ZX Spectrum default).
+   TILE_PRINT: print characters whose pictures come from the font and UDG pointers (the
+   NC200, the Aquarius+ and, with ZX_PRINT, the Spectrum: the same path as text). */
+#if defined(HAVE_TILES) && defined(TARGET_ZX) && !defined(ZX_PRINT)
+#define TILE_BLIT
+#elif defined(HAVE_TILES)
+#define TILE_PRINT
+#endif
+
+#if defined(TILE_BLIT)
 #include <arch/zx.h>
 extern void zx_blit8(uint8_t *screen, const uint8_t *art, uint8_t inverse) __smallc;   /* plat_zx_blit.asm */
 #define text_mode()
-#elif defined(HAVE_TILES)
+#elif defined(TILE_PRINT)
+#ifdef TARGET_ZX
+extern uint8_t _zx_console_attr;                /* the colour the console prints in */
+static uint8_t std_attr;
+#endif
 extern void *plat_std_font(void);               /* plat_font.asm */
+extern void plat_set_font(const void *p) __z88dk_fastcall;
+extern void plat_set_udgs(const void *p) __z88dk_fastcall;
 
 static const uint8_t *std_font;
 static const uint8_t *font_now;                 /* font the console is using */
 static const uint8_t *udg_now;                  /* UDG table the console is using */
-static const uint8_t *font_arg, *udg_arg;       /* console_ioctl takes the address of a pointer */
 static uint8_t tile_mode;                       /* the tile font and colours are selected */
 static uint8_t cursor_art[8];
 
 static void set_font(const uint8_t *p)
 {
     if (p != font_now) {
-        font_arg = p;
-        console_ioctl(IOCTL_GENCON_SET_FONT32, &font_arg);
+        plat_set_font(p);
         font_now = p;
     }
 }
@@ -58,8 +72,7 @@ static void set_font(const uint8_t *p)
 static void set_udgs(const uint8_t *p)
 {
     if (p != udg_now) {
-        udg_arg = p;
-        console_ioctl(IOCTL_GENCON_SET_UDGS, &udg_arg);
+        plat_set_udgs(p);
         udg_now = p;
     }
 }
@@ -69,6 +82,9 @@ static void text_mode(void)
 {
     if (tile_mode) {
         set_font(std_font);
+#if defined(TARGET_ZX)
+        _zx_console_attr = std_attr;
+#endif
         tile_mode = 0;
     }
 }
@@ -76,17 +92,37 @@ static void text_mode(void)
 #define text_mode()
 #endif
 
+#ifdef TARGET_AQPLUS
+/* Aquarius+ video control: 4 = 320x200 1bpp bitmap, text off (40x25 cells of 8x8); 1 = text. */
+static uint16_t aq_mode;
+
+static void aq_set_mode(uint16_t m)
+{
+    aq_mode = m;
+    console_ioctl(IOCTL_GENCON_SET_MODE, &aq_mode);
+}
+#endif
+
 void plat_init(void)
 {
+#ifdef TARGET_AQPLUS
+    aq_set_mode(4);                     /* bitmap mode: the console then draws characters from its font pointers */
+#endif
     clrscr();
-#if defined(HAVE_TILES) && !defined(TARGET_ZX)
+#if defined(TILE_PRINT)
     std_font = font_now = (const uint8_t *)plat_std_font();
+#if defined(TARGET_ZX)
+    std_attr = _zx_console_attr;
+#endif
 #endif
 }
 
 void plat_exit(void)
 {
     text_mode();
+#ifdef TARGET_AQPLUS
+    aq_set_mode(1);                     /* back to the text screen */
+#endif
     clrscr();
 }
 
@@ -136,14 +172,18 @@ uint8_t plat_has_tiles(void)
 
 void plat_put_tile(uint8_t col, uint8_t row, const uint8_t *art, uint8_t attr, uint8_t inverse)
 {
-#if defined(HAVE_TILES) && defined(TARGET_ZX)
+#if defined(TILE_BLIT)
     zx_blit8(zx_cxy2saddr(col, row), art, inverse);
     *zx_cxy2aaddr(col, row) = attr;
-#elif defined(HAVE_TILES)
+#elif defined(TILE_PRINT)
     uint16_t n = (uint16_t)(art - view_tile_art) >> 3;      /* 0..344 */
     uint8_t ch, i;
 
-    (void)attr;
+#if defined(TARGET_ZX)
+    _zx_console_attr = attr;                            /* the console prints in this colour */
+#else
+    (void)attr;                                         /* Aquarius+, NC200: not mapped yet */
+#endif
     if (inverse) {
         for (i = 0; i < 8; ++i)
             cursor_art[i] = (uint8_t)~art[i];

@@ -27,7 +27,7 @@ END = 0xFF
 
 
 def build():
-    subprocess.run([os.path.join(ROOT, 'tools', 'build.sh'), 'test'], check=True, capture_output=True)
+    subprocess.run(['make', '-s', '-C', ROOT, 'build/test/simcity.bin'], check=True, capture_output=True)
     syms = {}
     for line in open(os.path.join(OUT, 'simcity.map')):
         m = re.match(r'(\S+)\s*=\s*\$([0-9A-Fa-f]+)', line)

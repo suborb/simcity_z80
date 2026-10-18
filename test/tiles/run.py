@@ -5,7 +5,7 @@ Spectrum's screen memory against the art in assets/udgs.bin for every picture
 (map tiles and both ranges of large-zone pieces), the
 inverted cursor, the colours, and that text afterwards uses the standard font.
 
-  usage: test/tiles/run.py
+  usage: test/tiles/run.py [--print]      (--print: the print-a-character drawing instead of the blit)
 """
 import os
 import re
@@ -21,15 +21,19 @@ TILE_BASE = 536
 N_ART = 94 + 251
 
 
+PRINT = '--print' in sys.argv        # draw by printing characters instead of the direct blit
+
+
 def build():
     os.makedirs(OUT, exist_ok=True)
     env = dict(os.environ, ZCCCFG=os.path.join(Z88DK, 'lib', 'config'),
                PATH=os.path.join(Z88DK, 'bin') + os.pathsep + os.environ['PATH'])
     cmd = ['zcc', '+zx', f'-zorg={ZORG}', '-pragma-define:REGISTER_SP=0xFF57', '-pragma-define:CLIB_ZX_CONIO32=1', '-Ca-DPORTABLE',
            '-Ca-Iengine', '-Ca-I.', '-Iui', '-Cc-standard-escape-chars', '-m',
-           '-DTARGET_ZX', '-Ca-DTARGET_ZX', '-DHAVE_TILES', '-DMAX_VIEW_W=32', '-DMAX_VIEW_H=16',
+           '-DTARGET_ZX', '-Ca-DTARGET_ZX', '-DHAVE_TILES'] + (['-DZX_PRINT'] if PRINT else []) + [ '-DMAX_VIEW_W=32', '-DMAX_VIEW_H=16',
            'test/tiles/main.c', 'engine/engine_c.asm', 'platform/common/hooks.asm',
-           'platform/console/plat_console.c', 'platform/console/plat_font.asm', 'platform/console/plat_zx_blit.asm',
+           'platform/console/plat_console.c', 'platform/console/plat_font.asm'] + \
+          ([] if PRINT else ['platform/console/plat_zx_blit.asm']) + [
            '-o', os.path.join(OUT, 'tiles')]
     r = subprocess.run(cmd, cwd=ROOT, env=env, capture_output=True, text=True)
     if r.returncode:

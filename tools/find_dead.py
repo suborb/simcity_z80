@@ -13,7 +13,7 @@ the source with PORTABLE defined:
     platform/test name.
 
 Whatever is not reachable from the roots is listed with its size (from the link map of
-`tools/build.sh test`).  It is a static, conservative analysis: anything referenced by
+`make test`).  It is a static, conservative analysis: anything referenced by
 name counts as used, even by other dead code in a cycle (those are reported separately
 when they can be told apart from a root).
 

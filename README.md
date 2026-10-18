@@ -31,7 +31,8 @@ Z80 based computer.
 | `platform/console/` | z88dk console and keyboard front end used by the Aquarius+, NC200 and Z88 builds. |
 | `platform/common/` | Settings and hooks the engine needs, for C programs. |
 | `platform/test`, `platform/test_ui/` | Headless platforms used by the tests. |
-| `tools/` | `split_engine.py` (extract the engine), `extract_text.py` (generate `ui/text.h`), `build.sh`. |
+| `tools/` | `split_engine.py` (extract the engine), `extract_text.py` (generate `ui/text.h`), `find_dead.py`, `make_map_art.py`. |
+| `Makefile` | Builds every platform (`make zx`, `make aqplus`, ...) and runs the tests (`make check`). |
 | `test/` | `run_all.sh` runs everything. |
 | `PORTING.md` | Strategy, status and plan. |
 
@@ -39,10 +40,13 @@ Z80 based computer.
 
 Needs [z88dk](https://z88dk.org).
 
-    tools/build.sh aqplus     # Aquarius+   -> build/aqplus/simcity.caq
-    tools/build.sh nc200      # NC200       -> build/nc200/SIMCITY.COM
-    tools/build.sh z88        # Z88         -> build/z88/SIMCITY.BAS
-    test/run_all.sh           # golden master, UI tests, all builds
+    make aqplus     # Aquarius+   -> build/aqplus/simcity.aqx
+    make nc200      # NC200       -> build/nc200/SIMCITY.COM
+    make z88        # Z88         -> build/z88/SIMCITY.BAS
+    make zx         # ZX Spectrum -> build/zx/simcity.tap
+    make check      # golden master, tile drawing, UI tests, all builds
 
-The three machine builds compile and link, but have not yet been run on
-hardware or an emulator.
+z88dk is taken from `~/z88dk` unless `Z88DK` is set (`make Z88DK=/path/to/z88dk zx`).
+
+The ZX Spectrum build has been played; the Aquarius+, NC200 and Z88 builds compile
+and link but have not yet been run on hardware or an emulator.
