@@ -1,0 +1,42 @@
+# start-line  owner   name        (1-based line in disassembly/sim_game.asm; a segment runs to the next start)
+# Special starts: 'after:<regex>' resolves to the first line matching the regex.
+1        zx      zx_start
+343      engine  rand
+374      zx      zx_ui1
+1535     engine  maths24
+1641     zx      zx_ui2
+2137     engine  landscape
+3870     engine  mapaccess
+4334     zx      zx_sprites
+4448     engine  transport
+4593     zx      zx_crash_sound
+4606     engine  disasters
+4800     zx      zx_input2
+4985     engine  simulation
+8159     zx      zx_ui4
+8289     engine  fire_flood
+8348     zx      zx_tones
+8373     engine  earthquake
+8438     zx      zx_budget_ui
+8522     engine  budget
+8726     zx      zx_budget_ui2
+8759     engine  funding
+8862     zx      zx_evaluation_ui
+9280     engine  messages
+9517     zx      zx_ui5
+re:^; La950  engine  buffers
+re:^; The UDGs for the images  zx  zx_udgs
+1358     engine  zone_edge
+1371     zx      zx_ui1b
+9266     engine  alertmsg
+9269     zx      zx_ui4b
+2546     zx      zx_ui3
+2698     engine  tools_a
+2733     zx      zx_greyout
+2781     engine  tools_b
+3117     zx      zx_place_tool_keys
+3163     engine  tools_c
+3410     zx      zx_place_sound
+3425     engine  tools_d
+3551     zx      zx_demolish_wait
+3569     engine  tools_e

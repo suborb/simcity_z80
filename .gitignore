@@ -1,0 +1,4 @@
+build/
+*.o
+*.lis
+__pycache__/
