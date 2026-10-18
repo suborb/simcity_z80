@@ -2,3 +2,13 @@ build/
 *.o
 *.lis
 __pycache__/
+
+# built from disassembly/sim_game.asm (z80asm -m -b) and the reference snapshot
+disassembly/sim_game.bin
+disassembly/sim_game.map
+disassembly/sim_game.sym
+sim.sna
+
+# other releases kept here for comparison; copyrighted, never commit
+*.dsk
+*.zip
