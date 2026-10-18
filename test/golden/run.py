@@ -12,7 +12,7 @@ compared.  Any difference is a bug in the extraction.
 
   usage: test/golden/run.py [--ticks N] [--scenario NAME ...] [--keep]
 
-Needs z88dk (set Z88DK, default ~/z88dk): z80asm and z88dk-ticks.
+Needs z88dk on the PATH: z88dk-z80asm and z88dk-ticks.
 """
 import argparse
 import os
@@ -23,9 +23,8 @@ import sys
 import tempfile
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
-Z88DK = os.environ.get('Z88DK', os.path.expanduser('~/z88dk'))
-Z80ASM = os.path.join(Z88DK, 'bin', 'z80asm')
-TICKS = os.path.join(Z88DK, 'bin', 'z88dk-ticks')
+Z80ASM = 'z88dk-z80asm'
+TICKS = 'z88dk-ticks'
 
 ZX_ORG = 23323
 MAP_W = 96

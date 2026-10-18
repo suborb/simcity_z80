@@ -5,7 +5,7 @@
 #      and writes nothing below the start of its RAM sections (so it can run from ROM)
 #   3. the game core, with the engine, plays correctly under scripted keys
 #   4. every platform builds
-# Needs z88dk (Z88DK, default ~/z88dk).
+# Needs z88dk's tools on the PATH.
 set -e
 cd "$(dirname "$0")/.."
 echo "== golden master: engine vs original Spectrum program"

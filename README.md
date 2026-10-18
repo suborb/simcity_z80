@@ -47,7 +47,7 @@ Needs [z88dk](https://z88dk.org).
     make zx         # ZX Spectrum -> build/zx/simcity.tap
     make check      # golden master, tile drawing, UI tests, all builds
 
-z88dk is taken from `~/z88dk` unless `Z88DK` is set (`make Z88DK=/path/to/z88dk zx`).
+z88dk's tools (`zcc`, `z88dk-z80asm`, `z88dk-ticks`) must be on the `PATH`.
 
 The ZX Spectrum build has been played; the Aquarius+, NC200 and Z88 builds compile
 and link but have not yet been run on hardware or an emulator.

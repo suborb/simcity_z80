@@ -17,8 +17,7 @@ import subprocess
 import sys
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
-Z88DK = os.environ.get('Z88DK', os.path.expanduser('~/z88dk'))
-TICKS = os.path.join(Z88DK, 'bin', 'z88dk-ticks')
+TICKS = 'z88dk-ticks'
 OUT = os.path.join(ROOT, 'build', 'test')
 ROWS, COLS = 24, 64
 MAP_W = 96

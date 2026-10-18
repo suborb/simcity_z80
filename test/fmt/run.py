@@ -10,7 +10,6 @@ import subprocess
 import sys
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
-Z88DK = os.environ.get('Z88DK', os.path.expanduser('~/z88dk'))
 OUT = os.path.join(ROOT, 'build', 'fmt')
 ZCC = os.environ.get('ZCC', 'zcc -compiler=80cc -fframe-pointer')
 N = 24
@@ -18,8 +17,7 @@ N = 24
 
 def main():
     os.makedirs(OUT, exist_ok=True)
-    env = dict(os.environ, ZCCCFG=os.path.join(Z88DK, 'lib', 'config'),
-               PATH=os.path.join(Z88DK, 'bin') + os.pathsep + os.environ['PATH'])
+    env = os.environ
     binary = os.path.join(OUT, 'fmt.bin')
     r = subprocess.run(ZCC.split() + ['+test', '-m', '-Iui', '-Ca-Iengine', '-Ca-I.', test_main(), 'ui/numfmt.c', 'ui/numfmt.asm',
                                       '-o', binary], cwd=ROOT, env=env, capture_output=True, text=True)
@@ -34,7 +32,7 @@ def main():
     dump = os.path.join(OUT, 'fmt.out')
     if os.path.exists(dump):
         os.remove(dump)
-    subprocess.run([os.path.join(Z88DK, 'bin', 'z88dk-ticks'), binary, '-end', f'{syms["__Exit"]:x}', '-counter', '200000000',
+    subprocess.run(['z88dk-ticks', binary, '-end', f'{syms["__Exit"]:x}', '-counter', '200000000',
                     '-output', dump], capture_output=True)
     mem = open(dump, 'rb').read()
     values = [int.from_bytes(mem[syms['_fmt_in'] + 4 * i:syms['_fmt_in'] + 4 * i + 4], 'little') for i in range(N)]

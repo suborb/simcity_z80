@@ -13,11 +13,7 @@
 #   make deadcode                       list engine code nothing reaches
 #   make clean
 #
-# z88dk is taken from $(Z88DK) (default ~/z88dk) and its bin directory goes first on PATH.
-
-Z88DK  ?= $(HOME)/z88dk
-export ZCCCFG ?= $(Z88DK)/lib/config
-export PATH := $(Z88DK)/bin:$(PATH)
+# z88dk's tools (zcc, z88dk-z80asm, z88dk-ticks) must be on the PATH, with ZCCCFG set if z88dk needs it.
 
 # 80cc with a frame pointer makes the smallest code, which the Z88's 32 KB ROM and the Spectrum need.
 ZCC ?= zcc -compiler=80cc -fframe-pointer
@@ -78,25 +74,16 @@ $(NC200): $(DEPS)
 	$(ZCC) +nc -clib=nc200 -subtype=ram -create-app $(COMMON) -DHAVE_TILES \
 	    $(GAME) $(EXTRAS) $(CONSOLE) -o $(@D)/simcity
 
-# Z88: OZ text console, so characters only for now.
+# Z88 as a BASIC program: the same screen, without the ROM image.
 $(Z88): $(DEPS)
 	@mkdir -p $(@D)
 	$(ZCC) +z88 --generic-console -create-app -DTARGET_Z88 -Ca-DZ88_DI_SIM -DHAVE_TILES -DMAX_VIEW_W=32 -DMAX_VIEW_H=8 \
 	    $(COMMON) $(GAME) $(EXTRAS) $(CONSOLE) platform/console/plat_z88.asm -o $(@D)/simcity
 
-# Z88_DI_SIM: each simulation slice runs with OZ's interrupts disabled (OZ_DI/OZ_EI around sim_step in
-# engine_c.asm).  OZ's interrupt handling needs the stack below $2000, and the simulation's coroutine
-# stack is in application RAM; an interrupt arriving while it is in use crashed the Z88 emulator.
-# Z88 screen: --generic-console makes conio's gotoxy/fputc_cons the generic console instead of OZ's native
-# text calls, and platform_console.c switches it to z88dk's mode 1: an OZ text window on the left and a 256
-# pixel graphics map on the right, which the console then draws into with our tile font (HAVE_TILES).  The
-# status text goes to the text window with OZ's own string call (platform/console/plat_z88.asm).
-# Z88 as a ROM application for a 32 KB card (two 16 KB banks) with RAM for the data.  The engine
-# keeps code and tables apart from its variables (see engine/sections.asm), so the code and
-# tables go in ROM and the rest in the RAM OZ allocates.  platform/console/zpragma_z88rom.inc
-# sets the origins.  The view is sized 32x16 (the Z88 map is 32 cells wide), which keeps the UI's
-# shadow screen at 1 KB instead of 4 KB.  Output: simcity.epr (the ROM image) plus its banks;
-# z88dk prints how many pages of RAM the application will ask OZ for.  Not yet run on a Z88.
+# Z88 as a ROM application for a 32 KB card (code and tables in ROM, the data in the RAM OZ allocates;
+# see engine/sections.asm and platform/console/zpragma_z88rom.inc).  Output: simcity.epr and its banks.
+# --generic-console: the map is drawn in the console's graphics window with our tile font (HAVE_TILES),
+# the status text goes to OZ's text window.  Z88_DI_SIM runs each simulation slice with OZ's interrupts off.
 Z88ROM_FLAGS = -subtype=app --generic-console -create-app -pragma-include:platform/console/zpragma_z88rom.inc \
                -DTARGET_Z88 -Ca-DZ88_DI_SIM -DHAVE_TILES -DMAX_VIEW_W=32 -DMAX_VIEW_H=8
 

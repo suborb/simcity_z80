@@ -13,7 +13,6 @@ import subprocess
 import sys
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
-Z88DK = os.environ.get('Z88DK', os.path.expanduser('~/z88dk'))
 OUT = os.path.join(ROOT, 'build', 'tiles')
 ZORG = 24000
 ART = open(os.path.join(ROOT, 'assets', 'udgs.bin'), 'rb').read()
@@ -26,8 +25,7 @@ PRINT = '--print' in sys.argv        # draw by printing characters instead of th
 
 def build():
     os.makedirs(OUT, exist_ok=True)
-    env = dict(os.environ, ZCCCFG=os.path.join(Z88DK, 'lib', 'config'),
-               PATH=os.path.join(Z88DK, 'bin') + os.pathsep + os.environ['PATH'])
+    env = os.environ
     cmd = os.environ.get('ZCC', 'zcc -compiler=80cc -fframe-pointer').split() + ['+zx', f'-zorg={ZORG}', '-pragma-include:platform/console/zpragma_zx.inc', '-Ca-DPORTABLE',
            '-Ca-Iengine', '-Ca-I.', '-Iui', '-Cc-standard-escape-chars', '-m',
            '-DTARGET_ZX', '-Ca-DTARGET_ZX', '-DHAVE_TILES'] + (['-DZX_PRINT'] if PRINT else []) + [ '-DMAX_VIEW_W=32', '-DMAX_VIEW_H=16',
@@ -57,7 +55,7 @@ def run(syms):
     image = bytes(ZORG) + binary
     img_path = os.path.join(OUT, 'tiles.img')
     open(img_path, 'wb').write(image)
-    subprocess.run([os.path.join(Z88DK, 'bin', 'z88dk-ticks'), '-pc', f'{ZORG:x}', '-end', f'{end:x}',
+    subprocess.run(['z88dk-ticks', '-pc', f'{ZORG:x}', '-end', f'{end:x}',
                     '-counter', '2000000000', '-output', dump, img_path], capture_output=True, text=True)
     return open(dump, 'rb').read()
 

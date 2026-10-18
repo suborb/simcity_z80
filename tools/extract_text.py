@@ -7,7 +7,7 @@ Spectrum game's own text tables, by assembling disassembly/sim_game.asm.
 import os, re, shutil, subprocess, sys, tempfile
 
 ROOT = os.getcwd()
-Z80ASM = os.path.join(os.environ.get('Z88DK', os.path.expanduser('~/z88dk')), 'bin', 'z80asm')
+Z80ASM = 'z88dk-z80asm'
 ORG = 23323
 
 
