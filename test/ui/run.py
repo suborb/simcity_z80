@@ -151,6 +151,36 @@ def main():
     check('simulation advances the date', year > 1902 or mem[syms['_V_month']] > 0,
           f'year={year} month={mem[syms["_V_month"]]}')
 
+    # --- 4. menu commands (what the Z88's OZ menus send) behave like the keys ------------------
+    CMD_TOOL, CMD_NEW_CITY, CMD_PAUSE = 0x81, 0x90, 0x91
+    CMD_FAST, CMD_NORMAL, CMD_SLOW = 0x92, 0x93, 0x94
+    CMD_COAL, CMD_NUCLEAR, CMD_DIS_ON, CMD_DIS_OFF, CMD_BULL_ON, CMD_BULL_OFF = 0x95, 0x96, 0x97, 0x98, 0x99, 0x9A
+    CMD_QUIT, CMD_REDRAW = 0x9B, 0x9C
+    byte = lambda mem, name: mem[syms[name]]
+
+    mem = run(binary, syms, [LEVEL_MEDIUM, CMD_TOOL + 5, 0, 0])
+    check('command: tool 5 chooses residential', any('RESIDENTIAL' in row for row in screen(mem, syms)))
+    mem = run(binary, syms, [LEVEL_MEDIUM, CMD_TOOL + 13, 0, 0])
+    check('command: tool 13 chooses the airport', any('AIRPORT' in row for row in screen(mem, syms)))
+    for cmd, word in ((CMD_FAST, 'FAST'), (CMD_SLOW, 'SLOW'), (CMD_PAUSE, 'PAUSED'), (CMD_NORMAL, 'NORMAL')):
+        mem = run(binary, syms, [LEVEL_MEDIUM, CMD_PAUSE if cmd == CMD_NORMAL else cmd, cmd if cmd == CMD_NORMAL else 0, 0, 0])
+        check(f'command: speed shows {word}', any(word in row for row in screen(mem, syms)))
+    mem = run(binary, syms, [LEVEL_MEDIUM, CMD_DIS_OFF, CMD_BULL_OFF, CMD_NUCLEAR, 0])
+    check('command: disasters off', byte(mem, '_V_disaster_reset') == 1)
+    check('command: auto-bulldoze off', byte(mem, '_V_auto_bulldoze') == 0)
+    mem = run(binary, syms, [LEVEL_MEDIUM, CMD_DIS_OFF, CMD_DIS_ON, CMD_BULL_OFF, CMD_BULL_ON, 0])
+    check('command: disasters and auto-bulldoze back on', byte(mem, '_V_disaster_reset') == 0 and byte(mem, '_V_auto_bulldoze') == 1)
+    mem = run(binary, syms, [LEVEL_MEDIUM, CMD_QUIT, ord('3')])
+    check('command: quit leaves the game', byte(mem, '_test_done') == 1 and byte(mem, '_V_difficulty') == 1,
+          f'difficulty {byte(mem, "_V_difficulty")}')
+    mem = run(binary, syms, [LEVEL_MEDIUM, CMD_NEW_CITY, ord('3'), CMD_TOOL + 2, 0, 0])
+    check('command: new city goes back to the title and starts a harder city',
+          byte(mem, '_V_difficulty') == 2 and byte(mem, '_test_done') == 1, f'difficulty {byte(mem, "_V_difficulty")}')
+    check('command: the new city is drawn (tool shown, map present)',
+          any('POWER LINES' in row for row in screen(mem, syms)) and any('~' in row for row in screen(mem, syms)[8:]))
+    mem = run(binary, syms, [LEVEL_MEDIUM, CMD_REDRAW, 0, 0])
+    check('command: redraw draws the status panel again', any('FUNDS $10000' in row for row in screen(mem, syms)))
+
     print()
     print('\n'.join(scr))
     print()

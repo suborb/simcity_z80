@@ -39,6 +39,8 @@ static uint8_t origin_x, origin_y;      /* map cell at the top left of the view 
 static uint8_t tool;
 static uint8_t frame;
 static uint8_t quit;
+static uint8_t restart;                 /* quit this city and start another */
+static uint8_t redraw;                  /* the screen was overwritten: draw everything again */
 static uint8_t power_nuclear;           /* what the power plant tool builds */
 /* Everything the status panel shows, to tell when it needs redrawing. */
 struct status {
@@ -380,10 +382,24 @@ static void handle_key(uint8_t k)
     case '-':
         if (V_simulation_speed < 2) ++V_simulation_speed;
         break;
-    case 'x': case KEY_ESC: quit = 1; break;
+    case 'x': case KEY_ESC: case CMD_QUIT: quit = 1; break;
+    case CMD_NEW_CITY:         restart = quit = 1; break;
+    case CMD_PAUSE:            V_simulation_speed = (V_simulation_speed == 3) ? 1 : 3; break;
+    case CMD_SPEED_FAST:       V_simulation_speed = 0; break;
+    case CMD_SPEED_NORMAL:     V_simulation_speed = 1; break;
+    case CMD_SPEED_SLOW:       V_simulation_speed = 2; break;
+    case CMD_POWER_COAL:       power_nuclear = 0; break;
+    case CMD_POWER_NUCLEAR:    power_nuclear = 1; break;
+    case CMD_DISASTERS_ON:     V_disaster_reset = 0; break;
+    case CMD_DISASTERS_OFF:    V_disaster_reset = 1; break;
+    case CMD_AUTOBULLDOZE_ON:  V_auto_bulldoze = 1; break;
+    case CMD_AUTOBULLDOZE_OFF: V_auto_bulldoze = 0; break;
+    case CMD_REDRAW:           redraw = 1; break;
     default:
         if (k >= '0' && k <= '9')
             set_tool((uint8_t)(k - '0'));
+        else if (k >= CMD_TOOL && k < CMD_TOOL + NUM_TOOLS)
+            set_tool((uint8_t)(k - CMD_TOOL));
         break;
     }
 }
@@ -425,13 +441,12 @@ static void title_screen(void)
     plat_flush();
 }
 
-void game_run(void)
+/* One city, from the title screen until it is quit or replaced. */
+static void play_city(void)
 {
     uint8_t k, countdown, ticking = 0, full, last_ox = 0, last_oy = 0;
     struct status st, last_st;
 
-    plat_init();
-    choose_layout();
     title_screen();
 
     V_auto_budget = 1;
@@ -449,6 +464,7 @@ void game_run(void)
     clamp_view();
     plat_clear();
     invalidate_view();
+    last_cx = 255;                          /* draw the whole view on the first frame */
     countdown = tick_frames[V_simulation_speed];
     memset(&st, 0, sizeof(st));
     memset(&last_st, 0xFF, sizeof(last_st));          /* nothing drawn yet */
@@ -481,7 +497,14 @@ void game_run(void)
         sim_periodic();
 
         /* a full pass over the map only when the view has moved */
-        full = origin_x != last_ox || origin_y != last_oy;
+        if (redraw) {                       /* OZ drew over us: start the screen again */
+            redraw = 0;
+            plat_clear();
+            invalidate_view();
+            memset(&last_st, 0xFF, sizeof(last_st));
+            last_cx = 255;
+        }
+        full = origin_x != last_ox || origin_y != last_oy || last_cx == 255;
         last_ox = origin_x;
         last_oy = origin_y;
         draw_view(full, map_dirty);
@@ -507,5 +530,15 @@ void game_run(void)
         ++frame;
         plat_idle();
     }
+}
+
+void game_run(void)
+{
+    plat_init();
+    choose_layout();
+    do {
+        quit = restart = 0;
+        play_city();
+    } while (restart);
     plat_exit();
 }

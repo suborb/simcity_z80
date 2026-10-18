@@ -15,6 +15,24 @@
 #define KEY_ENTER  13
 #define KEY_ESC    27
 
+/* Commands.  A platform with menus (the Z88's OZ menus) returns these from plat_key() just as it
+   returns keys; the game treats them like the keys that do the same thing.  The codes are the
+   range OZ gives menu commands (0x81..0xB0), which the Z88's application descriptor uses. */
+#define CMD_TOOL            0x81    /* + tool number 0..13 (0x81..0x8E): choose that tool */
+#define CMD_NEW_CITY        0x90    /* back to the title screen, then a new city */
+#define CMD_PAUSE           0x91    /* pause or resume */
+#define CMD_SPEED_FAST      0x92
+#define CMD_SPEED_NORMAL    0x93
+#define CMD_SPEED_SLOW      0x94
+#define CMD_POWER_COAL      0x95    /* what the power plant tool builds */
+#define CMD_POWER_NUCLEAR   0x96
+#define CMD_DISASTERS_ON    0x97
+#define CMD_DISASTERS_OFF   0x98
+#define CMD_AUTOBULLDOZE_ON 0x99    /* tools clear what is in the way */
+#define CMD_AUTOBULLDOZE_OFF 0x9A
+#define CMD_QUIT            0x9B
+#define CMD_REDRAW          0x9C    /* the screen was overwritten (OZ asks for a redraw) */
+
 extern void     plat_init(void);
 extern void     plat_exit(void);
 extern uint8_t  plat_cols(void);                /* character columns */
