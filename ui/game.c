@@ -470,7 +470,7 @@ static void draw_status(void)
 #endif
     {
         st_line[0] = help_page[panel_h >= 7 ? 0 : (frame >> 6) % 3];
-        st_line[1] = icons ? ", . TOOL  0-9 PICK  H PAUSE  X QUIT" : help_page[1];
+        st_line[1] = icons ? "TAB TOOL  0-9 PICK  H PAUSE  X QUIT" : help_page[1];
         st_line[2] = help_page[2];
         fmt_fields(status_help, icons ? 2 : panel_h >= 7 ? 3 : 1);
     }

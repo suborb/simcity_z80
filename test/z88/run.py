@@ -4,8 +4,6 @@
 
   * every command except CMD_REDRAW (which OZ sends itself) has exactly one menu item, and
     every menu item sends a command that exists;
-  * the Tools menu lists the game's tools in order: item n sends CMD_TOOL + n and is named
-    like tool n in ui/text.c;
   * the shortcut keys (typed after the [] key) are letter sequences, each different, none the
     start of another, and each begins with its menu's initial, which is not M, I or J (ENTER, TAB
     and LF are <>M, <>I and <>J);
@@ -66,13 +64,7 @@ check('no shortcut starts with M, I or J (the ENTER, TAB and LF keys are <>M, <>
       not [k for k in seqs if k and k[0] in 'MIJ'], str([k for k in seqs if k and k[0] in 'MIJ']))
 check('at most 7 menus of 24 items', len(topics) <= 7 and all(sum(1 for (t, _) in items if t == k) <= 24 for k in topics))
 
-tools_topic = next((k for k, v in topics.items() if v == 'Tools'), None)
-names = re.findall(r'"([^"$]*?)\s*\$\d+"', text_h[text_h.index('text_tools'):text_h.index('};', text_h.index('text_tools'))])
-tool_items = sorted((i, v) for (t, i), v in items.items() if t == tools_topic)
-check('the Tools menu has one item per tool', len(tool_items) == len(names) == 14, f'{len(tool_items)} items, {len(names)} tools')
-bad = [(n, name, code) for n, ((_, (name, code)), tool) in enumerate(zip(tool_items, names))
-       if code != tool0 + n or not (name.lower().replace('-', ' ').startswith(tool.lower()[:5]) or tool.lower().startswith(name.lower()[:5]))]
-check('tool item n sends CMD_TOOL + n and is named like tool n', not bad, str(bad[:3]))
+check('there is no Tools menu (the icons and TAB choose a tool)', 'Tools' not in topics.values() and not any(tool0 <= c < tool0 + 14 for c in sent))
 
 # The icons the text window shows: the Spectrum's 16x16 tool icons, frame cut off, as 2x2 Z88 cells of 6x8.
 icons = open(os.path.join(ROOT, 'assets', 'z88_icons.bin'), 'rb').read()
