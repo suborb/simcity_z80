@@ -5,7 +5,7 @@
   * every command except CMD_REDRAW (which OZ sends itself) has exactly one menu item, and
     every menu item sends a command that exists;
   * the Tools menu lists the game's tools in order: item n sends CMD_TOOL + n and is named
-    like tool n in ui/text.h;
+    like tool n in ui/text.c;
   * the shortcut keys (typed after the [] key) are letter sequences, each different, none the
     start of another, and each begins with its menu's initial, which is not M, I or J (ENTER, TAB
     and LF are <>M, <>I and <>J);
@@ -20,7 +20,7 @@ import sys
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 read = lambda p: open(os.path.join(ROOT, p), encoding='latin-1').read()
 
-platform_h, dor, text_h = read('ui/platform.h'), read('platform/console/z88_dor.c'), read('ui/text.h')
+platform_h, dor, text_h = read('ui/platform.h'), read('platform/console/z88_dor.c'), read('ui/text.c')
 failures = []
 
 

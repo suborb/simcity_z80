@@ -22,7 +22,7 @@ ZCC ?= zcc -compiler=80cc -fframe-pointer
 # (engine, repository root for assets/) and the C compiler (ui).
 COMMON = -Ca-DPORTABLE -Ca-Iengine -Ca-I. -Iui -Cc-standard-escape-chars -m
 
-GAME    = ui/main.c ui/game.c ui/numfmt.c ui/numfmt.asm engine/engine_c.asm platform/common/hooks.asm
+GAME    = ui/main.c ui/game.c ui/text.c ui/numfmt.c ui/numfmt.asm engine/engine_c.asm platform/common/hooks.asm
 # The mini maps (ui/minimap.c), the budget and evaluation screens (HAVE_REPORTS) and the moving
 # sprites (ui/sprites.c): not on the Spectrum, whose memory
 # has no room for them (the Spectrum has its own budget screen).

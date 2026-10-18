@@ -14,13 +14,10 @@
 #include <stdint.h>
 #include "engine.h"
 #include "platform.h"
+#include "text.h"
 #include "textfmt.h"
 #include "numfmt.h"
 #include "evaluation.h"
-
-/* Not text.h, which would put a second copy of all its strings in the program. */
-static const char *const city_classes[6] = { "VILLAGE", "TOWN", "CITY", "CAPITAL", "METROPOLIS", "MEGALOPOLIS" };
-static const char *const levels[3] = { "EASY", "MEDIUM", "HARD" };
 
 static const uint8_t class_from[5][3] = {           /* population where each class starts, 24 bit */
     { 0xD0, 0x07, 0x00 },   /* 2000 */
@@ -139,8 +136,8 @@ static void draw(const struct evaluation *e)
     plat_text_puts(0, 6, b);
 
     fmt_blank(b);
-    n = fmt_str(b, 0, city_classes[e->city_class]);
-    fmt_str(b, (uint8_t)(n + 2), levels[V_difficulty > 2 ? 2 : V_difficulty]);
+    n = fmt_str(b, 0, text_city_class[e->city_class]);
+    fmt_str(b, (uint8_t)(n + 2), text_levels[V_difficulty > 2 ? 2 : V_difficulty]);
     fmt_str(b, 31, "ENTER OK");
     plat_text_puts(0, 7, b);
     plat_flush();

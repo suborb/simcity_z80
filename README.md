@@ -31,7 +31,7 @@ Z80 based computer.
 | `platform/console/` | z88dk console and keyboard front end used by the Aquarius+, NC200 and Z88 builds. |
 | `platform/common/` | Settings and hooks the engine needs, for C programs. |
 | `platform/test`, `platform/test_ui/` | Headless platforms used by the tests. |
-| `tools/` | `split_engine.py` (extract the engine), `extract_text.py` (generate `ui/text.h`), `find_dead.py`, `make_map_art.py`. |
+| `tools/` | `split_engine.py` (extract the engine), `extract_text.py` (generate `ui/text.h` and `ui/text.c`), `find_dead.py`, `make_map_art.py`. |
 | `Makefile` | Builds every platform (`make zx`, `make aqplus`, ...) and runs the tests (`make check`). |
 | `test/` | `run_all.sh` runs everything. |
 | `PORTING.md` | Strategy, status and plan. |
