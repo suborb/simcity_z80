@@ -23,10 +23,14 @@
 #include "sprites.h"
 #define DRAW_SPRITES
 #endif
-#ifdef HAVE_REPORTS
 #include "textfmt.h"
+#ifdef HAVE_BUDGET
 #include "budget.h"
+#endif
+#ifdef HAVE_EVALUATION
 #include "evaluation.h"
+#endif
+#ifdef HAVE_FILES
 #include "cityfile.h"
 #endif
 #include "game.h"
@@ -92,7 +96,7 @@ static uint32_t citypop(void)
     return (uint32_t)V_CityPop[0] | ((uint32_t)V_CityPop[1] << 8) | ((uint32_t)V_CityPop[2] << 16);
 }
 
-#ifndef HAVE_REPORTS
+#ifndef HAVE_FIELDS
 static uint8_t put_number(char *buf, uint32_t v)
 {
     return fmt_dec(buf, v);
@@ -406,7 +410,7 @@ static const char *const help_page[3] = {
     "H PAUSE  + - SPEED  X QUIT",
 };
 
-#ifdef HAVE_REPORTS
+#ifdef HAVE_FIELDS
 /* The status panel as tables of fields (ui/textfmt.h): the pointers are set from the game's state just
    before it is drawn. */
 static const char *st_month, *st_tool, *st_speed, *st_alert, *st_line[3];
@@ -574,7 +578,7 @@ static void set_tool(uint8_t t)
         tool = t;
 }
 
-#ifdef HAVE_REPORTS
+#ifdef HAVE_BUDGET
 /* The budget screen, modal.  The engine asks for it once a year (sim_step returns 2 and the main loop calls
    this, the simulation parked); the player can also look at it, and change the rates, any time. */
 void game_budget(void)
@@ -585,6 +589,11 @@ void game_budget(void)
         redraw = 1;                         /* it used the text area */
 }
 
+#else
+#define game_budget()
+#endif
+
+#ifdef HAVE_EVALUATION
 /* The evaluation screen, modal. */
 static void game_evaluation(void)
 {
@@ -593,7 +602,11 @@ static void game_evaluation(void)
     else
         redraw = 1;
 }
+#else
+#define game_evaluation()
+#endif
 
+#ifdef HAVE_FILES
 /* Save the city to a file, or load one. */
 static void game_save(void)
 {
@@ -622,8 +635,6 @@ static void game_load(void)
     }
 }
 #else
-#define game_budget()
-#define game_evaluation()
 #define game_save()
 #define game_load()
 #endif
@@ -738,7 +749,7 @@ static void play_city(void)
 
     title_screen();
 
-#ifdef HAVE_REPORTS
+#ifdef HAVE_BUDGET
     V_auto_budget = 0;                      /* the annual budget waits for the player (game_budget) */
 #else
     V_auto_budget = 1;
@@ -781,7 +792,7 @@ static void play_city(void)
             if (ticking) {
                 for (k = 0; k < SLICES_PER_FRAME; ++k) {
                     full = sim_step();
-#ifdef HAVE_REPORTS
+#ifdef HAVE_BUDGET
                     if (full == 2) {            /* the annual budget needs the player: show it here, not in the simulation */
                         game_budget();
                         V_wait_for_budget_confirm = 0;

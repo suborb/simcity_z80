@@ -23,11 +23,11 @@ ZCC ?= zcc -compiler=80cc -fframe-pointer
 COMMON = -Ca-DPORTABLE -Ca-Iengine -Ca-I. -Iui -Cc-standard-escape-chars -m
 
 GAME    = ui/main.c ui/game.c ui/text.c ui/textfmt.c ui/numfmt.asm engine/engine_c.asm platform/common/hooks.asm
-# The mini maps (ui/minimap.c), the budget and evaluation screens (HAVE_REPORTS) and the moving
-# sprites (ui/sprites.c): not on the Spectrum, whose memory
-# has no room for them (the Spectrum has its own budget screen).
+# The optional features, each its own flag: mini maps, the budget and evaluation screens, saving and
+# loading, and the moving sprites.  (HAVE_FIELDS, the status panel and screens drawn from tables, comes with
+# any of the screens.)  The Spectrum has none of them yet: its memory has no room.
 EXTRAS  = ui/minimap.c ui/budget.c ui/evaluation.c ui/sprites.c ui/cityfile.c platform/console/plat_sprites.asm \
-          -DHAVE_MINIMAP -DHAVE_REPORTS -DHAVE_SPRITES
+          -DHAVE_MINIMAP -DHAVE_BUDGET -DHAVE_EVALUATION -DHAVE_FILES -DHAVE_FIELDS -DHAVE_SPRITES
 CONSOLE = platform/console/plat_console.c platform/console/plat_font.asm
 
 # Everything a build depends on.

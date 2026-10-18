@@ -1,8 +1,16 @@
-/* Numbers as text, and (with HAVE_REPORTS) the screens that are tables of fields. */
+/* Numbers as text, and (with HAVE_FIELDS) the screens that are tables of fields.  The screens that use
+   them (HAVE_BUDGET, HAVE_EVALUATION, HAVE_FILES) bring HAVE_FIELDS with them, as does a build that wants
+   the status panel drawn that way. */
 #ifndef TEXTFMT_H
 #define TEXTFMT_H
 
 #include <stdint.h>
+
+#if defined(HAVE_BUDGET) || defined(HAVE_EVALUATION) || defined(HAVE_FILES)
+#ifndef HAVE_FIELDS
+#define HAVE_FIELDS
+#endif
+#endif
 
 /* v in decimal at b, no leading zeros ("0" for 0); returns the number of characters, up to 8.  There is
    no 32 bit division in it: see numfmt.asm. */
@@ -11,7 +19,7 @@ extern uint8_t fmt_dec(char *b, uint32_t v);
 /* The same for the 24 bit value in t[0..2] (little endian); t must have 7 bytes, which are overwritten. */
 extern uint8_t fmt_dec3(char *b, uint8_t *t);
 
-#ifdef HAVE_REPORTS
+#ifdef HAVE_FIELDS
 extern uint8_t  fmt_str(char *b, uint8_t n, const char *s); /* s at b[n..]; returns the column after it */
 extern void     fmt_blank(char *b);                         /* 40 spaces and a NUL */
 

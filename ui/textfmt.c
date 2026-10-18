@@ -26,7 +26,7 @@ uint8_t fmt_dec(char *b, uint32_t v)
     return fmt_dec3(b, t);
 }
 
-#ifdef HAVE_REPORTS
+#ifdef HAVE_FIELDS
 #include "platform.h"
 
 uint8_t fmt_str(char *b, uint8_t n, const char *s)
