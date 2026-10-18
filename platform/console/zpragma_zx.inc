@@ -1,5 +1,5 @@
 // z88dk pragmas for the ZX Spectrum build, used with -pragma-include: by the Makefile and
-// by test/tiles and test/stack, so that they all build the same program.
+// by test/tiles, so that they all build the same program.
 // (The load address is -zorg=24000 on the command line: below about that, appmake embeds
 // the program in a BASIC REM line at 23760 instead of using a separate loader, and the
 // code would not be where it was linked.)

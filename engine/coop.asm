@@ -55,7 +55,7 @@ SIM_STACK_SIZE  equ     256             ; the engine nests a few calls deep, plu
 
 sim_task_reset:
         IFDEF   SIM_STACK_FILL
-        ; test builds only: fill the stack with a pattern so test/stack can see how deep it went
+        ; test builds only: fill the stack with a pattern so test/golden can see how deep it went
         ld      hl,sim_stack
         ld      de,sim_stack+1
         ld      bc,SIM_STACK_SIZE-1
