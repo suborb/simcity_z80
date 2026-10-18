@@ -34,6 +34,8 @@
 #define CMD_REDRAW          0x9C    /* the screen was overwritten (OZ asks for a redraw) */
 #define CMD_MAP             0x9D    /* + view 0..5 (0x9D..0xA2): show that mini map (see ui/minimap.h) */
 #define CMD_MAP_OFF         0xA3    /* back to the city */
+#define CMD_BUDGET          0xA4    /* the budget screen */
+#define CMD_EVALUATION      0xA5    /* the evaluation screen: how the mayor is doing */
 
 extern void     plat_init(void);
 extern void     plat_exit(void);

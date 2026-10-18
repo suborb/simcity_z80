@@ -21,7 +21,7 @@
         SECTION code_user
 
         PUBLIC  _sim_new_city, _sim_init, _sim_tick, _sim_step, _sim_periodic, _tool_apply
-        PUBLIC  _view_fetch
+        PUBLIC  _view_fetch, _budget_recalc
         PUBLIC  _view_tile_art
         defc    _view_tile_art = view_udgs + ART_TILES
         PUBLIC  _engine_a, _view_x, _view_y, _view_art, _view_attr
@@ -100,6 +100,18 @@ _sim_periodic:
         pop     ix
         ret
 
+; The budget figures from the current tax rate and funding levels (the engine does this each time the
+; Spectrum's budget screen changes one): V_tax_collected, the allocations, V_cashflow and
+; V_money_after_budget.  Does not touch V_money.
+_budget_recalc:
+        push    ix
+        push    iy
+        call    calculate_tax
+        call    run_budget
+        pop     iy
+        pop     ix
+        ret
+
 _tool_apply:
         push    ix
         push    iy
@@ -139,6 +151,13 @@ _view_attr:     defb    0
         PUBLIC  _V_InitialSeed, _V_view_tick, _V_sim_loop_counter
         PUBLIC  _V_TrafficAverage, _V_PolluteAverage, _V_concern_crime, _V_unemployment
         PUBLIC  _V_transport_active, _V_transport_pos, _V_transport_sprite
+        PUBLIC  _V_tax_collected, _V_Transport_Funding_Requested, _V_Budget_Police_Funding_Requested
+        PUBLIC  _V_Budget_Fire_Funding_Requested, _V_Transport_Funding_Allocated
+        PUBLIC  _V_Police_Funding_Allocated, _V_Fire_Funding_Allocated, _V_expenditure, _V_cashflow
+        PUBLIC  _V_previous_money, _V_money_after_budget
+        PUBLIC  _V_wait_for_budget_confirm
+        PUBLIC  _V_display_population, _V_population, _V_prev_year_population, _V_previous_city_score
+        PUBLIC  _V_LVAverage, _V_concern_house_price, _V_unPwrdZCnt
 
         defc    _levelmap           = levelmap
         defc    _minimaps           = minimaps
@@ -164,3 +183,22 @@ _view_attr:     defb    0
         defc    _V_transport_active = V_transport_active
         defc    _V_transport_pos    = V_transport_pos
         defc    _V_transport_sprite = V_transport_sprite
+        defc    _V_tax_collected    = V_tax_collected
+        defc    _V_Transport_Funding_Requested     = V_Transport_Funding_Requested
+        defc    _V_Budget_Police_Funding_Requested = V_Budget_Police_Funding_Requested
+        defc    _V_Budget_Fire_Funding_Requested   = V_Budget_Fire_Funding_Requested
+        defc    _V_Transport_Funding_Allocated     = V_Transport_Funding_Allocated
+        defc    _V_Police_Funding_Allocated        = V_Police_Funding_Allocated
+        defc    _V_Fire_Funding_Allocated          = V_Fire_Funding_Allocated
+        defc    _V_expenditure      = V_expenditure
+        defc    _V_cashflow         = V_cashflow
+        defc    _V_previous_money   = V_previous_money
+        defc    _V_money_after_budget = V_money_after_budget
+        defc    _V_wait_for_budget_confirm = V_wait_for_budget_confirm
+        defc    _V_display_population   = V_display_population
+        defc    _V_population           = V_population
+        defc    _V_prev_year_population = V_prev_year_population
+        defc    _V_previous_city_score  = V_previous_city_score
+        defc    _V_LVAverage            = V_LVAverage
+        defc    _V_concern_house_price  = V_concern_house_price
+        defc    _V_unPwrdZCnt           = V_unPwrdZCnt

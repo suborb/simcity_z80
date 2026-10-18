@@ -8,8 +8,9 @@
    checks).
 
    Shortcuts: the user presses the [] (square) key and then types the letters of the item's KEY.  The letters are up to the application: here the first is the menu's initial
-   (Game, Tools, Speed, Options, Maps) and the rest name the item, with no sequence the start of
-   another (test/z88 checks that too). */
+   (Game, Tools, Speed, Options, Views) and the rest name the item, with no sequence the start of
+   another (test/z88 checks that too).  Keep M, I and J off the front of them: the ENTER key is Ctrl-M
+   (<>M), TAB is <>I and <>J is LF, and OZ takes those for a shortcut that starts with the letter. */
 #include <dor.h>
 
 #define APP_NAME "SimCity"
@@ -27,9 +28,15 @@
 #define TOPIC1_2             "Pause"
 #define TOPIC1_2KEY          "GP"
 #define TOPIC1_2CODE         0x91
-#define TOPIC1_3             "Quit"
-#define TOPIC1_3KEY          "GQ"
-#define TOPIC1_3CODE         0x9B
+#define TOPIC1_3             "Budget"
+#define TOPIC1_3KEY          "GB"
+#define TOPIC1_3CODE         0xA4
+#define TOPIC1_4             "Evaluation"
+#define TOPIC1_4KEY          "GE"
+#define TOPIC1_4CODE         0xA5
+#define TOPIC1_5             "Quit"
+#define TOPIC1_5KEY          "GQ"
+#define TOPIC1_5CODE         0x9B
 
 /* ---- Tools: CMD_TOOL + the tool's number, in the order of the game's tool keys ---- */
 #define TOPIC2               "Tools"
@@ -109,28 +116,29 @@
 #define TOPIC4_6KEY          "OBF"
 #define TOPIC4_6CODE         0x9A
 
-/* ---- Maps: CMD_MAP + the view (ui/minimap.h), then back to the city ---- */
-#define TOPIC5               "Maps"
+/* ---- Views: the mini maps, CMD_MAP + the view (ui/minimap.h), then back to the city.  Not "Maps": its
+   shortcuts would start with M, and the ENTER key is Ctrl-M (<>M), which OZ then takes for them ---- */
+#define TOPIC5               "Views"
 #define TOPIC5_1             "City"
-#define TOPIC5_1KEY          "MC"
+#define TOPIC5_1KEY          "VC"
 #define TOPIC5_1CODE         0x9D
 #define TOPIC5_2             "Pollution"
-#define TOPIC5_2KEY          "MU"
+#define TOPIC5_2KEY          "VU"
 #define TOPIC5_2CODE         0x9E
 #define TOPIC5_3             "Police coverage"
-#define TOPIC5_3KEY          "MO"
+#define TOPIC5_3KEY          "VO"
 #define TOPIC5_3CODE         0x9F
 #define TOPIC5_4             "Fire coverage"
-#define TOPIC5_4KEY          "MF"
+#define TOPIC5_4KEY          "VF"
 #define TOPIC5_4CODE         0xA0
 #define TOPIC5_5             "Traffic"
-#define TOPIC5_5KEY          "MT"
+#define TOPIC5_5KEY          "VT"
 #define TOPIC5_5CODE         0xA1
 #define TOPIC5_6             "Power"
-#define TOPIC5_6KEY          "MW"
+#define TOPIC5_6KEY          "VW"
 #define TOPIC5_6CODE         0xA2
 #define TOPIC5_7             "Back to the city"
-#define TOPIC5_7KEY          "MX"
+#define TOPIC5_7KEY          "VX"
 #define TOPIC5_7CODE         0xA3
 
 #include <application.h>

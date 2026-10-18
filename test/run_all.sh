@@ -28,4 +28,8 @@ echo "== UI: game core under scripted keys"
 python3 test/ui/run.py | grep -E "^(PASS|FAIL)|passed|FAILED"
 echo
 echo "== builds"
-for t in aqplus nc200 z88 z88rom zx zx-print; do make -s $t >/dev/null && echo "built $t"; done
+status=0
+for t in aqplus nc200 z88 z88rom zx zx-print; do
+    if make -s $t >/dev/null 2>&1; then echo "built $t"; else echo "FAIL  build $t"; status=1; fi
+done
+exit $status

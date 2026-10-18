@@ -7,7 +7,8 @@
   * the Tools menu lists the game's tools in order: item n sends CMD_TOOL + n and is named
     like tool n in ui/text.h;
   * the shortcut keys (typed after the [] key) are letter sequences, each different, none the
-    start of another, and each begins with its menu's initial;
+    start of another, and each begins with its menu's initial, which is not M, I or J (ENTER, TAB
+    and LF are <>M, <>I and <>J);
   * the menus stay within OZ's limits (7 topics, 24 items each, command codes 0x81..0xB0).
 
   usage: test/z88/run.py
@@ -61,6 +62,8 @@ check('no shortcut is the start of another', not clash, str(clash[:3]))
 check('each shortcut starts with its menu initial',
       all(k and k[0] == topics[t][0] for (t, _), k in shortcuts.items()),
       str([(topics[t], k) for (t, _), k in shortcuts.items() if not k or k[0] != topics[t][0]]))
+check('no shortcut starts with M, I or J (the ENTER, TAB and LF keys are <>M, <>I and <>J, which OZ would take for them)',
+      not [k for k in seqs if k and k[0] in 'MIJ'], str([k for k in seqs if k and k[0] in 'MIJ']))
 check('at most 7 menus of 24 items', len(topics) <= 7 and all(sum(1 for (t, _) in items if t == k) <= 24 for k in topics))
 
 tools_topic = next((k for k, v in topics.items() if v == 'Tools'), None)

@@ -29,7 +29,7 @@ uint8_t test_text[TEXT_ROWS][TEXT_COLS];    /* the separate text window */
 uint16_t test_put_count;                /* plat_put calls: cells and characters drawn */
 
 /* Keys fed to the game, one per frame; 0 = no key.  The harness patches this. */
-uint8_t test_script[1024] = { '2', 0 };
+uint8_t test_script[2048] = { '2', 0 };
 uint16_t test_script_pos;
 
 void plat_init(void) { }
@@ -127,12 +127,25 @@ void plat_idle(void) { }
 /* The mini map tests want something in the coverage maps, which a city has none of until it has run
    for a year.  After the new city is made (the first frames), fill them with a pattern. */
 extern uint8_t minimaps[6912];
+/* ...and the evaluation wants a city with people in it and some problems (unless a test turns it off). */
+extern uint8_t V_display_population[3], V_population[3], V_prev_year_population[3], V_previous_city_score[3];
+extern uint8_t V_TrafficAverage, V_PolluteAverage, V_concern_crime, V_concern_house_price;
+extern uint16_t V_LVAverage, V_unemployment;
+uint8_t test_poke_city = 1;
 void plat_flush(void)
 {
     uint16_t i;
-    if (++test_frames == 3)
+    if (++test_frames == 3) {
         for (i = 0; i < sizeof(minimaps); ++i)
             minimaps[i] = (uint8_t)(i * 37u + (i >> 8) * 11u) & (i < 1152 ? 15 : 255);   /* coverage is 0..15 */
+        if (test_poke_city) {
+            V_display_population[0] = V_population[0] = 0x88; V_display_population[1] = V_population[1] = 0x13;   /* 5000 */
+            V_prev_year_population[0] = 0xA0; V_prev_year_population[1] = 0x0F;                                    /* 4000 */
+            V_previous_city_score[0] = 0xA0; V_previous_city_score[1] = 0x0F;       /* assessed value 4000 thousand */
+            V_TrafficAverage = 20; V_PolluteAverage = 20; V_concern_crime = 40;
+            V_LVAverage = 2; V_concern_house_price = 4; V_unemployment = 0;
+        }
+    }
 }
 #else
 void plat_flush(void) { ++test_frames; }

@@ -19,6 +19,10 @@
 #ifdef HAVE_MINIMAP
 #include "minimap.h"
 #endif
+#ifdef HAVE_REPORTS
+#include "budget.h"
+#include "evaluation.h"
+#endif
 #include "game.h"
 
 #define NUM_TOOLS   14
@@ -183,12 +187,21 @@ static uint8_t glyph(uint8_t x, uint8_t y)
 
 /* ---- drawing -------------------------------------------------------------- */
 static uint8_t last_cx = 255, last_cy;  /* where the cursor was drawn, in view cells */
+static uint8_t last_size, last_phase;   /* its size (the tool's footprint) and blink phase then */
+
+/* The cursor is the size of what the tool would place: a square of tool_size[tool] cells whose top
+   left is the cursor position. */
+static uint8_t in_cursor(uint8_t mx, uint8_t my)
+{
+    uint8_t size = tool_size[tool];
+    return (uint8_t)(mx - cur_x) < size && (uint8_t)(my - cur_y) < size;
+}
 
 /* Draw one cell of the view, unless it already shows the right thing. */
 static void draw_cell(uint8_t cx, uint8_t cy)
 {
     uint8_t mx = (uint8_t)(origin_x + cx), my = (uint8_t)(origin_y + cy);
-    uint8_t cursor = (mx == cur_x && my == cur_y && (frame & 4));
+    uint8_t cursor = ((frame & 4) && in_cursor(mx, my));
     uint16_t *s = &shadow[(uint16_t)cy * MAX_VIEW_W + cx];
     uint16_t g;
 
@@ -216,11 +229,19 @@ static void draw_cell(uint8_t cx, uint8_t cy)
    picture), so a full pass is made only when the view has moved.  Otherwise:
      dirty    the rows a tool has just changed (the engine set map_dirty)
      always   one row in turn, to pick up the simulation's work and the animation
-     always   the cursor's cell, and the one it left */
+     always   the cursor's cells, and the ones it left, when it has moved, changed size or blinked */
+static void draw_footprint(uint8_t cx, uint8_t cy, uint8_t size)
+{
+    uint8_t x, y;
+    for (y = cy; y < (uint8_t)(cy + size) && y < view_h; ++y)
+        for (x = cx; x < (uint8_t)(cx + size) && x < view_w; ++x)
+            draw_cell(x, y);
+}
+
 static void draw_view(uint8_t full, uint8_t dirty)
 {
     static uint8_t refresh_row;
-    uint8_t cx, cy, rows_dirty;
+    uint8_t cx, cy, rows_dirty, size = tool_size[tool], phase = (frame & 4) != 0;
 
     if (full) {
         for (cy = 0; cy < view_h; ++cy)
@@ -238,13 +259,18 @@ static void draw_view(uint8_t full, uint8_t dirty)
             refresh_row = 0;
         for (cx = 0; cx < view_w; ++cx)
             draw_cell(cx, refresh_row);
-        if (last_cx < view_w && last_cy < view_h)
-            draw_cell(last_cx, last_cy);
+        cx = (uint8_t)(cur_x - origin_x);
+        cy = (uint8_t)(cur_y - origin_y);
+        if (cx != last_cx || cy != last_cy || size != last_size || phase != last_phase) {
+            if (last_cx < view_w && last_cy < view_h)
+                draw_footprint(last_cx, last_cy, last_size);
+            draw_footprint(cx, cy, size);
+        }
     }
     last_cx = (uint8_t)(cur_x - origin_x);
     last_cy = (uint8_t)(cur_y - origin_y);
-    if (!full && last_cx < view_w && last_cy < view_h)
-        draw_cell(last_cx, last_cy);
+    last_size = size;
+    last_phase = phase;
 }
 
 static void invalidate_view(void)
@@ -449,6 +475,30 @@ static void set_tool(uint8_t t)
         tool = t;
 }
 
+#ifdef HAVE_REPORTS
+/* The budget screen, modal.  The engine asks for it once a year (sim_step returns 2 and the main loop calls
+   this, the simulation parked); the player can also look at it, and change the rates, any time. */
+void game_budget(void)
+{
+    if (budget_screen())
+        quit = 1;
+    else
+        redraw = 1;                         /* it used the text area */
+}
+
+/* The evaluation screen, modal. */
+static void game_evaluation(void)
+{
+    if (evaluation_screen())
+        quit = 1;
+    else
+        redraw = 1;
+}
+#else
+#define game_budget()
+#define game_evaluation()
+#endif
+
 static void handle_key(uint8_t k)
 {
     switch (k) {
@@ -479,6 +529,8 @@ static void handle_key(uint8_t k)
         break;
     case CMD_QUIT: quit = 1; break;
     case CMD_MAP_OFF: set_map_view(0); break;
+    case 'b': case CMD_BUDGET: game_budget(); break;
+    case 'v': case CMD_EVALUATION: game_evaluation(); break;
     case CMD_NEW_CITY:         restart = quit = 1; break;
     case CMD_PAUSE:            V_simulation_speed = (V_simulation_speed == 3) ? 1 : 3; break;
     case CMD_SPEED_FAST:       V_simulation_speed = 0; break;
@@ -555,7 +607,11 @@ static void play_city(void)
 
     title_screen();
 
+#ifdef HAVE_REPORTS
+    V_auto_budget = 0;                      /* the annual budget waits for the player (game_budget) */
+#else
     V_auto_budget = 1;
+#endif
     V_auto_bulldoze = 1;
     V_disaster_reset = 0;
     V_simulation_speed = 1;
@@ -587,12 +643,21 @@ static void play_city(void)
            SLICES_PER_FRAME rows per frame until it completes. */
         if (tick_frames[V_simulation_speed]) {
             if (ticking) {
-                for (k = 0; k < SLICES_PER_FRAME; ++k)
-                    if (sim_step()) {
+                for (k = 0; k < SLICES_PER_FRAME; ++k) {
+                    full = sim_step();
+#ifdef HAVE_REPORTS
+                    if (full == 2) {            /* the annual budget needs the player: show it here, not in the simulation */
+                        game_budget();
+                        V_wait_for_budget_confirm = 0;
+                        break;
+                    }
+#endif
+                    if (full) {
                         ticking = 0;
                         countdown = tick_frames[V_simulation_speed];
                         break;
                     }
+                }
             } else if (--countdown == 0) {
                 ticking = 1;
             }

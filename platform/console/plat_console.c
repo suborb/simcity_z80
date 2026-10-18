@@ -275,7 +275,7 @@ void plat_put_tile(uint8_t col, uint8_t row, const uint8_t *art, uint8_t attr, u
 #endif
     if (inverse) {
         for (i = 0; i < 8; ++i)
-            cursor_art[i] = (uint8_t)~art[i];
+            cursor_art[i] = (uint8_t)(art[i] ^ 0xFF);
         set_udgs(cursor_art);
         ch = 128;
     } else if (n < NUM_TILE_ART) {
@@ -337,8 +337,9 @@ void plat_put_bitmap(uint8_t col, uint8_t row, const uint8_t *art)
    Notes ("Input and the keyboard decoder"): left $FC, right $FD, down $FE, up $FF, and with
    SHIFT $F8, $F9, $FA, $FB.  Plain cursor keys move one cell and shifted ones eight, as the
    game's o/p/q/a and O/P/Q/A do.  Letters are folded to lower case (the app may run with caps
-   lock on) and the rest of the control codes except ENTER (13) and ESC (27) are ignored, so
-   TAB (9) and LF (10) do not move the cursor. */
+   lock on) and the rest of the control codes except ENTER and ESC (27) are ignored, so TAB (9) does
+   not move the cursor.  ENTER: getk() returns the key's CR (13) as LF (10), because the program is
+   built with -Cc-standard-escape-chars, so 10 is what the ENTER key sends; it is KEY_ENTER here. */
 static uint8_t cmd_queue[8];
 static uint8_t cmd_head, cmd_tail;
 
@@ -380,6 +381,8 @@ uint8_t plat_key(void)
             case 0xFA: return 'A';
             case 0xFB: return 'Q';
             }
+            if (c == 10)                /* getk() turns the ENTER key's CR into LF (standard escape chars) */
+                return KEY_ENTER;
             if (c >= 'A' && c <= 'Z')   /* the app may run with caps lock on */
                 return (uint8_t)(c + 'a' - 'A');
             if (c < ' ' && c != KEY_ENTER && c != KEY_ESC)

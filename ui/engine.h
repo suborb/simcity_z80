@@ -12,7 +12,8 @@
 extern void sim_new_city(void);     /* new random city from V_InitialSeed */
 extern void sim_init(void);
 extern void sim_tick(void);         /* one simulation tick (about 6 million T-states), blocks */
-extern uint8_t sim_step(void);      /* run the simulation one slice (a map row); 1 = a tick has just completed */
+extern uint8_t sim_step(void);      /* run the simulation one slice (a map row); 1 = a tick has just completed;
+                                       2 = it is waiting for the budget (V_wait_for_budget_confirm) */
 extern void sim_periodic(void);     /* uses engine_a = frame counter */
 extern void tool_apply(void);       /* uses V_selected_tool, V_pointer_charxy, V_view_topleft */
 extern void view_fetch(void);       /* view_x, view_y -> view_art, view_attr */
@@ -59,6 +60,19 @@ extern uint8_t V_auto_budget;
 extern uint8_t V_disaster_reset;    /* non-zero: no random disasters */
 extern uint8_t V_auto_bulldoze;
 extern uint8_t V_power_type_chosen; /* power plant tool: 1 nuclear, else coal */
+/* ---- the evaluation (see disassembly: print_evaluation_concerns) ---- */
+extern uint8_t  V_display_population[3], V_population[3], V_prev_year_population[3], V_previous_city_score[3];
+extern uint16_t V_LVAverage, V_unPwrdZCnt, V_unemployment;
+extern uint8_t  V_concern_house_price;
+
+/* ---- the budget (see engine/budget.asm) ---- */
+extern uint8_t V_wait_for_budget_confirm;   /* sim_step returns 2 while set; the UI clears it once it has shown the budget */
+extern void budget_recalc(void);    /* figures from the tax rate and funding levels; not V_money */
+extern uint8_t  V_tax_collected[3];             /* 24 bit */
+extern uint16_t V_Transport_Funding_Requested, V_Budget_Police_Funding_Requested, V_Budget_Fire_Funding_Requested;
+extern uint16_t V_Transport_Funding_Allocated, V_Police_Funding_Allocated, V_Fire_Funding_Allocated;
+extern uint8_t  V_expenditure[3], V_cashflow[3];    /* cash flow is signed */
+extern uint8_t  V_previous_money[3], V_money_after_budget[3];
 extern uint8_t map_dirty;           /* set by the engine whenever the map changes */
 
 #endif

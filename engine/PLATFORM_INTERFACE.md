@@ -29,8 +29,9 @@ UI responsive call `sim_task_reset` once and then `sim_step` a few times per
 UI frame until it reports a completed tick; the simulation runs on its own
 256-byte stack (`engine/coop.asm`) and switches back at the end of each map
 row.  `sim_init` must be called before the first tick either way.  If a budget
-needs the player (`V_auto_budget` = 0) `sim_step` calls `ui_budget_confirm`
-on the caller's stack between slices.  The tools (`tool_apply`) may be used
+needs the player (`V_auto_budget` = 0) `sim_step` returns 2 (instead of 0 or 1) and goes on
+returning 2 until the caller has shown the budget and set `V_wait_for_budget_confirm` to 0;
+nothing is called back.  (A `sim_tick` run directly calls `ui_budget_confirm`.)  The tools (`tool_apply`) may be used
 between slices, as on the Spectrum.
 
 ### State the platform may read (all plain labels)
@@ -56,7 +57,7 @@ between slices, as on the Spectrum.
 | `SMC_tax_rate` | byte | Tax rate in percent. |
 | `SMC_transport_percent`, `SMC_police_percent`, `SMC_fire_percent` | byte | Budget funding levels, 0-100. |
 | `V_simulation_speed` | byte | 0 fast, 1 normal, 2 slow, 3 paused. |
-| `V_auto_budget` | byte | Non-zero: the engine runs the budget itself. Zero: calls `ui_budget_confirm`. |
+| `V_auto_budget` | byte | Non-zero: the engine runs the budget itself. Zero: it waits for the player (`sim_step` returns 2; `sim_tick` calls `ui_budget_confirm`). |
 | `V_disaster_reset` | byte | Non-zero disables random disasters. |
 | `V_InitialSeed` | word | Seed for landscape generation (defined by the engine; the platform writes it before `sim_new_city`). |
 

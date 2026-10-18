@@ -19,8 +19,9 @@
 ; One tick = 96 yields (one per row), so sim_step slices a tick into pieces
 ; of roughly 1/96 of 2 seconds (about 20ms at 3.5MHz).
 ; If a budget needs the player (V_auto_budget = 0) the simulation parks in
-; sim_budget_wait; sim_step then calls ui_budget_confirm on the UI's stack and
-; resumes the simulation on the next call.
+; sim_budget_wait and sim_step returns L = 2 (and goes on returning it) until the UI has run the
+; budget screen, on its own stack and outside sim_step, and cleared V_wait_for_budget_confirm.  A
+; sim_tick called directly (not through sim_step) calls ui_budget_confirm instead.
 ; ------------------------------------------------------------------------
 
 SIM_STACK_SIZE  equ     256             ; the engine nests a few calls deep, plus interrupts
@@ -109,11 +110,9 @@ sim_yield_switch:
         ld      a,(V_wait_for_budget_confirm)
         and     a
         jr      z,sim_step_return
-        SIM_SAVE_REGS
-        call    ui_budget_confirm       ; modal, on the UI's stack
-        SIM_RESTORE_REGS
-        xor     a
-        ld      (V_wait_for_budget_confirm),a
+        ld      hl,2                    ; the simulation is waiting for the player's budget
+        pop     af
+        ret
 sim_step_return:
         ld      a,(sim_tick_complete)
         ld      l,a
@@ -138,7 +137,7 @@ sim_budget_wait:
         and     a
         jp      z,ui_budget_confirm     ; sim_tick called directly: ask the UI right here
         ld      a,1
-        ld      (V_wait_for_budget_confirm),a
+        ld      (V_wait_for_budget_confirm),a   ; sim_step now reports it; the UI clears it
 sim_budget_wait_loop:
         call    sim_yield
         ld      a,(V_wait_for_budget_confirm)

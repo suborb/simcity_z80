@@ -22,7 +22,7 @@ TICKS = os.path.join(Z88DK, 'bin', 'z88dk-ticks')
 OUT = os.path.join(ROOT, 'build', 'test')
 ROWS, COLS = 24, 64
 MAP_W = 96
-SCRIPT_LEN = 1024
+SCRIPT_LEN = 2048
 END = 0xFF
 
 
@@ -36,13 +36,15 @@ def build():
     return open(os.path.join(OUT, 'simcity.bin'), 'rb').read(), syms
 
 
-def run(binary, syms, keys, limit=4_000_000_000):
+def run(binary, syms, keys, limit=4_000_000_000, patch=None):
     """Run the game with the given key script; return (memory dump, symbols)."""
     assert len(keys) < SCRIPT_LEN
     image = bytearray(binary)
     script = bytes(keys) + bytes([END]) + bytes(SCRIPT_LEN - len(keys) - 1)
     a = syms['_test_script']
     image[a:a + SCRIPT_LEN] = script
+    for name, data in (patch or {}).items():
+        image[syms[name]:syms[name] + len(data)] = data
     path = os.path.join(OUT, 'run.bin')
     open(path, 'wb').write(image)
     dump = os.path.join(OUT, 'run.out')
@@ -140,6 +142,24 @@ def main():
         lm3 = levelmap(mem, syms)
         cleared = [lm3[(by + 1 + j) * MAP_W + bx + 1 + i] for j in range(3) for i in range(3)]
         check('bulldozer clears the zone', cleared != expect, f'{cleared}')
+
+    # --- 2b. the cursor is the size of what the tool places ---
+    sizes = {}
+    for tool, size in (('1', 1), ('5', 3), ('k', 0)):
+        counts = set()
+        for pad in range(0, 10):
+            if tool == 'k':
+                continue
+            mem = run(binary, syms, [LEVEL_MEDIUM, PAUSE, ord(tool)] + [0] * (6 + pad))
+            cells = [(r, c) for r, row in enumerate(screen(mem, syms)[8:]) for c, ch in enumerate(row) if ch == '@']
+            counts.add(len(cells))
+            if cells:
+                rs, cs = {r for r, _ in cells}, {c for _, c in cells}
+                if len(cells) != size * size or max(rs) - min(rs) != size - 1 or max(cs) - min(cs) != size - 1:
+                    counts.add(-1)
+        sizes[tool] = counts
+    check('cursor: tool 1 (road) shows one cell', sizes['1'] == {0, 1}, str(sizes['1']))
+    check('cursor: tool 5 (residential) shows a 3x3 square', sizes['5'] == {0, 9}, str(sizes['5']))
 
     # --- 3. let the simulation run -------------------------------------------------
     # fast speed for 250 frames: a tick takes 96 frames (one map row per frame) plus the
@@ -301,6 +321,67 @@ def main():
     check('mini map: a menu command shows its view', any('POLLUTION' in r for r in panes(mem)[1]))
     mem = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE, CMD_MAP + 1, CMD_MAP_OFF, 0, 0])
     check('mini map: the menu can go back to the city', any('~' in r for r in panes(mem)[0]) and not any('MAP:' in r for r in panes(mem)[1]))
+
+    # --- 7. the budget screen (the 32x8 platform has it too) ---
+    CMD_BUDGET = 0xA4
+    byte_p = lambda mem, name: mem[psyms[name]]
+    mem = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE, CMD_BUDGET, 0, 0])
+    text = panes(mem)[1]
+    check('budget: the screen shows the headings and the departments',
+          all(any(w in r for r in text) for w in ('FISCAL BUDGET', 'TAX RATE', 'TRANSPORT', 'POLICE', 'FIRE', 'CASH FLOW', 'ENTER OK')),
+          '\n'.join(text))
+    check('budget: it starts with the tax rate of 7%', any('TAX RATE  7%' in r for r in text), '\n'.join(text))
+    check('budget: every line fits the 8 rows and 40 columns', all(len(r.rstrip()) <= 40 for r in text))
+    mem = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE, CMD_BUDGET, ord('p'), ord('p'), 0, 0])
+    check('budget: p raises the tax rate and the screen shows it',
+          byte_p(mem, '_SMC_tax_rate') == 9 and any('TAX RATE  9%' in r for r in panes(mem)[1]))
+    mem = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE, CMD_BUDGET] + [ord('o')] * 9 + [0, 0])
+    check('budget: the tax rate stops at 0', byte_p(mem, '_SMC_tax_rate') == 0)
+    mem = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE, CMD_BUDGET] + [ord('p')] * 20 + [0, 0])
+    check('budget: the tax rate stops at 20', byte_p(mem, '_SMC_tax_rate') == 20)
+    mem = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE, CMD_BUDGET, ord('a'), ord('o'), ord('a'), ord('o'), ord('o'), ord('a'), ord('o'), ord('o'), ord('o'), 0, 0])
+    check('budget: a selects the next item and o lowers its funding by 10% (transport 90, police 80, fire 70)',
+          (byte_p(mem, '_SMC_transport_percent'), byte_p(mem, '_SMC_police_percent'), byte_p(mem, '_SMC_fire_percent')) == (90, 80, 70))
+    mem = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE, CMD_BUDGET, ord('p'), 13, 0, 0])
+    text = panes(mem)[1]
+    check('budget: enter accepts it and the game goes on (status panel back, new rate kept)',
+          any('FUNDS' in r for r in text) and not any('FISCAL' in r for r in text) and byte_p(mem, '_SMC_tax_rate') == 8, '\n'.join(text))
+    check('budget: the game asks the player for the annual budget', byte_p(mem, '_V_auto_budget') == 0)
+    # the engine's own request, in November: fast, until the year's tick; then the player changes the tax rate and accepts
+    mem = run(pbin, psyms, [LEVEL_MEDIUM, ord('+')] + [0] * 1500 + [ord('p'), ord('p'), 0, 0])
+    text = panes(mem)[1]
+    check('budget: in November the game stops for the budget screen', any('FISCAL BUDGET' in r for r in text), '\n'.join(text))
+    check('budget: the player can change the tax rate in it', byte_p(mem, '_SMC_tax_rate') == 9)
+
+    # --- 8. the evaluation screen: the mayor's approval ---
+    CMD_EVALUATION = 0xA5
+    mem = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE, CMD_EVALUATION, 0, 0])
+    text = panes(mem)[1]
+    show = '\n'.join(text)
+    has = lambda *words: any(all(w in r for w in words) for r in text)
+    check('evaluation: the screen shows the mayor approval and the problems',
+          has('MAYOR APPROVAL') and has('TRAFFIC') and has('POLLUTION') and has('CRIME') and has('FIRE') and has('TAXES')
+          and has('HOUSE PRICES') and has('UNEMPLOYMENT') and has('CITY SCORE') and has('ENTER OK'), show)
+    check('evaluation: each problem is the percentage the Spectrum works out (10, 10, 10, 10, 16, 4, 0)',
+          has('TRAFFIC', ' 10%') and has('POLLUTION', ' 10%') and has('CRIME', ' 10%') and has('FIRE', ' 10%')
+          and has('TAXES', ' 16%') and has('HOUSE PRICES', '  4%') and has('UNEMPLOYMENT', '  0%'), show)
+    check('evaluation: the city score is (250 - 3 * 60) * 4 = 280', has('CITY SCORE', ' 280'), show)
+    check('evaluation: population, migration and assessed value',
+          has('POPULATION', ' 5000') and has('MIGRATION', ' 1000') and has('ASSESSED VALUE $4000000'), show)
+    check('evaluation: the category is a town and the level medium', has('TOWN', 'MEDIUM'), show)
+    row = next(r for r in text if 'MAYOR APPROVAL' in r)
+    yes, no = (int(x) for x in re.findall(r'(\d+)%', row))
+    check('evaluation: approval is yes + no = 100 and about 280/1024 of the people say yes',
+          yes + no == 100 and 10 <= yes <= 45, row)
+    mem = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE, CMD_EVALUATION, 0, 0], patch={'_test_poke_city': b'\0'})
+    text = panes(mem)[1]
+    row = next(r for r in text if 'MAYOR APPROVAL' in r)
+    check('evaluation: with nobody in the city there is nobody to ask',
+          any('NOBODY LIVES HERE' in r for r in text) and ' 0%' in row, '\n'.join(text))
+    mem = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE, ord('v'), 13, 0, 0])
+    text = panes(mem)[1]
+    check('evaluation: v opens it and enter closes it again',
+          any('FUNDS' in r for r in text) and not any('MAYOR APPROVAL' in r for r in text), '\n'.join(text))
 
     print()
     print('\n'.join(scr))

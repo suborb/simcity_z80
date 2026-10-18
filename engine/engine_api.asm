@@ -28,7 +28,7 @@ sim_init:
 ; sim_tick
 ;   Advance the simulation by one tick: one full pass over the 96x96 map.
 ;   Every month-length (V_sim_speed_block+4) ticks it also runs DoBudget and
-;   advances the month.  DoBudget calls ui_budget_confirm when the player must
+;   advances the month.  DoBudget waits (sim_step reports it; see coop.asm) when the player must
 ;   approve the annual budget (V_auto_budget = 0).
 sim_tick:
         call    reset_simulation_vars           ;Zero all per-tick population/fund counters
