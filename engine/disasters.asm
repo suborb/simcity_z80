@@ -56,7 +56,9 @@ activate_aircrash:                                    ; $78EA / 30954 - Set V_ai
         jr      play_crash_sound                   ; (-103)
         ENDIF
 
+        IN_DATA
 V_meltdown_triggered:    defb        0       ; VAR $7924 / 31012 - meltdown triggered
+        IN_CODE
 
 ; Nuclear meltdown - spread radiation everywhere?
 place_fallout:
@@ -130,8 +132,10 @@ place_fallout:
         ld      (V_tornado_pos),bc
         ret     
 
+        IN_DATA
 V_tornado_pos:    defw    0       ; VAR $7995 / 31125 - tornado current map position (b=y, c=x); random dirt start
 V_tornado_active:    defb    0       ; VAR $7997 / 31127 - tornado active (1=in progress, 0=none); cleared with 1/256 chance each tick
+        IN_CODE
 
 ; Something to do with parks?
 move_tornado:                                    ; $7998 / 31128 - If tornado active: 1/256 chance despawn; every 8 ticks steer toward CCxy centroid, else random walk

@@ -75,6 +75,33 @@ between slices, as on the Spectrum.
 | `text_generating_landscape` | (data label) | Any bytes; passed in `IX` to the above. |
 | `textcol`, `print_budget_amounts` | Budget recalculation | May do nothing; `textcol` is a byte. |
 
+## Memory layout: sections
+
+The engine can run from ROM.  In a PORTABLE build (`engine/sections.asm`) every piece goes in
+the z88dk section it belongs in:
+
+| Section | Contents |
+|---|---|
+| `code_user` | instructions |
+| `rodata_user` | tables nothing writes (`D_*`, the zone tile tables, the map art) |
+| `data_user` | variables (`V_*`), which start with the values in the source |
+| `bss_user` | buffers: `levelmap`, `minimaps`, the power queue, the coroutine stack |
+
+A platform with a ROM puts `code_user` and `rodata_user` there and gives the rest RAM; the
+crt copies `data_user` from ROM and clears `bss_user`.  The engine has no self-modifying
+code in this build: the nine operands the Spectrum program patches are ordinary variables
+(`SMC_PATCHES` in `tools/split_engine.py`).  `test/golden` runs the engine from an image laid out
+this way and fails if anything below `__data_user_head` changes, and
+`tools/find_dead.py --smc` fails if any instruction stores into a label that is code.
+
+Two things to remember when changing the engine:
+
+* a table and the variable after it are no longer neighbours.  If code reads a table with a
+  count larger than the table (the original's auto-bulldoze search does, and reads the next
+  variable as a seventh entry), say so explicitly, as in the patch for `D_autobulldoze_tile_types`;
+* the platform's own variables (`V_difficulty` and the other settings) belong in `data_user`
+  too: `platform/common/hooks.asm` shows how.
+
 ## Rules for engine changes
 
 * Never rename or remove an `Lxxxx` label; they are the original addresses.

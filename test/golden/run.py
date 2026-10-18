@@ -434,6 +434,15 @@ def run_scenario(name, ticks, files, tmp, view=None):
     LAST = (zx_dump, po_dump, zx_syms, po_syms)
     # compare
     problems = []
+    # The portable image is laid out like a ROM machine's: code and tables below
+    # __data_user_head, everything the engine writes above it.  So nothing below may change.
+    ram = po_syms['__data_user_head']
+    changed = [i for i in range(ram) if po_dump[i] != po_img[i]]
+    if changed:
+        near = lambda a: max(((v, k) for k, v in po_syms.items() if v <= a and not k.startswith('__')),
+                             default=(0, '?'))[1]
+        problems.append(f'the engine wrote to ROM: {len(changed)} bytes below {ram:#06x}, first at '
+                        f'{changed[0]:#06x} (after {near(changed[0])})')
     regions = [('levelmap', MAP_W * MAP_W), ('minimaps', 6912)] + engine_vars()
     nvars = 0
     for rname, size in regions:

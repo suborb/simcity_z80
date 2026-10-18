@@ -45,7 +45,9 @@ sim_random_disaster:
         ret     
 
 
+        IN_DATA
 V_disaster_option:  defb       $0   ; VAR $916D / 37229 - which disasters are enabled
+        IN_CODE
 
 sim_start_disaster:
 .L916e  ld      hl,V_disaster_option

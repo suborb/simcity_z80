@@ -1,5 +1,6 @@
 ; transport: lines 4448-4592 of disassembly/sim_game.asm (engine)
 
+        IN_DATA
 V_transport_pos:    defw    0       ; VAR $77D3 / 30675 - transport sprite current map position (b=y, c=x)
 
 V_transport_sprite:    defb    0       ; VAR $77D5 / 30677 - transport sprite type index (passed to display_transport_sprite)
@@ -10,6 +11,7 @@ V_transport_dir:    defb        0       ; VAR $77D8 / 30680 - current direction 
 V_transport_new_dir:    defb        0       ; VAR $77D9 / 30681 - confirmed next direction after rail check
 V_transport_steps:    defb        0       ; VAR $77DA / 30682 - steps remaining before direction re-roll
 V_transport_wander:    defb        0       ; VAR $77DB / 30683 - wander counter (decrements; sprite despawns at 0)
+        IN_CODE
 
 
 move_transport_sprite:                                    ; $77DC / 30684 - If transport active and on rail tile, step sprite in current direction; else despawn
@@ -99,10 +101,12 @@ maybe_spawn_transport:                                    ; $785D / 30813 - If n
         ld      (V_transport_active),a
         ret     
 
+        IN_DATA
 V_aircrash_active:    defb        0       ; VAR $7879 / 30841 - aircrash in progress (1=active, 0=none)
 V_CrashXY:    defw        0       ; VAR $787A / 30842 - aircrash current map position (b=y, c=x)
 V_aircrash_col:    defb        0       ; VAR $787C / 30844 - aircrash target display column
 V_aircrash_countdown:    defb        0       ; VAR $787D / 30845 - aircrash movement timer (decrements each tick)
+        IN_CODE
 
 
 move_aircrash_sprite:                                    ; $787E / 30846 - If aircrash active and not at target column, decrement countdown; at zero ignite 2x2 cells

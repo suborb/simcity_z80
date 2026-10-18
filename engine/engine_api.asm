@@ -105,11 +105,28 @@ tool_apply:
 
 ; Cursor / tool state used by the tool routines (the Spectrum build keeps these
 ; in its UI code).
+        IN_DATA
 V_selected_tool:        defb    1
 V_pointer_charxy:       defw    0
 V_view_topleft:         defw    0
 
+; Variables that stand in for operands the Spectrum program patches in its own code (a
+; PORTABLE build has no self-modifying code; see SMC_PATCHES in tools/split_engine.py).
+V_stroke_step_mask:     defb    7               ; AND mask for the landscape stroke step (7 or 3)
+V_ellipse_dx:           defw    0               ; running dx of the landscape ellipse
+V_ellipse_dy:           defw    0               ; running dy
+V_autobulldoze_width:   defb    0               ; width of the zone being auto-bulldozed
+V_width_29056:          defb    0               ; width of the area being checked for dirt
+V_width_29092:          defb    0               ; width of the area place_zone_direct copies
+V_path_tile_offset:     defb    11              ; offset from the neighbour tile to the path tile
+V_bulldoze_zone_width:  defb    0               ; width of the zone being bulldozed
+V_width_31652:          defb    0               ; width of the area filled (flood/fire spread)
+V_width_31705:          defb    0               ; width of the area filled (tornado)
+        IN_CODE
+
 ; Bit masks for the power minimap (one bit per tile, 8 tiles per byte).  The
 ; Spectrum build reads the same values from its keyboard buffer at $5B11.
+        IN_RODATA
 D_bit_masks:
         defb    $80, $40, $20, $10, $08, $04, $02, $01
+        IN_CODE

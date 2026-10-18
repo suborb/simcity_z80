@@ -1,5 +1,7 @@
 ; messages: lines 9280-9516 of disassembly/sim_game.asm (engine)
+        IN_DATA
 V_TotalZPop:    defw    0       ; VAR $99AB / 39339 - TotalZPop used for sending alert messages
+        IN_CODE
 
 
 ; Main alert setting loop?
@@ -225,6 +227,7 @@ set_alert_message:
         ret     
 
 ; 39758/9b4e
+        IN_RODATA
 D_minimap_section_coords:               ; $9B4E / 39758 - (row, col) char-cell pairs for 9 minimap section flash highlight positions
         defb    $4, $3
         defb    $4, $4
@@ -235,4 +238,5 @@ D_minimap_section_coords:               ; $9B4E / 39758 - (row, col) char-cell p
         defb    $6, $3
         defb    $6, $4
         defb    $6, $5
+        IN_CODE
 

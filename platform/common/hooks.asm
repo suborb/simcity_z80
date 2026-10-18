@@ -5,7 +5,8 @@
 ; the "dirty" flag to know when the map must be redrawn.
 ; ------------------------------------------------------------------------
         MODULE  hooks
-        SECTION code_user
+        INCLUDE "sections.asm"
+        IN_CODE
 
         PUBLIC  _V_difficulty, _SMC_tax_rate
         PUBLIC  _SMC_transport_percent, _SMC_police_percent, _SMC_fire_percent
@@ -24,6 +25,7 @@
         PUBLIC  print_budget_amounts, cls_map, cls_print_topbox, render_status_bar
         PUBLIC  text_generating_landscape
 
+        IN_DATA
 V_difficulty:           defb    0
 SMC_tax_rate:           defb    7
 SMC_transport_percent:  defb    100
@@ -36,6 +38,7 @@ V_auto_bulldoze:        defb    1
 V_power_type_chosen:    defb    2               ; 1 nuclear, anything else coal
 textcol:                defb    0
 _map_dirty:             defb    1
+        IN_CODE
 
         defc    _V_difficulty          = V_difficulty
         defc    _SMC_tax_rate          = SMC_tax_rate
@@ -72,5 +75,7 @@ wait_if_demolish_pending:
         xor     a                       ; Z = carry on demolishing
         ret
 
+        IN_RODATA
 text_generating_landscape:
         defb    0
+        IN_CODE

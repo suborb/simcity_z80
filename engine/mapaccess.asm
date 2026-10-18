@@ -1,5 +1,7 @@
 ; mapaccess: lines 3870-4333 of disassembly/sim_game.asm (engine)
+        IN_DATA
 V_minimap_start:    defw        0   ; VAR $753C / 30012 - 753c/30012, address of mini map being handled
+        IN_CODE
 
 
 ; Map is rendered at 48x48
@@ -313,6 +315,7 @@ l_mult_hlxde:                               ; $7657 / 30295
         djnz    L766c                   ; (-21)
         ret     
 
+        IN_RODATA
 D_special_zone_types:                        ; $7682 / 30338
                         ; $7682 / 30338
         defb    $00         ;Police
@@ -327,6 +330,7 @@ D_special_zone_types:                        ; $7682 / 30338
         defb    $09         ;Residential
         defb    $0A         ;Commercial
         defb    $0B         ;Industrial
+        IN_CODE
  
 ; 
 ; Entry: bc = coordinates
@@ -392,11 +396,13 @@ scan_zone_handler_config:                                    ; $76B3 / 30387 - L
         scf     
         ret     
 
+        IN_RODATA
 D_cardinal_offsets:                     ; $76DC / 30428 - (dx, dy) pairs for 4 cardinal directions: N, E, S, W
         defb    $00, $ff
         defb    $01, $00
         defb    $00,$01
         defb    $ff,$00
+        IN_CODE
 
 ; Entry: bc = coordinates
 ;         a = direction
@@ -429,7 +435,9 @@ levelmap_addr_in_direction:                                    ; $76E4 / 30436 -
         ld      b,a
         ret     
 
+        IN_DATA
 V_PowerStackNum:    defb        0       ; VAR $76FD / 30461 - power BFS queue tail index (2 bytes per entry, wraps within queue)
+        IN_CODE
 
 ; Push bc coordinates onto the power BFS queue
 .powerqueue_push

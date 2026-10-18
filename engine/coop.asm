@@ -138,10 +138,13 @@ sim_budget_wait_loop:
         jr      nz,sim_budget_wait_loop
         ret
 
+        IN_DATA
 sim_sp:              defw    0
 ui_sp:               defw    0
 sim_coop_active:     defb    0
 sim_tick_complete:   defb    0
 
+        IN_BSS
 sim_stack:           defs    SIM_STACK_SIZE
 sim_stack_top:
+        IN_CODE

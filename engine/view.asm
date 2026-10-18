@@ -16,7 +16,9 @@
 ;   bit 5 : unpowered zones flash the "needs power" icon
 ;   bit 4 : busy roads alternate between two pictures
 ; ------------------------------------------------------------------------
+        IN_DATA
 V_view_tick:    defb    0
+        IN_CODE
 
 view_cell:
         push    bc

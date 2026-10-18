@@ -10,6 +10,16 @@
 ; Build:  z80asm -DPORTABLE -b -m platform/test/test_platform.asm
 ; ------------------------------------------------------------------------
         org     $0100
+        INCLUDE "../../engine/sections.asm"
+
+; Lay the image out the way a machine with a ROM would: code and tables first, then
+; everything writable.  Declaring the sections in this order fixes it, so that
+; test/golden can check that the engine never writes below __data_user_head.
+        IN_CODE
+        IN_RODATA
+        IN_DATA
+        IN_BSS
+        IN_CODE
 
 ; ---- driver ------------------------------------------------------------
 test_start:
@@ -120,6 +130,7 @@ test_view_col:
 test_done:
         jr      test_done               ; z88dk-ticks stops here (-end)
 
+        IN_DATA
 test_ticks:     defw    1               ; patched by the harness
 test_actions:   defs    768,$ff         ; patched by the harness
 test_pokes:     defs    768,0           ; patched by the harness
@@ -128,12 +139,15 @@ test_steps:     defw    0               ; number of sim_step calls
 test_view_on:   defb    0
 test_view_tick: defb    0
 test_view_xy:   defw    0               ; e = left column, d = top row
+        IN_BSS
 test_view_out:  defs    16*32*9         ; per cell: 8 bytes of art + attribute
+        IN_CODE
 
 ; ---- the engine --------------------------------------------------------
         INCLUDE "../../engine/engine.asm"
 
 ; ---- settings the engine reads (normally owned by the UI) -----------------
+        IN_DATA
 V_difficulty:           defb    0       ; 0 = easy ($20000 start funds)
 SMC_tax_rate:           defb    7
 SMC_transport_percent:  defb    100
@@ -145,6 +159,7 @@ V_disaster_reset:       defb    1       ; non-zero = no random disasters
 textcol:                defb    0
 V_auto_bulldoze:        defb    1       ; tools may demolish what is in the way
 V_power_type_chosen:    defb    2       ; answer given by ui_choose_power_plant: coal
+        IN_CODE
 
 ; ---- hooks: this platform has no display or sound -------------------------
 ui_budget_confirm:      ret
@@ -161,4 +176,6 @@ print_budget_amounts:   ret
 cls_map:                ret
 cls_print_topbox:       ret
 render_status_bar:      ret
+        IN_RODATA
 text_generating_landscape:      defb    0
+        IN_CODE

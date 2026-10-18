@@ -1,5 +1,7 @@
 ; landscape: lines 2137-2545 of disassembly/sim_game.asm (engine)
+        IN_DATA
 V_InitialSeed:   defw    3       ; VAR $6A8C / 27276 - initial random seed
+        IN_CODE
 
 ; ============================================================
 ; LANDSCAPE GENERATION
@@ -79,11 +81,13 @@ create_landscape:
 ; Ellipse shape table: pairs of (w exponent, h exponent) for draw_filled_ellipse_stroke.
 ; Larger exponent = more compression in that axis.
 ; Randomly indexed by (rand & 3)*2, giving one of: (4,4) square, (5,3) wide, (3,5) tall.
+        IN_RODATA
 D_blob_shape_table:                     ; $6AD3 / 27347 - ellipse (w-exp, h-exp) pairs for terrain paint blobs; indexed by (rand & 3)*2
         defb    $04, $04    ; square-ish
         defb    $05, $03    ; wide
         defb    $03, $05    ; tall
         defb    $04, $04    ; square-ish
+        IN_CODE
 
 
 
@@ -93,13 +97,24 @@ D_blob_shape_table:                     ; $6AD3 / 27347 - ellipse (w-exp, h-exp)
 .L6adb  ld      a,c
         ld      (V_stroke_tile),a         ; set tile type for draw_filled_ellipse_stroke
         ld      a,e
+        IFDEF PORTABLE
+        ld      (V_stroke_step_mask),a     ; AND mask used for step size
+        ELSE
         ld      (SMC_27367+1),a     ; patch the AND mask used for step size
+        ENDIF
 
 .L6ae3  push    bc                  ; save stroke counter and tile
         ; randomise step size (2-7)
         call    get_random_number
 SMC_27367:
+        IFDEF PORTABLE
+        push    hl
+        ld      hl,V_stroke_step_mask
+        and     (hl)                ; mask = e parameter (7 or 3)
+        pop     hl
+        ELSE
         and     7                   ; SMC: mask = e parameter (7 or 3)
+        ENDIF
         cp      2
         jr      nc,L6aef
         ld      a,2                 ; clamp minimum step size to 2
@@ -135,6 +150,7 @@ SMC_27367:
 ; First 66 bytes: 8-neighbour dirt bitmasks (bits 0-7 = NW,N,NE,W,E,SW,S,SE are dirt).
 ; Second 66 bytes: replacement water-edge tile for the matching pattern.
 ; Tiles 1,3,4,5 are the diagonal/curved water-edge graphics; 2=TILE_DIRT.
+        IN_RODATA
 D_shoreline_lookup:                        ; $6B21 / 27425
                         ; $6B21 / 27425
         defb    $FE, $EB, $F5, $CB, $76, $6E, $DB
@@ -156,6 +172,7 @@ D_shoreline_lookup:                        ; $6B21 / 27425
         defb    $05, $05, $01, $01, $01, $03, $03, $03
         defb    $03, $03, $05, $05, $05, $05, $05, $04
         defb    $04, $04, $04, $02, $02
+        IN_CODE
 
 
 ; Scan the entire 96x96 map and replace water cells that border land with
@@ -196,7 +213,9 @@ smooth_shoreline_tiles:
         djnz    L6ba7
         ret     
 
+        IN_DATA
 V_levelmap_bounds_flag:   defb        0   ; VAR $6BDA / 27610 - ?? unused?
+        IN_CODE
 
 ;Range check
 .levelmap_xypos_with_check
@@ -239,11 +258,13 @@ levelmap_xypos:                             ; $6BE6 / 27622
         ret
 
 
+        IN_DATA
 V_stroke_center:        defw    0           ; VAR $6C02 / 27650 - landscape stroke center (x,y), random 16-79
 V_stroke_step:        defb    $05         ; VAR $6C04 / 27652 - landscape stroke step size (random 2-7, controls drawing density)
 V_stroke_tile:        defb    $02         ; VAR $6C05 / 27653 - landscape stroke tile type to paint (TILE_DIRT=2 for land pass, TILE_WATER=0 for water pass)
 V_stroke_constraint:        defb    $00         ; VAR $6C06 / 27654 - landscape stroke constraint tile (0=paint anywhere; else only overwrite cells containing this tile)
 V_stroke_dims:        defw    $0404       ; VAR $6C07 / 27655 - landscape stroke half-dimensions (w,h) loaded via ldi from D_blob_shape_table
+        IN_CODE
 
 
 
@@ -268,16 +289,30 @@ V_stroke_dims:        defw    $0404       ; VAR $6C07 / 27655 - landscape stroke
 .L6c09  ld      a,(V_stroke_step)     ; step size s (2-7): controls initial dy magnitude
         ld      h,a
         ld      l,0
+        IFDEF PORTABLE
+        ld      (V_ellipse_dy),hl ; initialise dy = s (high byte), dx low byte = 0
+        ld      h,l
+        ld      (V_ellipse_dx),hl ; initialise dx = 0
+        ELSE
         ld      (SMC_27676+1),hl ; initialise dy = s (high byte), dx low byte = 0
         ld      h,l
         ld      (SMC_27673+1),hl ; initialise dx = 0
+        ENDIF
         ld      b,49             ; 49 steps traces one full ellipse path
 
 .L6c18  push    bc              ; save outer loop counter
 SMC_27673:
+        IFDEF PORTABLE
+        ld      hl,(V_ellipse_dx) ; current dx (updated each iteration)
+        ELSE
         ld      hl,0            ; SMC: current dx (updated each iteration)
+        ENDIF
 SMC_27676:
+        IFDEF PORTABLE
+        ld      de,(V_ellipse_dy) ; current dy (updated each iteration)
+        ELSE
         ld      de,0            ; SMC: current dy (updated each iteration)
+        ENDIF
         ; --- compute dx_new = dx - (dy >> w) - 1 ---
         ld      b,d
         ld      c,e             ; bc = dy
@@ -305,8 +340,13 @@ SMC_27676:
         add     hl,bc           ; hl (dy) = dy + (dx_new >> h) + 1
 
         ex      de,hl           ; de = new dy, hl = new dx
+        IFDEF PORTABLE
+        ld      (V_ellipse_dx),hl ; save updated dx for next iteration
+        ld      (V_ellipse_dy),de ; save updated dy for next iteration
+        ELSE
         ld      (SMC_27673+1),hl ; save updated dx for next iteration
         ld      (SMC_27676+1),de ; save updated dy for next iteration
+        ENDIF
 
         ; --- compute map position and span width for this step ---
         ld      bc,(V_stroke_center)    ; bc = (y_center, x_center)
@@ -316,7 +356,11 @@ SMC_27676:
         ld      a,h             ; dx high byte = col offset (negative at equator)
         add     a,c
         ld      c,a             ; c = x_center + dx_high (left edge of span)
+        IFDEF PORTABLE
+        ld      a,(V_ellipse_dx+1) ; dx_high (high byte of stored dx)
+        ELSE
         ld      a,(SMC_27673+2) ; dx_high (high byte of stored dx)
+        ENDIF
         neg
         add     a,a
         ld      d,a             ; d = -2 * dx_high = span width (positive when dx_high < 0)

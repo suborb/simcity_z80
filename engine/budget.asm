@@ -1,5 +1,6 @@
 ; budget: lines 8522-8725 of disassembly/sim_game.asm (engine)
 
+        IN_DATA
 V_tax_collected:    defb    0,0,0       ; VAR $930E / 37646 - , 930e
 
 
@@ -19,6 +20,7 @@ V_cashflow:        defb    0,0,0       ; VAR $9320 / 37664 - cashflow
 
 V_previous_money:        defb    0,0,0           ; VAR $9323 / 37667 - previous money before budget
 V_money_after_budget:            defb    0,0,0           ; VAR $9326 / 37670 - money after budget
+        IN_CODE
 
 
 calculate_tax:                                    ; $9329 / 37673 - Compute tax = population / 100 * tax_rate; result in V_tax_collected
@@ -123,7 +125,9 @@ calc_expenditure_and_cashflow:                                    ; $93A3 / 3779
         ld      (V_money_after_budget+2),a
         ret     
 
+        IN_DATA
 V_budget_working_reg:    defb   0,0,0       ; VAR $93F6 / 37878 -
+        IN_CODE
 
 
 cap_transport_funding_to_balance:                                    ; $93F9 / 37881 - If transport allocation would overdraft (money+tax < transport), cap to available balance

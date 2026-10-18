@@ -9,6 +9,7 @@
 ;   +3456  traffic density    48x48  (  2304)  +20 per trip, decays every tick
 ;   +5760  power              1 bit per tile, 12 bytes per row (1152)
 ; (get_land_value_minimap_value is a misnomer: it addresses the pollution map)
+        IN_BSS
 minimaps:                                   ; $A950 / 43344
 .La950
         defs        6912
@@ -17,4 +18,5 @@ minimaps:                                   ; $A950 / 43344
 ; At 50256
 .levelmap
         defs        9216,2
+        IN_CODE
 

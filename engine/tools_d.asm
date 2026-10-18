@@ -1,5 +1,6 @@
 ; tools_d: lines 3425-3550 of disassembly/sim_game.asm (engine)
 ;71ff/29183
+        IN_RODATA
 D_neighbour_type_index:                 ; $71FF / 29183 - 4-bit neighbour bitmask -> join-type index (0=no join)
         defb    $00, $01, $02, $00, $03, $00, $00, $00
         defb    $04, $00, $00, $00, $00, $00, $00, $00
@@ -7,6 +8,7 @@ D_neighbour_type_index:                 ; $71FF / 29183 - 4-bit neighbour bitmas
 D_join_tile_triplets:                   ; $720F / 29199 - join-type -> (E, D, fn) triplet for tile placement
         defb    $00, $00, $00, $00, $FF, $0C, $FF, $00 
         defb    $0B, $01, $00, $0B, $00, $01, $0C
+        IN_CODE
         
 
 L721e:
@@ -39,7 +41,11 @@ L721e:
         ld      d,(hl)
         inc     hl
         ld      a,(hl)
+        IFDEF PORTABLE
+        ld      (V_path_tile_offset),a
+        ELSE
         ld      (SMC_29270+1),a
+        ENDIF
         ld      a,0
         ld      (V_path_tile_type),a
         call    place_path_tile_with_join
@@ -47,7 +53,14 @@ L721e:
 
         ld      a,(V_neighbour_tile_to_check)
 SMC_29270:
+        IFDEF PORTABLE
+        push    hl
+        ld      hl,V_path_tile_offset
+        add     a,(hl)
+        pop     hl
+        ELSE
         add     a,11
+        ENDIF
         ld      (V_path_tile_type),a
         call    place_path_tile_with_join
         call    join_up_neighbour_cells
@@ -57,6 +70,7 @@ SMC_29270:
 
 
 ;726b/29291
+        IN_RODATA
 D_joinable_tile_list:                   ; $726B / 29291 - tile IDs that accept road/rail/power joins; searched by cpir
         defb    $2c, $2d, $1f, $20
         defb    $12, $13, $57,$58
@@ -64,6 +78,7 @@ D_joinable_tile_list:                   ; $726B / 29291 - tile IDs that accept r
 ;7273/29299
 unbulldozeable_tiles:
         defb    TILE_WATER, TILE_DIRT, TILE_RADIOACTIVE
+        IN_CODE
         
 
 

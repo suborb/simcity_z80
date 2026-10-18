@@ -104,11 +104,13 @@ _view_fetch:
         pop     ix
         ret
 
+        IN_DATA
 _engine_a:      defb    0
 _view_x:        defb    0
 _view_y:        defb    0
 _view_art:      defw    0
 _view_attr:     defb    0
+        IN_CODE
 
 ; ---- data the C code reads and writes ------------------------------------
         PUBLIC  _levelmap, _minimaps, _D_tile_flags

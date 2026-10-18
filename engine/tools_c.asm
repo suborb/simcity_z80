@@ -1,5 +1,6 @@
 ; tools_c: lines 3163-3409 of disassembly/sim_game.asm (engine)
 ;7062
+        IN_RODATA
 D_power_tile_conversions:                        ; $7062 / 28770
                         ; $7062 / 28770
         ;If we place power on one of these
@@ -19,6 +20,7 @@ D_rail_tile_conversions:                        ; $707A / 28794
         ;If we place rail on one of these
         defb    $07, $08, $21, $22, $38, $39
         defb    $2F, $2E, $33, $32, $14, $15
+        IN_CODE
         
 
 ; Place a joinable (road,rail,power) 
@@ -85,13 +87,17 @@ place_power:
 
 ; Types used for auto-bulldoze
 ;70fa/28922
+        IN_RODATA
 D_autobulldoze_free_tiles:              ; $70FA / 28922 - tiles that do not need explicit bulldoze (free to build on)
         defb    TILE_DIRT, TILE_WATER            ;DIRT, WATER
 ;70fc/28944
 D_autobulldoze_tile_types:              ; $70FC / 28924 - tile types auto-bulldozeable; searched by cpir in bulldoze check
         defb    $02, $03, $01, $05, $04, $06
+        IN_CODE
  
+        IN_DATA
 V_auto_bulldoze_flag:    defb        0       ; VAR $7102 / 28930 - auto-bulldoze mode flag (2=large zone needs bulldoze check, 0=small tool; written but not subsequently read - possibly vestigial)
+        IN_CODE
 
 check_bulldoze_then_place:                                    ; $7103 / 28931 - From cursor position: if tile empty place zone, else if auto-bulldoze enabled bulldoze first
 .L7103  call    levelmap_xypos_from_cursor
@@ -117,19 +123,37 @@ check_bulldoze_then_place:                                    ; $7103 / 28931 - 
         call    levelmap_xypos_from_cursor
         pop     bc
         ld      a,c
+        IFDEF PORTABLE
+        ld      (V_autobulldoze_width),a
+        ELSE
         ld      (auto_bulldoze_nun_columns+1),a
+        ENDIF
 
 ; Think this is doing the auto bulldoze
 .L7135  push    hl
 auto_bulldoze_nun_columns:
+        IFDEF PORTABLE
+        ld      a,(V_autobulldoze_width)
+        ld      c,a
+        ELSE
         ld      c,0         ;SMC
+        ENDIF
 
 .L7138  ld      a,(hl)
         push    hl      ;Address of top left of zone
         push    bc      ;Size of zone
         ld      hl,D_autobulldoze_tile_types
+        IFDEF PORTABLE
+        ld      bc,6
+        cpir    
+        jr      z,L7141_found
+        ld      hl,V_auto_bulldoze_flag ;the original's 7th byte: the flag after the table
+        cp      (hl)
+L7141_found:
+        ELSE
         ld      bc,7
         cpir    
+        ENDIF
         pop     bc
         pop     hl
         jp      z,L714b ;If we haven't one of those types then we must bulldoze
@@ -167,10 +191,17 @@ check_can_place_zone:
         call    levelmap_xypos_from_cursor
         pop     bc
         ld      a,c
+        IFDEF PORTABLE
+        ld      (V_width_29056),a
+.L717f  push    hl
+        ld      a,(V_width_29056)
+        ld      c,a
+        ELSE
         ld      (SMC_29056+1),a
 .L717f  push    hl
 SMC_29056:
         ld      c,0
+        ENDIF
 .L7182  ld      a,(hl)
         cp      2                   ;DIRT
         jr      z,L718a                 ; (3)
@@ -200,10 +231,17 @@ place_zone:                                 ; $7197 / 29079
 ;        bc = yx size to place
 place_zone_direct:
 .L719f  ld      a,c
+        IFDEF PORTABLE
+        ld      (V_width_29092),a
+.L71a3  push    hl
+        ld      a,(V_width_29092)
+        ld      c,a
+        ELSE
         ld      (SMC_29092+1),a
 .L71a3  push    hl
 SMC_29092:
         ld      c,0
+        ENDIF
 .L71a6  ld      a,(ix+0)
         ld      (hl),a
         inc     hl
@@ -217,8 +255,10 @@ SMC_29092:
         ret   
 
 
+        IN_DATA
 V_t_1zone_cost_on_land:    defw    0   ; VAR $71B8 / 29112 - : Cost of a placing a single zone
 V_t_1zone_cost_on_water:      defw    0   ; VAR $71BA / 29114 - : Cost on land
+        IN_CODE
 ;71b8/29112
 
 

@@ -18,6 +18,7 @@ name counts as used, even by other dead code in a cycle (those are reported sepa
 when they can be told apart from a root).
 
   usage: tools/find_dead.py [--verbose]
+         tools/find_dead.py --smc      fail if the engine stores into its own code
 """
 import collections
 import glob
@@ -109,7 +110,8 @@ def parse(lines):
         tok = rest.split(None, 1)
         mn = tok[0].lower()
         ops = tok[1] if len(tok) > 1 else ''
-        if mn == 'defc' or mn in ('section', 'public', 'extern', 'org', 'macro', 'endm', 'align'):
+        if mn == 'defc' or mn in ('section', 'public', 'extern', 'org', 'macro', 'endm', 'align',
+                                  'in_code', 'in_rodata', 'in_data', 'in_bss'):
             continue
         for w in WORDS.findall(ops):
             cur['refs'].add(w)
@@ -124,7 +126,32 @@ def parse(lines):
     return chunks, labels
 
 
+STORE_RE = [
+    re.compile(r'\bld\s+\(\s*([A-Za-z_]\w*)\s*(?:[+-]\s*\w+)?\s*\)\s*,'),
+    re.compile(r'\b(?:inc|dec|set|res|sla|sra|srl|sll|rl|rr|rlc|rrc)\s+(?:\w+\s*,\s*)?\(\s*([A-Za-z_]\w*)\s*(?:[+-]\s*\w+)?\s*\)'),
+]
+
+
+def check_smc():
+    """A PORTABLE engine must run from ROM, so nothing may store into a label that is code."""
+    lines = source_lines()
+    chunks, labels = parse(lines)
+    bad = []
+    for path, raw, code in lines:
+        for rx in STORE_RE:
+            for m in rx.finditer(code):
+                c = labels.get(m.group(1))
+                if c is not None and c['has_code']:
+                    bad.append((path, raw.strip(), m.group(1)))
+    for path, raw, name in bad:
+        print(f'  stores into code: {name:28} {path}: {raw}')
+    print(('FAIL' if bad else 'PASS') + f'  engine does not modify its own code ({len(bad)} stores into code labels)')
+    return 1 if bad else 0
+
+
 def main():
+    if '--smc' in sys.argv:
+        sys.exit(check_smc())
     verbose = '--verbose' in sys.argv
     chunks, labels = parse(source_lines())
 

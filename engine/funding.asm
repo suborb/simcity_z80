@@ -10,6 +10,7 @@ apply_funding_percent:                                    ; $94FF / 38143 - Mult
 
 
 ;950a/38154
+        IN_RODATA
 D_funding_effect_mask:                  ; $950A / 38154 - funding ratio index -> road effect bitmask (16 levels)
         defb    $0F, $1F, $1F, $3F, $3F, $7F, $7F, $FF
         defb    $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF
@@ -17,6 +18,7 @@ D_funding_effect_mask:                  ; $950A / 38154 - funding ratio index ->
 D_funding_effect_level:                 ; $951A / 38170 - funding ratio index -> service effectiveness 0-15 (16 levels)
         defb    $00, $03, $06, $07, $08, $0A, $0C, $0F
         defb    $0F, $0F, $0F, $0F, $0F, $0F, $0F, $0F
+        IN_CODE
         
 
 ;

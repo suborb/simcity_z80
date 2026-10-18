@@ -13,11 +13,19 @@ fill_zone_with_tile:                                    ; $7B86 / 31622 - Find t
 
 .L7b99  ld      a,(ix+0)
         and     7
+        IFDEF PORTABLE
+        ld      (V_width_31652),a
+        ld      b,a
+.L7ba2  push    ix
+        ld      a,(V_width_31652)
+        ld      c,a
+        ELSE
         ld      (SMC_31652+1),a
         ld      b,a
 .L7ba2  push    ix
 SMC_31652:
         ld      c,0
+        ENDIF
 .L7ba6  ld      a,(V_fill_tile)
         ld      (ix+0),a
         inc     ix
@@ -43,11 +51,19 @@ tornado_find_zone_top:                                    ; $7BC4 / 31684 - Walk
 
 .L7bce  ld      a,(ix+0)
         and     7
+        IFDEF PORTABLE
+        ld      (V_width_31705),a
+        ld      b,a
+.L7bd7  push    ix
+        ld      a,(V_width_31705)
+        ld      c,a
+        ELSE
         ld      (SMC_31705+1),a
         ld      b,a
 .L7bd7  push    ix
 SMC_31705:
         ld      c,0
+        ENDIF
 .L7bdb  ld      a,58
         ld      (ix+0),a
         inc     ix
@@ -65,6 +81,7 @@ SMC_31705:
 ; shifted right by (value-1) before being added to the coverage minimap, so
 ; 1 = full strength at the centre, 2 = half, and 9 = shifted away to nothing.
 ; Cells are capped at 15.
+        IN_RODATA
 D_station_influence_kernel:                        ; $7BEF / 31727
                         ; $7BEF / 31727
         defb    $09, $09, $02, $09, $09 
@@ -72,9 +89,12 @@ D_station_influence_kernel:                        ; $7BEF / 31727
         defb    $02, $01, $01, $01, $02 
         defb    $09, $02, $01, $02, $09 
         defb    $09, $09, $02, $09, $09
+        IN_CODE
 
 
+        IN_DATA
 V_FireEffect:    defb        0       ; VAR $7C08 / 31752 -
+        IN_CODE
 
 apply_fire_station_kernel:                                    ; $7C09 / 31753 - Apply D_station_influence_kernel 5x5 around current pos to fire coverage minimap
 .L7c09  ld      bc,(V_map_iter_xy)
@@ -98,7 +118,9 @@ apply_fire_station_kernel:                                    ; $7C09 / 31753 - 
         jr      nz,L7c1c                ; (-20)
         ret     
 
+        IN_DATA
 V_PoliceEffect:    defb    0       ; VAR $7C31 / 31793 -
+        IN_CODE
 
 apply_police_station_kernel:                                    ; $7C32 / 31794 - Apply D_station_influence_kernel 5x5 around current pos to police coverage minimap
 .L7c32  ld      bc,(V_map_iter_xy)
@@ -154,6 +176,7 @@ add_fire_kernel_value:                                    ; $7C5F / 31839 - Add 
 ; the second (tighter, only 1 and 5) is used for the light pollution of road traffic
 ; (IX=31899 in process_traffic_from_connections).  The amount spread is
 ; V_traffic_bfs_steps (despite the name, it is the source strength here).
+        IN_RODATA
 D_stadium_effect_kernel:                        ; $7C77 / 31863
                         ; $7C77 / 31863
         defb    $09, $04, $04, $04, $04, $09
@@ -168,8 +191,11 @@ D_stadium_effect_kernel:                        ; $7C77 / 31863
         defb    $09, $05, $01, $01, $05, $09
         defb    $09, $09, $05, $05, $09, $09
         defb    $09, $09, $09, $09, $09, $09
+        IN_CODE
 
+        IN_DATA
 V_traffic_bfs_steps:    defb    $ff       ; VAR $7CBF / 31935 - traffic BFS step limit (initialised to 5, decremented per step; $ff = inactive)
+        IN_CODE
 
 
 apply_stadium_kernel_from_iter:                                    ; $7CC0 / 31936 - Load BC from V_map_iter_xy and IX from D_stadium_effect_kernel, then call apply_stadium_kernel
@@ -240,10 +266,12 @@ read_traffic_density:                                    ; $7D1D / 32029 - Read 
         ret     
 
 
+        IN_DATA
 V_zone_best_coords:    defw        0       ; VAR $7D2B / 32043 - map coords of highest-value zone tile (candidate for upgrade)
 
 
 V_zone_size_to_scan:    defw    0       ; VAR $7D2D / 32045 - size of zone to scan
+        IN_CODE
 
 scan_zone_with_size:                                    ; $7D2F / 32047 - Store HL as zone scan size in V_zone_size_to_scan, then enter zone scan loop
 .L7d2f  ld      (V_zone_size_to_scan),hl
@@ -433,12 +461,14 @@ manhattan_dist_to_centroid:                                    ; $7E03 / 32259 -
 .L7e15  add     a,e
         ret     
 
+        IN_DATA
 V_zone_parks:    defb        0       ; VAR $7E17 / 32279 - park tile count within 3x3 zone scan
 V_zone_seas:    defb        0       ; VAR $7E18 / 32280 - sea/water tile count within 3x3 zone scan
 V_zone_trees:    defb        0       ; VAR $7E19 / 32281 - tree tile count within 3x3 zone scan
 V_zone_transport_count:    defb        0       ; VAR $7E1A / 32282 - transport tile count within 3x3 zone scan
 V_zone_transport_score:    defb        0       ; VAR $7E1B / 32283 - accumulated transport score (capped at 127)
 V_zone_land_value_base:    defb        0       ; VAR $7E1C / 32284 - combined land value base score (parks + transport - pollution)
+        IN_CODE
 
 
 ;
@@ -500,7 +530,9 @@ proximity_score_to_centroid:                                    ; $7E5A / 32346 
 
         defb    0               ; padding
 
+        IN_DATA
 V_zone_police_score:    defb    0       ; VAR $7E69 / 32361 - police coverage score for zone (proximity to police station)
+        IN_CODE
 
 ; Despite the name this produces a CRIME figure for the zone, later subtracted
 ; from its land value:
@@ -536,7 +568,9 @@ calc_police_coverage_score:                                    ; $7E6A / 32362
         ld      (V_police_cov_den),hl
         ret     
 
+        IN_DATA
 V_zone_tax_penalty:    defb        0       ; VAR $7E9A / 32410 - tax rate * 8 + difficulty bonus; subtracted from zone land value
+        IN_CODE
 
 ; penalty = tax_rate * 8, plus one more tax_rate for difficulty 1 and 2, plus a
 ; second one for difficulty 1 only (so *8, *10, *9 for difficulty 0, 1, 2 - the
@@ -564,10 +598,12 @@ calc_tax_penalty:                                    ; $7E9B / 32411
         ld      (V_zone_tax_penalty),a
         ret     
 
+        IN_DATA
 V_zone_landval_local:    defb        0       ; VAR $7EBF / 32447 - zone's local land value from the land value minimap
 V_zone_traffic_density:    defb        0       ; VAR $7EC0 / 32448 - zone's traffic density from traffic minimap
 V_zone_landval_final:    defb        0       ; VAR $7EC1 / 32449 - final computed land value for this zone (0-255)
 V_zone_landval_mult:    defw        0       ; VAR $7EC2 / 32450 - land value demand multiplier (scales growth/shrink probability)
+        IN_CODE
 
 ; Compute the final land value of the zone being processed (0-255).
 ;
@@ -630,8 +666,10 @@ clamp_h_to_byte:                                    ; $7F04 / 32516 - If H=0 ret
 .L7f0d  ld      l,255
         ret     
 
+        IN_DATA
 V_zone_growth_factor:    defb    0       ; VAR $7F10 / 32528 - zone growth probability factor (land value based)
 V_zone_half_landval:    defb    0       ; VAR $7F11 / 32529 - half of zone land value (used in population growth threshold)
+        IN_CODE
 
 ; Derive the residential growth thresholds from land value.
 ;   V_zone_half_landval = value / 2                     (value < 128)
@@ -670,8 +708,10 @@ V_zone_half_landval:    defb    0       ; VAR $7F11 / 32529 - half of zone land 
         ld      (V_zone_half_landval),a
         ret     
 
+        IN_DATA
 V_com_growth_index:    defb    0       ; VAR $7F43 / 32579 -
 V_com_growth_scaled:    defb    0       ; VAR $7F44 / 32580 - unused?
+        IN_CODE
 
 
 calc_commercial_growth_index:                                    ; $7F45 / 32581 - Compute land value / 25 -> V_com_growth_index growth index; *4 -> V_com_growth_scaled; for commercial zone upgrade
@@ -688,8 +728,10 @@ calc_commercial_growth_index:                                    ; $7F45 / 32581
         ld      (V_com_growth_scaled),a
         ret     
 
+        IN_DATA
 V_ind_growth_index:    defb    0       ; VAR $7F5D / 32605 -
 V_ind_growth_scaled:    defb    0       ; VAR $7F5E / 32606 - unused?
+        IN_CODE
 
 
 calc_industrial_growth_index:                                    ; $7F5F / 32607 - Compute land value / 31 -> V_ind_growth_index growth index; *8 -> V_ind_growth_scaled; for industrial zone upgrade
@@ -709,7 +751,9 @@ calc_industrial_growth_index:                                    ; $7F5F / 32607
 
 
 ; Holds result f searching the map - address within map?
+        IN_BSS
 V_powerstation_list:    defs        32          ; VAR $7F78 / 32632 - : 32632/7f78 - list of map addresses for all power stations (16 x 2-byte entries, zero-terminated)
+        IN_CODE
 
 
 build_powerstation_list:                                    ; $7F98 / 32664 - Scan levelmap for power station tiles (coal/nuclear); store addresses into V_powerstation_list
@@ -740,7 +784,9 @@ powerstation_list_scan_loop:                                    ; $7FA2 / 32674 
         jr      powerstation_list_scan_loop                   ; (-42)
 
 
+        IN_DATA
 V_brownout_detected:    defb    0       ; VAR $7FCC / 32716 - (32716/7fcc) - brownouts detected
+        IN_CODE
 
 generate_power_map:
 .L7fcd  call    build_powerstation_list
@@ -778,13 +824,17 @@ power_bfs_per_station:                                    ; $7FE5 / 32741 - For 
         jr      power_bfs_per_station                   ; (-48)
 
 ;8015
+        IN_DATA
 V_power_bfs_down:        defb    0       ; VAR $8015 / 32789 - power BFS downward traversal flag (set if going south, prevents backtrack)
 V_power_bfs_up:        defb    0       ; VAR $8016 / 32790 - power BFS upward traversal flag (set if going north, prevents backtrack)
 V_power_bfs_pos:        defw    0       ; VAR $8017 / 32791 - power BFS current map coordinates (b=y, c=x)
 V_power_units_left: defw    0          ; VAR $8019 / 32793 - power units remaining from current station (coal=450, nuclear=1350; decrements each powered tile)
 V_powersp:  defw    0       ; VAR $801B / 32795 - saved stack when aborting power search 
+        IN_CODE
 
+        IN_BSS
 V_powerqueue:   defs    256 ; VAR $801D / 32797 - list of coordinates to check for power connection
+        IN_CODE
 
 
 
@@ -934,8 +984,10 @@ set_tile_as_powered:
         ret     
 
 ;33245
+        IN_BSS
 V_city_score:           defs    3   ; VAR $81DD / 33245 - calculated city score
 V_previous_city_score:  defs    3   ; VAR $81E0 / 33248 - previous city score
+        IN_CODE
 
 
 ; cf s_eval.c::GetAssValue()
@@ -991,7 +1043,9 @@ calculate_city_score:
         ld      (V_city_score+2),a
         ret     
 
+        IN_DATA
 V_unemployment:    defw    0       ; VAR $8265 / 33381 - unemployment level (derived from industrial demand; feeds concern score)
+        IN_CODE
 
 
 ; (Res-(Com+Ind))*4
@@ -1009,9 +1063,11 @@ set_unemployment:
         ret     
 
 
+        IN_DATA
 V_RValve:    defw    0       ; VAR $827C / 33404 - residential demand index (positive = demand, negative = surplus)
 V_CValve:    defw    0       ; VAR $827E / 33406 - commercial demand index
 V_IValve:    defw    0       ; VAR $8280 / 33408 - industrial demand index
+        IN_CODE
 
 
 ; Calculate economic balance indices (unemployment, commercial/industrial balance, etc.)
@@ -1246,8 +1302,10 @@ initialise_simulation_variables:
 ;   V_RailTotal, V_RoadTotal  - road/rail tile counts
 ; ============================================================
 
+        IN_DATA
 .V_zone_dispatch_suppress            defb        0       ; VAR $835D / 33629 -
 .V_sim_loop_counter defb       0       ; VAR $835E / 33630 - loop counter for simulation (increments each time through)
+        IN_CODE
 
 start_simulation:
         call    zero_simulation_state                           ;Initialise all simulation vars (minimaps, disaster flags, budgets)
@@ -1340,6 +1398,7 @@ zero_simulation_state:                                    ; $83A1 / 33697 - Zero
         ret     
 
 ;8443, 33859
+        IN_DATA
 V_CityPop: defb        0,0,0       ; VAR $8443 / 33859 - 24-bit cumulative population total (summed per tick for tax revenue calculation)
 
 V_ResZPop: defw        0       ; VAR $8446 / 33862
@@ -1381,6 +1440,7 @@ V_traffic_count:        defw        0   ; VAR $8478 / 33912 - traffic tile count
 V_pollution_sum:        defw        0   ; VAR $847A / 33914 - pollution accumulator (sum, for average)
 V_pollution_count:        defw        0   ; VAR $847C / 33916 - pollution tile count (denominator for average)
 V_landval_accum:        defw        0   ; VAR $847E / 33918 - land value accumulator (used by update_stats for tornado centroid)
+        IN_CODE
 
       
 ;33920
@@ -1398,6 +1458,7 @@ reset_simulation_vars:
         ld      (V_zone_extent+3),a
         ret     
 
+        IN_DATA
 V_LVAverage:     defw    0           ; VAR $849C / 33948 - land value total snapshot (copy of V_landval_accum; used for display)
 
 V_safe_AirportPop:        defw    0           ; VAR $849E / 33950
@@ -1405,6 +1466,7 @@ V_safe_NuclearPop:        defw    0           ; VAR $84A0 / 33952
 
 ;V_CCxy
 V_CCxy:    defb $20, $20       ; VAR $84A2 / 33954 - midpoint of active zone extent (x,y); used as tornado spawn target
+        IN_CODE
 
 
 ; Update safe copies of airport/nuclear pop, land value centroid, pollution average
@@ -1432,7 +1494,9 @@ update_stats:
         ld      (V_PolluteAverage),a             ;V_PolluteAverage = average pollution level
         ret
 
+        IN_DATA
 V_PolluteAverage:    defb        0       ; VAR $84DD / 34013 - average pollution level city-wide (V_pollution_sum / V_pollution_count)
+        IN_CODE
 
 
 ; Decay pollution minimap and compute average (runs every other tick)
@@ -1472,7 +1536,9 @@ zero_police_fire_minimaps:                                    ; $850C / 34060 - 
         ldir    
         ret     
 
+        IN_DATA
 V_TrafficAverage:    defb        0       ; VAR $851A / 34074 - average traffic density city-wide (rolling average from DecTrafficMem)
+        IN_CODE
 
 ; Decay traffic density minimap every tick; compute rolling average -> V_TrafficAverage
 ; Decay tiers: value<24 -> 0, 24-199 -> sub 24, 200-255 -> sub 34
@@ -1525,8 +1591,10 @@ traffic_decay_loop_next:                                    ; $854F / 34127 - Ad
         ld      (V_TrafficAverage),a
         ret     
 
+        IN_DATA
 V_traffic_active:    defb    0       ; VAR $8568 / 34152 - traffic BFS active (1=road traffic, 2=rail traffic)
 V_Zsource:    defb    0       ; VAR $8569 / 34153 - tile-flag mask for the traffic walk: the transport bits (4=road, 2=rail) of the start tile; only neighbours sharing a bit are walkable
+        IN_CODE
 
 ;
 ; TRAFFIC MODEL.  Not a true BFS: each call sends a single "commuter" on a
@@ -1618,8 +1686,10 @@ V_Zsource:    defb    0       ; VAR $8569 / 34153 - tile-flag mask for the traff
 
 .L85d3  ret     
 
+        IN_DATA
 V_LDir:    defb    0       ; VAR $85D4 / 34260 - traffic BFS previous direction (prevents immediate U-turns)
 V_PosStackN:    defb    0       ; VAR $85D5 / 34261 - traffic BFS steps taken so far (trip ends at 30)
+        IN_CODE
 
 
 ;
@@ -1663,9 +1733,11 @@ traffic_bfs_check_limit:                                    ; $85FD / 34301 - Ch
 .L8604  scf     
         ret     
 
+        IN_DATA
 V_traffic_rand_dir:    defb    0       ; VAR $8606 / 34310 - traffic BFS initial random direction (0-3) for this step
 V_traffic_cur_dir:    defb    0       ; VAR $8607 / 34311 - traffic BFS current direction being tried
 V_traffic_attempts:    defb    0       ; VAR $8608 / 34312 - traffic BFS attempts remaining before step fails (tries all 4 directions)
+        IN_CODE
 
 
 ;
@@ -1719,7 +1791,9 @@ traffic_bfs_try_step:                                    ; $8609 / 34313
         or      a
         ret     
 
+        IN_DATA
 V_zone_neighbour_filter:    defw    0           ; VAR $865E / 34398 -
+        IN_CODE
 
 ; Look at the four cells orthogonally around BC; if any belongs to a zone whose
 ; handler type (get_zone_handler_type) matches either byte of
@@ -1800,10 +1874,12 @@ apply_fire_kernel_save_regs:            ; $86BF / 34495 - Save alternate regs, a
         exx
         ret
 
+        IN_DATA
 V_ZonePwrFlg: defb    0       ; VAR $86C5 / 34501 - zone is powered this cell (1=yes, 0=no)
 V_zone_proc_type: defb    0       ; VAR $86C6 / 34502 - zone processing type (1=big zone centre, 2=compact RIC tile)
 V_CChr: defb    0       ; VAR $86C7 / 34503 - raw tile type of the zone centre tile (used to index D_zone_handler_config)
 V_zone_unpow_tile: defb    0       ; VAR $86C8 / 34504 - unpowered tile variant for check_ric_power
+        IN_CODE
 
 ; Scan full 96x96 map; evaluate zone tiles and dispatch to zone handlers
 ; Called once per simulation tick
@@ -1873,7 +1949,9 @@ set_zone_power_state:
 .L8739  exx     
         ret     
 
+        IN_DATA
 V_ric_tile_current: defb    0   ; VAR $873B / 34619 - current RIC tile state byte (powered/unpowered variant)
+        IN_CODE
 
 
 ; Process RIC characters
@@ -1922,8 +2000,10 @@ check_ric_power:
 .L8784  ret     
 
 
+        IN_DATA
 V_map_iter_xy: defw    0       ; VAR $8785 / 34693 - map coordinates whilst iterating
 V_map_iter_addr: defw    0       ; VAR $8787 / 34695 - map address whilst iterating
+        IN_CODE
 
 
 .L8789  ld      (V_map_iter_addr),hl
@@ -1965,7 +2045,9 @@ update_powered_zone_count:                                    ; $87AA / 34730 - 
         ld      (V_unPwrdZCnt),hl
 .L87c7  ret     
 
+        IN_DATA
 V_zone_extent:    defb    0, 255, 0, 255      ; VAR $87C8 / 34760 - zone bounding box: minX, maxX, minY, maxY (reset to 0,255,0,255 each tick)
+        IN_CODE
 
 
 
@@ -2001,6 +2083,7 @@ dispatch_compact_ric:
         ret
 
 ; Zone handler jump table, indexed by D_zone_handler_config byte 1
+        IN_RODATA
 D_zone_handler_table:                   ; $87FB / 34811 - dispatch table of function pointers for special zone processors
         defw    DoPolice        ;0
         defw    DoFire          ;1
@@ -2044,9 +2127,12 @@ D_zone_handler_config:                  ; $8813 / 34835 - per-zone config: (tile
         defb    $1c,$0b,$02,$30         ;industrial density 3
         defb    $1d,$0b,$03,$40         ;industrial density 4
         defb    $ff,$ff                 ;sentinel
+        IN_CODE
 
+        IN_DATA
 V_zone_handler_params:                                        ; VAR $8869 / 34921
         defb    $00, $00         ;VAR 8869/34921 - density/sub-type from D_zone_handler_config for current zone
+        IN_CODE
 
 ; Dispatch zone handler: search D_zone_handler_config for V_CChr (tile type), load V_zone_handler_params
 ; parameters, then jump via D_zone_handler_table to the appropriate DoXxx handler
@@ -2118,7 +2204,9 @@ L8898_return:
         exx     
         ret     
 
+        IN_DATA
 V_rail_upgrade_mask:    defb    $FF         ; VAR $88C5 / 35013 -
+        IN_CODE
 
 .L88c6  ld      hl,V_rail_upgrade_mask
         ld      a,(hl)
@@ -2158,7 +2246,9 @@ V_rail_upgrade_mask:    defb    $FF         ; VAR $88C5 / 35013 -
 
 .L8901  ret     
 
+        IN_DATA
 V_road_upgrade_mask:    defb    0       ; VAR $8902 / 35074 -
+        IN_CODE
 
 .L8903  ld      hl,V_road_upgrade_mask
         ld      a,(hl)
@@ -2250,7 +2340,9 @@ place_dirt:
 .L8980  ld      (V_fill_mode_flag),a
         jr      fire_spread_to_neighbours                   ; (22)
 
+        IN_DATA
 V_flood_timer:  defb    $32         ; VAR $8985 / 35205 -
+        IN_CODE
 
 .process_flood_tile                     ; $8986 / 35206
 .L8986
@@ -2264,9 +2356,11 @@ V_flood_timer:  defb    $32         ; VAR $8985 / 35205 -
         ld      (V_fill_mode_flag),a
         jr      fire_spread_to_neighbours                   ; (3)
 
+        IN_DATA
 V_fill_tile:    defb    0       ; VAR $8998 / 35224 -
 V_fill_mode_flag:    defb    0       ; VAR $8999 / 35225 -
 V_fire_neighbour_count:    defb    0       ; VAR $899A / 35226 -
+        IN_CODE
 
 fire_spread_to_neighbours:                                    ; $899B / 35227 - Scan 4 neighbours of current zone; probabilistically bulldoze flammable tiles to spread fire
 .L899b  xor     a
@@ -2336,6 +2430,7 @@ bulldoze_or_fill_zone_tile:                                    ; $89EA / 35306 -
 ; where "ring tile" is the tile that sits in that position in a freshly placed,
 ; empty zone (see residential_zone_2: $49 $4A $4B / $50 [$51] $4C / $4F $4E $4D).
 ; Indexed by (random & 7) * 3 in zone_pick_ring_cell.
+        IN_RODATA
 D_zone_ring_offsets:                    ; $8A08 / 35336
 ;8a08
         defb    $FF, $FF, $49, $FF, $00, $4A, $FF, $01
@@ -2344,6 +2439,7 @@ D_zone_ring_offsets:                    ; $8A08 / 35336
         
         
         defb    $01, $4D
+        IN_CODE
 
 
 ;
@@ -2592,6 +2688,7 @@ L8b37:
         jp      write_zone_print_entries
 
 ;35735
+        IN_RODATA
 residential_zone_1:
         defb    $42, $40, $42
         defb    $41, $51, $43
@@ -2604,6 +2701,7 @@ residential_zone_2:
         defb    $49, $4a, $4b
         defb    $50, $51, $4c
         defb    $4f, $4e, $4d
+        IN_CODE
 
 
 .L8ba9  ld      ix,residential_zone_1
@@ -2615,9 +2713,11 @@ sim_place_zone_3x3:
         ld      bc,$0303
         jp      place_zone_direct
 
+        IN_RODATA
 D_density_class_table:                  ; $8BBA / 35770 - population count index -> density class 0-3
         defb    $00, $00, $01, $01, $01, $02
         defb    $02, $03, $03, $03
+        IN_CODE
         
 
 .L8bc4  ld      hl,(V_ComZPop)
@@ -2684,10 +2784,12 @@ do_commercial_zone_scan:                                    ; $8BEB / 35819 - Sc
         jp      write_zone_print_entries
 
 ;8c41, 35905 
+        IN_RODATA
 commercial_zone_1:
         defb    $49, $4a, $4b
         defb    $50, $52, $4c
         defb    $4f, $4e, $4d
+        IN_CODE
 
 
 .L8c4a  ld      bc,(V_map_iter_xy)
@@ -2783,10 +2885,12 @@ check_industrial_pop_nonzero:                                    ; $8CE0 / 36064
         xor     a
         ret     
 
+        IN_RODATA
 industrial_zone_1:
         defb    $49, $4a, $4b
         defb    $50, $53, $4c
         defb    $4f, $4e, $4d
+        IN_CODE
 
 
 .L8cfa  ld      bc,(V_map_iter_xy)
@@ -3010,6 +3114,7 @@ L8e52:
 .L8e87  jp      sim_maybe_start_fire_or_flood
 
 
+        IN_DATA
 V_display_population:        defb    0,0,0        ; VAR $8E8A / 36490 - current cumulative population (copy for budget display)
 V_prev_year_population:        defb    0,0,0        ; VAR $8E8D / 36493 - previous year's population (for budget comparison)
 V_population:   defb    0,0,0        ; VAR $8E90 / 36496 - running population snapshot (updated each November)
@@ -3018,6 +3123,7 @@ V_population:   defb    0,0,0        ; VAR $8E90 / 36496 - running population sn
 
 ; Simulation stops whilst waiting for budget confirmation, this variable is checked
 .V_wait_for_budget_confirm defb    0   ; VAR $8E93 / 36499 - set waiting for budget to complete
+        IN_CODE
 
 
 ; Budget processing - runs every tick to update V_display_population (current pop for display);
@@ -3086,10 +3192,12 @@ apply_budget_to_money:                                    ; $8EEF / 36591 - Copy
         ret     
 
 
+        IN_DATA
 V_concern_crime:    defb    0       ; VAR $8F01 / 36609 - crime concern
 V_concern_house_price:    defb    0       ; VAR $8F02 / 36610 - house price concern
 
 V_transport_total:    defw    0       ; VAR $8F03 / 36611 - road/transport total (for city score display)
+        IN_CODE
 
 
 ; Compute city concern scores from per-tick accumulators
@@ -3116,8 +3224,10 @@ compute_concern_scores:
         ret
 
 
+        IN_DATA
 V_hospital_demand:    defb    0       ; VAR $8F2F / 36655 - hopsital demand
 V_church_demand:    defb    0       ; VAR $8F30 / 36656 - church demand
+        IN_CODE
 
 ; Determine if we need a hospital or church
 census_church_hosp:
@@ -3155,15 +3265,19 @@ census_church_hosp:
 ;   +2 = random mask for DoCommercial
 ;   +3 = not referenced by this code (the CPC version uses it in DoIndustrial)
 ;   +4 = month-advance mask (budget fires when sim_loop_counter & this == 0)
+        IN_DATA
 V_sim_speed_block:  defb    $08, $07, $07, $07, $01     ; VAR $8F67 / 36711 - 5-byte simulation speed control block (default = NORMAL speed)
+        IN_CODE
 
 ; Speed settings table: 5 bytes per row, indexed by V_simulation_speed (0=FAST..3=PAUSED)
+        IN_RODATA
 D_sim_speed_params:                        ; $8F6C / 36716
                         ; $8F6C / 36716
         defb    $08, $01, $0f, $01, $00     ;FAST   (month every tick)
         defb    $04, $03, $1f, $03, $01     ;NORMAL (month every 2 ticks)
         defb    $03, $07, $3f, $07, $03     ;SLOW   (month every 4 ticks)
         defb    $ff, $ff, $ff, $ff, $ff     ;PAUSED (never advance month)
+        IN_CODE
 
 
 ; Copy D_sim_speed_params row for current speed into V_sim_speed_block
@@ -3184,8 +3298,10 @@ D_sim_speed_params:                        ; $8F6C / 36716
 
 ; We have a few variables here 7 I think
 
+        IN_DATA
 V_money:       defb  0,0,0   ; VAR $8F97 / 36759 - money!! - 8f99
             defb    0       ;UNUSED
 V_month:     defb  0       ; VAR $8F9B / 36763 - (8f9b) - Month
 V_year:      defw  1902    ; VAR $8F9C / 36764 - (8f9c) - Year
 V_8f9e:      defb  0       ; VAR $8F9E / 36766 - unreferenced, likely struct padding
+        IN_CODE

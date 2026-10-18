@@ -1,5 +1,7 @@
 ; rand: lines 343-373 of disassembly/sim_game.asm (engine)
+        IN_DATA
 V_random_seed: defw        $fc03        ; VAR $5CC4 / 23748 - random seed
+        IN_CODE
 
 ; Random number generator?
 get_random_number:                          ; $5CC6 / 23750

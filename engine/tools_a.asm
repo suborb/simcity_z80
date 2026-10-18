@@ -1,5 +1,6 @@
 ; tools_a: lines 2698-2732 of disassembly/sim_game.asm (engine)
 
+        IN_RODATA
 D_zone_sizes:                        ; $6DAF / 28079
                         ; $6DAF / 28079
         defb    $01, $01    ;Bulldozer
@@ -16,6 +17,7 @@ D_zone_sizes:                        ; $6DAF / 28079
         defb    $04, $04    ;Power plant
         defb    $04, $04    ;Seaport
         defb    $06, $06    ;Airport
+        IN_CODE
 
 ; Get the size of a zone
 ;

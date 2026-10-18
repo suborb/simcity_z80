@@ -1,6 +1,7 @@
 ; tools_e: lines 3569-3869 of disassembly/sim_game.asm (engine)
 
 ; Zone bulldoze costs
+        IN_RODATA
 D_bulldoze_costs:                        ; $7301 / 29441
                         ; $7301 / 29441
         defb    0
@@ -10,6 +11,7 @@ D_bulldoze_costs:                        ; $7301 / 29441
         defb    16
         defb    25
         defb    36
+        IN_CODE
 
 
 .L7308  call    wait_if_demolish_pending
@@ -40,12 +42,22 @@ find_zone_top_row:                                    ; $7315 / 29461 - Walk IX 
         and     7
 
 bulldoze_zone_rows:                                    ; $7337 / 29495 - Fill zone W*H tiles with rubble row by row via IX, then animate bulldoze sequence
+        IFDEF PORTABLE
+.L7337  ld      (V_bulldoze_zone_width),a
+        ld      b,a
+        ELSE
 .L7337  ld      (SMC_bulldoze_zone_width+1),a
         ld      b,a
+        ENDIF
 ; Clear the whole zone and step through the bulldoze sequence
 .L733b  push    ix
 SMC_bulldoze_zone_width:
+        IFDEF PORTABLE
+        ld      a,(V_bulldoze_zone_width)
+        ld      c,a
+        ELSE
         ld      c,0             ;SMC
+        ENDIF
 .L733f  ld      (ix+0),70
         inc     ix
         dec     c
@@ -76,9 +88,11 @@ SMC_bulldoze_zone_width:
         ld      a,3
         jr      bulldoze_zone_rows                   ; (-70)
 
+        IN_RODATA
 D29565:
         defb    $46, $47, $48
         defb    $47, $48, $02
+        IN_CODE
 
 ; Degrade any bulldozed tiles through the sequence
 bulldoze_degrade_tile:
@@ -147,10 +161,12 @@ action_zone_park:
 .L73ed  ld      (hl),c
         jp      draw_map
 
+        IN_RODATA
 default_residential_tiles:
         defb    $49, $4a, $4b
         defb    $50, $54, $4c
         defb    $4f, $4e, $4d
+        IN_CODE
 
 ;73fa
 action_zone_residential:
@@ -163,10 +179,12 @@ action_zone_residential:
 
 
 ;29707/740b
+        IN_RODATA
 default_commercial_tiles:
         defb    $49, $4a, $4b
         defb    $50, $55, $4c
         defb    $4f, $4e, $4d
+        IN_CODE
 
 action_zone_commercial:
         ld      de,100
@@ -176,10 +194,12 @@ action_zone_commercial:
         call    place_zone
         jp      draw_map
 
+        IN_RODATA
 default_industrial_tiles:
         defb    $49, $4a, $4b
         defb    $50, $56, $4c
         defb    $4f, $4e, $4d
+        IN_CODE
 
 ;742e
 action_zone_industrial:
@@ -190,10 +210,12 @@ action_zone_industrial:
         call    place_zone
         jp      draw_map
 
+        IN_RODATA
 default_police_tiles:
         defb    $a3, $c0, $c0
         defb    $83, $c0, $c3
         defb    $83, $c0, $c6
+        IN_CODE
 
 action_zone_police:
         ld      de,500
@@ -203,10 +225,12 @@ action_zone_police:
         call    place_zone
         jp      draw_map
 
+        IN_RODATA
 default_fire_tiles:
         defb    $a3, $c1, $c1
         defb    $83, $c1, $c4
         defb    $83, $c1, $c7
+        IN_CODE
 
 action_zone_fire:
         ld      de,500
@@ -216,11 +240,13 @@ action_zone_fire:
         call    place_zone
         jp      draw_map
 
+        IN_RODATA
 default_stadium_tiles:
         defb    $a4, $c4, $c4, $c0
         defb    $84, $c5, $c0, $c0
         defb    $84, $c5, $c4, $c0
         defb    $84, $c6, $c0, $c0
+        IN_CODE
 
 ;7483
 action_zone_stadium:
@@ -231,6 +257,7 @@ action_zone_stadium:
         call    place_zone
         jp      draw_map
 
+        IN_RODATA
 default_coal_power_station_tile:
         defb    $b4, $c6, $c4, $c0
         defb    $84, $c7, $c0, $c0
@@ -242,6 +269,7 @@ default_nuclear_power_station_tiles:
         defb    $84, $c9, $c0, $c0
         defb    $84, $c9, $c4, $c0
         defb    $84, $ca, $c0, $c0
+        IN_CODE
 
 
 action_zone_power_station:
@@ -271,11 +299,13 @@ action_zone_power_station:
         jp      draw_map
 
 
+        IN_RODATA
 default_seaport_tiles:
         defb    $a4, $ca, $c4, $c0
         defb    $84, $cb, $c0, $c0
         defb    $84, $cb, $c4, $c0
         defb    $84, $cc, $c0, $c0
+        IN_CODE
 
 
 action_zone_seaport:
@@ -287,6 +317,7 @@ action_zone_seaport:
         jp      draw_map
 
 
+        IN_RODATA
 default_airport_tiles:
         defb    $a6, $cc, $c4, $c0, $c0, $c0
         defb    $86, $cd, $c2, $c0, $c0, $c0
@@ -294,6 +325,7 @@ default_airport_tiles:
         defb    $86, $ce, $c6, $c0, $c0, $c0
         defb    $86, $cf, $c4, $c0, $c0, $c0
         defb    $86, $d0, $c2, $c0, $c0, $c0
+        IN_CODE
     
 action_zone_airport:
         ld      de,10000

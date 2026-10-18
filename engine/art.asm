@@ -16,5 +16,7 @@
         defc    ART_TILE_ATTRS = 2760
         defc    ART_ZONE_ATTRS = 2854
 
+        IN_RODATA
 view_udgs:
         BINARY  "assets/map_art.bin"
+        IN_CODE

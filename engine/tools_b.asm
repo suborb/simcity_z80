@@ -1,5 +1,6 @@
 ; tools_b: lines 2781-3116 of disassembly/sim_game.asm (engine)
 ; 28190
+        IN_RODATA
 zone_costs:
         defw    1
         defw    10
@@ -15,6 +16,7 @@ zone_costs:
         defw    4000
         defw    5000
         defw    10000       ;airport
+        IN_CODE
 
 ; Gets the cost for the selected icon index
 ; Entry: a = zone index number
@@ -57,8 +59,10 @@ get_cost_for_zone:
         ret     
 
 
+        IN_DATA
 V_cursor_map_coords:    defw    0       ; VAR $6E67 / 28263 - cursor map coordinates saved by levelmap_xypos_from_cursor (appears written but not read back; possibly vestigial)
 V_raw_coords_flag:    defb    0       ; VAR $6E69 / 28265 - raw-coordinates flag: when set, view offset is NOT added (use absolute map coords rather than view-relative)
+        IN_CODE
 
 ; Gets coordinates on the levelmap - based on ccursor?
 .levelmap_xypos_from_cursor
@@ -141,14 +145,18 @@ get_tile_join_type_flag:                                    ; $6EBE / 28350 - Re
 
 
 ; Variable reused in a few places for convenience
+        IN_DATA
 V_neighbour_tile_to_check:    defb    $00         ; VAR $6ED2 / 28370 - cell to check for neight
+        IN_CODE
 
 ;6ed3/28371
+        IN_RODATA
 D_road_join_offsets:                    ; $6ED3 / 28371 - (type, tile) pairs for road/rail tile adjacency joining
         defb    $00, $01, $00, $02 
         defb    $00, $03, $00, $06 
         defb    $01, $01, $04, $09
         defb    $05, $08, $07, $0A
+        IN_CODE
     
 ; ?? Joins up roads and rail together using the offset table above
 ; Enters: bc = xy coordinates
@@ -179,8 +187,10 @@ join_neighbour_cell:                                    ; $6EE3 / 28387 - Check 
 .L6f0e  pop     bc
         ret     
 
+        IN_DATA
 V_tile_conn_flags:    defb        0   ; VAR $6F10 / 28432 - current tile connection flags bitmask (from tile_to_flags, used in path-joining neighbour check)
 V_force_tile_match:    defb        0   ; VAR $6F11 / 28433 - force tile-type match flag: when set, get_neighbours bypasses connection flags and compares tile type directly
+        IN_CODE
 
 check_neighbour_tile_match:                                    ; $6F12 / 28434 - Check tile at BC against V_neighbour_tile_to_check range [e, e+11]; set C if match
 .L6f12  push    bc
@@ -241,8 +251,10 @@ get_neighbours:
         pop     bc
         ret     
 
+        IN_DATA
 V_path_tile_coords:    defw    0       ; VAR $6F5C / 28508 - map coords of last-placed path tile (saved for subsequent join_up_neighbour_cells call)
 V_path_tile_type:    defb    0       ; VAR $6F5E / 28510 - tile type to place in path routine (0=plain tile, neighbour_tile+11=crossing variant)
+        IN_CODE
 
 place_path_tile_with_join:                                    ; $6F5F / 28511 - Call get_join_type then fall into place_path_tile; alternate entry with join detection
 .L6f5f  call    get_cursor_charxy
@@ -299,6 +311,7 @@ place_path_tile:                                    ; $6F62 / 28514 - Place path
 ; bit 3 = needs power?      val 8
 ; bit 2 = transport - road? val 4
 ; bit 1 = transport - rail? val 2
+        IN_RODATA
 D_tile_flags:                        ; $6F9C / 28572
                         ; $6F9C / 28572
         defb    $00, $00, $00, $00, $00, $00, $80, $84
@@ -333,5 +346,6 @@ zone_action_jump_table:
         defw    action_zone_power_station   ;$B4, $74
         defw    action_zone_seaport     ;$F6, $74, 
         defw    action_zone_airport     ;$2B, $75
+        IN_CODE
 
 
