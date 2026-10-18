@@ -3,30 +3,26 @@
 #include "engine.h"
 #include "platform.h"
 #include "cityfile.h"
+#include "textfmt.h"
 
 #define NAME_MAX 24
 
 static uint8_t header[CITY_HEADER];
 
-/* Show a line of the screen: the title, the name typed so far and what to press. */
-static void show(const char *title, const char *name, const char *help)
-{
-    char line[41];
-    uint8_t n = 0;
+/* The screen: a title, the name typed so far (and a cursor), a message and what to press. */
+static const char *title, *shown, *message, *help;
+static const struct field screen[] = {
+    { 0,  0, F_STR,  0, &title },
+    { 2,  0, F_TEXT, 0, "FILE NAME:" },
+    { 2, 11, F_STR,  0, &shown },
+    { 4,  0, F_STR,  0, &message },
+    { 7,  0, F_STR,  0, &help },
+};
 
+static void show(void)
+{
     plat_text_clear();
-    plat_text_puts(0, 0, title);
-    memset(line, ' ', sizeof(line) - 1);
-    line[sizeof(line) - 1] = 0;
-    plat_text_puts(0, 2, "FILE NAME:");
-    while (name[n] && n < 30) {
-        line[n] = name[n];
-        ++n;
-    }
-    line[n] = '_';
-    line[n + 1] = 0;
-    plat_text_puts(11, 2, line);
-    plat_text_puts(0, 7, help);
+    fmt_fields(screen, sizeof(screen) / sizeof(struct field));
     plat_flush();
 }
 
@@ -34,9 +30,9 @@ static void say(const char *s)
 {
     uint8_t k;
 
-    plat_text_puts(0, 4, s);
-    plat_text_puts(0, 7, "ANY KEY                                 ");
-    plat_flush();
+    message = s;
+    help = "ANY KEY";
+    show();
     do {
         k = plat_key();
         if (!k)
@@ -45,47 +41,47 @@ static void say(const char *s)
 }
 
 /* The name of the file, typed in the text area.  Returns 1 for a name, 0 if cancelled, 2 to quit. */
-static uint8_t ask(const char *title, char *name)
+static uint8_t ask(const char *t, char *name)
 {
     uint8_t n = 0, k;
 
-    name[0] = 0;
-    show(title, name, "ENTER OK  ESC CANCEL");
+    title = t;
+    shown = name;
+    message = "";
+    help = "ENTER OK  ESC CANCEL";
+    name[0] = '_';
+    name[1] = 0;
     for (;;) {
-        k = plat_key();
-        if (!k) {
-            plat_idle();
-            continue;
-        }
-        if (k == KEY_ENTER)
-            return n ? 1 : 0;
-        if (k == KEY_ESC)
-            return 0;
-        if (k == CMD_QUIT)
-            return 2;
-        if (k == CMD_REDRAW)
-            ;
-        else if ((k == KEY_LEFT || k == 127) && n)
-            name[--n] = 0;
-        else if (k > ' ' && k < 127 && n < NAME_MAX) {
-            name[n++] = (char)k;
+        show();
+        do {
+            k = plat_key();
+            if (!k)
+                plat_idle();
+        } while (!k);
+        if (k == KEY_ENTER || k == KEY_ESC || k == CMD_QUIT) {
             name[n] = 0;
+            return k == KEY_ENTER ? n != 0 : k == KEY_ESC ? 0 : 2;
         }
-        show(title, name, "ENTER OK  ESC CANCEL");
+        if ((k == KEY_LEFT || k == 127) && n)
+            --n;
+        else if (k > ' ' && k < 127 && n < NAME_MAX)
+            name[n++] = (char)k;
+        name[n] = '_';
+        name[n + 1] = 0;
     }
 }
 
 uint8_t city_save(void)
 {
-    char name[NAME_MAX + 1];
+    char name[NAME_MAX + 2];
     uint8_t r = ask("SAVE THIS CITY", name);
 
     if (r == 2)
         return CITY_QUIT;
     if (r != 1)
         return CITY_SAVED;
-    memset(header, ' ', 12);                        /* the file name, as the Spectrum keeps it */
-    memcpy(header, name, strlen(name) < 12 ? strlen(name) : 12);
+    for (r = 0; r < 12; ++r)                        /* the file name, padded with spaces as the Spectrum keeps it */
+        header[r] = name[r] && (r == 0 || header[r - 1] != ' ') ? name[r] : ' ';
     memcpy(header + 12, V_money, 7);               /* money, the month and the year follow each other */
     memcpy(header + 19, "HERESVILLE  ", 12);        /* the city name */
     if (plat_file_save(name, header, CITY_HEADER, levelmap, MAP_W * MAP_H))
@@ -97,7 +93,7 @@ uint8_t city_save(void)
 
 uint8_t city_load(void)
 {
-    char name[NAME_MAX + 1];
+    char name[NAME_MAX + 2];
     uint8_t r = ask("LOAD A CITY", name);
 
     if (r == 2)
