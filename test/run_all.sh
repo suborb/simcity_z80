@@ -24,8 +24,11 @@ echo
 echo "== ZX Spectrum stack depth, with every tool and every disaster"
 python3 test/stack/run.py
 echo
+echo "== Z88 menus agree with the commands the game understands"
+python3 test/z88/run.py
+echo
 echo "== UI: game core under scripted keys"
 python3 test/ui/run.py | grep -E "^(PASS|FAIL)|passed|FAILED"
 echo
 echo "== builds"
-for t in aqplus nc200 z88 zx zx-print; do make -s $t >/dev/null && echo "built $t"; done
+for t in aqplus nc200 z88 z88rom zx zx-print; do make -s $t >/dev/null && echo "built $t"; done

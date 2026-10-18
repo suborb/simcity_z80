@@ -27,6 +27,7 @@
 #include <stdint.h>
 #include <conio.h>
 #include <input.h>
+#include <stdio.h>
 #include <sys/ioctl.h>
 #include "engine.h"
 #include "platform.h"
@@ -205,10 +206,81 @@ void plat_put_tile(uint8_t col, uint8_t row, const uint8_t *art, uint8_t attr, u
 #endif
 }
 
+#ifdef TARGET_Z88
+/* ---- Z88: keys and menus come from OZ ------------------------------------------------
+   in_Inkey reads the keyboard matrix directly, which OZ never sees, so no menu would ever
+   open.  getk() asks OZ instead.  When the user chooses a menu item OZ makes getk() call
+   handlecmds() (the application's callback, set up by `#pragma redirect` in
+   platform/console/zpragma_z88rom.inc) with the command code from the descriptor in
+   z88_dor.c; the codes are the CMD_* of platform.h, so we queue them and return them from
+   plat_key() like keys.  OZ also asks us to redraw (redrawscreen) after drawing over the
+   screen.
+
+   Keys: the cursor keys are extended keys: OS_In returns 0 and then the code, and getk() hands
+   back that second code ($B1 and up; below that is a menu command).  From the Z88 Developer
+   Notes ("Input and the keyboard decoder"): left $FC, right $FD, down $FE, up $FF, and with
+   SHIFT $F8, $F9, $FA, $FB.  Plain cursor keys move one cell and shifted ones eight, as the
+   game's o/p/q/a and O/P/Q/A do.  Letters are folded to lower case (the app may run with caps
+   lock on) and the rest of the control codes except ENTER (13) and ESC (27) are ignored, so
+   TAB (9) and LF (10) do not move the cursor. */
+static uint8_t cmd_queue[8];
+static uint8_t cmd_head, cmd_tail;
+
+static void queue_cmd(uint8_t cmd)
+{
+    uint8_t next = (uint8_t)((cmd_tail + 1) & 7);
+    if (next != cmd_head) {
+        cmd_queue[cmd_tail] = cmd;
+        cmd_tail = next;
+    }
+}
+
+void handlecmds(int cmd)
+{
+    queue_cmd((uint8_t)cmd);
+}
+
+void redrawscreen(void)
+{
+    queue_cmd(CMD_REDRAW);
+}
+
+uint8_t plat_key(void)
+{
+    int k;
+    uint8_t c;
+
+    if (cmd_head == cmd_tail) {
+        k = getk();                     /* may call handlecmds() and then return 0 */
+        if (cmd_head == cmd_tail) {
+            c = (uint8_t)k;
+            switch (c) {
+            case 0xFC: return KEY_LEFT;
+            case 0xFD: return KEY_RIGHT;
+            case 0xFE: return KEY_DOWN;
+            case 0xFF: return KEY_UP;
+            case 0xF8: return 'O';      /* shift + cursor: eight cells */
+            case 0xF9: return 'P';
+            case 0xFA: return 'A';
+            case 0xFB: return 'Q';
+            }
+            if (c >= 'A' && c <= 'Z')   /* the app may run with caps lock on */
+                return (uint8_t)(c + 'a' - 'A');
+            if (c < ' ' && c != KEY_ENTER && c != KEY_ESC)
+                return 0;
+            return c;
+        }
+    }
+    c = cmd_queue[cmd_head];
+    cmd_head = (uint8_t)((cmd_head + 1) & 7);
+    return c;
+}
+#else
 uint8_t plat_key(void)
 {
     return (uint8_t)in_Inkey();
 }
+#endif
 
 uint16_t plat_clock(void)
 {

@@ -43,6 +43,7 @@ Needs [z88dk](https://z88dk.org).
     make aqplus     # Aquarius+   -> build/aqplus/simcity.aqx
     make nc200      # NC200       -> build/nc200/SIMCITY.COM
     make z88        # Z88         -> build/z88/SIMCITY.BAS
+    make z88rom     # Z88 ROM application, 32 KB card image -> build/z88rom/simcity.epr
     make zx         # ZX Spectrum -> build/zx/simcity.tap
     make check      # golden master, tile drawing, UI tests, all builds
 

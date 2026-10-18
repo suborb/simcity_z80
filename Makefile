@@ -1,12 +1,14 @@
 # SimCity ports built with z88dk.
 #
 #   make aqplus | nc200 | z88 | zx      build one platform   (output in build/<name>/)
+#   make z88rom                         the Z88 as a ROM application: build/z88rom/simcity.epr
 #   make zx-print                       the Spectrum again, tiles drawn by printing characters
 #                                       (the same path as the other machines) to compare speed
 #   make all                            build all four
 #   make test                           the headless build the UI tests run
 #   make check                          every automated test (test/run_all.sh)
-#   make golden | uitest | tiletest | stacktest   one group of tests
+#   make golden | uitest | tiletest | stacktest | z88test   one group of tests
+#   make ZCC='zcc -compiler=NAME' ...  build with another compiler (give it on the command line)
 #   make engine                         regenerate engine/ and platform/zx from disassembly/sim_game.asm
 #   make deadcode                       list engine code nothing reaches
 #   make clean
@@ -33,17 +35,19 @@ DEPS = Makefile $(wildcard ui/*.c ui/*.h engine/*.asm engine/*.h platform/common
 AQPLUS = build/aqplus/simcity.aqx
 NC200  = build/nc200/SIMCITY.COM
 Z88    = build/z88/SIMCITY.BAS
+Z88ROM = build/z88rom/simcity.epr
 ZX     = build/zx/simcity.tap
 ZXP    = build/zx-print/simcity.tap
 TEST   = build/test/simcity.bin
 
-.PHONY: all aqplus nc200 z88 zx zx-print test check golden uitest tiletest stacktest engine deadcode clean
+.PHONY: all aqplus nc200 z88 z88rom zx zx-print test check golden uitest tiletest stacktest z88test engine deadcode clean
 
 all: aqplus nc200 z88 zx
 
 aqplus: $(AQPLUS)
 nc200:  $(NC200)
 z88:    $(Z88)
+z88rom: $(Z88ROM)
 zx:     $(ZX)
 zx-print: $(ZXP)
 test:   $(TEST)
@@ -67,15 +71,30 @@ $(NC200): $(DEPS)
 # Z88: OZ text console, so characters only for now.
 $(Z88): $(DEPS)
 	@mkdir -p $(@D)
-	$(ZCC) +z88 -create-app $(COMMON) $(GAME) $(CONSOLE) -o $(@D)/simcity
+	$(ZCC) +z88 -create-app -DTARGET_Z88 $(COMMON) $(GAME) $(CONSOLE) -o $(@D)/simcity
+
+# Z88 as a ROM application for a 32 KB card (two 16 KB banks) with RAM for the data.  The engine
+# keeps code and tables apart from its variables (see engine/sections.asm), so the code and
+# tables go in ROM and the rest in the RAM OZ allocates.  platform/console/zpragma_z88rom.inc
+# sets the origins.  The view is sized 32x16 (the Z88 map is 32 cells wide), which keeps the UI's
+# shadow screen at 1 KB instead of 4 KB.  Output: simcity.epr (the ROM image) plus its banks;
+# z88dk prints how many pages of RAM the application will ask OZ for.  Not yet run on a Z88.
+Z88ROM_FLAGS = -subtype=app -create-app -pragma-include:platform/console/zpragma_z88rom.inc \
+               -DTARGET_Z88 -DMAX_VIEW_W=32 -DMAX_VIEW_H=16
+
+$(Z88ROM): $(DEPS)
+	@mkdir -p $(@D)
+	$(ZCC) +z88 $(Z88ROM_FLAGS) $(COMMON) $(GAME) $(CONSOLE) platform/console/z88_dor.c -o $(@D)/simcity.bin
 
 # ZX Spectrum.  The memory-layout pragmas (stack at the top of RAM, 32 column console, no
 # 64 column font) are in platform/console/zpragma_zx.inc, which the tests use too.
 #   -zorg=24000      below about that appmake embeds the program in a BASIC REM line at 23760
 #                    instead of using a separate loader, so the code would not be where it was linked.
+#   --reserve-regs-iy  the Spectrum ROM's interrupt routine needs IY to hold the system variables,
+#                    so compiled code must not use it.  sccz80 never does; other compilers may.
 #   HAVE_TILES       draw the map with the real pictures, blitted to screen memory.
 ZX_PRAGMAS = platform/console/zpragma_zx.inc
-ZX_FLAGS = -zorg=24000 -pragma-include:$(ZX_PRAGMAS) -create-app $(COMMON) \
+ZX_FLAGS = -zorg=24000 -pragma-include:$(ZX_PRAGMAS) --reserve-regs-iy -create-app $(COMMON) \
            -DTARGET_ZX -Ca-DTARGET_ZX -DHAVE_TILES -DMAX_VIEW_W=32 -DMAX_VIEW_H=16
 
 $(ZX): $(DEPS)
@@ -110,6 +129,9 @@ tiletest:
 
 stacktest:
 	python3 test/stack/run.py
+
+z88test:
+	python3 test/z88/run.py
 
 engine:
 	python3 tools/split_engine.py
