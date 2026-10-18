@@ -36,6 +36,8 @@
 #define CMD_MAP_OFF         0xA3    /* back to the city */
 #define CMD_BUDGET          0xA4    /* the budget screen */
 #define CMD_EVALUATION      0xA5    /* the evaluation screen: how the mayor is doing */
+#define CMD_SAVE            0xA6    /* save the city to a file */
+#define CMD_LOAD            0xA7    /* load a city from a file */
 
 extern void     plat_init(void);
 extern void     plat_exit(void);
@@ -70,6 +72,15 @@ extern void     plat_text_puts(uint8_t col, uint8_t row, const char *s);
      inverse  1 for the blinking cursor: the picture with its pixels inverted */
 extern uint8_t  plat_has_tiles(void);
 extern void     plat_put_tile(uint8_t col, uint8_t row, const uint8_t *art, uint8_t attr, uint8_t inverse);
+
+/* Files, for saving and loading a city.  A platform that has them returns 1 from plat_has_files().
+   plat_file_save() writes the two blocks one after the other to the named file; it returns 0 if all
+   the bytes were written.  plat_file_load() reads them back: 0 if both were read in full, 1 if
+   nothing was read (no such file, or too short for the first block), 2 if the second block was cut
+   short (it has been partly overwritten). */
+extern uint8_t  plat_has_files(void);
+extern uint8_t  plat_file_save(const char *name, const uint8_t *a, uint16_t alen, const uint8_t *b, uint16_t blen);
+extern uint8_t  plat_file_load(const char *name, uint8_t *a, uint16_t alen, uint8_t *b, uint16_t blen);
 
 /* Pictures of the game's own making, for the mini maps.  A platform that can show them returns 1
    from plat_has_bitmap(); plat_put_bitmap() then draws 8 bytes of 1bpp art (a byte a pixel row,

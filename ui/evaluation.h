@@ -6,7 +6,7 @@
 
 /* The approval: percent of the people who would say "yes, the mayor is doing a good job" (100 votes). */
 struct evaluation {
-    uint8_t traffic, pollution, crime, fire, taxes, house_prices, unemployment;   /* worst problems, 0..100 % */
+    uint8_t problem[7];                 /* traffic, pollution, crime, fire, taxes, house prices, unemployment: 0..100 % */
     uint16_t score;                     /* city score, 0..1000 */
     uint8_t yes, no;                    /* approval, percent */
     uint8_t city_class;                 /* 0 village .. 5 megalopolis */

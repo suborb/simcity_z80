@@ -11,6 +11,7 @@
 /* ---- calls ---- */
 extern void sim_new_city(void);     /* new random city from V_InitialSeed */
 extern void sim_init(void);
+extern void sim_loaded(void);       /* a city is in levelmap: abandon the tick and reset the simulation (money, date) */
 extern void sim_tick(void);         /* one simulation tick (about 6 million T-states), blocks */
 extern uint8_t sim_step(void);      /* run the simulation one slice (a map row); 1 = a tick has just completed;
                                        2 = it is waiting for the budget (V_wait_for_budget_confirm) */

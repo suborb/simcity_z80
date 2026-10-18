@@ -416,6 +416,39 @@ def main():
     check('sprites: they scroll with the map (the cells where they were no longer hold them)',
           any(moved[(8, 2)] != with_s[(8, 2)] for _ in [0]))
 
+    # --- 10. saving and loading a city ---
+    CMD_SAVE, CMD_LOAD = 0xA6, 0xA7
+    rd = lambda mem, name, n: bytes(mem[psyms[name]:psyms[name] + n])
+    mem = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE, CMD_SAVE, ord('a'), ord('b'), 13, ord(' '), 0, 0])
+    text = panes(mem)[1]
+    header = rd(mem, '_test_file', 31)
+    check('save: asks for a name and says it saved', rd(mem, '_test_file_name', 3) == b'ab\0', repr(rd(mem, '_test_file_name', 3)))
+    check('save: the header is the Spectrum\'s (name, 7 bytes of money and date, city name)',
+          header[:12] == b'ab          ' and header[12:19] == bytes([0x10, 0x27, 0, 0, 0, 0x6E, 0x07]) and header[19:31] == b'HERESVILLE  ',
+          header.hex())
+    lm = levelmap(mem, psyms) if False else mem[psyms['_levelmap']:psyms['_levelmap'] + 9216]
+    check('save: the map is in the file after the header', rd(mem, '_test_file', 31 + 2400)[31:] == bytes(lm[3600:6000]))
+    check('save: the file is 31 + 9216 bytes', int.from_bytes(rd(mem, '_test_file_len', 2), 'little') == 31 + 9216)
+    spot = find_dirt_block(bytes(lm), 1)                   # somewhere a road can be built
+    at = psyms['_levelmap'] + spot[1] * 96 + spot[0]
+    go = moves(spot[0] - 48, spot[1] - 48)
+    money0 = mem[psyms['_V_money']] | mem[psyms['_V_money'] + 1] << 8
+    # save, build a road there (costs $10), and see it built; then do the same and load the city back
+    keys = [LEVEL_MEDIUM, PAUSE] + go + [CMD_SAVE, ord('a'), ord('b'), 13, ord(' '), ord(' ')]
+    built = run(pbin, psyms, keys)
+    check('(the road is built at the dirt spot if we do not load: so the next test can tell)', built[at] == 7 and built[at] != lm[spot[1] * 96 + spot[0]])
+    mem = run(pbin, psyms, keys + [CMD_LOAD, ord('a'), ord('b'), 13, 0, 0])
+    check('load: the map and the money are what they were when saved (the road is gone, $10 is back)',
+          mem[at] == lm[spot[1] * 96 + spot[0]] and (mem[psyms['_V_money']] | mem[psyms['_V_money'] + 1] << 8) == money0)
+    base = mem[psyms['_levelmap'] + 48 * 96 + 48]
+    mem = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE, CMD_LOAD, ord('n'), ord('o'), 13, ord(' '), 0, 0])
+    check('load: a file that is not there is reported and the city goes on',
+          mem[psyms['_levelmap'] + 48 * 96 + 48] == base and mem[psyms['_test_done']] == 1)
+    mem = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE, CMD_SAVE, ord('x'), 27, 0, 0])
+    check('save: escape cancels without saving', rd(mem, '_test_file_name', 1) == b'\0')
+    mem = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE, CMD_SAVE, ord('a'), ord('b'), 127, ord('c'), 13, ord(' '), 0, 0])
+    check('save: delete takes back a letter (a, b, delete, c = ac)', rd(mem, '_test_file_name', 3) == b'ac\0')
+
     print()
     print('\n'.join(scr))
     print()

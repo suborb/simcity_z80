@@ -16,92 +16,45 @@
 #include "platform.h"
 #include "budget.h"
 #include "textfmt.h"
-#include "numfmt.h"
 
 #define MAX_TAX 20
 #define ROWS    8
 
 static uint8_t sel;                     /* 0 tax rate, 1 transport, 2 police, 3 fire */
 
-/* The row for one department: name, requested, allocated and funding level. */
-static void dept_row(char *b, uint8_t item, const char *name, uint16_t requested, uint16_t allocated, uint8_t percent)
-{
-    fmt_blank(b);
-    if (sel == item)
-        b[0] = '>';
-    fmt_str(b, 1, name);
-    fmt_num(b, 18, requested);
-    fmt_num(b, 26, allocated);
-    fmt_num(b, 32, percent);
-    b[32] = '%';
-}
+static const struct field fields[] = {
+    { 0,  1, F_TEXT, 0,   "FISCAL BUDGET   TAX COLLECTED $" },
+    { 0, 32, F_L24,  0,   V_tax_collected },
+    { 1,  1, F_TEXT, 0,   "TAX RATE" },
+    { 1, 12, F_U8,   '%', &SMC_tax_rate },
+    { 2, 12, F_TEXT, 0,   "REQSTD   ALLCTD   FUND" },
+    { 3,  1, F_TEXT, 0,   "TRANSPORT" },
+    { 3, 18, F_U16,  0,   &V_Transport_Funding_Requested },
+    { 3, 26, F_U16,  0,   &V_Transport_Funding_Allocated },
+    { 3, 32, F_U8,   '%', &SMC_transport_percent },
+    { 4,  1, F_TEXT, 0,   "POLICE" },
+    { 4, 18, F_U16,  0,   &V_Budget_Police_Funding_Requested },
+    { 4, 26, F_U16,  0,   &V_Police_Funding_Allocated },
+    { 4, 32, F_U8,   '%', &SMC_police_percent },
+    { 5,  1, F_TEXT, 0,   "FIRE" },
+    { 5, 18, F_U16,  0,   &V_Budget_Fire_Funding_Requested },
+    { 5, 26, F_U16,  0,   &V_Fire_Funding_Allocated },
+    { 5, 32, F_U8,   '%', &SMC_fire_percent },
+    { 6,  1, F_TEXT, 0,   "CASH FLOW $" },
+    { 6, 19, F_S24,  0,   V_cashflow },
+    { 6, 21, F_TEXT, 0,   "FUNDS $" },
+    { 6, 29, F_U24,  0,   V_previous_money },
+    { 6, 29, F_TEXT, 0,   ">$" },
+    { 6, 39, F_U24,  0,   V_money_after_budget },
+    { 7,  1, F_TEXT, 0,   "Q A SELECT  O P CHANGE  ENTER OK" },
+};
 
 static void draw(void)
 {
-    char b[41];
-    uint8_t n;
+    static const uint8_t item_row[4] = { 1, 3, 4, 5 };
 
-    fmt_blank(b);
-    fmt_str(b, 1, "FISCAL BUDGET   TAX COLLECTED $");
-    n = 32;
-    n += fmt_dec(b + n, fmt_u24(V_tax_collected));
-    plat_text_puts(0, 0, b);
-
-    fmt_blank(b);
-    if (sel == 0)
-        b[0] = '>';
-    fmt_str(b, 1, "TAX RATE");
-    fmt_num(b, 12, SMC_tax_rate);
-    b[12] = '%';
-    plat_text_puts(0, 1, b);
-
-    fmt_blank(b);
-    fmt_str(b, 12, "REQSTD   ALLCTD   FUND");
-    plat_text_puts(0, 2, b);
-    dept_row(b, 1, "TRANSPORT", V_Transport_Funding_Requested, V_Transport_Funding_Allocated, SMC_transport_percent);
-    plat_text_puts(0, 3, b);
-    dept_row(b, 2, "POLICE", V_Budget_Police_Funding_Requested, V_Police_Funding_Allocated, SMC_police_percent);
-    plat_text_puts(0, 4, b);
-    dept_row(b, 3, "FIRE", V_Budget_Fire_Funding_Requested, V_Fire_Funding_Allocated, SMC_fire_percent);
-    plat_text_puts(0, 5, b);
-
-    fmt_blank(b);
-    n = fmt_str(b, 1, "CASH FLOW $");
-    {
-        int32_t cf = fmt_s24(V_cashflow);
-        char tmp[10];
-        uint8_t k;
-        for (k = 0; k < 10; ++k)
-            tmp[k] = ' ';
-        fmt_num(tmp, 10, cf);
-        for (k = 0; k < 10 && tmp[k] == ' '; ++k)
-            ;
-        while (k < 10)
-            b[n++] = tmp[k++];
-    }
-    n = fmt_str(b, n, "  FUNDS $");
-    {
-        uint32_t m[2];
-        uint8_t k, j;
-        char tmp[8];
-        m[0] = fmt_u24(V_previous_money);
-        m[1] = fmt_u24(V_money_after_budget);
-        for (j = 0; j < 2; ++j) {
-            for (k = 0; k < 8; ++k)
-                tmp[k] = ' ';
-            fmt_num(tmp, 8, (int32_t)m[j]);
-            for (k = 0; k < 8 && tmp[k] == ' '; ++k)
-                ;
-            while (k < 8)
-                b[n++] = tmp[k++];
-            if (!j)
-                n = fmt_str(b, n, ">$");
-        }
-    }
-    b[n] = 0;
-    plat_text_puts(0, 6, b);
-
-    plat_text_puts(0, 7, " Q A SELECT  O P CHANGE  ENTER OK    ");
+    fmt_fields(fields, sizeof(fields) / sizeof(struct field));
+    plat_text_puts(0, item_row[sel], ">");              /* the selected item */
     plat_flush();
 }
 

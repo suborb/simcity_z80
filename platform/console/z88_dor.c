@@ -34,9 +34,15 @@
 #define TOPIC1_4             "Evaluation"
 #define TOPIC1_4KEY          "GE"
 #define TOPIC1_4CODE         0xA5
-#define TOPIC1_5             "Quit"
-#define TOPIC1_5KEY          "GQ"
-#define TOPIC1_5CODE         0x9B
+#define TOPIC1_5             "Save"
+#define TOPIC1_5KEY          "GS"
+#define TOPIC1_5CODE         0xA6
+#define TOPIC1_6             "Load"
+#define TOPIC1_6KEY          "GL"
+#define TOPIC1_6CODE         0xA7
+#define TOPIC1_7             "Quit"
+#define TOPIC1_7KEY          "GQ"
+#define TOPIC1_7CODE         0x9B
 
 /* ---- Tools: CMD_TOOL + the tool's number, in the order of the game's tool keys ---- */
 #define TOPIC2               "Tools"

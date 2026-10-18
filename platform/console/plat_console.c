@@ -35,6 +35,9 @@
 #include <input.h>
 #include <stdio.h>
 #include <sys/ioctl.h>
+#ifdef TARGET_Z88
+#include <fcntl.h>
+#endif
 #include "engine.h"
 #include "platform.h"
 
@@ -293,6 +296,48 @@ void plat_put_tile(uint8_t col, uint8_t row, const uint8_t *art, uint8_t attr, u
     (void)col; (void)row; (void)art; (void)attr; (void)inverse;
 #endif
 }
+
+#ifdef TARGET_Z88
+/* ---- files: OZ's, through z88dk's open, read, write and close ---- */
+uint8_t plat_has_files(void) { return 1; }
+
+uint8_t plat_file_save(const char *name, const uint8_t *a, uint16_t alen, const uint8_t *b, uint16_t blen)
+{
+    int fd = open((char *)name, O_WRONLY, 0);
+    uint8_t bad;
+
+    if (fd < 0)
+        return 1;
+    bad = write(fd, (void *)a, alen) != (ssize_t)alen || write(fd, (void *)b, blen) != (ssize_t)blen;
+    close(fd);
+    return bad;
+}
+
+uint8_t plat_file_load(const char *name, uint8_t *a, uint16_t alen, uint8_t *b, uint16_t blen)
+{
+    int fd = open((char *)name, O_RDONLY, 0);
+    uint8_t r = 1;
+
+    if (fd < 0)
+        return 1;
+    if (read(fd, a, alen) == (ssize_t)alen)
+        r = read(fd, b, blen) == (ssize_t)blen ? 0 : 2;
+    close(fd);
+    return r;
+}
+#else
+uint8_t plat_has_files(void) { return 0; }
+uint8_t plat_file_save(const char *name, const uint8_t *a, uint16_t alen, const uint8_t *b, uint16_t blen)
+{
+    (void)name; (void)a; (void)alen; (void)b; (void)blen;
+    return 1;
+}
+uint8_t plat_file_load(const char *name, uint8_t *a, uint16_t alen, uint8_t *b, uint16_t blen)
+{
+    (void)name; (void)a; (void)alen; (void)b; (void)blen;
+    return 1;
+}
+#endif
 
 uint8_t plat_has_bitmap(void)
 {

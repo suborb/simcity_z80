@@ -21,7 +21,7 @@
         SECTION code_user
 
         PUBLIC  _sim_new_city, _sim_init, _sim_tick, _sim_step, _sim_periodic, _tool_apply
-        PUBLIC  _view_fetch, _budget_recalc
+        PUBLIC  _view_fetch, _budget_recalc, _sim_loaded
         PUBLIC  _view_tile_art
         defc    _view_tile_art = view_udgs + ART_TILES
         PUBLIC  _engine_a, _view_x, _view_y, _view_art, _view_attr
@@ -108,6 +108,17 @@ _budget_recalc:
         push    iy
         call    calculate_tax
         call    run_budget
+        pop     iy
+        pop     ix
+        ret
+
+; A city has been loaded into levelmap: abandon the tick in progress and reset the simulation (the
+; caller then puts the file's money and date in).
+_sim_loaded:
+        push    ix
+        push    iy
+        call    sim_task_reset
+        call    sim_init
         pop     iy
         pop     ix
         ret

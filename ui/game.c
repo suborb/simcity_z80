@@ -26,6 +26,7 @@
 #ifdef HAVE_REPORTS
 #include "budget.h"
 #include "evaluation.h"
+#include "cityfile.h"
 #endif
 #include "numfmt.h"
 #include "game.h"
@@ -54,6 +55,7 @@ static uint8_t quit;
 static uint8_t restart;                 /* quit this city and start another */
 static uint8_t redraw;                  /* the screen was overwritten: draw everything again */
 static uint8_t power_nuclear;           /* what the power plant tool builds */
+static uint8_t tick_reset;              /* a city was loaded: abandon the tick in progress */
 static uint8_t map_view;                /* 0: the city; else the mini map shown (MM_CITY..) */
 static uint8_t map_full;                /* the mini map needs drawing from scratch */
 /* Everything the status panel shows, to tell when it needs redrawing. */
@@ -522,9 +524,39 @@ static void game_evaluation(void)
     else
         redraw = 1;
 }
+
+/* Save the city to a file, or load one. */
+static void game_save(void)
+{
+    if (!plat_has_files())
+        return;
+    if (city_save() == CITY_QUIT)
+        quit = 1;
+    else
+        redraw = 1;
+}
+
+static void game_load(void)
+{
+    uint8_t r;
+
+    if (!plat_has_files())
+        return;
+    r = city_load();
+    if (r == CITY_QUIT) {
+        quit = 1;
+    } else if (r == CITY_BROKEN) {
+        restart = quit = 1;                 /* the map was half read: a new city */
+    } else {
+        redraw = 1;
+        tick_reset = r == CITY_LOADED;
+    }
+}
 #else
 #define game_budget()
 #define game_evaluation()
+#define game_save()
+#define game_load()
 #endif
 
 static void handle_key(uint8_t k)
@@ -559,6 +591,8 @@ static void handle_key(uint8_t k)
     case CMD_MAP_OFF: set_map_view(0); break;
     case 'b': case CMD_BUDGET: game_budget(); break;
     case 'v': case CMD_EVALUATION: game_evaluation(); break;
+    case 's': case CMD_SAVE: game_save(); break;
+    case 'l': case CMD_LOAD: game_load(); break;
     case CMD_NEW_CITY:         restart = quit = 1; break;
     case CMD_PAUSE:            V_simulation_speed = (V_simulation_speed == 3) ? 1 : 3; break;
     case CMD_SPEED_FAST:       V_simulation_speed = 0; break;
@@ -662,6 +696,11 @@ static void play_city(void)
     memset(&last_st, 0xFF, sizeof(last_st));          /* nothing drawn yet */
 
     while (!quit) {
+        if (tick_reset) {                   /* a city was loaded */
+            tick_reset = 0;
+            ticking = 0;
+            countdown = tick_frames[V_simulation_speed];
+        }
         k = plat_key();
         if (k)
             handle_key(k);

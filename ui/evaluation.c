@@ -16,7 +16,6 @@
 #include "platform.h"
 #include "text.h"
 #include "textfmt.h"
-#include "numfmt.h"
 #include "evaluation.h"
 
 static const uint8_t class_from[5][3] = {           /* population where each class starts, 24 bit */
@@ -29,6 +28,15 @@ static const uint8_t class_from[5][3] = {           /* population where each cla
 
 static uint16_t rnd = 1;
 
+static uint8_t ge24(const uint8_t *a, const uint8_t *b)     /* a >= b, 24 bit */
+{
+    uint8_t i = 3;
+    while (i--)
+        if (a[i] != b[i])
+            return a[i] > b[i];
+    return 1;
+}
+
 static uint8_t clip(int16_t v)                      /* the Spectrum's ckpercent */
 {
     return (uint8_t)(v < 0 ? 0 : v > 100 ? 100 : v);
@@ -36,25 +44,27 @@ static uint8_t clip(int16_t v)                      /* the Spectrum's ckpercent 
 
 void evaluate(struct evaluation *e)
 {
-    int16_t total, s;
+    int16_t raw[7], total;
     uint8_t i, yes;
-    uint32_t pop = fmt_u24(V_population);
 
-    e->traffic = clip(V_TrafficAverage >> 1);
-    e->pollution = clip(V_PolluteAverage >> 1);
-    e->crime = clip(V_concern_crime >> 2);
-    e->fire = clip((int16_t)(V_LVAverage & 0xFF) * 5);
-    e->taxes = clip(((int16_t)SMC_tax_rate - 3) * 4);
-    e->house_prices = clip(V_concern_house_price);
-    e->unemployment = clip((int16_t)V_unemployment);
-    total = (int16_t)e->traffic + e->pollution + e->crime + e->fire + e->taxes + e->house_prices
-            + e->unemployment + (int16_t)(V_unPwrdZCnt >> 2) + (V_alertmessage ? 4 : 0);
-    s = (int16_t)((250 - 3 * total) * 4);
-    e->score = (uint16_t)(s < 0 ? 0 : s > 1000 ? 1000 : s);
+    raw[0] = V_TrafficAverage >> 1;
+    raw[1] = V_PolluteAverage >> 1;
+    raw[2] = V_concern_crime >> 2;
+    raw[3] = (int16_t)(V_LVAverage & 0xFF) * 5;
+    raw[4] = ((int16_t)SMC_tax_rate - 3) * 4;
+    raw[5] = V_concern_house_price;
+    raw[6] = (int16_t)V_unemployment;
+    total = (int16_t)(V_unPwrdZCnt >> 2) + (V_alertmessage ? 4 : 0);
+    for (i = 0; i < 7; ++i) {
+        e->problem[i] = clip(raw[i]);
+        total += e->problem[i];
+    }
+    total = (250 - 3 * total) * 4;
+    e->score = (uint16_t)(total < 0 ? 0 : total > 1000 ? 1000 : total);
 
     e->city_class = 0;
-    for (i = 0; i < 5 && pop >= fmt_u24(class_from[i]); ++i)
-        e->city_class = (uint8_t)(i + 1);
+    for (i = 0; i < 5; ++i)
+        e->city_class += ge24(V_population, class_from[i]);
     e->has_people = (V_display_population[0] | V_display_population[1] | V_display_population[2]) != 0;
 
     rnd ^= (uint16_t)(plat_clock() ^ ((uint16_t)V_view_tick << 8) ^ 0x9E37);
@@ -74,85 +84,85 @@ void evaluate(struct evaluation *e)
     e->no = (uint8_t)(e->has_people ? 100 - yes : 0);
 }
 
-/* "LABEL      nn%" with the label at column `at` and the number ending at `end`. */
-static void percent(char *b, uint8_t at, const char *label, uint8_t end, uint8_t v)
+static struct evaluation ev;
+static uint8_t migration[3];
+static const char *class_name, *level_name;
+
+static const struct field head[] = {
+    { 0,  0, F_TEXT, 0,   "MAYOR APPROVAL" },
+    { 0, 17, F_TEXT, 0,   "YES" },
+    { 0, 25, F_U8,   '%', &ev.yes },
+    { 0, 28, F_TEXT, 0,   "NO" },
+    { 0, 36, F_U8,   '%', &ev.no },
+};
+
+static const struct field body[] = {
+    { 1,  0, F_TEXT, 0,   "TRAFFIC" },
+    { 1, 15, F_U8,   '%', ev.problem },
+    { 1, 18, F_TEXT, 0,   "POLLUTION" },
+    { 1, 36, F_U8,   '%', ev.problem + 1 },
+    { 2,  0, F_TEXT, 0,   "CRIME" },
+    { 2, 15, F_U8,   '%', ev.problem + 2 },
+    { 2, 18, F_TEXT, 0,   "FIRE" },
+    { 2, 36, F_U8,   '%', ev.problem + 3 },
+    { 3,  0, F_TEXT, 0,   "TAXES" },
+    { 3, 15, F_U8,   '%', ev.problem + 4 },
+    { 3, 18, F_TEXT, 0,   "HOUSE PRICES" },
+    { 3, 36, F_U8,   '%', ev.problem + 5 },
+    { 4,  0, F_TEXT, 0,   "UNEMPLOYMENT" },
+    { 4, 15, F_U8,   '%', ev.problem + 6 },
+    { 4, 18, F_TEXT, 0,   "CITY SCORE" },
+    { 4, 36, F_U16,  0,   &ev.score },
+};
+
+static const struct field nobody[] = {
+    { 1,  0, F_TEXT, 0,   "NOBODY LIVES HERE YET" },
+};
+
+static const struct field foot[] = {
+    { 5,  0, F_TEXT, 0,   "POPULATION" },
+    { 5, 17, F_U24,  0,   V_display_population },
+    { 5, 20, F_TEXT, 0,   "MIGRATION" },
+    { 5, 39, F_S24,  0,   migration },
+    { 6,  0, F_TEXT, 0,   "ASSESSED VALUE $" },
+    { 6, 16, F_K24,  0,   V_previous_city_score },
+    { 7,  0, F_STR,  0,   &class_name },
+    { 7, 14, F_STR,  0,   &level_name },
+    { 7, 31, F_TEXT, 0,   "ENTER OK" },
+};
+
+#define COUNT(a) (sizeof(a) / sizeof(struct field))
+
+static void draw(void)
 {
-    fmt_str(b, at, label);
-    fmt_num(b, end, v);
-    b[end] = '%';
-}
+    uint8_t i, borrow = 0;
+    int16_t d;
 
-static void draw(const struct evaluation *e)
-{
-    char b[41];
-    uint8_t n;
-
-    fmt_blank(b);
-    fmt_str(b, 0, "MAYOR APPROVAL");
-    percent(b, 17, "YES", 25, e->yes);
-    percent(b, 28, "NO", 36, e->no);
-    plat_text_puts(0, 0, b);
-
-    fmt_blank(b);
-    if (e->has_people) {
-        percent(b, 0, "TRAFFIC", 15, e->traffic);
-        percent(b, 18, "POLLUTION", 36, e->pollution);
-        plat_text_puts(0, 1, b);
-        fmt_blank(b);
-        percent(b, 0, "CRIME", 15, e->crime);
-        percent(b, 18, "FIRE", 36, e->fire);
-        plat_text_puts(0, 2, b);
-        fmt_blank(b);
-        percent(b, 0, "TAXES", 15, e->taxes);
-        percent(b, 18, "HOUSE PRICES", 36, e->house_prices);
-        plat_text_puts(0, 3, b);
-        fmt_blank(b);
-        percent(b, 0, "UNEMPLOYMENT", 15, e->unemployment);
-        fmt_str(b, 18, "CITY SCORE");
-        fmt_num(b, 36, e->score);
-        plat_text_puts(0, 4, b);
-    } else {
-        fmt_str(b, 0, "NOBODY LIVES HERE YET");
-        plat_text_puts(0, 1, b);
-        fmt_blank(b);
-        plat_text_puts(0, 2, b);
-        plat_text_puts(0, 3, b);
-        plat_text_puts(0, 4, b);
+    for (i = 0; i < 3; ++i) {                       /* this year's population less last year's */
+        d = (int16_t)V_population[i] - V_prev_year_population[i] - borrow;
+        migration[i] = (uint8_t)d;
+        borrow = d < 0;
     }
-
-    fmt_blank(b);
-    fmt_str(b, 0, "POPULATION");
-    fmt_num(b, 17, (int32_t)fmt_u24(V_display_population));
-    fmt_str(b, 20, "MIGRATION");
-    fmt_num(b, 39, fmt_s24(V_population) - fmt_s24(V_prev_year_population));
-    plat_text_puts(0, 5, b);
-
-    fmt_blank(b);
-    n = fmt_str(b, 0, "ASSESSED VALUE $");
-    n += fmt_dec(b + n, fmt_u24(V_previous_city_score));
-    if (V_previous_city_score[0] | V_previous_city_score[1] | V_previous_city_score[2]) {
-        b[n++] = '0'; b[n++] = '0'; b[n++] = '0';   /* the score is in thousands */
-    }
-    plat_text_puts(0, 6, b);
-
-    fmt_blank(b);
-    n = fmt_str(b, 0, text_city_class[e->city_class]);
-    fmt_str(b, (uint8_t)(n + 2), text_levels[V_difficulty > 2 ? 2 : V_difficulty]);
-    fmt_str(b, 31, "ENTER OK");
-    plat_text_puts(0, 7, b);
+    class_name = text_city_class[ev.city_class];
+    level_name = text_levels[V_difficulty > 2 ? 2 : V_difficulty];
+    fmt_fields(head, COUNT(head));
+    if (ev.has_people)
+        fmt_fields(body, COUNT(body));
+    else
+        fmt_fields(nobody, COUNT(nobody));
+    fmt_fields(foot, COUNT(foot));
     plat_flush();
 }
 
 uint8_t evaluation_screen(void)
 {
-    struct evaluation e;
     uint8_t k;
 
     if (plat_text_rows() < 8 || plat_text_cols() < 40)
         return 0;
-    evaluate(&e);
+    evaluate(&ev);
     plat_text_clear();
-    draw(&e);
+    draw();
     for (;;) {
         k = plat_key();
         switch (k) {
@@ -163,7 +173,7 @@ uint8_t evaluation_screen(void)
             return 1;
         case CMD_REDRAW:
             plat_text_clear();
-            draw(&e);
+            draw();
             break;
         case 0:
             plat_idle();

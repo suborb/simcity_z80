@@ -121,6 +121,58 @@ void plat_put_tile(uint8_t col, uint8_t row, const uint8_t *art, uint8_t attr, u
 #endif
 
 #ifdef TEST_PANEL
+/* One file in memory, for the save and load tests.  The headless image is already close to the 64 KB
+   a Z80 can address, so of the map it keeps only the rows the tests change (3600..6000, the middle). */
+#define KEEP_FROM 3600
+#define KEEP_TO   6000
+uint8_t test_file[31 + KEEP_TO - KEEP_FROM];
+char test_file_name[32];
+uint16_t test_file_len;
+uint8_t plat_has_files(void) { return 1; }
+
+uint8_t plat_file_save(const char *name, const uint8_t *a, uint16_t alen, const uint8_t *b, uint16_t blen)
+{
+    uint16_t i;
+    for (i = 0; i < 31 && name[i]; ++i)
+        test_file_name[i] = name[i];
+    test_file_name[i] = 0;
+    for (i = 0; i < alen; ++i)
+        test_file[i] = a[i];
+    for (i = KEEP_FROM; i < KEEP_TO && i < blen; ++i)
+        test_file[alen + i - KEEP_FROM] = b[i];
+    test_file_len = alen + blen;
+    return 0;
+}
+
+uint8_t plat_file_load(const char *name, uint8_t *a, uint16_t alen, uint8_t *b, uint16_t blen)
+{
+    uint16_t i;
+    for (i = 0; name[i] || test_file_name[i]; ++i)
+        if (name[i] != test_file_name[i])
+            return 1;                           /* no such file */
+    if (test_file_len < alen)
+        return 1;
+    for (i = 0; i < alen; ++i)
+        a[i] = test_file[i];
+    for (i = KEEP_FROM; i < KEEP_TO && i < blen; ++i)
+        b[i] = test_file[alen + i - KEEP_FROM];
+    return test_file_len < alen + blen ? 2 : 0;
+}
+#else
+uint8_t plat_has_files(void) { return 0; }
+uint8_t plat_file_save(const char *name, const uint8_t *a, uint16_t alen, const uint8_t *b, uint16_t blen)
+{
+    (void)name; (void)a; (void)alen; (void)b; (void)blen;
+    return 1;
+}
+uint8_t plat_file_load(const char *name, uint8_t *a, uint16_t alen, uint8_t *b, uint16_t blen)
+{
+    (void)name; (void)a; (void)alen; (void)b; (void)blen;
+    return 1;
+}
+#endif
+
+#ifdef TEST_PANEL
 uint8_t test_bitmap[ROWS][COLS][8];     /* what plat_put_bitmap drew in each cell */
 uint8_t plat_has_bitmap(void) { return 1; }
 void plat_put_bitmap(uint8_t col, uint8_t row, const uint8_t *art)
