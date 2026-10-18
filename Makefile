@@ -39,8 +39,9 @@ Z88ROM = build/z88rom/simcity.epr
 ZX     = build/zx/simcity.tap
 ZXP    = build/zx-print/simcity.tap
 TEST   = build/test/simcity.bin
+TESTP  = build/testpanel/simcity.bin
 
-.PHONY: all aqplus nc200 z88 z88rom zx zx-print test check golden uitest tiletest stacktest z88test engine deadcode clean
+.PHONY: all aqplus nc200 z88 z88rom zx zx-print test testpanel check golden uitest tiletest stacktest z88test engine deadcode clean
 
 all: aqplus nc200 z88 zx
 
@@ -51,6 +52,7 @@ z88rom: $(Z88ROM)
 zx:     $(ZX)
 zx-print: $(ZXP)
 test:   $(TEST)
+testpanel: $(TESTP)
 
 # Aquarius+: the .aqx loads from the Aquarius+ file browser.  --generic-console pulls in the
 # generic console driver, which can draw in the Aquarius+'s 320x200 bitmap mode (plat_init
@@ -71,23 +73,29 @@ $(NC200): $(DEPS)
 # Z88: OZ text console, so characters only for now.
 $(Z88): $(DEPS)
 	@mkdir -p $(@D)
-	$(ZCC) +z88 -create-app -DTARGET_Z88 -Ca-DZ88_DI_SIM $(COMMON) $(GAME) $(CONSOLE) -o $(@D)/simcity
+	$(ZCC) +z88 --generic-console -create-app -DTARGET_Z88 -Ca-DZ88_DI_SIM -DHAVE_TILES -DMAX_VIEW_W=32 -DMAX_VIEW_H=8 \
+	    $(COMMON) $(GAME) $(CONSOLE) platform/console/plat_z88.asm -o $(@D)/simcity
 
 # Z88_DI_SIM: each simulation slice runs with OZ's interrupts disabled (OZ_DI/OZ_EI around sim_step in
 # engine_c.asm).  OZ's interrupt handling needs the stack below $2000, and the simulation's coroutine
 # stack is in application RAM; an interrupt arriving while it is in use crashed the Z88 emulator.
+# Z88 screen: --generic-console makes conio's gotoxy/fputc_cons the generic console instead of OZ's native
+# text calls, and platform_console.c switches it to z88dk's mode 1: an OZ text window on the left and a 256
+# pixel graphics map on the right, which the console then draws into with our tile font (HAVE_TILES).  The
+# status text goes to the text window with OZ's own string call (platform/console/plat_z88.asm).
 # Z88 as a ROM application for a 32 KB card (two 16 KB banks) with RAM for the data.  The engine
 # keeps code and tables apart from its variables (see engine/sections.asm), so the code and
 # tables go in ROM and the rest in the RAM OZ allocates.  platform/console/zpragma_z88rom.inc
 # sets the origins.  The view is sized 32x16 (the Z88 map is 32 cells wide), which keeps the UI's
 # shadow screen at 1 KB instead of 4 KB.  Output: simcity.epr (the ROM image) plus its banks;
 # z88dk prints how many pages of RAM the application will ask OZ for.  Not yet run on a Z88.
-Z88ROM_FLAGS = -subtype=app -create-app -pragma-include:platform/console/zpragma_z88rom.inc \
-               -DTARGET_Z88 -Ca-DZ88_DI_SIM -DMAX_VIEW_W=32 -DMAX_VIEW_H=16
+Z88ROM_FLAGS = -subtype=app --generic-console -create-app -pragma-include:platform/console/zpragma_z88rom.inc \
+               -DTARGET_Z88 -Ca-DZ88_DI_SIM -DHAVE_TILES -DMAX_VIEW_W=32 -DMAX_VIEW_H=8
 
 $(Z88ROM): $(DEPS)
 	@mkdir -p $(@D)
-	$(ZCC) +z88 $(Z88ROM_FLAGS) $(COMMON) $(GAME) $(CONSOLE) platform/console/z88_dor.c -o $(@D)/simcity.bin
+	$(ZCC) +z88 $(Z88ROM_FLAGS) $(COMMON) $(GAME) $(CONSOLE) platform/console/plat_z88.asm \
+	    platform/console/z88_dor.c -o $(@D)/simcity.bin
 
 # ZX Spectrum.  The memory-layout pragmas (stack at the top of RAM, 32 column console, no
 # 64 column font) are in platform/console/zpragma_zx.inc, which the tests use too.
@@ -115,6 +123,11 @@ $(ZXP): $(DEPS)
 $(TEST): $(DEPS)
 	@mkdir -p $(@D)
 	$(ZCC) +test $(COMMON) $(GAME) platform/test_ui/plat_test.c -o $@
+
+# The same with a separate text window and a 32x8 map, the shape of the Z88's screen.
+$(TESTP): $(DEPS)
+	@mkdir -p $(@D)
+	$(ZCC) +test $(COMMON) -DTEST_PANEL $(GAME) platform/test_ui/plat_test.c -o $@
 
 check:
 	sh test/run_all.sh

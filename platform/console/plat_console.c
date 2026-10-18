@@ -23,6 +23,12 @@
      cursor            UDG pointer  -> a scratch inverted copy, character 128
 
    Text is printed with the standard font, put back whenever a string is drawn.
+
+   The Z88 (TARGET_Z88) is different: z88dk's mode 1 gives a text window of 51 columns on the
+   left and a 256 pixel graphics map on the right, and when a font pointer is set the console
+   IS the map (32 columns by 8 rows, drawn with custom font and UDGs, as on the NC200).  So the
+   console only ever draws tiles, and all text goes to the OZ text window with OZ's own string
+   call (GN_Sop), through plat_text_puts().
    ------------------------------------------------------------------------ */
 #include <stdint.h>
 #include <conio.h>
@@ -33,6 +39,16 @@
 #include "platform.h"
 
 static uint16_t clock_count;
+
+#ifdef TARGET_Z88
+extern void z88_sop(const char *s) __z88dk_fastcall;    /* plat_z88.asm: OZ GN_Sop */
+#define Z88_TEXT_COLS   51      /* the text window z88dk's mode 1 opens, beside the map */
+#define Z88_TEXT_ROWS   8
+#define Z88_MAP_COLS    32      /* the 256 pixel map, in 8 pixel cells */
+#define Z88_MAP_ROWS    8
+static char z88_text[5 + Z88_TEXT_COLS + 1];
+static uint16_t z88_mode;
+#endif
 
 /* How tiles are drawn.  TILE_BLIT: copy to screen memory (ZX Spectrum default).
    TILE_PRINT: print characters whose pictures come from the font and UDG pointers (the
@@ -81,6 +97,9 @@ static void set_udgs(const uint8_t *p)
 /* Back to the standard font and colour before printing text. */
 static void text_mode(void)
 {
+#ifdef TARGET_Z88
+    return;                             /* the console is always the map: the text is OZ's */
+#endif
     if (tile_mode) {
         set_font(std_font);
 #if defined(TARGET_ZX)
@@ -106,6 +125,19 @@ static void aq_set_mode(uint16_t m)
 
 void plat_init(void)
 {
+#ifdef TARGET_Z88
+    /* Font and UDG pointers first: with one set, mode 1 makes the console the graphics map. */
+    plat_set_font(view_tile_art);
+    plat_set_udgs(view_tile_art + NUM_TILE_ART * 8u);
+    font_now = view_tile_art;
+    udg_now = view_tile_art + NUM_TILE_ART * 8u;
+    z88_mode = 1;
+    console_ioctl(IOCTL_GENCON_SET_MODE, &z88_mode);
+    z88_sop("\x01" "2-C");                 /* no cursor in the text window */
+    plat_text_clear();
+    clrscr();                           /* the map */
+    return;
+#endif
 #ifdef TARGET_AQPLUS
     aq_set_mode(4);                     /* bitmap mode: the console then draws characters from its font pointers */
 #endif
@@ -120,6 +152,14 @@ void plat_init(void)
 
 void plat_exit(void)
 {
+#ifdef TARGET_Z88
+    plat_set_font(0);
+    plat_set_udgs(0);
+    z88_mode = 0;                       /* text mode again, one full window */
+    console_ioctl(IOCTL_GENCON_SET_MODE, &z88_mode);
+    plat_text_clear();
+    return;
+#endif
     text_mode();
 #ifdef TARGET_AQPLUS
     aq_set_mode(1);                     /* back to the text screen */
@@ -129,16 +169,24 @@ void plat_exit(void)
 
 uint8_t plat_cols(void)
 {
+#ifdef TARGET_Z88
+    return Z88_MAP_COLS;
+#else
     unsigned int x, y;
     screensize(&x, &y);
     return (uint8_t)x;
+#endif
 }
 
 uint8_t plat_rows(void)
 {
+#ifdef TARGET_Z88
+    return Z88_MAP_ROWS;
+#else
     unsigned int x, y;
     screensize(&x, &y);
     return (uint8_t)y;
+#endif
 }
 
 void plat_clear(void)
@@ -149,6 +197,10 @@ void plat_clear(void)
 
 void plat_put(uint8_t col, uint8_t row, uint8_t ch)
 {
+#ifdef TARGET_Z88
+    (void)col; (void)row; (void)ch;      /* the console is the map: it draws tiles only */
+    return;
+#endif
     text_mode();
     gotoxy(col, row);
     fputc_cons(ch);
@@ -156,11 +208,47 @@ void plat_put(uint8_t col, uint8_t row, uint8_t ch)
 
 void plat_puts(uint8_t col, uint8_t row, const char *s)
 {
+#ifdef TARGET_Z88
+    plat_text_puts(col, row, s);        /* text belongs in OZ's text window */
+    return;
+#endif
     text_mode();
     gotoxy(col, row);
     while (*s)
         fputc_cons((uint8_t)*s++);
 }
+
+#ifdef TARGET_Z88
+uint8_t plat_has_text_window(void) { return 1; }
+uint8_t plat_text_cols(void) { return Z88_TEXT_COLS; }
+uint8_t plat_text_rows(void) { return Z88_TEXT_ROWS; }
+
+void plat_text_clear(void)
+{
+    z88_sop("\x01" "2C1");               /* SOH 2 C 1: clear window 1, the text window */
+}
+
+void plat_text_puts(uint8_t col, uint8_t row, const char *s)
+{
+    uint8_t n = 5;
+
+    /* position the cursor: SOH 3 @ x y (coordinates offset by 32).  NB SOH 2 C n CLEARS window n, so it
+       must not be sent with each line. */
+    z88_text[0] = 1; z88_text[1] = '3'; z88_text[2] = '@';
+    z88_text[3] = (char)(32 + col);
+    z88_text[4] = (char)(32 + row);
+    while (*s && n < sizeof(z88_text) - 1)
+        z88_text[n++] = *s++;
+    z88_text[n] = 0;
+    z88_sop(z88_text);
+}
+#else
+uint8_t plat_has_text_window(void) { return 0; }
+uint8_t plat_text_cols(void) { return plat_cols(); }
+uint8_t plat_text_rows(void) { return plat_rows(); }
+void plat_text_clear(void) { plat_clear(); }
+void plat_text_puts(uint8_t col, uint8_t row, const char *s) { plat_puts(col, row, s); }
+#endif
 
 uint8_t plat_has_tiles(void)
 {

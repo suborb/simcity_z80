@@ -181,6 +181,37 @@ def main():
     mem = run(binary, syms, [LEVEL_MEDIUM, CMD_REDRAW, 0, 0])
     check('command: redraw draws the status panel again', any('FUNDS $10000' in row for row in screen(mem, syms)))
 
+    # --- 5. a platform with a text window of its own (the Z88's shape): the map is the whole 32x8 console ---
+    subprocess.run(['make', '-s', '-C', ROOT, 'build/testpanel/simcity.bin'], check=True, capture_output=True)
+    psyms = {}
+    for line in open(os.path.join(ROOT, 'build', 'testpanel', 'simcity.map')):
+        m = re.match(r'(\S+)\s*=\s*\$([0-9A-Fa-f]+)', line)
+        if m:
+            psyms[m.group(1)] = int(m.group(2), 16)
+    pbin = open(os.path.join(ROOT, 'build', 'testpanel', 'simcity.bin'), 'rb').read()
+
+    def panes(mem):
+        a, t = psyms['_test_screen'], psyms['_test_text']
+        return ([mem[a + r * 32:a + (r + 1) * 32].decode('latin1') for r in range(8)],
+                [mem[t + r * 51:t + (r + 1) * 51].decode('latin1') for r in range(8)])
+
+    mem = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE])
+    mapp, text = panes(mem)
+    check('text window: the game ran and quit cleanly', mem[psyms['_test_done']] == 1)
+    check('text window: the status is in the text window', any('FUNDS $10000' in r for r in text) and any('ROAD $10' in r for r in text),
+          '\n'.join(text))
+    check('text window: all three help lines fit', sum(1 for r in text if 'MOVE' in r or 'PICK' in r or 'QUIT' in r) == 3, '\n'.join(text))
+    check('text window: the map is only the map (no text on it)',
+          not any(w in r for r in mapp for w in ('FUNDS', 'POP', 'ROAD', 'MOVE', 'JAN', 'MORE')), '\n'.join(mapp))
+    check('text window: the map fills all 8 rows of the console', all(r.strip() for r in mapp), '\n'.join(mapp))
+    mem = run(pbin, psyms, [LEVEL_MEDIUM, CMD_TOOL + 5, 0, 0])
+    check('text window: a menu command updates the text window', any('RESIDENTIAL' in r for r in panes(mem)[1]))
+    mem = run(pbin, psyms, [LEVEL_MEDIUM, CMD_NEW_CITY, ord('3'), 0, 0])
+    mapp, text = panes(mem)
+    check('text window: a new city goes through the title and back (hard level, status and map drawn)',
+          mem[psyms['_V_difficulty']] == 2 and any('FUNDS' in r for r in text) and all(r.strip() for r in mapp),
+          '\n'.join(text))
+
     print()
     print('\n'.join(scr))
     print()

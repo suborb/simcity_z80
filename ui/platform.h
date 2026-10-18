@@ -45,6 +45,18 @@ extern uint16_t plat_clock(void);               /* free running counter, for see
 extern void     plat_idle(void);                /* called once per frame: may wait */
 extern void     plat_flush(void);               /* end of frame: show what was drawn */
 
+/* The text area.  On most platforms the status text shares the screen with the map, in the top
+   third (the game's layout decides).  A platform with a text window of its own - the Z88's OZ
+   text window beside its map - says so with plat_has_text_window(): the map then gets the whole
+   console, and everything textual (the title, "generating landscape", the status panel) is drawn
+   with plat_text_puts() in the text window's own coordinates.  Elsewhere plat_text_puts() is
+   plat_puts() and plat_text_clear() is plat_clear(). */
+extern uint8_t  plat_has_text_window(void);
+extern uint8_t  plat_text_cols(void);
+extern uint8_t  plat_text_rows(void);
+extern void     plat_text_clear(void);
+extern void     plat_text_puts(uint8_t col, uint8_t row, const char *s);
+
 /* Tile graphics.  A platform that can show the game's 8x8 pictures returns 1
    from plat_has_tiles() and draws one in a character cell with plat_put_tile();
    the rest get characters from plat_put().

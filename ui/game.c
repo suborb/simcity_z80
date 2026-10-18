@@ -109,7 +109,7 @@ static void line(uint8_t row, const char *s, uint32_t number, uint8_t with_numbe
         buf[n++] = ' ';
     buf[n] = 0;
     if (row < panel_h)
-        plat_puts(panel_col, (uint8_t)(panel_row + row), buf);
+        plat_text_puts(panel_col, (uint8_t)(panel_row + row), buf);
 }
 
 #ifndef HAVE_TILES
@@ -313,7 +313,13 @@ static void draw_status(void)
     line(2, buf, 0, 0);
     line(3, V_alertmessage < sizeof(text_alerts) / sizeof(text_alerts[0]) ?
             text_alerts[V_alertmessage] : "", 0, 0);
-    line(4, help_page[(frame >> 6) % 3], 0, 0);
+    if (panel_h >= 7) {                     /* room for all the help at once */
+        line(4, help_page[0], 0, 0);
+        line(5, help_page[1], 0, 0);
+        line(6, help_page[2], 0, 0);
+    } else {                                /* one line that changes every so often */
+        line(4, help_page[(frame >> 6) % 3], 0, 0);
+    }
 }
 
 /* ---- the cursor and the view -------------------------------------------------- */
@@ -410,6 +416,14 @@ static void choose_layout(void)
     cols = plat_cols();
     rows = plat_rows();
     view_w = cols < MAX_VIEW_W ? cols : MAX_VIEW_W;
+    if (plat_has_text_window()) {                   /* the text has a window of its own: the map is all of the console */
+        view_h = rows < MAX_VIEW_H ? rows : MAX_VIEW_H;
+        map_row = 0;
+        panel_col = panel_row = 0;
+        panel_w = plat_text_cols();
+        panel_h = plat_text_rows();
+        return;
+    }
     view_h = (uint8_t)(rows - rows / 3);            /* the map takes the bottom two thirds */
     if (view_h > MAX_VIEW_H)
         view_h = MAX_VIEW_H;
@@ -424,9 +438,9 @@ static void title_screen(void)
     uint16_t seed = 0;
     uint8_t k;
 
-    plat_clear();
-    plat_puts(0, 0, "S I M C I T Y");
-    plat_puts(0, 2, "CHOOSE A LEVEL:  1 EASY  2 MEDIUM  3 HARD");
+    plat_text_clear();
+    plat_text_puts(0, 0, "S I M C I T Y");
+    plat_text_puts(0, 2, "CHOOSE A LEVEL:  1 EASY  2 MEDIUM  3 HARD");
     plat_flush();
     do {
         seed++;
@@ -436,8 +450,8 @@ static void title_screen(void)
     } while (k != '1' && k != '2' && k != '3');
     V_difficulty = (uint8_t)(k - '1');
     V_InitialSeed = (uint16_t)(seed ^ plat_clock()) | 1;
-    plat_clear();
-    plat_puts(0, 0, "GENERATING LANDSCAPE...");
+    plat_text_clear();
+    plat_text_puts(0, 0, "GENERATING LANDSCAPE...");
     plat_flush();
 }
 
@@ -463,6 +477,7 @@ static void play_city(void)
     tool = 1;
     clamp_view();
     plat_clear();
+    plat_text_clear();
     invalidate_view();
     last_cx = 255;                          /* draw the whole view on the first frame */
     countdown = tick_frames[V_simulation_speed];
@@ -500,6 +515,7 @@ static void play_city(void)
         if (redraw) {                       /* OZ drew over us: start the screen again */
             redraw = 0;
             plat_clear();
+            plat_text_clear();
             invalidate_view();
             memset(&last_st, 0xFF, sizeof(last_st));
             last_cx = 255;
@@ -520,7 +536,7 @@ static void play_city(void)
         st.tool = tool;
         st.speed = V_simulation_speed;
         st.alert = V_alertmessage;
-        st.page = (uint8_t)((frame >> 6) % 3);
+        st.page = (panel_h >= 7) ? 0 : (uint8_t)((frame >> 6) % 3);
         if (memcmp(&st, &last_st, sizeof(st))) {
             last_st = st;
             draw_status();
