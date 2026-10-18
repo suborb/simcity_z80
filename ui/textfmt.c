@@ -1,4 +1,5 @@
 #include "textfmt.h"
+#include "numfmt.h"
 
 uint32_t fmt_u24(const uint8_t *p)
 {
@@ -20,15 +21,14 @@ uint8_t fmt_str(char *b, uint8_t n, const char *s)
 
 void fmt_num(char *b, uint8_t end, int32_t v)
 {
-    uint8_t neg = v < 0, n = end;
-    uint32_t u = neg ? (uint32_t)-v : (uint32_t)v;
+    char t[10];
+    uint8_t neg = v < 0, n;
 
-    do {
-        b[--n] = (char)('0' + (uint8_t)(u % 10));
-        u /= 10;
-    } while (u);
+    n = fmt_dec(t, neg ? (uint32_t)-v : (uint32_t)v);
+    while (n)
+        b[--end] = t[--n];
     if (neg)
-        b[--n] = '-';
+        b[--end] = '-';
 }
 
 void fmt_blank(char *b)

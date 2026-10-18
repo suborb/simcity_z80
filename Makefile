@@ -8,7 +8,7 @@
 #   make test                           the headless build the UI tests run
 #   make check                          every automated test (test/run_all.sh)
 #   make golden | uitest | tiletest | z88test   one group of tests
-#   make ZCC='zcc -compiler=NAME' ...  build with another compiler (or set ZCC in the environment: the tests use it too)
+#   make ZCC='zcc' ...                 build with another compiler (or set ZCC in the environment: the tests use it too)
 #   make engine                         regenerate engine/ and platform/zx from disassembly/sim_game.asm
 #   make deadcode                       list engine code nothing reaches
 #   make clean
@@ -19,16 +19,19 @@ Z88DK  ?= $(HOME)/z88dk
 export ZCCCFG ?= $(Z88DK)/lib/config
 export PATH := $(Z88DK)/bin:$(PATH)
 
-ZCC ?= zcc
+# 80cc with a frame pointer makes the smallest code, which the Z88's 32 KB ROM and the Spectrum need.
+ZCC ?= zcc -compiler=80cc -fframe-pointer
 
 # -DPORTABLE selects the engine's portable build; the include paths are for the assembler
 # (engine, repository root for assets/) and the C compiler (ui).
 COMMON = -Ca-DPORTABLE -Ca-Iengine -Ca-I. -Iui -Cc-standard-escape-chars -m
 
-GAME    = ui/main.c ui/game.c engine/engine_c.asm platform/common/hooks.asm
-# The mini maps (ui/minimap.c) and the budget and evaluation screens (HAVE_REPORTS): not on the Spectrum, whose memory
+GAME    = ui/main.c ui/game.c ui/numfmt.c ui/numfmt.asm engine/engine_c.asm platform/common/hooks.asm
+# The mini maps (ui/minimap.c), the budget and evaluation screens (HAVE_REPORTS) and the moving
+# sprites (ui/sprites.c): not on the Spectrum, whose memory
 # has no room for them (the Spectrum has its own budget screen).
-EXTRAS  = ui/minimap.c ui/budget.c ui/evaluation.c ui/textfmt.c -DHAVE_MINIMAP -DHAVE_REPORTS
+EXTRAS  = ui/minimap.c ui/budget.c ui/evaluation.c ui/textfmt.c ui/sprites.c platform/console/plat_sprites.asm \
+          -DHAVE_MINIMAP -DHAVE_REPORTS -DHAVE_SPRITES
 CONSOLE = platform/console/plat_console.c platform/console/plat_font.asm
 
 # Everything a build depends on.
@@ -43,8 +46,9 @@ ZX     = build/zx/simcity.tap
 ZXP    = build/zx-print/simcity.tap
 TEST   = build/test/simcity.bin
 TESTP  = build/testpanel/simcity.bin
+TESTS  = build/testsprites/simcity.bin
 
-.PHONY: all aqplus nc200 z88 z88rom zx zx-print test testpanel check golden uitest tiletest z88test engine deadcode clean
+.PHONY: all aqplus nc200 z88 z88rom zx zx-print test testpanel testsprites check golden uitest tiletest z88test engine deadcode clean
 
 all: aqplus nc200 z88 zx
 
@@ -56,6 +60,7 @@ zx:     $(ZX)
 zx-print: $(ZXP)
 test:   $(TEST)
 testpanel: $(TESTP)
+testsprites: $(TESTS)
 
 # Aquarius+: the .aqx loads from the Aquarius+ file browser.  --generic-console pulls in the
 # generic console driver, which can draw in the Aquarius+'s 320x200 bitmap mode (plat_init
@@ -131,6 +136,11 @@ $(TEST): $(DEPS)
 $(TESTP): $(DEPS)
 	@mkdir -p $(@D)
 	$(ZCC) +test $(COMMON) -DTEST_PANEL $(GAME) $(EXTRAS) platform/test_ui/plat_test.c -o $@
+
+# The same, drawing the map from pictures (and the sprites over it), which the test reads back.
+$(TESTS): $(DEPS)
+	@mkdir -p $(@D)
+	$(ZCC) +test $(COMMON) -DTEST_PANEL -DTEST_SPRITES -DHAVE_TILES $(GAME) $(EXTRAS) platform/test_ui/plat_test.c -o $@
 
 check:
 	sh test/run_all.sh

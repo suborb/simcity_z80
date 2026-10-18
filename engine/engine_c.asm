@@ -156,6 +156,7 @@ _view_attr:     defb    0
         PUBLIC  _V_Police_Funding_Allocated, _V_Fire_Funding_Allocated, _V_expenditure, _V_cashflow
         PUBLIC  _V_previous_money, _V_money_after_budget
         PUBLIC  _V_wait_for_budget_confirm
+        PUBLIC  _V_aircrash_active, _V_CrashXY, _V_tornado_active, _V_tornado_pos
         PUBLIC  _V_display_population, _V_population, _V_prev_year_population, _V_previous_city_score
         PUBLIC  _V_LVAverage, _V_concern_house_price, _V_unPwrdZCnt
 
@@ -195,6 +196,10 @@ _view_attr:     defb    0
         defc    _V_previous_money   = V_previous_money
         defc    _V_money_after_budget = V_money_after_budget
         defc    _V_wait_for_budget_confirm = V_wait_for_budget_confirm
+        defc    _V_aircrash_active      = V_aircrash_active
+        defc    _V_CrashXY              = V_CrashXY
+        defc    _V_tornado_active       = V_tornado_active
+        defc    _V_tornado_pos          = V_tornado_pos
         defc    _V_display_population   = V_display_population
         defc    _V_population           = V_population
         defc    _V_prev_year_population = V_prev_year_population

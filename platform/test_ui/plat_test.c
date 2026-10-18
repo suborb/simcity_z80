@@ -100,11 +100,25 @@ void plat_text_clear(void) { plat_clear(); }
 void plat_text_puts(uint8_t col, uint8_t row, const char *s) { plat_puts(col, row, s); }
 #endif
 
+#ifdef TEST_SPRITES
+/* With TEST_SPRITES the game draws the map from pictures, which the test reads back from test_bitmap. */
+uint8_t plat_has_tiles(void) { return 1; }
+extern uint8_t test_bitmap[ROWS][COLS][8];
+void plat_put_tile(uint8_t col, uint8_t row, const uint8_t *art, uint8_t attr, uint8_t inverse)
+{
+    uint8_t i;
+    (void)attr;
+    if (col < COLS && row < ROWS)
+        for (i = 0; i < 8; ++i)
+            test_bitmap[row][col][i] = inverse ? (uint8_t)~art[i] : art[i];
+}
+#else
 uint8_t plat_has_tiles(void) { return 0; }
 void plat_put_tile(uint8_t col, uint8_t row, const uint8_t *art, uint8_t attr, uint8_t inverse)
 {
     (void)col; (void)row; (void)art; (void)attr; (void)inverse;
 }
+#endif
 
 #ifdef TEST_PANEL
 uint8_t test_bitmap[ROWS][COLS][8];     /* what plat_put_bitmap drew in each cell */
@@ -132,9 +146,20 @@ extern uint8_t V_display_population[3], V_population[3], V_prev_year_population[
 extern uint8_t V_TrafficAverage, V_PolluteAverage, V_concern_crime, V_concern_house_price;
 extern uint16_t V_LVAverage, V_unemployment;
 uint8_t test_poke_city = 1;
+#ifdef TEST_SPRITES
+extern uint8_t V_transport_active, V_transport_pos[2], V_transport_sprite;
+extern uint8_t V_aircrash_active, V_CrashXY[2];
+uint8_t test_poke_sprites = 1;
+#endif
 void plat_flush(void)
 {
     uint16_t i;
+#ifdef TEST_SPRITES
+    if (test_poke_sprites && test_frames >= 3) {        /* the engine moves or removes them: put them back each frame */
+        V_transport_active = 1; V_transport_pos[0] = 40; V_transport_pos[1] = 46; V_transport_sprite = 3;
+        V_aircrash_active = 1; V_CrashXY[0] = 36; V_CrashXY[1] = 45;
+    }
+#endif
     if (++test_frames == 3) {
         for (i = 0; i < sizeof(minimaps); ++i)
             minimaps[i] = (uint8_t)(i * 37u + (i >> 8) * 11u) & (i < 1152 ? 15 : 255);   /* coverage is 0..15 */

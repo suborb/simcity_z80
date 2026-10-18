@@ -28,10 +28,10 @@ def build():
     os.makedirs(OUT, exist_ok=True)
     env = dict(os.environ, ZCCCFG=os.path.join(Z88DK, 'lib', 'config'),
                PATH=os.path.join(Z88DK, 'bin') + os.pathsep + os.environ['PATH'])
-    cmd = os.environ.get('ZCC', 'zcc').split() + ['+zx', f'-zorg={ZORG}', '-pragma-include:platform/console/zpragma_zx.inc', '-Ca-DPORTABLE',
+    cmd = os.environ.get('ZCC', 'zcc -compiler=80cc -fframe-pointer').split() + ['+zx', f'-zorg={ZORG}', '-pragma-include:platform/console/zpragma_zx.inc', '-Ca-DPORTABLE',
            '-Ca-Iengine', '-Ca-I.', '-Iui', '-Cc-standard-escape-chars', '-m',
            '-DTARGET_ZX', '-Ca-DTARGET_ZX', '-DHAVE_TILES'] + (['-DZX_PRINT'] if PRINT else []) + [ '-DMAX_VIEW_W=32', '-DMAX_VIEW_H=16',
-           'test/tiles/main.c', 'engine/engine_c.asm', 'platform/common/hooks.asm',
+           'test/tiles/main.c', 'ui/sprites.c', 'platform/console/plat_sprites.asm', 'engine/engine_c.asm', 'platform/common/hooks.asm',
            'platform/console/plat_console.c', 'platform/console/plat_font.asm'] + \
           ([] if PRINT else ['platform/console/plat_zx_blit.asm']) + [
            '-o', os.path.join(OUT, 'tiles')]
@@ -106,6 +106,17 @@ def main():
     art, attr = cell(mem, 0, 16)
     want = ART[TILE_BASE + 8 * 200:TILE_BASE + 8 * 200 + 8]
     check('picture after text still correct', art == want and attr == 0x46, f'{art.hex()} {attr:02x}')
+    spr = open(os.path.join(ROOT, 'assets', 'transport.spr'), 'rb').read()
+    bad = []
+    for sid in range(5):
+        base = ART[TILE_BASE + 8 * (2 if sid & 1 else 7):][:8]
+        for q in range(4):
+            qx, qy = q & 1, q >> 1
+            want = bytes(base[r] | spr[sid * 32 + (qy * 8 + r) * 2 + qx] for r in range(8))
+            got = cell(mem, sid * 3 + qx, 20 + qy)[0]
+            if got != want:
+                bad.append((sid, q, got.hex(), want.hex()))
+    check('all 5 sprites, in 4 cells each, are the picture ORed onto the tile under it', not bad, str(bad[:3]))
     print('FAILED: ' + ', '.join(failures) if failures else 'all tile tests passed')
     sys.exit(1 if failures else 0)
 

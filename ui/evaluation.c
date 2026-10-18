@@ -15,6 +15,7 @@
 #include "engine.h"
 #include "platform.h"
 #include "textfmt.h"
+#include "numfmt.h"
 #include "evaluation.h"
 
 /* Not text.h, which would put a second copy of all its strings in the program. */
@@ -131,19 +132,9 @@ static void draw(const struct evaluation *e)
 
     fmt_blank(b);
     n = fmt_str(b, 0, "ASSESSED VALUE $");
-    {
-        char t[12];
-        uint8_t k = 12;
-        uint32_t v = fmt_u24(V_previous_city_score);
-        t[--k] = '0'; t[--k] = '0'; t[--k] = '0';   /* the score is in thousands */
-        do {
-            t[--k] = (char)('0' + (uint8_t)(v % 10));
-            v /= 10;
-        } while (v && k);
-        if (fmt_u24(V_previous_city_score) == 0)
-            k = 11;                                 /* "$0" */
-        while (k < 12)
-            b[n++] = t[k++];
+    n += fmt_dec(b + n, fmt_u24(V_previous_city_score));
+    if (V_previous_city_score[0] | V_previous_city_score[1] | V_previous_city_score[2]) {
+        b[n++] = '0'; b[n++] = '0'; b[n++] = '0';   /* the score is in thousands */
     }
     plat_text_puts(0, 6, b);
 

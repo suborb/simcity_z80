@@ -383,6 +383,40 @@ def main():
     check('evaluation: v opens it and enter closes it again',
           any('FUNDS' in r for r in text) and not any('MAYOR APPROVAL' in r for r in text), '\n'.join(text))
 
+    # --- 9. the moving sprites, drawn over the map's pictures ---
+    subprocess.run(['make', '-s', '-C', ROOT, 'build/testsprites/simcity.bin'], check=True, capture_output=True)
+    ssyms = {}
+    for line in open(os.path.join(ROOT, 'build', 'testsprites', 'simcity.map')):
+        m = re.match(r'(\S+)\s*=\s*\$([0-9A-Fa-f]+)', line)
+        if m:
+            ssyms[m.group(1)] = int(m.group(2), 16)
+    sbin = open(os.path.join(ROOT, 'build', 'testsprites', 'simcity.bin'), 'rb').read()
+    spr = open(os.path.join(ROOT, 'assets', 'transport.spr'), 'rb').read()
+
+    def cells(mem):
+        b = ssyms['_test_bitmap']
+        return {(c, r): bytes(mem[b + (r * 32 + c) * 8:b + (r * 32 + c) * 8 + 8]) for r in range(8) for c in range(32)}
+
+    with_s = cells(run(sbin, ssyms, [LEVEL_MEDIUM, PAUSE] + [0] * 20))
+    without = cells(run(sbin, ssyms, [LEVEL_MEDIUM, PAUSE] + [0] * 20, patch={'_test_poke_sprites': b'\0'}))
+    # origin of the view is (32, 44): the train at map (40, 46) is console cell (8, 2), the plane at (36, 45) is (4, 1)
+    want = {}
+    for (c0, r0, sid) in ((8, 2, 3), (4, 1, 0)):
+        for qy in (0, 1):
+            for qx in (0, 1):
+                base = without[(c0 + qx, r0 + qy)]
+                want[(c0 + qx, r0 + qy)] = bytes(base[r] | spr[sid * 32 + (qy * 8 + r) * 2 + qx] for r in range(8))
+    wrong = [(k, with_s[k].hex(), v.hex()) for k, v in want.items() if with_s[k] != v]
+    check('sprites: the train and the plane are drawn over the tiles, 2x2 cells each', not wrong, str(wrong[:3]))
+    check('sprites: they changed the pictures of those cells (not all: water is solid already)', sum(with_s[k] != without[k] for k in want) >= 4)
+    other = [k for k in with_s if k not in want and k != (16, 4) and with_s[k] != without[k]]
+    check('sprites: no other cell is touched', not other, str(other[:5]))
+    mem = run(sbin, ssyms, [LEVEL_MEDIUM, PAUSE] + [0] * 20 + [ord('p')] * 40 + [0] * 10)
+    moved = cells(mem)
+    # the view scrolled right once the cursor passed its edge: the sprite must have moved on the screen with the map
+    check('sprites: they scroll with the map (the cells where they were no longer hold them)',
+          any(moved[(8, 2)] != with_s[(8, 2)] for _ in [0]))
+
     print()
     print('\n'.join(scr))
     print()

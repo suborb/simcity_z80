@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include "engine.h"
 #include "platform.h"
+#include "sprites.h"
 
 #define PER_ROW 32
 
@@ -22,5 +23,14 @@ int main(void)
     plat_puts(0, 14, "HELLO SIMCITY 123");
     plat_put_tile(0, 16, view_tile_art + 200 * 8, 0x46, 0);
     plat_puts(0, 18, "AFTER");
+    /* rows 20, 21: the five sprites, each over a road tile (even ones) or dirt (odd ones), 2x2 cells */
+    {
+        uint8_t id, q, art[8];
+        for (id = 0; id < 5; ++id)
+            for (q = 0; q < 4; ++q) {
+                sprite_or(id, q & 1, q >> 1, view_tile_art + ((id & 1) ? 2 : 7) * 8, art);
+                plat_put_bitmap((uint8_t)(id * 3 + (q & 1)), (uint8_t)(20 + (q >> 1)), art);
+            }
+    }
     return 0;
 }

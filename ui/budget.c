@@ -16,6 +16,7 @@
 #include "platform.h"
 #include "budget.h"
 #include "textfmt.h"
+#include "numfmt.h"
 
 #define MAX_TAX 20
 #define ROWS    8
@@ -43,18 +44,7 @@ static void draw(void)
     fmt_blank(b);
     fmt_str(b, 1, "FISCAL BUDGET   TAX COLLECTED $");
     n = 32;
-    {
-        uint32_t t = fmt_u24(V_tax_collected);
-        char tmp[8];
-        uint8_t k = 8;
-        do {
-            tmp[--k] = (char)('0' + (uint8_t)(t % 10));
-            t /= 10;
-        } while (t && k);
-        while (k < 8)
-            b[n++] = tmp[k++];
-        b[n] = 0;
-    }
+    n += fmt_dec(b + n, fmt_u24(V_tax_collected));
     plat_text_puts(0, 0, b);
 
     fmt_blank(b);

@@ -19,10 +19,15 @@
 #ifdef HAVE_MINIMAP
 #include "minimap.h"
 #endif
+#if defined(HAVE_SPRITES) && defined(HAVE_TILES)
+#include "sprites.h"
+#define DRAW_SPRITES
+#endif
 #ifdef HAVE_REPORTS
 #include "budget.h"
 #include "evaluation.h"
 #endif
+#include "numfmt.h"
 #include "game.h"
 
 #define NUM_TOOLS   14
@@ -87,19 +92,7 @@ static uint32_t citypop(void)
 
 static uint8_t put_number(char *buf, uint32_t v)
 {
-    char tmp[11];
-    uint8_t n = 0, i;
-    if (v == 0) {
-        buf[0] = '0';
-        return 1;
-    }
-    while (v) {
-        tmp[n++] = (char)('0' + (uint8_t)(v % 10));
-        v /= 10;
-    }
-    for (i = 0; i < n; ++i)
-        buf[i] = tmp[n - 1 - i];
-    return n;
+    return fmt_dec(buf, v);
 }
 
 static void line(uint8_t row, const char *s, uint32_t number, uint8_t with_number)
@@ -188,6 +181,9 @@ static uint8_t glyph(uint8_t x, uint8_t y)
 /* ---- drawing -------------------------------------------------------------- */
 static uint8_t last_cx = 255, last_cy;  /* where the cursor was drawn, in view cells */
 static uint8_t last_size, last_phase;   /* its size (the tool's footprint) and blink phase then */
+#ifdef DRAW_SPRITES
+static struct sprite sprites[MAX_SPRITES], last_sprites[MAX_SPRITES];   /* the train, plane and tornado, now and last frame */
+#endif
 
 /* The cursor is the size of what the tool would place: a square of tool_size[tool] cells whose top
    left is the cursor position. */
@@ -210,6 +206,23 @@ static void draw_cell(uint8_t cx, uint8_t cy)
     view_y = my;
     view_fetch();
     g = (uint16_t)(((uint16_t)(view_art - view_tile_art) >> 3) + 1) | (cursor ? 0x8000 : 0);
+#ifdef DRAW_SPRITES
+    {
+        uint8_t art[8], key = sprites_cell(sprites, mx, my, view_art, art), i;
+
+        if (key) {                          /* a sprite is over this cell: its picture, not the tile's */
+            g |= (uint16_t)key << 9;
+            if (*s != g) {
+                *s = g;
+                if (cursor)
+                    for (i = 0; i < 8; ++i)
+                        art[i] ^= 0xFF;
+                plat_put_bitmap(cx, (uint8_t)(map_row + cy), art);
+            }
+            return;
+        }
+    }
+#endif
     if (*s != g) {
         *s = g;
         plat_put_tile(cx, (uint8_t)(map_row + cy), view_art, view_attr, cursor);
@@ -230,12 +243,13 @@ static void draw_cell(uint8_t cx, uint8_t cy)
      dirty    the rows a tool has just changed (the engine set map_dirty)
      always   one row in turn, to pick up the simulation's work and the animation
      always   the cursor's cells, and the ones it left, when it has moved, changed size or blinked */
-static void draw_footprint(uint8_t cx, uint8_t cy, uint8_t size)
+static void draw_footprint(int16_t cx, int16_t cy, uint8_t size)   /* view cells; part may be off the view */
 {
-    uint8_t x, y;
-    for (y = cy; y < (uint8_t)(cy + size) && y < view_h; ++y)
-        for (x = cx; x < (uint8_t)(cx + size) && x < view_w; ++x)
-            draw_cell(x, y);
+    int16_t x, y;
+    for (y = cy; y < cy + size; ++y)
+        for (x = cx; x < cx + size; ++x)
+            if (x >= 0 && y >= 0 && x < view_w && y < view_h)
+                draw_cell((uint8_t)x, (uint8_t)y);
 }
 
 static void draw_view(uint8_t full, uint8_t dirty)
@@ -243,6 +257,9 @@ static void draw_view(uint8_t full, uint8_t dirty)
     static uint8_t refresh_row;
     uint8_t cx, cy, rows_dirty, size = tool_size[tool], phase = (frame & 4) != 0;
 
+#ifdef DRAW_SPRITES
+    sprites_collect(sprites, frame);
+#endif
     if (full) {
         for (cy = 0; cy < view_h; ++cy)
             for (cx = 0; cx < view_w; ++cx)
@@ -267,6 +284,17 @@ static void draw_view(uint8_t full, uint8_t dirty)
             draw_footprint(cx, cy, size);
         }
     }
+#ifdef DRAW_SPRITES
+    if (!full)                              /* a sprite that moved, changed or went: its old cells and its new */
+        for (cx = 0; cx < MAX_SPRITES; ++cx)
+            if (memcmp(&sprites[cx], &last_sprites[cx], sizeof(struct sprite))) {
+                if (last_sprites[cx].on)
+                    draw_footprint((int16_t)last_sprites[cx].x - origin_x, (int16_t)last_sprites[cx].y - origin_y, 2);
+                if (sprites[cx].on)
+                    draw_footprint((int16_t)sprites[cx].x - origin_x, (int16_t)sprites[cx].y - origin_y, 2);
+            }
+    memcpy(last_sprites, sprites, sizeof(sprites));
+#endif
     last_cx = (uint8_t)(cur_x - origin_x);
     last_cy = (uint8_t)(cur_y - origin_y);
     last_size = size;
