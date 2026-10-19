@@ -77,6 +77,40 @@ uint8_t plat_key(void)
 uint8_t plat_text_cols(void) { return TEXT_COLS; }
 uint8_t plat_text_rows(void) { return TEXT_ROWS; }
 
+#if defined(HAVE_FILES) || defined(HAVE_APPNAME)
+/* The line editor of the headless platform: the keys of the script, ENTER to finish, ESC to cancel, delete or cursor
+   left to take a letter back; the line is echoed in the text window. */
+uint8_t plat_text_input(uint8_t col, uint8_t row, char *buf, uint8_t max, uint8_t spaces)
+{
+    uint8_t n = 0, k, i;
+    char one[2];
+
+    one[1] = 0;
+    buf[0] = 0;
+    for (;;) {
+        k = plat_key();
+        if (!k) {
+            plat_idle();
+            continue;
+        }
+        if (k == KEY_ENTER || k == KEY_ESC || k == CMD_QUIT) {
+            buf[n] = 0;
+            return k == KEY_ENTER ? n != 0 : k == KEY_ESC ? 0 : 2;
+        }
+        if ((k == KEY_LEFT || k == 127) && n)
+            buf[--n] = 0;
+        else if (k >= (spaces ? ' ' : '!') && k < 127 && n < max) {
+            buf[n++] = (char)k;
+            buf[n] = 0;
+        }
+        for (i = 0; i < max + 1; ++i) {
+            one[0] = i < n ? buf[i] : ' ';
+            plat_text_puts((uint8_t)(col + i), row, one);
+        }
+    }
+}
+#endif
+
 uint16_t test_text_clears;               /* how often the whole text window was cleared */
 
 void plat_text_clear(void)

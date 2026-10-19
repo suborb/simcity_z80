@@ -24,23 +24,6 @@ static void show(void)
     plat_flush();
 }
 
-/* Only the name changes as keys are typed: redraw that, not the screen. */
-static void show_name(void)
-{
-    char b[28];
-    uint8_t i = 0;
-
-    while (shown[i] && i < sizeof(b) - 1) {
-        b[i] = shown[i];
-        ++i;
-    }
-    while (i < sizeof(b) - 1)                       /* rub out what a delete left behind */
-        b[i++] = ' ';
-    b[i] = 0;
-    plat_text_puts(11, 2, b);
-    plat_flush();
-}
-
 void prompt_say(const char *s)
 {
     uint8_t k;
@@ -57,38 +40,13 @@ void prompt_say(const char *s)
 
 uint8_t prompt_ask(const char *t, const char *l, char *name, uint8_t max, uint8_t spaces)
 {
-    uint8_t n = 0, k;
-
     title = t;
     label = l;
-    shown = name;
+    shown = "";
     message = "";
     help = "ENTER OK  ESC CANCEL";
-    name[0] = '_';
-    name[1] = 0;
     show();
-    for (;;) {
-        do {
-            k = plat_key();
-            if (!k)
-                plat_idle();
-        } while (!k);
-        if (k == CMD_REDRAW) {                      /* the screen was overwritten: all of it again */
-            show();
-            continue;
-        }
-        if (k == KEY_ENTER || k == KEY_ESC || k == CMD_QUIT) {
-            name[n] = 0;
-            return k == KEY_ENTER ? n != 0 : k == KEY_ESC ? 0 : 2;
-        }
-        if ((k == KEY_LEFT || k == 127) && n)
-            --n;
-        else if (k >= (spaces ? ' ' : '!') && k < 127 && n < max)
-            name[n++] = (char)k;
-        name[n] = '_';
-        name[n + 1] = 0;
-        show_name();
-    }
+    return plat_text_input(11, 2, name, max, spaces);          /* the platform's own line editor */
 }
 
 void city_name_from(const uint8_t *padded)

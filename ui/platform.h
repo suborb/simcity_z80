@@ -114,6 +114,14 @@ extern void     plat_put_tile(uint8_t col, uint8_t row, const uint8_t *art, uint
 extern void     plat_put_bitmap(uint8_t col, uint8_t row, const uint8_t *art);
 #endif
 
+#if defined(HAVE_FILES) || defined(HAVE_APPNAME)
+/* plat_text_input() lets the player edit a line of text at (col, row) of the text area, with the machine's own line
+   editor (the Z88's OZ, or the console's fgets_cons): up to `max` characters into buf (max + 2 bytes), spaces allowed
+   if `spaces` is set (a platform whose editor cannot tell may allow them anyway).  Returns 1 for a line, 0 if it is
+   empty or was cancelled, and 2 if the platform wants the game to quit. */
+extern uint8_t  plat_text_input(uint8_t col, uint8_t row, char *buf, uint8_t max, uint8_t spaces);
+#endif
+
 #ifdef HAVE_APPNAME
 extern void     plat_set_name(const char *name);       /* the city's name: shown by the machine as it likes */
 #endif

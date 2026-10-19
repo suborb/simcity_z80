@@ -342,6 +342,36 @@ void plat_put_tile(uint8_t col, uint8_t row, const uint8_t *art, uint8_t attr, u
 }
 #endif
 
+#if defined(HAVE_FILES) || defined(HAVE_APPNAME)
+/* The line editor is the library's fgets_cons: on the Z88 that is OZ's own editor (GN_Sip, with cursor keys, insert and
+   delete), elsewhere a simple one that echoes through the console.  OZ's cursor is off in our text window, so it is
+   switched on around the call.  The library adds the newline ENTER ends the line with; it is taken off again. */
+uint8_t plat_text_input(uint8_t col, uint8_t row, char *buf, uint8_t max, uint8_t spaces)
+{
+    char *r;
+    uint8_t n;
+
+    (void)spaces;
+#ifdef TARGET_Z88
+    plat_text_puts(col, row, "");                   /* the cursor to the start of the line */
+    z88_sop("\x01" "2+C");
+#else
+    text_mode();
+    gotoxy(col, row);
+#endif
+    buf[0] = 0;
+    r = fgets_cons(buf, (size_t)max + 1);
+#ifdef TARGET_Z88
+    z88_sop("\x01" "2-C");
+#endif
+    for (n = 0; buf[n]; ++n)
+        ;
+    while (n && (uint8_t)buf[n - 1] < ' ')          /* the newline */
+        buf[--n] = 0;
+    return r != 0 && n != 0;
+}
+#endif
+
 #ifdef HAVE_FILES
 /* ---- files: OZ's, through z88dk's open, read, write and close ---- */
 

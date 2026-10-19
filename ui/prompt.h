@@ -9,8 +9,8 @@
 
 extern char city_name[CITY_NAME_LEN + 1];   /* the city's name, not padded */
 
-/* Ask for text with the title and label shown, into name (max + 2 bytes: it shows a cursor while typing); spaces
-   are allowed in it if `spaces` is set (a city's name: not a file's).
+/* Ask for text with the title and label shown, into name (max + 2 bytes); spaces are allowed in it if `spaces`
+   is set (a city's name: not a file's), where the platform's line editor can tell.
    Returns 1 for a name, 0 if cancelled or empty, 2 if the platform asked to quit. */
 extern uint8_t prompt_ask(const char *title, const char *label, char *name, uint8_t max, uint8_t spaces);
 
