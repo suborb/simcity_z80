@@ -9,6 +9,7 @@
         SECTION code_clib
         PUBLIC  _z88_sop
         INCLUDE "stdio.def"
+        INCLUDE "director.def"
 
 ; The 14 tool icons as OZ character rows (tools/make_z88_icons.py): 4 cells of 8 rows each.
         SECTION rodata_user
@@ -17,6 +18,12 @@ _z88_icons:
         BINARY  "assets/z88_icons.bin"
 
         SECTION code_clib
+; void plat_set_name(const char *name) __z88dk_fastcall: the city's name for OZ's Index (DC_Nam, which keeps IX)
+        PUBLIC  _plat_set_name
+_plat_set_name:
+        call_oz (dc_nam)
+        ret
+
 _z88_sop:
         call_oz (gn_sop)                ;HL = the string; preserves IX and IY
         ret

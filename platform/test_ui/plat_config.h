@@ -9,6 +9,7 @@
 #define HAVE_MENUS
 #define HAVE_ICONS
 #define HAVE_FILES
+#define HAVE_APPNAME
 #define HAVE_SOUND
 #define HAVE_BITMAP
 #define HAVE_BUDGET

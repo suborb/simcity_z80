@@ -71,11 +71,12 @@ extern void     plat_flush(void);               /* end of frame: show what was d
      HAVE_MENUS        menus of its own, which have quit: the X key does not quit there, ESC leaves a mini map,
                        and the cursor keys move (Q, A, O and P do not)
      HAVE_FILES        files, for saving and loading a city (plat_file_save()/plat_file_load())
+     HAVE_APPNAME      the machine can show what the city is called (plat_set_name(); the Z88's Index)
      HAVE_SOUND        a beeper behind the engine's sound hooks (the Makefile links the platform's sound code, or
                        platform/common/nosound.asm if there is none); `sound_enabled` is the player's on/off
    and the optional features: HAVE_BUDGET, HAVE_EVALUATION, HAVE_MINIMAP, HAVE_SPRITES (see ui/*.c).  The
    screens and the status panel drawn from tables of fields (HAVE_FIELDS) come with any of the screens. */
-#if defined(HAVE_BUDGET) || defined(HAVE_EVALUATION) || defined(HAVE_FILES) || defined(HAVE_ICONS)
+#if defined(HAVE_BUDGET) || defined(HAVE_EVALUATION) || defined(HAVE_FILES) || defined(HAVE_ICONS) || defined(HAVE_APPNAME)
 #ifndef HAVE_FIELDS
 #define HAVE_FIELDS
 #endif
@@ -111,6 +112,10 @@ extern void     plat_put_tile(uint8_t col, uint8_t row, const uint8_t *art, uint
 #ifdef HAVE_BITMAP
 /* plat_put_bitmap() draws 8 bytes of 1bpp art (a byte a pixel row, bit 7 on the left) in a character cell. */
 extern void     plat_put_bitmap(uint8_t col, uint8_t row, const uint8_t *art);
+#endif
+
+#ifdef HAVE_APPNAME
+extern void     plat_set_name(const char *name);       /* the city's name: shown by the machine as it likes */
 #endif
 
 #ifdef HAVE_SOUND

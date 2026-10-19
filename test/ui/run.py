@@ -35,8 +35,20 @@ def build():
     return open(os.path.join(OUT, 'simcity.bin'), 'rb').read(), syms
 
 
-def run(binary, syms, keys, limit=4_000_000_000, patch=None):
-    """Run the game with the given key script; return (memory dump, symbols)."""
+def run(binary, syms, keys, limit=4_000_000_000, patch=None, city=b''):
+    """Run the game with the given key script; return (memory dump, symbols).  A build that asks for the city's name
+    after the level (it has test_app_name) gets the name in `city` at the first title screen, and just ENTER after the others."""
+    if '_test_app_name' in syms:
+        typed, title, named = [], True, city
+        for k in keys:
+            typed.append(k)
+            if title and k in (ord('1'), ord('2'), ord('3')):
+                typed += list(named) + [13]
+                named = b''                                             # a later title screen just takes the default
+                title = False
+            if k == 0x90:                                               # CMD_NEW_CITY: the title screen again
+                title = True
+        keys = typed
     assert len(keys) < SCRIPT_LEN
     image = bytearray(binary)
     script = bytes(keys) + bytes([END]) + bytes(SCRIPT_LEN - len(keys) - 1)
@@ -393,6 +405,23 @@ def main():
     mem = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE, CMD_DISASTER + 1, 0])
     check('disaster menu: the request is held in V_disaster_option until the engine takes it', mem[psyms['_V_disaster_option']] in (0, 2))
 
+    # --- 6e. the city's name ---
+    CMD_SAVE, CMD_LOAD = 0xA6, 0xA7
+    rd = lambda mem, name, n: bytes(mem[psyms[name]:psyms[name] + n])
+    app_name = lambda mem: bytes(mem[psyms['_test_app_name']:psyms['_test_app_name'] + 16]).split(b'\0')[0]
+    mem = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE, 0, 0])
+    check('city name: without one the default, HERESVILLE, is the name the machine is told', app_name(mem) == b'HERESVILLE', repr(app_name(mem)))
+    mem = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE, 0, 0], city=b'noodle')
+    check('city name: a name typed at the title screen is the name the machine is told', app_name(mem) == b'noodle', repr(app_name(mem)))
+    mem = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE, 0, 0], city=b'a name that is too long')
+    check('city name: it is cut to the 12 the Spectrum keeps', app_name(mem) == b'a name that ', repr(app_name(mem)))
+    mem = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE, CMD_SAVE, ord('f'), 13, ord(' '), 0, 0], city=b'noodle')
+    check('city name: it is in the save file header, padded with spaces', rd(mem, '_test_file', 31)[19:31] == b'noodle      ', repr(rd(mem, '_test_file', 31)[19:31]))
+    mem = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE, CMD_SAVE, ord('f'), 13, ord(' '), CMD_NEW_CITY, ord('2'), 0, 0], city=b'noodle')
+    check('city name: a new city goes back to the default', app_name(mem) == b'HERESVILLE', repr(app_name(mem)))
+    mem = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE, CMD_SAVE, ord('f'), 13, ord(' '), CMD_NEW_CITY, ord('2'), CMD_LOAD, ord('f'), 13, 0, 0], city=b'noodle')
+    check('city name: loading the file brings the name back', app_name(mem) == b'noodle', repr(app_name(mem)))
+
     # --- 7. the budget screen (the 32x8 platform has it too) ---
     CMD_BUDGET = 0xA4
     byte_p = lambda mem, name: mem[psyms[name]]
@@ -401,6 +430,10 @@ def main():
     check('budget: the screen shows the headings and the departments',
           all(any(w in r for r in text) for w in ('FISCAL BUDGET', 'TAX RATE', 'TRANSPORT', 'POLICE', 'FIRE', 'CASH FLOW', 'ENTER OK')),
           '\n'.join(text))
+    check('budget: the funds row shows the label and both figures, not overlapping (the test city pays 350 in tax: FUNDS 10000>10350)',
+          re.search(r'CASH FLOW\s+350\s+FUNDS\s+10000>\s+10350', text[6]) is not None, repr(text[6]))
+    check('budget: the figures of the three departments line up under their headings',
+          text[2].index('REQSTD') + 5 == text[3].index('0 ') and all(len(r.rstrip()) <= 40 for r in text), '\n'.join(text))
     check('budget: it starts with the tax rate of 7%', any('TAX RATE  7%' in r for r in text), '\n'.join(text))
     check('budget: every line fits the 8 rows and 40 columns', all(len(r.rstrip()) <= 40 for r in text))
     mem = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE, CMD_BUDGET, KEY_RIGHT, KEY_RIGHT, 0, 0])

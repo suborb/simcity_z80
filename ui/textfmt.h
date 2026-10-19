@@ -32,7 +32,10 @@ struct field {
     const void *p;
 };
 
-extern void fmt_fields(const struct field *f, uint8_t n);
+/* The drawing is in assembler (fmtfields.asm): fmt_fields(f, n) draws n fields of the table f. */
+extern uint8_t fmt_count, fmt_row;
+extern void fmt_run(const struct field *f) __z88dk_fastcall;
+#define fmt_fields(f, n)    do { fmt_count = (n); fmt_run(f); } while (0)
 #endif
 
 #endif

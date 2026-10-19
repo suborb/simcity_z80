@@ -14,3 +14,11 @@
 // not call them.
 #pragma redirect handlecmds = _handlecmds
 #pragma redirect redrawscreen = _redrawscreen
+
+// Nothing here uses stdio FILEs (the game talks to the console and, for saving, to OZ's own file calls) or atexit.
+#pragma output CRT_ENABLE_STDIO = 0
+#pragma output CLIB_EXIT_STACK_SIZE = 0
+
+// The console only gets plain characters and pictures (positioning is done with gotoxy; the text window is
+// written with OZ's own calls), so use the library's minimal fputc_cons.
+#pragma redirect fputc_cons_generic = fputc_cons_generic_minimal

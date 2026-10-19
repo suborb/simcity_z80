@@ -33,6 +33,9 @@
 #ifdef HAVE_FILES
 #include "cityfile.h"
 #endif
+#if defined(HAVE_FILES) || defined(HAVE_APPNAME)
+#include "prompt.h"
+#endif
 #include "game.h"
 
 #define NUM_TOOLS   14
@@ -64,7 +67,7 @@ static uint8_t map_view;                /* 0: the city; else the mini map shown 
 static uint8_t map_full;                /* the mini map needs drawing from scratch */
 /* Everything the status panel shows, to tell when it needs redrawing. */
 struct status {
-    uint32_t money, pop;
+    uint8_t money[3], pop[3];             /* 24 bit, as the engine keeps them */
     int16_t rv, cv, iv;
     uint16_t year;
     uint8_t month, tool, speed, alert, page, map_view;
@@ -86,6 +89,7 @@ static uint8_t panel_w, panel_h;
 static uint16_t shadow[MAX_VIEW_W * MAX_VIEW_H];    /* what is on the screen: 0 = unknown */
 
 /* ---- small helpers ----------------------------------------------------- */
+#ifndef HAVE_FIELDS                                 /* the status panel without tables prints the numbers itself */
 static uint32_t money(void)
 {
     return (uint32_t)V_money[0] | ((uint32_t)V_money[1] << 8) | ((uint32_t)V_money[2] << 16);
@@ -97,6 +101,7 @@ static uint32_t citypop(void)
        halfway; the engine copies the finished figure to V_display_population at the end of each tick. */
     return (uint32_t)V_display_population[0] | ((uint32_t)V_display_population[1] << 8) | ((uint32_t)V_display_population[2] << 16);
 }
+#endif
 
 #ifndef HAVE_FIELDS
 static uint8_t put_number(char *buf, uint32_t v)
@@ -788,6 +793,21 @@ static void title_screen(void)
     } while (k != '1' && k != '2' && k != '3');
     V_difficulty = (uint8_t)(k - '1');
     V_InitialSeed = (uint16_t)(seed ^ plat_clock()) | 1;
+#ifdef HAVE_APPNAME
+    {                                               /* the Spectrum asks for the city's name here */
+        char name[CITY_NAME_LEN + 2];
+
+        k = prompt_ask("NAME YOUR CITY", "CITY NAME:", name, CITY_NAME_LEN, 1);
+        if (k == 2) {
+            quit = 1;
+            return;
+        }
+        for (seed = 0; seed < CITY_NAME_LEN + 1; ++seed)
+            city_name[seed] = k == 1 ? name[seed] : "HERESVILLE"[seed];
+        city_name[CITY_NAME_LEN] = 0;
+        plat_set_name(city_name);
+    }
+#endif
     plat_text_clear();
     plat_text_puts(0, 0, "GENERATING LANDSCAPE...");
     plat_flush();
@@ -894,8 +914,8 @@ static void play_city(void)
         }
 
         /* the status panel only when something it shows has changed */
-        st.money = money();
-        st.pop = citypop();
+        memcpy(st.money, V_money, 3);
+        memcpy(st.pop, V_display_population, 3);
         st.year = V_year;
         st.rv = V_RValve;
         st.cv = V_CValve;

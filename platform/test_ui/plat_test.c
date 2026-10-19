@@ -37,9 +37,12 @@ void plat_exit(void) { test_done = 1; }
 uint8_t plat_cols(void) { return COLS; }
 uint8_t plat_rows(void) { return ROWS; }
 
+uint8_t test_cleared;                   /* plat_clear was called: in the panel build the game has made its city by then */
+
 void plat_clear(void)
 {
     uint8_t r, c;
+    test_cleared = 1;
     for (r = 0; r < ROWS; ++r)
         for (c = 0; c < COLS; ++c)
             test_screen[r][c] = ' ';
@@ -96,6 +99,17 @@ uint8_t plat_text_cols(void) { return COLS; }
 uint8_t plat_text_rows(void) { return ROWS; }
 void plat_text_clear(void) { plat_clear(); }
 void plat_text_puts(uint8_t col, uint8_t row, const char *s) { plat_puts(col, row, s); }
+#endif
+
+#ifdef HAVE_APPNAME
+char test_app_name[16];                  /* what the game last told the machine the city is called */
+void plat_set_name(const char *name)
+{
+    uint8_t i;
+    for (i = 0; i < 15 && name[i]; ++i)
+        test_app_name[i] = name[i];
+    test_app_name[i] = 0;
+}
 #endif
 
 #ifdef HAVE_SOUND
@@ -197,7 +211,9 @@ void plat_flush(void)
         V_aircrash_active = 1; V_CrashXY[0] = 36; V_CrashXY[1] = 45;
     }
 #endif
-    if (++test_frames == 3) {
+    ++test_frames;
+    if (test_cleared == 1) {                    /* the first frame of the city is drawn: put the figures in */
+        test_cleared = 2;
         for (i = 0; i < sizeof(minimaps); ++i)
             minimaps[i] = (uint8_t)(i * 37u + (i >> 8) * 11u) & (i < 1152 ? 15 : 255);   /* coverage is 0..15 */
         if (test_poke_city) {
