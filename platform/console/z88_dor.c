@@ -11,7 +11,7 @@
    checks).
 
    Shortcuts: the user presses the [] (square) key and then types the letters of the item's KEY.  The letters are up to the application: here the first is the menu's initial
-   (Game, Speed, Options, Views) and the rest name the item, with no sequence the start of
+   (Game, Speed, Options, Views, Disasters) and the rest name the item, with no sequence the start of
    another (test/z88 checks that too).  Keep M, I and J off the front of them: the ENTER key is Ctrl-M
    (<>M), TAB is <>I and <>J is LF, and OZ takes those for a shortcut that starts with the letter. */
 #include <dor.h>
@@ -102,24 +102,51 @@
 #define TOPIC4               "Views"
 #define TOPIC4_1             "City"
 #define TOPIC4_1KEY          "VC"
-#define TOPIC4_1CODE         0x9D
+#define TOPIC4_1CODE         0x87
 #define TOPIC4_2             "Pollution"
 #define TOPIC4_2KEY          "VU"
-#define TOPIC4_2CODE         0x9E
+#define TOPIC4_2CODE         0x88
 #define TOPIC4_3             "Police coverage"
 #define TOPIC4_3KEY          "VO"
-#define TOPIC4_3CODE         0x9F
+#define TOPIC4_3CODE         0x89
 #define TOPIC4_4             "Fire coverage"
 #define TOPIC4_4KEY          "VF"
-#define TOPIC4_4CODE         0xA0
+#define TOPIC4_4CODE         0x8A
 #define TOPIC4_5             "Traffic"
 #define TOPIC4_5KEY          "VT"
-#define TOPIC4_5CODE         0xA1
+#define TOPIC4_5CODE         0x8B
 #define TOPIC4_6             "Power"
 #define TOPIC4_6KEY          "VW"
-#define TOPIC4_6CODE         0xA2
-#define TOPIC4_7             "Back to the city"
-#define TOPIC4_7KEY          "VX"
-#define TOPIC4_7CODE         0xA3
+#define TOPIC4_6CODE         0x8C
+#define TOPIC4_7             "Transport"
+#define TOPIC4_7KEY          "VR"
+#define TOPIC4_7CODE         0x8D
+#define TOPIC4_8             "Crime"
+#define TOPIC4_8KEY          "VI"
+#define TOPIC4_8CODE         0x8E
+#define TOPIC4_9             "Back to the city"
+#define TOPIC4_9KEY          "VX"
+#define TOPIC4_9CODE         0xA3
+
+/* ---- Disasters: CMD_DISASTER + 0..5, started a few frames after the choice ---- */
+#define TOPIC5               "Disasters"
+#define TOPIC5_1             "Fire"
+#define TOPIC5_1KEY          "DF"
+#define TOPIC5_1CODE         0x81
+#define TOPIC5_2             "Flood"
+#define TOPIC5_2KEY          "DL"
+#define TOPIC5_2CODE         0x82
+#define TOPIC5_3             "Earthquake"
+#define TOPIC5_3KEY          "DE"
+#define TOPIC5_3CODE         0x83
+#define TOPIC5_4             "Air crash"
+#define TOPIC5_4KEY          "DA"
+#define TOPIC5_4CODE         0x84
+#define TOPIC5_5             "Tornado"
+#define TOPIC5_5KEY          "DT"
+#define TOPIC5_5CODE         0x85
+#define TOPIC5_6             "Nuclear meltdown"
+#define TOPIC5_6KEY          "DM"
+#define TOPIC5_6CODE         0x86
 
 #include <application.h>

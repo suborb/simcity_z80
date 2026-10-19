@@ -51,6 +51,8 @@ extern uint8_t  V_view_tick;
 extern uint8_t  V_sim_loop_counter;
 extern uint8_t  V_TrafficAverage, V_PolluteAverage, V_concern_crime;
 extern uint8_t  V_transport_active;
+extern uint8_t  V_CCxy[2];                      /* the city's centre: x then y */
+extern uint8_t  V_disaster_option;              /* a disaster to start (1 fire .. 6 meltdown); the engine takes it and clears it */
 
 /* ---- settings ---- */
 extern uint8_t V_difficulty;        /* 0 easy, 1 medium, 2 hard */

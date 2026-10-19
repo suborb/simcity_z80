@@ -183,16 +183,16 @@ def main():
           f'year={year} month={mem[syms["_V_month"]]}')
 
     # --- 4. menu commands (what the Z88's OZ menus send) behave like the keys ------------------
-    CMD_TOOL, CMD_NEW_CITY, CMD_PAUSE = 0x81, 0x90, 0x91
+    CMD_NEW_CITY, CMD_PAUSE = 0x90, 0x91
     CMD_FAST, CMD_NORMAL, CMD_SLOW = 0x92, 0x93, 0x94
     CMD_COAL, CMD_NUCLEAR, CMD_DIS_ON, CMD_DIS_OFF, CMD_BULL_ON, CMD_BULL_OFF = 0x95, 0x96, 0x97, 0x98, 0x99, 0x9A
     CMD_QUIT, CMD_REDRAW = 0x9B, 0x9C
-    CMD_MAP, CMD_MAP_OFF = 0x9D, 0xA3
+    CMD_MAP, CMD_MAP_OFF = 0x87, 0xA3
     byte = lambda mem, name: mem[syms[name]]
 
-    mem = run(binary, syms, [LEVEL_MEDIUM, CMD_TOOL + 5, 0, 0])
+    mem = run(binary, syms, [LEVEL_MEDIUM, ord('5'), 0, 0])
     check('command: tool 5 chooses residential', any('RESIDENTIAL' in row for row in screen(mem, syms)))
-    mem = run(binary, syms, [LEVEL_MEDIUM, CMD_TOOL + 13, 0, 0])
+    mem = run(binary, syms, [LEVEL_MEDIUM] + [ord('.')] * 12 + [0, 0])
     check('command: tool 13 chooses the airport', any('AIRPORT' in row for row in screen(mem, syms)))
     for cmd, word in ((CMD_FAST, 'FAST'), (CMD_SLOW, 'SLOW'), (CMD_PAUSE, 'PAUSED'), (CMD_NORMAL, 'NORMAL')):
         mem = run(binary, syms, [LEVEL_MEDIUM, CMD_PAUSE if cmd == CMD_NORMAL else cmd, cmd if cmd == CMD_NORMAL else 0, 0, 0])
@@ -205,7 +205,7 @@ def main():
     mem = run(binary, syms, [LEVEL_MEDIUM, CMD_QUIT, ord('3')])
     check('command: quit leaves the game', byte(mem, '_test_done') == 1 and byte(mem, '_V_difficulty') == 1,
           f'difficulty {byte(mem, "_V_difficulty")}')
-    mem = run(binary, syms, [LEVEL_MEDIUM, CMD_NEW_CITY, ord('3'), CMD_TOOL + 2, 0, 0])
+    mem = run(binary, syms, [LEVEL_MEDIUM, CMD_NEW_CITY, ord('3'), ord('2'), 0, 0])
     check('command: new city goes back to the title and starts a harder city',
           byte(mem, '_V_difficulty') == 2 and byte(mem, '_test_done') == 1, f'difficulty {byte(mem, "_V_difficulty")}')
     check('command: the new city is drawn (tool shown, map present)',
@@ -242,11 +242,11 @@ def main():
     check('text window: the map is only the map (no text on it)',
           not any(w in r for r in mapp for w in ('FUNDS', 'POP', 'ROAD', 'MOVE', 'JAN', 'MORE')), '\n'.join(mapp))
     check('text window: the map fills all 8 rows of the console', all(r.strip() for r in mapp), '\n'.join(mapp))
-    mem = run(pbin, psyms, [LEVEL_MEDIUM, CMD_TOOL + 5, 0, 0])
+    mem = run(pbin, psyms, [LEVEL_MEDIUM, ord('5'), 0, 0])
     check('text window: choosing a tool moves the icon highlight to it', mem[psyms['_test_icons_selected']] == 5)
     mem = run(pbin, psyms, [LEVEL_MEDIUM, ord('9'), 0, 0])
     check('text window: so does a digit key', mem[psyms['_test_icons_selected']] == 9)
-    mem = run(pbin, psyms, [LEVEL_MEDIUM, CMD_TOOL + 5, 0, 0])
+    mem = run(pbin, psyms, [LEVEL_MEDIUM, ord('5'), 0, 0])
     check('text window: a menu command updates the text window', any('RESIDENTIAL' in r for r in panes(mem)[1]))
     mem = run(pbin, psyms, [LEVEL_MEDIUM, CMD_NEW_CITY, ord('3'), 0, 0])
     mapp, text = panes(mem)
@@ -283,6 +283,13 @@ def main():
             return 3 if t < 56 and mem[flags_at + t] & 0x0E else 4
 
         level16 = lambda v: min(16, v >> 2)
+        flags_of = lambda t: 0x99 if t & 0x80 else mem[flags_at + t]
+
+        def crime(tx, ty):
+            ccx, ccy = mem[psyms['_V_CCxy']], mem[psyms['_V_CCxy'] + 1]
+            d = min(31, abs(tx - ccx) + abs(ty - ccy))
+            e = 0 if d == 0 else 15 - ((32 - d) >> 1)
+            return max(0, e - mem[mm + 576 + (ty >> 2) * 24 + (tx >> 2)])
         out = []
         for py in range(64):
             y = top + py
@@ -296,6 +303,12 @@ def main():
                     powered = mem[mm + 5760 + (y // 2) * 12 + tx // 8] >> (7 - tx % 8) & 1
                     level = 4 if powered else min(1, tile_level(tile))
                     v = level > BAYER2[(y & 1) * 2 + (x & 1)]
+                elif view == 7:
+                    level = 4 if flags_of(tile) & 6 else min(1, tile_level(tile))
+                    v = level > BAYER2[(y & 1) * 2 + (x & 1)]
+                elif view == 8:
+                    tx, ty = x // 2, y // 2
+                    v = (crime(tx, ty) if flags_of(tile) & 0x10 else 0) > BAYER4[((((ty & 1) << 1) | (y & 1)) << 2) | ((tx & 1) << 1) | (x & 1)]
                 elif view in (2, 5):
                     base = mm + (1152 if view == 2 else 3456)
                     v = level16(mem[base + (y // 4) * 48 + x // 4]) > BAYER4[(y & 3) * 4 + (x & 3)]
@@ -312,14 +325,14 @@ def main():
         return [(x, y) for y in range(64) for x in range(192) if got[y][x] != want[y][x] and (x, y) not in cursor]
 
     KEY_M = ord('m')
-    for view, name in ((1, 'city'), (2, 'pollution'), (3, 'police'), (4, 'fire'), (5, 'traffic'), (6, 'power')):
+    for view, name in ((1, 'city'), (2, 'pollution'), (3, 'police'), (4, 'fire'), (5, 'traffic'), (6, 'power'), (7, 'transport'), (8, 'crime')):
         mem = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE] + [KEY_M] * view + [0] * 12)
         got = bitmaps(mem)
         d = differences(got, reference(mem, view, 64))
         check(f'mini map {view}: {name} is drawn as the engine data says', not d, f'{len(d)} pixels differ, first {d[:4]}')
         if view > 1:        # the harness fills the coverage maps with a pattern, so something must show
             lit = sum(map(sum, got))
-            check(f'mini map {view}: {name} has lit and dark pixels', 300 < lit < 192 * 64 - 300, f'{lit} of 12288 lit')
+            check(f'mini map {view}: {name} has lit and dark pixels', (20 if view == 8 else 300) < lit < 192 * 64 - 300, f'{lit} of 12288 lit')
         _, text = panes(mem)
         check(f'mini map {view}: the text window names it', any(minimap_name in r for r in text for minimap_name in [name.upper()]),
               '\n'.join(text))
@@ -343,7 +356,7 @@ def main():
     mem = run(pbin, psyms, [LEVEL_MEDIUM, ord('+')] + [0] * 250)
     text = panes(mem)[1]
     check('the advisor message is on row 6 (below the icons), where the Z88 shows it', text[6].strip() and not text[3].strip(), '\n'.join(text))
-    mem = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE] + [KEY_M] * 7 + [0, 0])
+    mem = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE] + [KEY_M] * 9 + [0, 0])
     check('mini map: m cycles through the views and back to the city', any('~' in r for r in panes(mem)[0]))
     mem = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE, CMD_MAP + 1, 0, 0])
     check('mini map: a menu command shows its view', any('POLLUTION' in r for r in panes(mem)[1]))
@@ -367,6 +380,18 @@ def main():
     check('sound: the menu turns it off', mem[psyms['_sound_enabled']] == 0)
     mem = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE, CMD_SOUND_OFF, CMD_SOUND_ON, 0, 0])
     check('sound: and on again', mem[psyms['_sound_enabled']] == 1)
+
+    # --- 6d. disasters started from the menu ---
+    CMD_DISASTER = 0x81
+    for n, (name, alert) in enumerate((('fire', 22), ('flood', 23), ('earthquake', 24), ('air crash', 0), ('tornado', 26), ('meltdown', 0))):
+        mem = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE, CMD_DISASTER + n] + [0] * 40)
+        # the engine takes the request a few frames on (sim_periodic); an air crash needs an airport and a meltdown a
+        # nuclear plant, as on the Spectrum, so in an empty city those two come to nothing
+        check(f'disaster menu: {name} is taken up by the engine' + (f' and raises alert {alert}' if alert else ' (nothing to crash or melt in an empty city)'),
+              mem[psyms['_V_disaster_option']] == 0 and mem[psyms['_V_alertmessage']] == alert,
+              f"option {mem[psyms['_V_disaster_option']]}, alert {mem[psyms['_V_alertmessage']]}")
+    mem = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE, CMD_DISASTER + 1, 0])
+    check('disaster menu: the request is held in V_disaster_option until the engine takes it', mem[psyms['_V_disaster_option']] in (0, 2))
 
     # --- 7. the budget screen (the 32x8 platform has it too) ---
     CMD_BUDGET = 0xA4

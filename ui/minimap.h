@@ -14,7 +14,9 @@
 #define MM_FIRE      4
 #define MM_TRAFFIC   5
 #define MM_POWER     6      /* the city, with what has power solid */
-#define MM_VIEWS     6      /* views 1..MM_VIEWS */
+#define MM_TRANSPORT 7      /* roads and rails */
+#define MM_CRIME     8      /* crime on the built-up tiles: far from the city's centre, less covered by police */
+#define MM_VIEWS     8      /* views 1..MM_VIEWS */
 
 #define MM_CELLS_W   24     /* the picture is 24x8 cells: 192x64 pixels */
 #define MM_CELLS_H   8

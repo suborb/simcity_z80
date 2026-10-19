@@ -740,8 +740,10 @@ static void handle_key(uint8_t k)
             set_map_view((uint8_t)(k - CMD_MAP + 1));
         else if (k >= '0' && k <= '9')
             set_tool((uint8_t)(k - '0'));
-        else if (k >= CMD_TOOL && k < CMD_TOOL + NUM_TOOLS)
-            set_tool((uint8_t)(k - CMD_TOOL));
+#ifdef HAVE_MENUS
+        else if (k >= CMD_DISASTER && k < CMD_DISASTER + 6)
+            V_disaster_option = (uint8_t)(k - CMD_DISASTER + 1);       /* the engine starts it a few frames on */
+#endif
         break;
     }
 }

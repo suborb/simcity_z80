@@ -43,13 +43,13 @@ check('the descriptor defines menus and items', len(topics) >= 3 and len(items) 
 check('every item has a command code', all(c is not None for _, c in items.values()))
 codes = [c for _, c in items.values()]
 check('no two items send the same command', len(codes) == len(set(codes)))
-tool0 = cmds['CMD_TOOL']
 map0 = cmds['CMD_MAP']
-singles = {n: v for n, v in cmds.items() if n not in ('CMD_TOOL', 'CMD_MAP', 'CMD_REDRAW')}
+dis0 = cmds['CMD_DISASTER']
+singles = {n: v for n, v in cmds.items() if n not in ('CMD_MAP', 'CMD_DISASTER', 'CMD_REDRAW')}
 sent = set(codes)
 check('every game command has a menu item', all(v in sent for v in singles.values()),
       str([n for n, v in singles.items() if v not in sent]))
-known = set(singles.values()) | {tool0 + n for n in range(14)} | {map0 + n for n in range(6)}
+known = set(singles.values()) | {map0 + n for n in range(8)} | {dis0 + n for n in range(6)}
 check('every menu item sends a command the game knows', sent <= known, str(sorted(hex(c) for c in sent - known)))
 check('command codes are in the range OZ gives menu commands (0x81..0xB0)', all(0x81 <= c <= 0xB0 for c in sent | set(cmds.values())))
 seqs = list(shortcuts.values())
@@ -64,7 +64,8 @@ check('no shortcut starts with M, I or J (the ENTER, TAB and LF keys are <>M, <>
       not [k for k in seqs if k and k[0] in 'MIJ'], str([k for k in seqs if k and k[0] in 'MIJ']))
 check('at most 7 menus of 24 items', len(topics) <= 7 and all(sum(1 for (t, _) in items if t == k) <= 24 for k in topics))
 
-check('there is no Tools menu (the icons and TAB choose a tool)', 'Tools' not in topics.values() and not any(tool0 <= c < tool0 + 14 for c in sent))
+check('there is no Tools menu (the icons and TAB choose a tool)', 'Tools' not in topics.values())
+check('every disaster and every mini map has a menu item', all(dis0 + n in sent for n in range(6)) and all(map0 + n in sent for n in range(8)))
 
 # The main help (the HELP key in OZ) says what this is, whose it is and where the source is.
 help_text = ' '.join(re.findall(r'#define\s+HELP[1-6]\s+"([^"]*)"', dor))

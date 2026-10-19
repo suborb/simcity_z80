@@ -1,5 +1,9 @@
-/* The mini maps.  See minimap.h.  Map tile (x, y) is the 2x2 pixels (2x, 2y); each picture row is
-   8 pixels, worked out from the engine's data a row at a time. */
+/* The mini maps.  See minimap.h.  Map tile (x, y) is the 2x2 pixels (2x, 2y).  Every view gives the level of a
+   tile (a small function each) and one routine turns levels into the 8 pixels of a picture row with an ordered
+   dither: a pixel is lit if the level is above its threshold in a matrix.  The matrix depends on the view:
+     speck     the city, power and transport: levels 0..4, a 2x2 matrix over each tile's own pixels;
+     density   pollution, traffic and crime: levels 0..16, a 4x4 matrix over 2x2 tiles (the maps are 48x48);
+     coverage  police and fire: levels 0..15, a 4x4 matrix over 4x4 tiles, a tile all lit or all dark (24x24). */
 #include <stdint.h>
 #include "engine.h"
 #include "platform.h"
@@ -14,10 +18,9 @@
 extern const uint8_t D_tile_flags[];
 
 const char *const minimap_names[MM_VIEWS + 1] = {
-    "", "CITY", "POLLUTION", "POLICE COVERAGE", "FIRE COVERAGE", "TRAFFIC", "POWER"
+    "", "CITY", "POLLUTION", "POLICE COVERAGE", "FIRE COVERAGE", "TRAFFIC", "POWER", "TRANSPORT", "CRIME"
 };
 
-/* Ordered dither: a pixel is lit if the level is above its threshold in the matrix. */
 static const uint8_t bayer2[4] = { 0, 2, 3, 1 };
 static const uint8_t bayer4[16] = { 0, 8, 2, 10,  12, 4, 14, 6,  3, 11, 1, 9,  15, 7, 13, 5 };
 
@@ -39,71 +42,124 @@ static uint8_t tile_level(uint8_t t)
     return (t < 56 && (D_tile_flags[t] & 0x0E)) ? 3 : 4;
 }
 
-/* Pixels 2k and 2k+1 of a row for a tile of this level: bayer2 row (y & 1). */
-#define PAIR(bits, m, l, b)  do { if ((l) > (b)[0]) (bits) |= (m); (m) >>= 1; \
-                                  if ((l) > (b)[1]) (bits) |= (m); (m) >>= 1; } while (0)
-
-/* The city: 4 tiles of the level map, 2 pixels each. */
-static uint8_t row_city(const uint8_t *p, uint8_t y)
+/* The tile's flags, as the engine's tile_to_flags: bit 1 rail, bit 2 road, bit 4 built up (a zone and what grows
+   round it); a large zone's pieces (bit 7) count as $99. */
+static uint8_t tile_flags(uint8_t t)
 {
-    uint8_t bits = 0, m = 0x80, i, l;
-    const uint8_t *b = bayer2 + ((y & 1) << 1);
-
-    for (i = 0; i < 4; ++i, ++p) {
-        l = tile_level(*p);
-        PAIR(bits, m, l, b);
-    }
-    return bits;
+    return (t & 0x80) ? 0x99 : D_tile_flags[t];
 }
 
-/* Power: what has it solid, the rest as the city but no more than a speck.  p is the city row and
-   `power` the power map's bits for these 4 tiles, in the top 4 bits. */
-static uint8_t row_power(const uint8_t *p, uint8_t power, uint8_t y)
+static uint8_t at(uint8_t tx, uint8_t ty)
 {
-    uint8_t bits = 0, m = 0x80, i, l;
-    const uint8_t *b = bayer2 + ((y & 1) << 1);
-
-    for (i = 0; i < 4; ++i, ++p, power <<= 1) {
-        l = (power & 0x80) ? 4 : tile_level(*p);
-        if (!(power & 0x80) && l > 1)
-            l = 1;
-        PAIR(bits, m, l, b);
-    }
-    return bits;
+    return levelmap[ty * (uint16_t)MAP_W + tx];
 }
 
-/* A density 0..255 as 0..16: 4x4 pixels of a 48x48 map's cell. */
-static uint8_t level16(uint8_t v)
+/* The background of the maps that show only some tiles: a speck for water, trees and buildings. */
+static uint8_t outline(uint8_t t)
 {
-    v >>= 2;
+    return tile_level(t) ? 1 : 0;
+}
+
+/* ---- the views: the level of tile (tx, ty) ---- */
+static uint8_t lv_city(uint8_t tx, uint8_t ty)
+{
+    return tile_level(at(tx, ty));
+}
+
+static uint8_t lv_power(uint8_t tx, uint8_t ty)         /* the power map has a bit a tile, 12 bytes a row */
+{
+    return (minimaps[MM_POWER_OFFSET + ty * 12u + (tx >> 3)] & (0x80 >> (tx & 7))) ? 4 : outline(at(tx, ty));
+}
+
+static uint8_t lv_transport(uint8_t tx, uint8_t ty)
+{
+    uint8_t t = at(tx, ty);
+    return (tile_flags(t) & 6) ? 4 : outline(t);
+}
+
+static uint8_t lv_density(uint16_t offset, uint8_t tx, uint8_t ty)      /* a 48x48 map of 0..255 */
+{
+    uint8_t v = minimaps[offset + (ty >> 1) * 48u + (tx >> 1)] >> 2;
     return v > 16 ? 16 : v;
 }
 
-/* 8 pixels from 2 cells of a 48 wide map, 4 pixels each. */
-static uint8_t row_density(const uint8_t *p, uint8_t y)
+static uint8_t lv_pollution(uint8_t tx, uint8_t ty)
 {
-    uint8_t bits = 0, m = 0x80, i, l, c;
-    const uint8_t *b = bayer4 + ((y & 3) << 2);
-
-    for (c = 0; c < 2; ++c, ++p) {
-        l = level16(*p);
-        for (i = 0; i < 4; ++i, m >>= 1)
-            if (l > b[i])
-                bits |= m;
-    }
-    return bits;
+    return lv_density(MM_POLLUTION_OFFSET, tx, ty);
 }
 
-/* 8 pixels from 1 cell of a 24 wide map (0..15), 8 pixels each: each matrix entry is 2x2 pixels. */
-static uint8_t row_coverage(uint8_t v, uint8_t y)
+static uint8_t lv_traffic(uint8_t tx, uint8_t ty)
 {
-    uint8_t bits = 0, m = 0x80, i;
-    const uint8_t *b = bayer4 + (((y & 7) >> 1) << 2);
+    return lv_density(MM_TRAFFIC_OFFSET, tx, ty);
+}
 
-    for (i = 0; i < 4; ++i, ++b) {
-        if (v > *b)
-            bits |= m | (m >> 1);
-        m >>= 2;
+static uint8_t lv_police(uint8_t tx, uint8_t ty)        /* a 24x24 map of 0..15 */
+{
+    return minimaps[MM_POLICE_OFFSET + (ty >> 2) * 24u + (tx >> 2)];
+}
+
+static uint8_t lv_fire(uint8_t tx, uint8_t ty)
+{
+    return minimaps[MM_FIRE_OFFSET + (ty >> 2) * 24u + (tx >> 2)];
+}
+
+/* Crime on the built-up tiles, 0..15, as the Spectrum works it out: it grows with the distance from the city's
+   centre (V_CCxy) and falls with the police cover there. */
+static uint8_t lv_crime(uint8_t tx, uint8_t ty)
+{
+    uint8_t d, e, p;
+
+    if (!(tile_flags(at(tx, ty)) & 0x10))
+        return 0;
+    d = (uint8_t)((tx > V_CCxy[0] ? tx - V_CCxy[0] : V_CCxy[0] - tx) + (ty > V_CCxy[1] ? ty - V_CCxy[1] : V_CCxy[1] - ty));
+    if (d > 31)
+        d = 31;
+    e = d ? (uint8_t)(15 - ((32 - d) >> 1)) : 0;
+    p = lv_police(tx, ty);
+    return e > p ? (uint8_t)(e - p) : 0;
+}
+
+#define SPECK    0
+#define DENSITY  1
+#define COVERAGE 2
+struct view {
+    uint8_t (*level)(uint8_t tx, uint8_t ty);
+    uint8_t kind;
+};
+
+static const struct view views[MM_VIEWS + 1] = {
+    { 0, 0 },
+    { lv_city, SPECK },
+    { lv_pollution, DENSITY },
+    { lv_police, COVERAGE },
+    { lv_fire, COVERAGE },
+    { lv_traffic, DENSITY },
+    { lv_power, SPECK },
+    { lv_transport, SPECK },
+    { lv_crime, DENSITY },
+};
+
+/* 8 pixels of pixel row y: 4 tiles from column tx0 of tile row ty = y >> 1, two pixels each. */
+static uint8_t row(const struct view *v, uint8_t tx0, uint8_t y)
+{
+    uint8_t bits = 0, m = 0x80, i, l, tx, ty = y >> 1;
+    const uint8_t *b;
+
+    for (i = 0; i < 4; ++i) {
+        tx = (uint8_t)(tx0 + i);
+        l = v->level(tx, ty);
+        if (v->kind == SPECK)
+            b = bayer2 + ((y & 1) << 1);
+        else if (v->kind == DENSITY)
+            b = bayer4 + ((y & 3) << 2) + ((tx & 1) << 1);
+        else
+            b = bayer4 + ((ty & 3) << 2) + (tx & 3);
+        if (l > b[0])
+            bits |= m;
+        m >>= 1;
+        if (l > b[v->kind == COVERAGE ? 0 : 1])
+            bits |= m;
+        m >>= 1;
     }
     return bits;
 }
@@ -111,35 +167,10 @@ static uint8_t row_coverage(uint8_t v, uint8_t y)
 void minimap_cell(uint8_t v, uint8_t cx, uint8_t cy, uint8_t top, uint8_t cur_x, uint8_t cur_y,
                   uint8_t mark, uint8_t *art)
 {
-    uint8_t r, y, ty, shift;
-    const uint8_t *city;
+    uint8_t r;
 
-    for (r = 0; r < 8; ++r) {
-        y = (uint8_t)(top + cy * 8 + r);                    /* pixel row, 0..191 */
-        ty = y >> 1;                                        /* map row */
-        city = levelmap + ty * (uint16_t)MAP_W + cx * 4u;
-        switch (v) {
-        case MM_POLLUTION:
-            art[r] = row_density(minimaps + MM_POLLUTION_OFFSET + (y >> 2) * 48u + cx * 2u, y);
-            break;
-        case MM_TRAFFIC:
-            art[r] = row_density(minimaps + MM_TRAFFIC_OFFSET + (y >> 2) * 48u + cx * 2u, y);
-            break;
-        case MM_POLICE:
-            art[r] = row_coverage(minimaps[MM_POLICE_OFFSET + (y >> 3) * 24u + cx], y);
-            break;
-        case MM_FIRE:
-            art[r] = row_coverage(minimaps[MM_FIRE_OFFSET + (y >> 3) * 24u + cx], y);
-            break;
-        case MM_POWER:
-            shift = (uint8_t)((cx & 1) ? 0 : 4);            /* 8 tiles a byte, 4 for this cell */
-            art[r] = row_power(city, (uint8_t)((minimaps[MM_POWER_OFFSET + ty * 12u + (cx >> 1)] >> shift) << 4), y);
-            break;
-        default:                                            /* MM_CITY */
-            art[r] = row_city(city, y);
-            break;
-        }
-    }
+    for (r = 0; r < 8; ++r)
+        art[r] = row(views + v, (uint8_t)(cx * 4), (uint8_t)(top + cy * 8 + r));
     if (mark && (cur_x >> 2) == cx && cur_y * 2u >= top && ((cur_y * 2u - top) >> 3) == cy) {
         r = (uint8_t)((cur_y * 2u - top) & 7);                  /* the tile's 2x2 pixels, inverted */
         art[r] ^= (uint8_t)(0xC0 >> ((cur_x & 3) * 2));

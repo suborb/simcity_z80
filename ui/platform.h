@@ -23,7 +23,7 @@
 /* Commands.  A platform with menus (the Z88's OZ menus) returns these from plat_key() just as it
    returns keys; the game treats them like the keys that do the same thing.  The codes are the
    range OZ gives menu commands (0x81..0xB0), which the Z88's application descriptor uses. */
-#define CMD_TOOL            0x81    /* + tool number 0..13 (0x81..0x8E): choose that tool */
+#define CMD_DISASTER        0x81    /* + 0..5 (0x81..0x86): start a fire, flood, earthquake, air crash, tornado or meltdown */
 #define CMD_NEW_CITY        0x90    /* back to the title screen, then a new city */
 #define CMD_PAUSE           0x91    /* pause or resume */
 #define CMD_SPEED_FAST      0x92
@@ -37,7 +37,7 @@
 #define CMD_AUTOBULLDOZE_OFF 0x9A
 #define CMD_QUIT            0x9B
 #define CMD_REDRAW          0x9C    /* the screen was overwritten (OZ asks for a redraw) */
-#define CMD_MAP             0x9D    /* + view 0..5 (0x9D..0xA2): show that mini map (see ui/minimap.h) */
+#define CMD_MAP             0x87    /* + view 0..7 (0x87..0x8E): show that mini map (see ui/minimap.h) */
 #define CMD_MAP_OFF         0xA3    /* back to the city */
 #define CMD_BUDGET          0xA4    /* the budget screen */
 #define CMD_EVALUATION      0xA5    /* the evaluation screen: how the mayor is doing */

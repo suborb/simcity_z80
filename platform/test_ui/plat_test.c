@@ -182,6 +182,7 @@ extern uint8_t V_display_population[3], V_population[3], V_prev_year_population[
 extern uint8_t V_TrafficAverage, V_PolluteAverage, V_concern_crime, V_concern_house_price;
 extern uint16_t V_LVAverage, V_unemployment;
 uint8_t test_poke_city = 1;
+extern uint8_t levelmap[9216];
 #ifdef TEST_SPRITES
 extern uint8_t V_transport_active, V_transport_pos[2], V_transport_sprite;
 extern uint8_t V_aircrash_active, V_CrashXY[2];
@@ -205,6 +206,11 @@ void plat_flush(void)
             V_previous_city_score[0] = 0xA0; V_previous_city_score[1] = 0x0F;       /* assessed value 4000 thousand */
             V_TrafficAverage = 20; V_PolluteAverage = 20; V_concern_crime = 40;
             V_LVAverage = 2; V_concern_house_price = 4; V_unemployment = 0;
+            for (i = 40; i < 60; ++i) {                 /* a road, houses and a large zone's pieces, for the maps of them */
+                levelmap[42 * 96 + i] = 7;
+                levelmap[44 * 96 + i] = 60;
+                levelmap[46 * 96 + i] = 0x81;
+            }
         }
     }
 }
