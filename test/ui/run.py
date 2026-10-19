@@ -357,6 +357,16 @@ def main():
         d = differences(bitmaps(mem), reference(mem, view, 0), 0, 8)
         check(f'mini map {view}: with the cursor in the top half the top of the city is shown', not d, f'{len(d)} pixels differ, first {d[:4]}')
 
+    # up and down turn the pages (the cursor stays where it is: its 2x2 is only shown on the page it is on)
+    # the pages start where the cursor is (64) and step 48 pixels, so 16 stay in view
+    for keys, top, what in (([KEY_UP], 16, 'up steps 48 pixels back, keeping 16 of the last page in view'), ([KEY_DOWN], 112, 'down steps 48 pixels on'),
+                            ([KEY_DOWN, KEY_DOWN], 128, 'down stops at the end of the city'), ([KEY_DOWN, KEY_DOWN, KEY_DOWN], 128, 'down stays there'),
+                            ([KEY_UP, KEY_UP, KEY_UP, KEY_UP], 0, 'up stops at the top of the city'),
+                            ([KEY_FAR_DOWN], 112, 'shifted down turns a page too')):
+        mem = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE, KEY_M] + keys + [0] * 12)
+        d = differences(bitmaps(mem), reference(mem, 1, top), top, 48)
+        check(f'mini map: {what}', not d, f'{len(d)} pixels differ, first {d[:4]}')
+
     mem = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE, KEY_M, 27, 0, 0])
     mapp, text = panes(mem)
     check('mini map: escape goes back to the city instead of quitting', mem[psyms['_test_done']] == 1 and any('~' in r for r in mapp)
@@ -442,6 +452,12 @@ def main():
           text[2].index('REQSTD') + 5 == text[3].index('0 ') and all(len(r.rstrip()) <= 40 for r in text), '\n'.join(text))
     check('budget: it starts with the tax rate of 7%', any('TAX RATE  7%' in r for r in text), '\n'.join(text))
     check('budget: every line fits the 8 rows and 40 columns', all(len(r.rstrip()) <= 40 for r in text))
+    map_clears = lambda m: m[psyms['_test_clears']] | m[psyms['_test_clears'] + 1] << 8
+    base = map_clears(run(pbin, psyms, [LEVEL_MEDIUM, PAUSE, 0, 0]))
+    check('budget: leaving the screen redraws the text window but not the map (the map console is not cleared again)',
+          map_clears(run(pbin, psyms, [LEVEL_MEDIUM, PAUSE, CMD_BUDGET, 13, 0, 0])) == base, f'{map_clears(run(pbin, psyms, [LEVEL_MEDIUM, PAUSE, CMD_BUDGET, 13, 0, 0]))} vs {base}')
+    mem = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE, CMD_BUDGET, 13, 0, 0])
+    check('budget: ...and the status panel is back in the text window', any('FUNDS' in r for r in panes(mem)[1]), '\n'.join(panes(mem)[1]))
     mem = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE, CMD_BUDGET, KEY_RIGHT, KEY_RIGHT, 0, 0])
     check('budget: p raises the tax rate and the screen shows it',
           byte_p(mem, '_SMC_tax_rate') == 9 and any('TAX RATE  9%' in r for r in panes(mem)[1]))

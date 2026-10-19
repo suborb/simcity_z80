@@ -37,12 +37,14 @@ void plat_exit(void) { test_done = 1; }
 uint8_t plat_cols(void) { return COLS; }
 uint8_t plat_rows(void) { return ROWS; }
 
+uint16_t test_clears;                   /* how often the map console was cleared */
 uint8_t test_cleared;                   /* plat_clear was called: in the panel build the game has made its city by then */
 
 void plat_clear(void)
 {
     uint8_t r, c;
     test_cleared = 1;
+    ++test_clears;
     for (r = 0; r < ROWS; ++r)
         for (c = 0; c < COLS; ++c)
             test_screen[r][c] = ' ';

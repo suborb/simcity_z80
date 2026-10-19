@@ -60,7 +60,13 @@ static uint8_t tool;
 static uint8_t frame;
 static uint8_t quit;
 static uint8_t restart;                 /* quit this city and start another */
-static uint8_t redraw;                  /* the screen was overwritten: draw everything again */
+static uint8_t redraw;                  /* the screen was overwritten: draw everything again (REDRAW_ALL), or just the text */
+#define REDRAW_ALL 1
+#ifdef HAVE_TEXT_WINDOW
+#define REDRAW_TEXT 2                   /* the screens use the text window only: the map is as it was */
+#else
+#define REDRAW_TEXT REDRAW_ALL          /* they share the screen with the map */
+#endif
 static uint8_t power_nuclear;           /* what the power plant tool builds */
 static uint8_t tick_reset;              /* a city was loaded: abandon the tick in progress */
 static uint8_t map_view;                /* 0: the city; else the mini map shown (MM_CITY..) */
@@ -326,10 +332,10 @@ static void invalidate_view(void)
 
 #ifdef HAVE_MINIMAP
 /* ---- the mini maps ---------------------------------------------------------------
-   The map window shows the city two pixels a tile, 192x64 of its 192x192 (see ui/minimap.h): the
-   third of it with the cursor.  A cell row is redrawn every few frames to follow the simulation
-   (a row of 24 cells is a lot of work), and the cursor's cell every frame (it blinks, as in the
-   city view). */
+   The map window shows the city two pixels a tile, 192x64 of its 192x192 (see ui/minimap.h): a third
+   of it, which starts as the third with the cursor; up and down flip to the next.  A cell row is redrawn
+   every few frames to follow the simulation (a row of 24 cells is a lot of work), and the cursor's cell
+   every frame (it blinks, as in the city view). */
 #define MM_COL 4                            /* 24 cells wide, in the middle of 32 */
 #define MM_ROW 0
 
@@ -339,6 +345,8 @@ static void draw_minimap_cell(uint8_t cx, uint8_t cy)
 {
     uint8_t art[8];
 
+    if (cy >= MM_CELLS_H)
+        return;
     minimap_cell(map_view, cx, cy, mm_top, cur_x, cur_y, (frame & 4) != 0, art);
     plat_put_bitmap((uint8_t)(MM_COL + cx), (uint8_t)(map_row + MM_ROW + cy), art);
 }
@@ -346,12 +354,8 @@ static void draw_minimap_cell(uint8_t cx, uint8_t cy)
 static void draw_minimap(uint8_t full)
 {
     static uint8_t refresh_row, last_cx_, last_cy_;
-    uint8_t cx, cy, top = minimap_top(cur_y);
+    uint8_t cx, cy;
 
-    if (top != mm_top) {                    /* the cursor crossed to the other half of the city */
-        mm_top = top;
-        full = 1;
-    }
     if (full) {
         for (cy = 0; cy < MM_CELLS_H; ++cy)
             for (cx = 0; cx < MM_CELLS_W; ++cx)
@@ -366,8 +370,20 @@ static void draw_minimap(uint8_t full)
         draw_minimap_cell(last_cx_, last_cy_);
     }
     last_cx_ = (uint8_t)(cur_x >> 2);
-    last_cy_ = (uint8_t)((cur_y * 2u - mm_top) >> 3);
+    last_cy_ = (uint8_t)((uint8_t)(cur_y * 2 - mm_top) >> 3);       /* (8 or more: off the page, nothing is drawn) */
     draw_minimap_cell(last_cx_, last_cy_);
+}
+
+/* Up and down flip the page of the city the picture shows (the cursor stays where it is).  A page is 64 pixels high
+   and the step 48, so that 16 pixels of what was shown stay on the screen: you can see where you were. */
+static void flip_page(int8_t dy)
+{
+    uint8_t top = (uint8_t)(mm_top + (dy < 0 ? -48 : 48));
+
+    if (top > 128)                          /* (it wrapped below 0, or ran past the end) */
+        top = dy < 0 ? 0 : 128;
+    mm_top = top;
+    map_full = 1;
 }
 
 /* Show mini map v (1..MM_VIEWS), or 0 for the city again. */
@@ -381,7 +397,7 @@ static void set_map_view(uint8_t v)
     plat_clear();                           /* the map window starts again either way */
     if (v) {
         map_full = 1;
-        mm_top = minimap_top(cur_y);
+        mm_top = (uint8_t)((cur_y >> 5) << 6);   /* the third of the city the cursor is in */
     } else {
         invalidate_view();
         last_cx = 255;                      /* a full pass over the city */
@@ -584,6 +600,13 @@ static void clamp_view(void)
 
 static void move_cursor(int8_t dx, int8_t dy)
 {
+#ifdef HAVE_MINIMAP
+    if (map_view) {                         /* on a mini map up and down turn its pages */
+        if (dy)
+            flip_page(dy);
+        dy = 0;
+    }
+#endif
     int16_t nx = (int16_t)cur_x + dx;
     int16_t ny = (int16_t)cur_y + dy;
     if (nx < 0 || nx >= MAP_W || ny < 0 || ny >= MAP_H)
@@ -621,7 +644,7 @@ void game_budget(void)
     if (budget_screen())
         quit = 1;
     else
-        redraw = 1;                         /* it used the text area */
+        redraw |= REDRAW_TEXT;              /* it used the text area */
 }
 
 #else
@@ -635,7 +658,7 @@ static void game_evaluation(void)
     if (evaluation_screen())
         quit = 1;
     else
-        redraw = 1;
+        redraw |= REDRAW_TEXT;
 }
 #else
 #define game_evaluation()
@@ -648,7 +671,7 @@ static void game_save(void)
     if (city_save() == CITY_QUIT)
         quit = 1;
     else
-        redraw = 1;
+        redraw |= REDRAW_TEXT;
 }
 
 static void game_load(void)
@@ -661,7 +684,7 @@ static void game_load(void)
     } else if (r == CITY_BROKEN) {
         restart = quit = 1;                 /* the map was half read: a new city */
     } else {
-        redraw = 1;
+        redraw = REDRAW_ALL;
         tick_reset = r == CITY_LOADED;
     }
 }
@@ -739,7 +762,7 @@ static void handle_key(uint8_t k)
 #endif
     case CMD_AUTOBUDGET_ON:    V_auto_budget = 1; break;
     case CMD_AUTOBUDGET_OFF:   V_auto_budget = 0; break;
-    case CMD_REDRAW:           redraw = 1; break;
+    case CMD_REDRAW:           redraw = REDRAW_ALL; break;
     default:
         if (k >= CMD_MAP && k < CMD_MAP + MM_VIEWS)
             set_map_view((uint8_t)(k - CMD_MAP + 1));
@@ -778,7 +801,7 @@ static void choose_layout(void)
 
 static void title_screen(void)
 {
-    uint16_t seed = 0;
+    uint16_t seed = 0, first;
     uint8_t k;
 
     plat_text_clear();
@@ -792,22 +815,24 @@ static void title_screen(void)
             plat_idle();
     } while (k != '1' && k != '2' && k != '3');
     V_difficulty = (uint8_t)(k - '1');
-    V_InitialSeed = (uint16_t)(seed ^ plat_clock()) | 1;
+    first = plat_clock();                           /* how long the level took to choose... */
 #ifdef HAVE_APPNAME
     {                                               /* the Spectrum asks for the city's name here */
         char name[CITY_NAME_LEN + 2];
+        uint8_t k2;
 
         k = prompt_ask("NAME YOUR CITY", "CITY NAME:", name, CITY_NAME_LEN, 1);
         if (k == 2) {
             quit = 1;
             return;
         }
-        for (seed = 0; seed < CITY_NAME_LEN + 1; ++seed)
-            city_name[seed] = k == 1 ? name[seed] : "HERESVILLE"[seed];
+        for (k2 = 0; k2 < CITY_NAME_LEN + 1; ++k2)
+            city_name[k2] = k == 1 ? name[k2] : "HERESVILLE"[k2];
         city_name[CITY_NAME_LEN] = 0;
         plat_set_name(city_name);
     }
 #endif
+    V_InitialSeed = (uint16_t)(seed ^ first ^ (plat_clock() - first)) | 1;     /* ...and the name took to type */
     plat_text_clear();
     plat_text_puts(0, 0, "GENERATING LANDSCAPE...");
     plat_flush();
@@ -894,14 +919,16 @@ static void play_city(void)
         sim_periodic();
 
         /* a full pass over the map only when the view has moved */
-        if (redraw) {                       /* OZ drew over us: start the screen again */
+        if (redraw) {                       /* OZ drew over us, or a screen did: start the screen again */
+            if (redraw & REDRAW_ALL) {
+                plat_clear();
+                invalidate_view();
+                last_cx = 255;
+                map_full = 1;
+            }
             redraw = 0;
-            plat_clear();
             plat_text_clear();
-            invalidate_view();
             memset(&last_st, 0xFF, sizeof(last_st));
-            last_cx = 255;
-            map_full = 1;
         }
         full = origin_x != last_ox || origin_y != last_oy || last_cx == 255;
         last_ox = origin_x;

@@ -31,6 +31,9 @@
    call (GN_Sop), through plat_text_puts().
    ------------------------------------------------------------------------ */
 #include <stdint.h>
+#if defined(TARGET_Z88) || defined(TARGET_ZX)
+#include <time.h>
+#endif
 #include <conio.h>
 #include <input.h>
 #include <stdio.h>
@@ -506,7 +509,11 @@ uint8_t plat_key(void)
 
 uint16_t plat_clock(void)
 {
-    return clock_count;
+#if defined(TARGET_Z88) || defined(TARGET_ZX)
+    return (uint16_t)clock() ^ clock_count;     /* the library's clock, real time on the Z88 (the frames stand still while OZ's line editor waits) */
+#else
+    return clock_count;                         /* no clock() in the Aquarius+ or CP/M libraries */
+#endif
 }
 
 void plat_idle(void)

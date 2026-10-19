@@ -24,11 +24,6 @@ const char *const minimap_names[MM_VIEWS + 1] = {
 static const uint8_t bayer2[4] = { 0, 2, 3, 1 };
 static const uint8_t bayer4[16] = { 0, 8, 2, 10,  12, 4, 14, 6,  3, 11, 1, 9,  15, 7, 13, 5 };
 
-uint8_t minimap_top(uint8_t cur_y)
-{
-    return (uint8_t)((cur_y / 32) * 64);
-}
-
 /* How much of a tile's 2x2 pixels are lit, 0..4: dirt 0, water 1, trees 2, roads, rails and wires
    3, anything built 4. */
 static uint8_t tile_level(uint8_t t)
@@ -167,12 +162,12 @@ static uint8_t row(const struct view *v, uint8_t tx0, uint8_t y)
 void minimap_cell(uint8_t v, uint8_t cx, uint8_t cy, uint8_t top, uint8_t cur_x, uint8_t cur_y,
                   uint8_t mark, uint8_t *art)
 {
-    uint8_t r;
+    uint8_t r, py = (uint8_t)(cur_y * 2 - top);     /* the cursor's pixel row in the picture (128 or more if above it) */
 
     for (r = 0; r < 8; ++r)
         art[r] = row(views + v, (uint8_t)(cx * 4), (uint8_t)(top + cy * 8 + r));
-    if (mark && (cur_x >> 2) == cx && cur_y * 2u >= top && ((cur_y * 2u - top) >> 3) == cy) {
-        r = (uint8_t)((cur_y * 2u - top) & 7);                  /* the tile's 2x2 pixels, inverted */
+    if (mark && (cur_x >> 2) == cx && py < 64 && (py >> 3) == cy) {
+        r = (uint8_t)(py & 7);                      /* the tile's 2x2 pixels, inverted */
         art[r] ^= (uint8_t)(0xC0 >> ((cur_x & 3) * 2));
         art[r + 1] ^= (uint8_t)(0xC0 >> ((cur_x & 3) * 2));
     }
