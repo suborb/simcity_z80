@@ -29,7 +29,7 @@ def build():
     cmd = os.environ.get('ZCC', 'zcc -compiler=80cc -fframe-pointer').split() + ['+zx', f'-zorg={ZORG}', '-pragma-include:platform/console/zpragma_zx.inc', '-Ca-DPORTABLE',
            '-Ca-Iengine', '-Ca-I.', '-Iui', '-Cc-standard-escape-chars', '-m',
            '-Iplatform/console', '-DTARGET_ZX', '-Ca-DTARGET_ZX', '-DHAVE_SPRITES'] + (['-DZX_PRINT'] if PRINT else []) + [ '-DMAX_VIEW_W=32', '-DMAX_VIEW_H=16',
-           'test/tiles/main.c', 'ui/sprites.c', 'engine/engine_c.asm', 'platform/common/hooks.asm',
+           'test/tiles/main.c', 'ui/sprites.c', 'engine/engine_c.asm', 'platform/common/hooks.asm', 'platform/common/nosound.asm',
            'platform/console/plat_console.c', 'platform/console/plat_font.asm'] + \
           ([] if PRINT else ['platform/console/plat_zx_blit.asm']) + [
            '-o', os.path.join(OUT, 'tiles')]

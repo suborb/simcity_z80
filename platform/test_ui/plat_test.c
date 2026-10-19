@@ -98,6 +98,10 @@ void plat_text_clear(void) { plat_clear(); }
 void plat_text_puts(uint8_t col, uint8_t row, const char *s) { plat_puts(col, row, s); }
 #endif
 
+#ifdef HAVE_SOUND
+uint8_t sound_enabled = 1;               /* the game's Sound option */
+#endif
+
 #ifdef HAVE_ICONS
 uint8_t test_icons_selected = 255;      /* the tool plat_icons() was last asked to highlight */
 uint16_t test_icons_calls;

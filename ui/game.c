@@ -726,6 +726,10 @@ static void handle_key(uint8_t k)
     case CMD_DISASTERS_OFF:    V_disaster_reset = 1; break;
     case CMD_AUTOBULLDOZE_ON:  V_auto_bulldoze = 1; break;
     case CMD_AUTOBULLDOZE_OFF: V_auto_bulldoze = 0; break;
+#ifdef HAVE_SOUND
+    case CMD_SOUND_ON:         sound_enabled = 1; break;
+    case CMD_SOUND_OFF:        sound_enabled = 0; break;
+#endif
     case CMD_AUTOBUDGET_ON:    V_auto_budget = 1; break;
     case CMD_AUTOBUDGET_OFF:   V_auto_budget = 0; break;
     case CMD_REDRAW:           redraw = 1; break;

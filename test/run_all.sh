@@ -21,6 +21,9 @@ echo "== ZX Spectrum tile drawing: every picture through the real console code"
 python3 test/tiles/run.py
 python3 test/tiles/run.py --print
 echo
+echo "== the Z88's sound routines"
+python3 test/sound/run.py
+echo
 echo "== number printing"
 python3 test/fmt/run.py
 echo

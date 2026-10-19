@@ -355,6 +355,13 @@ def main():
     check('auto-budget: in November the engine runs the budget without stopping for the screen',
           not any('FISCAL' in r for r in text) and any('FUNDS' in r for r in text), '\n'.join(text))
 
+    # --- 6c. the sound option ---
+    CMD_SOUND_ON, CMD_SOUND_OFF = 0xAA, 0xAB
+    mem = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE, CMD_SOUND_OFF, 0, 0])
+    check('sound: the menu turns it off', mem[psyms['_sound_enabled']] == 0)
+    mem = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE, CMD_SOUND_OFF, CMD_SOUND_ON, 0, 0])
+    check('sound: and on again', mem[psyms['_sound_enabled']] == 1)
+
     # --- 7. the budget screen (the 32x8 platform has it too) ---
     CMD_BUDGET = 0xA4
     byte_p = lambda mem, name: mem[psyms[name]]

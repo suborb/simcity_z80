@@ -21,6 +21,7 @@
 #define HAVE_MENUS              /* OZ's menus: quit is in them, the keys need not show it */
 #define HAVE_ICONS              /* the tools as user defined characters in the text window */
 #define HAVE_FILES              /* OZ's files: save and load a city */
+#define HAVE_SOUND              /* the beeper (platform/console/plat_sound.asm, linked by the Makefile) */
 #endif
 
 #endif

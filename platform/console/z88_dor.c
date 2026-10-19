@@ -90,6 +90,12 @@
 #define TOPIC3_8             "Auto-budget off"
 #define TOPIC3_8KEY          "OAF"
 #define TOPIC3_8CODE         0xA9
+#define TOPIC3_9             "Sound on"
+#define TOPIC3_9KEY          "OSN"
+#define TOPIC3_9CODE         0xAA
+#define TOPIC3_10            "Sound off"
+#define TOPIC3_10KEY         "OSF"
+#define TOPIC3_10CODE        0xAB
 
 /* ---- Views: the mini maps, CMD_MAP + the view (ui/minimap.h), then back to the city.  Not "Maps": its
    shortcuts would start with M, and the ENTER key is Ctrl-M (<>M), which OZ then takes for them ---- */

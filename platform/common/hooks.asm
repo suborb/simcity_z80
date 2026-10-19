@@ -20,8 +20,7 @@
         PUBLIC  V_auto_bulldoze, V_power_type_chosen
         PUBLIC  textcol
         PUBLIC  ui_budget_confirm, ui_choose_power_plant, draw_map
-        PUBLIC  play_place_sound, wait_if_demolish_pending
-        PUBLIC  play_crash_sound, play_rising_tone, play_falling_tone, soundfx1
+        PUBLIC  wait_if_demolish_pending
         PUBLIC  print_budget_amounts, cls_map, cls_print_topbox, render_status_bar
         PUBLIC  text_generating_landscape
 
@@ -60,11 +59,6 @@ draw_map:
 ; hooks that do nothing yet
 ui_budget_confirm:
 ui_choose_power_plant:
-play_place_sound:
-play_crash_sound:
-play_rising_tone:
-play_falling_tone:
-soundfx1:
 print_budget_amounts:
 cls_map:
 cls_print_topbox:
