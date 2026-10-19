@@ -18,6 +18,8 @@
 #include "textfmt.h"
 #include "evaluation.h"
 #ifdef HAVE_EVALUATION
+uint16_t eval_unpowered;
+
 static const uint8_t class_from[5][3] = {           /* population where each class starts, 24 bit */
     { 0xD0, 0x07, 0x00 },   /* 2000 */
     { 0x10, 0x27, 0x00 },   /* 10000 */
@@ -54,7 +56,7 @@ void evaluate(struct evaluation *e)
     raw[4] = ((int16_t)SMC_tax_rate - 3) * 4;
     raw[5] = V_concern_house_price;
     raw[6] = (int16_t)V_unemployment;
-    total = (int16_t)(V_unPwrdZCnt >> 2) + (V_alertmessage ? 4 : 0);
+    total = (int16_t)(eval_unpowered >> 2) + (V_alertmessage ? 4 : 0);
     for (i = 0; i < 7; ++i) {
         e->problem[i] = clip(raw[i]);
         total += e->problem[i];

@@ -93,7 +93,9 @@ static uint32_t money(void)
 
 static uint32_t citypop(void)
 {
-    return (uint32_t)V_CityPop[0] | ((uint32_t)V_CityPop[1] << 8) | ((uint32_t)V_CityPop[2] << 16);
+    /* V_CityPop is the running total of the tick in progress, so it is partial (or 0) while the simulation is
+       halfway; the engine copies the finished figure to V_display_population at the end of each tick. */
+    return (uint32_t)V_display_population[0] | ((uint32_t)V_display_population[1] << 8) | ((uint32_t)V_display_population[2] << 16);
 }
 
 #ifndef HAVE_FIELDS
@@ -422,7 +424,7 @@ static const struct field status_top[] = {
     { 0, 10, F_TEXT, 0, "FUNDS $" },
     { 0, 17, F_L24,  0, V_money },
     { 0, 27, F_TEXT, 0, "POP" },
-    { 0, 31, F_L24,  0, V_CityPop },
+    { 0, 31, F_L24,  0, V_display_population },       /* not V_CityPop: that is the tick in progress */
 };
 static const struct field status_tool[] = {
     { 2,  0, F_STR,  0, &st_tool },
@@ -832,6 +834,8 @@ static void play_city(void)
         k = plat_key();
         if (k)
             handle_key(k);
+        if (quit)                           /* no last frame: it would draw over a screen the quit left up */
+            break;
 
         /* The simulation runs in slices (one map row each) so that the UI stays
            responsive: a tick is started every tick_frames[] frames, then advanced
@@ -848,6 +852,9 @@ static void play_city(void)
                     }
 #endif
                     if (full) {
+#ifdef HAVE_EVALUATION
+                        eval_unpowered = V_unPwrdZCnt;      /* the tick's own count, whole at last */
+#endif
                         ticking = 0;
                         countdown = tick_frames[V_simulation_speed];
                         break;

@@ -13,6 +13,11 @@ struct evaluation {
     uint8_t has_people;                 /* there is somebody to ask */
 };
 
+/* The number of zones without power, as it was when the last tick finished: the engine counts it afresh from
+   0 in each tick, so V_unPwrdZCnt is only part of the answer while the simulation is halfway.  The game sets this
+   when a tick completes. */
+extern uint16_t eval_unpowered;
+
 /* Work out the evaluation from the engine's state. */
 extern void evaluate(struct evaluation *e);
 

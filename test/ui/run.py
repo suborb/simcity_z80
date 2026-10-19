@@ -227,6 +227,9 @@ def main():
     mem = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE])
     mapp, text = panes(mem)
     check('text window: the game ran and quit cleanly', mem[psyms['_test_done']] == 1)
+    shown = panes(run(pbin, psyms, [LEVEL_MEDIUM, PAUSE] + [0] * 8))[1]
+    check('the status shows the population the engine has finished counting (V_display_population, 5000 here), not the running total',
+          any('POP 5000' in r for r in shown), '\n'.join(shown))
     check('text window: the status is in the text window', any('FUNDS $10000' in r for r in text) and any('ROAD $10' in r for r in text),
           '\n'.join(text))
     check('text window: no key tips; rows 3, 4 (the icons), 5 and 7 are left empty',
