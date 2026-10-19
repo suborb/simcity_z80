@@ -90,8 +90,12 @@ $(Z88): $(DEPS)
 # see engine/sections.asm and platform/console/zpragma_z88rom.inc).  Output: simcity.epr and its banks.
 # --generic-console: the map is drawn in the console's graphics window with our tile font,
 # the status text goes to OZ's text window.  Z88_DI_SIM runs each simulation slice with OZ's interrupts off.
+# The version shown in the Z88's help page (make VERSION=1.1 z88rom).
+VERSION ?= 1.0.0
+
 Z88ROM_FLAGS = -subtype=app --generic-console -create-app -pragma-include:platform/console/zpragma_z88rom.inc \
-               $(CINC) -DTARGET_Z88 -Ca-DZ88_DI_SIM -DMAX_VIEW_W=32 -DMAX_VIEW_H=8
+               $(CINC) -DTARGET_Z88 -Ca-DZ88_DI_SIM -DMAX_VIEW_W=32 -DMAX_VIEW_H=8 \
+               -Cp-DAPP_VERSION=$(VERSION)
 
 $(Z88ROM): $(DEPS)
 	@mkdir -p $(@D)

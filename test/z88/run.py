@@ -71,6 +71,8 @@ check('every disaster and every mini map has a menu item', all(dis0 + n in sent 
 help_text = ' '.join(re.findall(r'#define\s+HELP[1-6]\s+"([^"]*)"', dor))
 check('the main help has the name, the copyright of the original game and the source repository',
       'SimCity' in help_text and '(C)' in help_text and 'Maxis' in help_text and 'https://github.com/suborb/simcity_z80' in help_text, help_text)
+check('and a version number, which the Makefile passes in',
+      re.search(r'#define\s+HELP[1-6]\s+"Version ",\s*STRING\(APP_VERSION\)', dor) is not None and re.search(r'^VERSION\s*\?=\s*\d+\.\d+\.\d+', open(os.path.join(ROOT, 'Makefile')).read(), re.M) is not None)
 check('and every line of it is short enough for the help window (about 50 characters)',
       all(len(h) <= 50 for h in re.findall(r'#define\s+HELP[1-6]\s+"([^"]*)"', dor)))
 

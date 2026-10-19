@@ -26,7 +26,14 @@
 #define HELP3 "Spectrum version: Probe Software, Infogrames"
 #define HELP4 "The Z88 port, built with z88dk"
 #define HELP5 "https://github.com/suborb/simcity_z80"
-#define HELP6 ""
+#ifndef APP_VERSION
+#error "APP_VERSION is set by the Makefile (VERSION)"
+#endif
+/* (the help text is expanded inside assembler, which takes the two strings of this one as a list, not as adjacent
+   literals; the version arrives as a bare number, which zcc cannot pass quoted) */
+#define STRING_(x) #x
+#define STRING(x) STRING_(x)
+#define HELP6 "Version ", STRING(APP_VERSION)
 
 /* ---- Game ---- */
 #define TOPIC1               "Game"
