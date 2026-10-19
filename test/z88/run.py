@@ -66,6 +66,13 @@ check('at most 7 menus of 24 items', len(topics) <= 7 and all(sum(1 for (t, _) i
 
 check('there is no Tools menu (the icons and TAB choose a tool)', 'Tools' not in topics.values() and not any(tool0 <= c < tool0 + 14 for c in sent))
 
+# The main help (the HELP key in OZ) says what this is, whose it is and where the source is.
+help_text = ' '.join(re.findall(r'#define\s+HELP[1-6]\s+"([^"]*)"', dor))
+check('the main help has the name, the copyright of the original game and the source repository',
+      'SimCity' in help_text and '(C)' in help_text and 'Maxis' in help_text and 'https://github.com/suborb/simcity_z80' in help_text, help_text)
+check('and every line of it is short enough for the help window (about 50 characters)',
+      all(len(h) <= 50 for h in re.findall(r'#define\s+HELP[1-6]\s+"([^"]*)"', dor)))
+
 # The icons the text window shows: the Spectrum's 16x16 tool icons, frame cut off, as 2x2 Z88 cells of 6x8.
 icons = open(os.path.join(ROOT, 'assets', 'z88_icons.bin'), 'rb').read()
 udgs = open(os.path.join(ROOT, 'assets', 'udgs.bin'), 'rb').read()

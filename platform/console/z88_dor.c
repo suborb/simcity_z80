@@ -20,8 +20,13 @@
 #define APP_KEY  'S'
 #define APP_INFO "A city building game"
 
-#define HELP1 "A port of SimCity for the Z88"
-#define HELP2 "Built with z88dk"
+/* The main help (the HELP key): up to six lines. */
+#define HELP1 "SimCity - The City Simulator"
+#define HELP2 "(C) 1989 Maxis Software"
+#define HELP3 "Spectrum version: Probe Software, Infogrames"
+#define HELP4 "The Z88 port, built with z88dk"
+#define HELP5 "https://github.com/suborb/simcity_z80"
+#define HELP6 ""
 
 /* ---- Game ---- */
 #define TOPIC1               "Game"
