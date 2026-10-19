@@ -413,6 +413,12 @@ def main():
     check('city name: without one the default, HERESVILLE, is the name the machine is told', app_name(mem) == b'HERESVILLE', repr(app_name(mem)))
     mem = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE, 0, 0], city=b'noodle')
     check('city name: a name typed at the title screen is the name the machine is told', app_name(mem) == b'noodle', repr(app_name(mem)))
+    clears = lambda m: m[psyms['_test_text_clears']] | m[psyms['_test_text_clears'] + 1] << 8
+    check('city name: typing letters redraws the name only, not the whole text window (the same number of clears with a long name as with none)',
+          clears(run(pbin, psyms, [LEVEL_MEDIUM, PAUSE, 0, 0], city=b'abcdefghijkl')) == clears(run(pbin, psyms, [LEVEL_MEDIUM, PAUSE, 0, 0])),
+          f"{clears(run(pbin, psyms, [LEVEL_MEDIUM, PAUSE, 0, 0], city=b'abcdefghijkl'))} vs {clears(run(pbin, psyms, [LEVEL_MEDIUM, PAUSE, 0, 0]))}")
+    mem = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE, 0, 0], city=b'ab' + bytes([127, 127]) + b'cd')
+    check('city name: delete takes letters back and the name is right on screen (ab, delete, delete, cd = cd)', app_name(mem) == b'cd', repr(app_name(mem)))
     mem = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE, 0, 0], city=b'a name that is too long')
     check('city name: it is cut to the 12 the Spectrum keeps', app_name(mem) == b'a name that ', repr(app_name(mem)))
     mem = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE, CMD_SAVE, ord('f'), 13, ord(' '), 0, 0], city=b'noodle')

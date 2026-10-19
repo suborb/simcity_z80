@@ -77,9 +77,12 @@ uint8_t plat_key(void)
 uint8_t plat_text_cols(void) { return TEXT_COLS; }
 uint8_t plat_text_rows(void) { return TEXT_ROWS; }
 
+uint16_t test_text_clears;               /* how often the whole text window was cleared */
+
 void plat_text_clear(void)
 {
     uint8_t r, c;
+    ++test_text_clears;
     for (r = 0; r < TEXT_ROWS; ++r)
         for (c = 0; c < TEXT_COLS; ++c)
             test_text[r][c] = ' ';
