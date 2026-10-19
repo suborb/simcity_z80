@@ -209,5 +209,14 @@ void plat_flush(void)
     }
 }
 #else
-void plat_flush(void) { ++test_frames; }
+/* The plain build: once the new city exists, the engine's finished population is 5000 (its running total stays 0
+   without a tick), so that a test can see which of the two the status panel shows. */
+extern uint8_t V_display_population[3];
+void plat_flush(void)
+{
+    if (++test_frames == 3) {
+        V_display_population[0] = 0x88;
+        V_display_population[1] = 0x13;
+    }
+}
 #endif

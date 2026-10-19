@@ -118,6 +118,9 @@ def main():
     lm = levelmap(mem, syms)
     check('game starts and quits cleanly', mem[syms['_test_done']] == 1)
     check('status panel shows the funds', any('FUNDS $10000' in row for row in scr), '\n'.join(scr))
+    mem5 = run(binary, syms, [LEVEL_MEDIUM, PAUSE] + [0] * 8)
+    check('the status panel of the plain build (the Spectrum code) shows the finished population, 5000, not the running total',
+          any('POP 5000' in row for row in screen(mem5, syms)), '\n'.join(screen(mem5, syms)))
     check('status panel shows the tool', any('ROAD $10' in row for row in scr))
     check('map has water and land', 0 in lm and 2 in lm)
 
