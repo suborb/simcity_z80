@@ -82,6 +82,8 @@ extern void     plat_flush(void);               /* end of frame: show what was d
                        the tool, the demand bars and the advisor: a six row panel (no text window; ui/game.c)
      HAVE_MENUS        menus of its own, which have quit: the X key does not quit there, ESC leaves a mini map,
                        and the cursor keys move (Q, A, O and P do not)
+     HAVE_POPUP_MENU   use the shared console box + message selector: ESC opens it over the city; do not set this
+                       on a platform with native HAVE_MENUS
      HAVE_FILES        files, for saving and loading a city (plat_file_save()/plat_file_load())
      HAVE_APPNAME      the machine can show what the city is called (plat_set_name(); the Z88's Index)
      HAVE_SOUND        a beeper behind the engine's sound hooks (the Makefile links the platform's sound code, or
@@ -102,6 +104,9 @@ extern void     plat_flush(void);               /* end of frame: show what was d
 #endif
 #if defined(HAVE_ICONS) && !defined(HAVE_TILES) && !defined(HAVE_TEXT_WINDOW)
 #error "the icons need a text window, or pictures"
+#endif
+#if defined(HAVE_MENUS) && defined(HAVE_POPUP_MENU)
+#error "a platform uses either native menus or the shared popup menu"
 #endif
 
 /* The text area.  Where there is a text window the status text, the title and the screens go in it; elsewhere

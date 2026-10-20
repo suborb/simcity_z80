@@ -27,6 +27,7 @@ COMMON = -Ca-DPORTABLE -Ca-Iengine -Ca-I. -Iui -Cc-standard-escape-chars -m
 # HAVE_BUDGET and so on (see ui/platform.h), and compiles to nothing where it is off.
 GAME    = ui/main.c ui/game.c ui/text.c ui/textfmt.c ui/numfmt.asm ui/budget.c ui/evaluation.c ui/cityfile.c \
           ui/minimap.c ui/sprites.c ui/prompt.c engine/engine_c.asm platform/common/hooks.asm
+MENU    = ui/menu.c
 # The table drawing of the screens, in assembler: for the targets that have HAVE_FIELDS (see ui/platform.h).
 FIELDS  = ui/fmtfields.asm
 # The sound hooks the engine calls: the platform's own, or none.
@@ -81,17 +82,19 @@ testhires: $(TESTH)
 # generic console driver, which can draw in the Aquarius+'s 320x200 bitmap mode (plat_init
 # switches to it, IOCTL_GENCON_SET_MODE 4).  There characters are drawn from font and UDG
 # pointers when printed, so the map gets the real tiles like the NC200.
+# The CRT_COMPRESS_AQX pragma selects the self-extracting ZX0 AQX path in z88dk's
+# Aquarius CRT and appmake implementation.
 $(AQPLUS): $(DEPS)
 	@mkdir -p $(@D)
-	$(ZCC) +aquarius -clib=aqplus -subtype=aqx --generic-console -create-app $(COMMON) -pragma-include:$(AQPLUS_PRAGMAS) -pragma-define:CRT_TRIM_BSS=1 -pragma-define:CRT_AQPLUS_BANK3_RAM=1 -pragma-define:REGISTER_SP=0x4000 -pragma-define:CRT_ORG_CODE=0x4000 -pragma-redirect:CRT_FONT=_font_8x8_bbc_system \
-	    $(AQINC) -DTARGET_AQPLUS -DMAX_VIEW_W=40 -DMAX_VIEW_H=19 -Ca-DTARGET_AQPLUS -Ca-DSIM_STACK_TOP=0x3D00 $(GAME) $(NOSOUND) $(FIELDS) $(AQPLUS_PLATFORM) -o $(@D)/simcity
+	$(ZCC) +aquarius -clib=aqplus -subtype=aqx -create-app --generic-console $(COMMON) -pragma-include:$(AQPLUS_PRAGMAS) -pragma-define:CRT_TRIM_BSS=1 -pragma-define:CRT_AQPLUS_BANK3_RAM=1 -pragma-define:REGISTER_SP=0x3d00 -pragma-define:CRT_ORG_CODE=0x3d00 -pragma-redirect:CRT_FONT=_font_8x8_bbc_system \
+	    $(AQINC) -DTARGET_AQPLUS -DMAX_VIEW_W=40 -DMAX_VIEW_H=19 -Ca-DTARGET_AQPLUS -Ca-DSIM_STACK_TOP=0x3a00 $(GAME) $(MENU) $(NOSOUND) $(FIELDS) $(AQPLUS_PLATFORM) -o $(@D)/simcity
 
 # NC200: RAM subtype (the default ROM-card subtype cannot host self-modifying code).  Tiles
 # go through the console's font and UDG pointers (see platform/console/plat_config.h and plat_console.c).
 $(NC200): $(DEPS)
 	@mkdir -p $(@D)
 	$(ZCC) +nc -clib=nc200 -subtype=ncboot -create-app $(COMMON) $(CINC) \
-	    $(GAME) $(NOSOUND) $(FIELDS) $(CONSOLE) -o $(@D)/simcity
+	    $(GAME) $(MENU) $(NOSOUND) $(FIELDS) $(CONSOLE) -o $(@D)/simcity
 
 # Z88 as a BASIC program: the same screen, without the ROM image.
 $(Z88): $(DEPS)
@@ -139,7 +142,7 @@ $(ZXP): $(DEPS)
 # Headless: a scripted keyboard and a screen in RAM instead of the console, run under z88dk-ticks.
 $(TEST): $(DEPS)
 	@mkdir -p $(@D)
-	$(ZCC) +test $(COMMON) $(TINC) $(GAME) $(NOSOUND) target/test_ui/plat_test.c -o $@
+	$(ZCC) +test $(COMMON) $(TINC) $(GAME) $(MENU) $(NOSOUND) target/test_ui/plat_test.c -o $@
 
 # The same with a separate text window and a 32x8 map, the shape of the Z88's screen.
 $(TESTP): $(DEPS)
@@ -159,7 +162,7 @@ $(TESTS): $(DEPS)
 # A 40x25 Aquarius+-shaped screen: its 19-row map window holds the high-resolution mini map.
 $(TESTH): $(DEPS)
 	@mkdir -p $(@D)
-	$(ZCC) +test $(COMMON) $(TINC) -DTEST_HIRES_MINIMAP $(GAME) $(NOSOUND) $(FIELDS) target/test_ui/plat_test.c -o $@
+	$(ZCC) +test $(COMMON) $(TINC) -DTEST_HIRES_MINIMAP $(GAME) $(MENU) $(NOSOUND) $(FIELDS) target/test_ui/plat_test.c -o $@
 
 check:
 	sh test/run_all.sh

@@ -16,6 +16,9 @@
 #include "engine.h"
 #include "platform.h"
 #include "text.h"
+#ifdef HAVE_POPUP_MENU
+#include "menu.h"
+#endif
 #ifdef HAVE_MINIMAP
 #include "minimap.h"
 #endif
@@ -60,8 +63,14 @@ static uint8_t tool;
 static uint8_t frame;
 static uint8_t quit;
 static uint8_t restart;                 /* quit this city and start another */
-static uint8_t redraw;                  /* the screen was overwritten: draw everything again (REDRAW_ALL), or just the text */
+static uint8_t redraw;                  /* parts of the display a modal screen overwrote */
 #define REDRAW_ALL 1
+#define REDRAW_MAP 4                    /* a popup sits entirely in the city map area */
+#ifdef HAVE_ICONS_TOP
+#define POPUP_REDRAW REDRAW_MAP          /* six status rows; the centred box starts at row six */
+#else
+#define POPUP_REDRAW REDRAW_ALL          /* a shorter map area can be covered by the box */
+#endif
 #ifdef HAVE_TEXT_WINDOW
 #define REDRAW_TEXT 2                   /* the screens use the text window only: the map is as it was */
 #else
@@ -92,7 +101,131 @@ static uint8_t panel_w, panel_h;
 #ifndef MAX_VIEW_H
 #define MAX_VIEW_H 25
 #endif
-static uint16_t shadow[MAX_VIEW_W * MAX_VIEW_H];    /* what is on the screen: 0 = unknown */
+#ifdef HAVE_POPUP_MENU
+/* The native Z88 menu already sends CMD_* values.  The other targets get this compact character-cell
+   menu; the page values are deliberately below the printable and CMD_* ranges. */
+#define MENU_GAME_OPTIONS  1
+#define MENU_BUILD_OPTIONS 2
+#define MENU_DISASTERS     3
+#define MENU_MAIN          4
+#define MENU_BUDGET          0xC0
+#define MENU_EVALUATION      0xC1
+#define MENU_MAP_NEXT        0xC2
+#define MENU_NEW_CITY        0xC3
+#define MENU_PAUSE           0xC4
+#define MENU_SPEED_NEXT      0xC5
+#define MENU_POWER_TOGGLE    0xC6
+#define MENU_BULLDOZE_TOGGLE 0xC7
+#define MENU_DISASTERS_TOGGLE 0xC8
+#define MENU_AUTOBUDGET_TOGGLE 0xC9
+#define MENU_DISASTER        0xCA    /* + 0..5 */
+#define MENU_SOUND_TOGGLE    0xCB
+#define MENU_SAVE            0xD1
+#define MENU_LOAD            0xD2
+#define MENU_TOGGLE          0x10    /* stay on this options page after the action */
+
+static const struct menu_item main_menu[] = {
+#ifdef HAVE_BUDGET
+    { "Budget", MENU_BUDGET },
+#endif /* HAVE_POPUP_MENU */
+#ifdef HAVE_EVALUATION
+    { "Evaluation", MENU_EVALUATION },
+#endif
+#ifdef HAVE_FILES
+    { "Save city", MENU_SAVE },
+    { "Load city", MENU_LOAD },
+#endif
+#ifdef HAVE_MINIMAP
+    { "Mini map", MENU_MAP_NEXT },
+#endif
+    { "Game options", MENU_GAME_OPTIONS },
+    { "Building options", MENU_BUILD_OPTIONS },
+    { "Disasters", MENU_DISASTERS },
+    { "New city", MENU_NEW_CITY },
+#ifndef TARGET_AQPLUS
+    { "Quit", CMD_QUIT }
+#endif
+};
+
+/* Each setting has one action; its label is refreshed to show its current value. */
+static struct menu_item game_options[] = {
+    { "Pause: running", MENU_PAUSE | MENU_TOGGLE },
+    { "Speed: normal", MENU_SPEED_NEXT | MENU_TOGGLE },
+    { "Auto budget: on", MENU_AUTOBUDGET_TOGGLE | MENU_TOGGLE },
+#ifdef HAVE_SOUND
+    { "Sound: on", MENU_SOUND_TOGGLE | MENU_TOGGLE },
+#endif
+    { "Back", 0 }
+};
+
+static struct menu_item build_options[] = {
+    { "Power: coal", MENU_POWER_TOGGLE | MENU_TOGGLE },
+    { "Auto bulldoze: on", MENU_BULLDOZE_TOGGLE | MENU_TOGGLE },
+    { "Back", 0 }
+};
+
+static struct menu_item disaster_menu[] = {
+    { "Start fire", MENU_DISASTER },
+    { "Start flood", MENU_DISASTER + 1 },
+    { "Earthquake", MENU_DISASTER + 2 },
+    { "Air crash", MENU_DISASTER + 3 },
+    { "Tornado", MENU_DISASTER + 4 },
+    { "Meltdown", MENU_DISASTER + 5 },
+    { "Random disasters: on", MENU_DISASTERS_TOGGLE | MENU_TOGGLE },
+    { "Back", 0 }
+};
+
+#define MENU_COUNT(a) (sizeof(a) / sizeof(struct menu_item))
+
+static void handle_key(uint8_t k);
+
+static void update_option_labels(void)
+{
+    static const char * const speed[] = {
+        "Speed: fast", "Speed: normal", "Speed: slow", "Speed: paused"
+    };
+
+    game_options[0].text = V_simulation_speed == 3 ? "Pause: paused" : "Pause: running";
+    game_options[1].text = speed[V_simulation_speed];
+    game_options[2].text = V_auto_budget ? "Auto budget: on" : "Auto budget: off";
+#ifdef HAVE_SOUND
+    game_options[3].text = sound_enabled ? "Sound: on" : "Sound: off";
+#endif
+    build_options[0].text = power_nuclear ? "Power: nuclear" : "Power: coal";
+    build_options[1].text = V_auto_bulldoze ? "Auto bulldoze: on" : "Auto bulldoze: off";
+    disaster_menu[6].text = V_disaster_reset ? "Random disasters: off" : "Random disasters: on";
+}
+
+static uint8_t popup_menu(void)
+{
+    uint8_t choice = MENU_MAIN, page;
+
+    while (choice) {
+        page = choice;
+        if (choice == MENU_MAIN)
+            choice = menu_choose("SIMCITY", main_menu, MENU_COUNT(main_menu));
+        else if (choice == MENU_GAME_OPTIONS) {
+            update_option_labels();
+            choice = menu_choose("GAME", game_options, MENU_COUNT(game_options));
+        } else if (choice == MENU_BUILD_OPTIONS) {
+            update_option_labels();
+            choice = menu_choose("BUILDING", build_options, MENU_COUNT(build_options));
+        } else if (choice == MENU_DISASTERS) {
+            update_option_labels();
+            choice = menu_choose("DISASTERS", disaster_menu, MENU_COUNT(disaster_menu));
+        }
+        /* A setting changes in place.  Redraw its page so the value column
+           immediately describes the new state, rather than dismissing it. */
+        if (choice >= (MENU_PAUSE | MENU_TOGGLE) && choice <= (MENU_SOUND_TOGGLE | MENU_TOGGLE)) {
+            handle_key((uint8_t)(choice & ~MENU_TOGGLE));
+            choice = page;
+        }
+        if (choice != MENU_MAIN && choice != MENU_GAME_OPTIONS && choice != MENU_BUILD_OPTIONS && choice != MENU_DISASTERS)
+            return choice;
+    }
+    return 0;
+}
+#endif
 
 /* ---- small helpers ----------------------------------------------------- */
 #ifndef HAVE_FIELDS                                 /* the status panel without tables prints the numbers itself */
@@ -215,48 +348,35 @@ static uint8_t in_cursor(uint8_t mx, uint8_t my)
     return (uint8_t)(mx - cur_x) < size && (uint8_t)(my - cur_y) < size;
 }
 
-/* Draw one cell of the view, unless it already shows the right thing. */
+/* Draw one scheduled cell of the view.  The scheduler below only asks for a
+   full view after it has been overwritten or moved; otherwise it supplies the
+   changed map rows, cursor and sprites.  Keeping a tile identity for every
+   visible cell saves writes, but costs too much RAM on small targets. */
 static void draw_cell(uint8_t cx, uint8_t cy)
 {
     uint8_t mx = (uint8_t)(origin_x + cx), my = (uint8_t)(origin_y + cy);
     uint8_t cursor = ((frame & 4) && in_cursor(mx, my));
-    uint16_t *s = &shadow[(uint16_t)cy * MAX_VIEW_W + cx];
-    uint16_t g;
 
 #ifdef HAVE_TILES
     view_x = mx;
     view_y = my;
     view_fetch();
-    g = (uint16_t)(((uint16_t)(view_art - view_tile_art) >> 3) + 1) | (cursor ? 0x8000 : 0);
 #ifdef DRAW_SPRITES
     {
         uint8_t art[8], key = sprites_cell(sprites, mx, my, view_art, art), i;
 
         if (key) {                          /* a sprite is over this cell: its picture, not the tile's */
-            g |= (uint16_t)key << 9;
-            if (*s != g) {
-                *s = g;
-                if (cursor)
-                    for (i = 0; i < 8; ++i)
-                        art[i] ^= 0xFF;
-                plat_put_bitmap(cx, (uint8_t)(map_row + cy), art);
-            }
+            if (cursor)
+                for (i = 0; i < 8; ++i)
+                    art[i] ^= 0xFF;
+            plat_put_bitmap(cx, (uint8_t)(map_row + cy), art);
             return;
         }
     }
 #endif
-    if (*s != g) {
-        *s = g;
-        plat_put_tile(cx, (uint8_t)(map_row + cy), view_art, view_attr, cursor);
-    }
+    plat_put_tile(cx, (uint8_t)(map_row + cy), view_art, view_attr, cursor);
 #else
-    g = glyph(mx, my);
-    if (cursor)
-        g = '@';                                /* blinking cursor */
-    if (*s != g) {
-        *s = g;
-        plat_put(cx, (uint8_t)(map_row + cy), (uint8_t)g);
-    }
+    plat_put(cx, (uint8_t)(map_row + cy), cursor ? '@' : glyph(mx, my));
 #endif
 }
 
@@ -321,13 +441,6 @@ static void draw_view(uint8_t full, uint8_t dirty)
     last_cy = (uint8_t)(cur_y - origin_y);
     last_size = size;
     last_phase = phase;
-}
-
-static void invalidate_view(void)
-{
-    uint16_t i;
-    for (i = 0; i < MAX_VIEW_W * MAX_VIEW_H; ++i)
-        shadow[i] = 0;
 }
 
 #ifdef HAVE_MINIMAP
@@ -410,7 +523,6 @@ static void set_map_view(uint8_t v)
         mm_col = (uint8_t)((cols - MM_CELLS_W) >> 1);
         mm_row = map_row;
     } else {
-        invalidate_view();
         last_cx = 255;                      /* a full pass over the city */
     }
 }
@@ -441,7 +553,11 @@ static void demand_bar(char *b, char name, int16_t v)
 static const char *const help_page[3] = {
     "O P Q A MOVE  SPACE BUILD",
     ", . TOOL  0-9 PICK  E POWER",
+#ifdef HAVE_POPUP_MENU
+    "H PAUSE  + - SPEED  X MENU",
+#else
     "H PAUSE  + - SPEED  X QUIT",
+#endif
 };
 
 #ifdef HAVE_FIELDS
@@ -794,11 +910,33 @@ static void handle_key(uint8_t k)
     case KEY_ESC:
         if (map_view) set_map_view(0);      /* (it does not quit either) */
         break;
+#elif defined(HAVE_POPUP_MENU)
+    case 'x': case KEY_ESC:
+        if (map_view)
+            set_map_view(0);             /* X is the documented mini-map back key */
+        else {
+            k = popup_menu();
+            if (k)
+                handle_key(k);
+            if (!quit && !redraw)
+                redraw = POPUP_REDRAW;
+        }
+        break;
 #else
     case 'x': case KEY_ESC:
         if (map_view) set_map_view(0); else quit = 1;
         break;
 #endif
+#ifdef HAVE_POPUP_MENU
+    case MENU_BUDGET:          game_budget(); break;
+    case MENU_EVALUATION:      game_evaluation(); break;
+    case MENU_MAP_NEXT:        set_map_view((uint8_t)(map_view < MM_VIEWS ? map_view + 1 : 0)); break;
+    case MENU_NEW_CITY:        restart = quit = 1; break;
+    case MENU_PAUSE:           V_simulation_speed = (V_simulation_speed == 3) ? 1 : 3; break;
+    case MENU_SAVE:            game_save(); break;
+    case MENU_LOAD:            game_load(); break;
+#endif
+#ifndef TARGET_AQPLUS
     case CMD_QUIT: quit = 1; break;
     case CMD_MAP_OFF: set_map_view(0); break;
     case 'b': case CMD_BUDGET: game_budget(); break;
@@ -807,28 +945,76 @@ static void handle_key(uint8_t k)
     case 'l': case CMD_LOAD: game_load(); break;
     case CMD_NEW_CITY:         restart = quit = 1; break;
     case CMD_PAUSE:            V_simulation_speed = (V_simulation_speed == 3) ? 1 : 3; break;
+#else
+    case 'b': game_budget(); break;
+    case 'v': game_evaluation(); break;
+    case 's': game_save(); break;
+    case 'l': game_load(); break;
+#endif
+#ifdef HAVE_POPUP_MENU
+    case MENU_SPEED_NEXT:
+        if (V_simulation_speed == 3) V_simulation_speed = 1;
+        else if (V_simulation_speed) --V_simulation_speed;
+        else V_simulation_speed = 2;
+        break;
+#endif
+#ifndef TARGET_AQPLUS
     case CMD_SPEED_FAST:       V_simulation_speed = 0; break;
     case CMD_SPEED_NORMAL:     V_simulation_speed = 1; break;
     case CMD_SPEED_SLOW:       V_simulation_speed = 2; break;
+#endif
+#ifdef HAVE_POPUP_MENU
+    case MENU_POWER_TOGGLE:    power_nuclear = !power_nuclear; break;
+#endif
+#ifndef TARGET_AQPLUS
     case CMD_POWER_COAL:       power_nuclear = 0; break;
     case CMD_POWER_NUCLEAR:    power_nuclear = 1; break;
+#endif
+#ifdef HAVE_POPUP_MENU
+    case MENU_DISASTERS_TOGGLE: V_disaster_reset = !V_disaster_reset; break;
+#endif
+#ifndef TARGET_AQPLUS
     case CMD_DISASTERS_ON:     V_disaster_reset = 0; break;
     case CMD_DISASTERS_OFF:    V_disaster_reset = 1; break;
+#endif
+#ifdef HAVE_POPUP_MENU
+    case MENU_BULLDOZE_TOGGLE: V_auto_bulldoze = !V_auto_bulldoze; break;
+#endif
+#ifndef TARGET_AQPLUS
     case CMD_AUTOBULLDOZE_ON:  V_auto_bulldoze = 1; break;
     case CMD_AUTOBULLDOZE_OFF: V_auto_bulldoze = 0; break;
+#endif
 #ifdef HAVE_SOUND
+#ifdef HAVE_POPUP_MENU
+    case MENU_SOUND_TOGGLE:    sound_enabled = !sound_enabled; break;
+#endif
+#ifndef TARGET_AQPLUS
     case CMD_SOUND_ON:         sound_enabled = 1; break;
     case CMD_SOUND_OFF:        sound_enabled = 0; break;
 #endif
+#endif
+#ifdef HAVE_POPUP_MENU
+    case MENU_AUTOBUDGET_TOGGLE: V_auto_budget = !V_auto_budget; break;
+#endif
+#ifndef TARGET_AQPLUS
     case CMD_AUTOBUDGET_ON:    V_auto_budget = 1; break;
     case CMD_AUTOBUDGET_OFF:   V_auto_budget = 0; break;
     case CMD_REDRAW:           redraw = REDRAW_ALL; break;
+#endif
     default:
+#ifndef TARGET_AQPLUS
         if (k >= CMD_MAP && k < CMD_MAP + MM_VIEWS)
             set_map_view((uint8_t)(k - CMD_MAP + 1));
-        else if (k >= '0' && k <= '9')
+        else
+#else
+#endif
+        if (k >= '0' && k <= '9')
             set_tool((uint8_t)(k - '0'));
-#ifdef HAVE_MENUS
+#ifdef HAVE_POPUP_MENU
+        else if (k >= MENU_DISASTER && k < MENU_DISASTER + 6)
+            V_disaster_option = (uint8_t)(k - MENU_DISASTER + 1);
+#endif
+#ifndef TARGET_AQPLUS
         else if (k >= CMD_DISASTER && k < CMD_DISASTER + 6)
             V_disaster_option = (uint8_t)(k - CMD_DISASTER + 1);       /* the engine starts it a few frames on */
 #endif
@@ -934,7 +1120,6 @@ static void play_city(void)
     clamp_view();
     plat_clear();
     plat_text_clear();
-    invalidate_view();
     last_cx = 255;                          /* draw the whole view on the first frame */
     countdown = tick_frames[V_simulation_speed];
     memset(&st, 0, sizeof(st));
@@ -987,16 +1172,22 @@ static void play_city(void)
         sim_periodic();
 
         /* a full pass over the map only when the view has moved */
-        if (redraw) {                       /* OZ drew over us, or a screen did: start the screen again */
+        if (redraw) {                       /* OZ drew over us, or a screen did: start the affected area again */
             if (redraw & REDRAW_ALL) {
                 plat_clear();
-                invalidate_view();
                 last_cx = 255;
                 map_full = 1;
             }
+            else if (redraw & REDRAW_MAP) {
+                /* A popup can only open from the city, not a mini map.  A full
+                   city-view pass overwrites its box without touching status. */
+                last_cx = 255;
+            }
+            if (!(redraw & REDRAW_MAP) || (redraw & REDRAW_ALL)) {
+                plat_text_clear();
+                memset(&last_st, 0xFF, sizeof(last_st));
+            }
             redraw = 0;
-            plat_text_clear();
-            memset(&last_st, 0xFF, sizeof(last_st));
         }
 #ifndef HAVE_ICONS_TOP
         full = origin_x != last_ox || origin_y != last_oy || last_cx == 255;

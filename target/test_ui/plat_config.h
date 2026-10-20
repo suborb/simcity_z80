@@ -34,4 +34,10 @@
 #define HAVE_TILES
 #endif
 
+/* The plain and Aquarius-shaped harnesses exercise the shared pop-up menu.  TEST_PANEL has the Z88's native-menu
+   behaviour, while TEST_MODAL keeps its deliberately tight full-screen fixture. */
+#if !defined(TEST_PANEL) && !defined(TEST_MODAL)
+#define HAVE_POPUP_MENU
+#endif
+
 #endif

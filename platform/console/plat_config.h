@@ -4,6 +4,7 @@
 
 #define HAVE_TILES
 #define HAVE_BITMAP
+#define HAVE_POPUP_MENU     /* shared box + message selector over the console */
 
 #define HAVE_BUDGET
 #define HAVE_EVALUATION

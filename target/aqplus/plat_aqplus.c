@@ -3,11 +3,15 @@
 #include <conio.h>
 #include <input.h>
 #include <sys/ioctl.h>
+#ifdef HAVE_FILES
+#include <fcntl.h>
+#endif
 #include "engine.h"
 #include "platform.h"
 
 static uint16_t aq_mode;
 static uint16_t clock_count;
+static uint8_t key_held;
 
 /* Aquarius+ palette entries for Spectrum colours, without and with BRIGHT. */
 static const uint8_t aq_colours[16] = {
@@ -103,7 +107,81 @@ void plat_icons(uint8_t selected)
             }
 }
 
-uint8_t plat_key(void) { return (uint8_t)in_Inkey(); }
+/* in_Inkey() reports the matrix state every poll.  The game and especially its pop-up
+   menus run much faster than a human key press, so turn that level into one event until
+   the key is released. */
+uint8_t plat_key(void)
+{
+    uint8_t k = (uint8_t)in_Inkey();
+
+    if (!k) {
+        key_held = 0;
+        return 0;
+    }
+    if (key_held == k)
+        return 0;
+    key_held = k;
+    return k;
+}
+
+#ifdef HAVE_FILES
+/* A tiny editor for file names.  This deliberately uses the game console rather
+   than fgets_cons: the latter brings in a complete generic console editor, while
+   this target already has keyboard polling and a character writer. */
+uint8_t plat_text_input(uint8_t col, uint8_t row, char *buf, uint8_t max, uint8_t spaces)
+{
+    uint8_t n = 0, k;
+
+    buf[0] = 0;
+    for (;;) {
+        k = plat_key();
+        if (!k) {
+            plat_idle();
+            continue;
+        }
+        if (k == KEY_ENTER)
+            return n != 0;
+        if (k == KEY_ESC)
+            return 0;
+        if ((k == KEY_LEFT || k == 127) && n) {
+            --n;
+            plat_aq_printc((uint8_t)(col + n), row, ' ');
+        } else if (k >= (spaces ? ' ' : '!') && k < 127 && n < max) {
+            buf[n] = (char)k;
+            plat_aq_printc((uint8_t)(col + n), row, k);
+            ++n;
+            buf[n] = 0;
+        }
+    }
+}
+
+uint8_t plat_file_save(const char *name, const uint8_t *a, uint16_t alen, const uint8_t *b, uint16_t blen)
+{
+    int fd = open(name, O_WRONLY | O_CREAT | O_TRUNC, 0);
+    uint8_t bad;
+
+    if ((uint8_t)fd >= 0xF0)             /* Aquarius+ ESP error codes are $F7..$FF */
+        return 1;
+    bad = write(fd, (void *)a, alen) != (ssize_t)alen ||
+          write(fd, (void *)b, blen) != (ssize_t)blen;
+    close(fd);
+    return bad;
+}
+
+uint8_t plat_file_load(const char *name, uint8_t *a, uint16_t alen, uint8_t *b, uint16_t blen)
+{
+    int fd = open(name, O_RDONLY, 0);
+    uint8_t r = 1;
+
+    if ((uint8_t)fd >= 0xF0)
+        return 1;
+    if (read(fd, a, alen) == (ssize_t)alen)
+        r = read(fd, b, blen) == (ssize_t)blen ? 0 : 2;
+    close(fd);
+    return r;
+}
+#endif
+
 uint16_t plat_clock(void) { return clock_count; }
 void plat_idle(void) { ++clock_count; }
 void plat_flush(void) {}

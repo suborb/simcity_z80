@@ -4,3 +4,4 @@
 #pragma output CLIB_EXIT_STACK_SIZE = 0
 #pragma redirect fputc_cons_generic = fputc_cons_generic_minimal
 #pragma output CRT_DISABLELOADER = 1
+#pragma output CRT_COMPRESS_AQX = 1
