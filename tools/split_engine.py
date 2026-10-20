@@ -4,8 +4,8 @@ Spectrum UI files, following tools/split_manifest.txt.
 
 The disassembly itself is never modified.  Output:
   engine/<name>.asm            engine segments (copied verbatim, with a one line header)
-  platform/zx/<name>.asm       Spectrum UI segments
-  platform/zx/zx_game.asm      INCLUDEs every segment in the original order, so that
+  target/zx-original/<name>.asm Spectrum UI segments
+  target/zx-original/zx_game.asm INCLUDEs every segment in the original order, so that
                                assembling it reproduces the original binary exactly.
   engine/engine_all.asm        INCLUDEs all engine segments (for the other platforms)
 
@@ -361,23 +361,23 @@ def main():
     segs.sort()
     assert segs[0][0] == 1
     os.makedirs('engine', exist_ok=True)
-    os.makedirs('platform/zx', exist_ok=True)
+    os.makedirs('target/zx-original', exist_ok=True)
     order = []
     for k, (start, owner, name) in enumerate(segs):
         end = segs[k + 1][0] - 1 if k + 1 < len(segs) else len(lines)
         body = lines[start - 1:end]
-        d = 'engine' if owner == 'engine' else 'platform/zx'
+        d = 'engine' if owner == 'engine' else 'target/zx-original'
         path = f'{d}/{name}.asm'
         header = f'; {name}: lines {start}-{end} of disassembly/sim_game.asm ({owner})'
         # keep the first line of each file a comment so INCLUDE is harmless
         open(path, 'w', encoding='latin-1').write(header + '\n' + '\n'.join(body) + '\n')
         order.append((owner, path, name))
-    with open('platform/zx/zx_game.asm', 'w', encoding='latin-1') as f:
+    with open('target/zx-original/zx_game.asm', 'w', encoding='latin-1') as f:
         f.write('; Spectrum build: all segments in their original order.\n')
         f.write('; Assembles to exactly the same bytes as disassembly/sim_game.asm.\n')
         f.write('        INCLUDE "../../engine/sections.asm"        ; IN_CODE etc.: empty here\n')
         for owner, path, name in order:
-            rel = os.path.relpath(path, 'platform/zx')
+            rel = os.path.relpath(path, 'target/zx-original')
             f.write(f'        INCLUDE "{rel}"\n')
     with open('engine/engine_all.asm', 'w', encoding='latin-1') as f:
         f.write('; All engine segments, in source order.\n')

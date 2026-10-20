@@ -27,10 +27,14 @@ Z80 based computer.
 | `disassembly/` | The Spectrum disassembly. Kept as a faithful reference: comments and extra labels only; `test/golden/run.py` checks that nothing else changes. |
 | `engine/` | The simulation and tool logic extracted from it as a platform-independent engine (`engine/PLATFORM_INTERFACE.md`). |
 | `ui/` | The shared game user interface, in C, written against the small platform API in `ui/platform.h`. |
-| `platform/zx/` | The Spectrum build, assembled from the engine and the original UI code; byte-identical to the disassembly. |
-| `platform/console/` | z88dk console and keyboard front end used by the Aquarius+, NC200 and Z88 builds. |
+| `target/zx-original/` | The original Spectrum build, assembled from the engine and original UI code; byte-identical to the disassembly. |
+| `platform/console/` | NC200 z88dk console and keyboard front end. |
+| `target/aqplus/` | Aquarius+-specific platform implementation: bitmap renderer, capabilities and AQX CRT settings. |
+| `target/zx/` | Spectrum-specific platform implementation: bitmap renderer, capabilities and CRT settings. |
+| `target/z88/` | Z88-specific implementation: OZ integration, icons, sound and ROM CRT settings. |
 | `platform/common/` | Settings and hooks the engine needs, for C programs. |
-| `platform/test`, `platform/test_ui/` | Headless platforms used by the tests. |
+| `target/test/` | Headless assembly platform used by the golden-master tests. |
+| `target/test_ui/` | Headless C platform used by the UI tests. |
 | `tools/` | `split_engine.py` (extract the engine), `extract_text.py` (generate `ui/text.h` and `ui/text.c`), `find_dead.py`, `make_map_art.py`, `make_z88_icons.py` (the tool icons as Z88 characters). |
 | `Makefile` | Builds every platform (`make zx`, `make aqplus`, ...) and runs the tests (`make check`). |
 | `test/` | `run_all.sh` runs everything. |

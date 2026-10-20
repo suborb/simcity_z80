@@ -2,11 +2,14 @@
 
 | Directory | Status |
 |---|---|
-| `zx/` | The reference. `zx_game.asm` includes the original UI segments and the engine segments in their original order and assembles to the same bytes as `disassembly/sim_game.asm`. Nothing here is portable. |
-| `test/` | Headless assembly platform: the engine with do-nothing hooks and a driver. Used by `test/golden`. A template for writing an assembly platform. |
-| `test_ui/` | Headless C platform: RAM screen and scripted keys for the game core. Used by `test/ui`. |
 | `common/hooks.asm` | The settings and hooks the engine expects (`engine/PLATFORM_INTERFACE.md`), for C programs. |
-| `console/` | z88dk conio and input front end. Builds for Aquarius+ (`+aquarius -clib=aqplus`), NC200 (`+nc -clib=nc200 -subtype=ram`) and Z88 (`+z88`). Character graphics only so far. |
+| `console/` | z88dk conio and input front end for NC200 (`+nc -clib=nc200 -subtype=ram`). |
+| `../target/aqplus/` | Aquarius+-specific implementation: 320x200 bitmap renderer, its UI capabilities and AQX CRT settings. |
+| `../target/zx/` | Spectrum-specific implementation: fast 8x8 bitmap renderer, its UI capabilities and CRT settings. |
+| `../target/zx-original/` | Reference Spectrum build: original UI segments and engine segments in original order; byte-identical to the disassembly. |
+| `../target/z88/` | Z88-specific implementation: OZ screen/menu integration, icons, sound and ROM CRT settings. |
+| `../target/test/` | Headless assembly platform: the engine with do-nothing hooks and a driver. Used by `test/golden`. A template for writing an assembly platform. |
+| `../target/test_ui/` | Headless C platform: RAM screen and scripted keys for the game core. Used by `test/ui`. |
 
 ## Writing a platform
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The Z88's menus (platform/console/z88_dor.c) must send the commands the game understands
+"""The Z88's menus (target/z88/z88_dor.c) must send the commands the game understands
 (CMD_* in ui/platform.h).  Nothing can run OZ menus here, so check the two files agree:
 
   * every command except CMD_REDRAW (which OZ sends itself) has exactly one menu item, and
@@ -18,7 +18,7 @@ import sys
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 read = lambda p: open(os.path.join(ROOT, p), encoding='latin-1').read()
 
-platform_h, dor, text_h = read('ui/platform.h'), read('platform/console/z88_dor.c'), read('ui/text.c')
+platform_h, dor, text_h = read('ui/platform.h'), read('target/z88/z88_dor.c'), read('ui/text.c')
 failures = []
 
 

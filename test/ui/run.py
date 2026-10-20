@@ -3,7 +3,7 @@
 +test target and run under z88dk-ticks with a scripted keyboard.
 
 The same ui/ sources are what the Aquarius+, NC200 and Z88 builds use; only the
-platform file differs (platform/test_ui here, platform/console there).
+platform file differs (target/test_ui here, platform/console there).
 
   usage: test/ui/run.py
 

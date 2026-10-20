@@ -1,6 +1,6 @@
 /* What the game core needs from a platform.  Implemented once per kind of
-   display: platform/console (z88dk conio: Aquarius+, NC200, Z88) and
-   platform/test_ui (headless). */
+   display: platform/console (z88dk conio: NC200), target/aqplus, target/zx, target/z88, and
+   target/test_ui (headless). */
 #ifndef PLATFORM_H
 #define PLATFORM_H
 
@@ -68,6 +68,8 @@ extern void     plat_flush(void);               /* end of frame: show what was d
      HAVE_BITMAP       it can draw pictures of the game's own making (plat_put_bitmap()); needed by HAVE_MINIMAP
      HAVE_ICONS        the tools as small pictures in rows 3 and 4 of the text area (plat_icons()); the status
                        panel then has the advisor message on row 6 and no key tips
+     HAVE_ICONS_TOP    with HAVE_ICONS: the date, funds and population are on row 0, the icons in rows 1 and 2, then
+                       the tool, the demand bars and the advisor: a six row panel (no text window; ui/game.c)
      HAVE_MENUS        menus of its own, which have quit: the X key does not quit there, ESC leaves a mini map,
                        and the cursor keys move (Q, A, O and P do not)
      HAVE_FILES        files, for saving and loading a city (plat_file_save()/plat_file_load())
@@ -84,8 +86,8 @@ extern void     plat_flush(void);               /* end of frame: show what was d
 #if defined(HAVE_MINIMAP) && !defined(HAVE_BITMAP)
 #error "the mini maps need HAVE_BITMAP"
 #endif
-#if defined(HAVE_ICONS) && !defined(HAVE_TEXT_WINDOW)
-#error "the icons need a text window"
+#if defined(HAVE_ICONS) && !defined(HAVE_TILES) && !defined(HAVE_TEXT_WINDOW)
+#error "the icons need a text window, or pictures"
 #endif
 
 /* The text area.  Where there is a text window the status text, the title and the screens go in it; elsewhere
@@ -96,7 +98,7 @@ extern void     plat_text_clear(void);
 extern void     plat_text_puts(uint8_t col, uint8_t row, const char *s);
 
 #ifdef HAVE_ICONS
-/* plat_icons() draws the 14 tool icons in rows 3 and 4 of the text area, tool `selected` highlighted. */
+/* plat_icons() draws the 14 tool icons in rows 3 and 4 of the text area (28 columns), tool `selected` highlighted. */
 extern void     plat_icons(uint8_t selected);
 #endif
 

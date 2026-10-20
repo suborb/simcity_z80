@@ -7,7 +7,7 @@
 ; test/golden to compare the portable engine with the original Spectrum
 ; program under z88dk-ticks, and is a template for the real platforms.
 ;
-; Build:  z80asm -DPORTABLE -b -m platform/test/test_platform.asm
+; Build:  z80asm -DPORTABLE -b -m target/test/test_platform.asm
 ; ------------------------------------------------------------------------
         org     $0100
         INCLUDE "../../engine/sections.asm"

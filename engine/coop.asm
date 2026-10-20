@@ -151,7 +151,14 @@ ui_sp:               defw    0
 sim_coop_active:     defb    0
 sim_tick_complete:   defb    0
 
+        IFDEF   SIM_STACK_TOP
+; The stack is at a fixed address (the Aquarius+ keeps it below $C000, where its firmware's interrupt
+; handler can reach it: RAM up there is a paged bank).
+sim_stack_top           equ     SIM_STACK_TOP
+sim_stack               equ     SIM_STACK_TOP - SIM_STACK_SIZE
+        ELSE
         IN_BSS
 sim_stack:           defs    SIM_STACK_SIZE
 sim_stack_top:
         IN_CODE
+        ENDIF

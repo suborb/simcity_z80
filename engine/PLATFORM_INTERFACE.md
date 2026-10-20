@@ -3,7 +3,7 @@
 The engine in this directory is a copy of the simulation half of the Spectrum
 program (see `tools/split_engine.py` and `PORTING.md`).  Build it with
 `PORTABLE` defined, include `engine/engine.asm` in the platform's program, and
-supply what is listed here.  `platform/test/test_platform.asm` is the smallest
+supply what is listed here.  `target/test/test_platform.asm` is the smallest
 complete example: every item below is either a fixed value or a `ret`.
 
 The engine contains no keyboard, screen, sound or timing code.

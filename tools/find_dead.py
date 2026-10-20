@@ -10,7 +10,7 @@ the source with PORTABLE defined:
   * every identifier in a chunk that names a label is an edge (calls, jumps, loads of an
     address or a variable, jump tables, self-modifying operands);
   * the roots are what the platforms use: everything engine_c.asm, platform/common and
-    platform/test name.
+    target/test name.
 
 Whatever is not reachable from the roots is listed with its size (from the link map of
 `make test`).  It is a static, conservative analysis: anything referenced by
@@ -174,7 +174,7 @@ def main():
 
     # roots: every name in the platform-facing files
     roots = set()
-    for f in ['engine/engine_c.asm'] + glob.glob('platform/common/*.asm') + glob.glob('platform/test/*.asm'):
+    for f in ['engine/engine_c.asm'] + glob.glob('platform/common/*.asm') + glob.glob('target/test/*.asm'):
         txt = re.sub(r';[^\n]*', '', open(f, encoding='latin-1').read())
         roots |= set(WORDS.findall(txt))
     live = set()

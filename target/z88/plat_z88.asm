@@ -1,4 +1,4 @@
-; OZ native text output for the Z88 build.
+; Z88 OZ support, icons and generic-console font pointers.
 ;
 ;     void z88_sop(const char *s) __z88dk_fastcall      write a string to the current OZ window
 ;
@@ -45,3 +45,13 @@ _z88_sop:
 generic_console_flags:  defb    0
 generic_console_font32: defw    0
 generic_console_udg32:  defw    0
+
+        SECTION code_clib
+        PUBLIC  _plat_set_font
+        PUBLIC  _plat_set_udgs
+_plat_set_font:
+        ld      (generic_console_font32),hl
+        ret
+_plat_set_udgs:
+        ld      (generic_console_udg32),hl
+        ret

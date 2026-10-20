@@ -9,7 +9,7 @@
 ;   +2854   one attribute byte per large-zone piece
 ;
 ; In udgs.bin the same tables start at +536, +1288, +3296 and +3390.  The Spectrum
-; build has the whole file in platform/zx/zx_udgs.asm.
+; build has the whole file in target/zx-original/zx_udgs.asm.
 ; ------------------------------------------------------------------------
         defc    ART_TILES      = 0
         defc    ART_ZONES      = 752

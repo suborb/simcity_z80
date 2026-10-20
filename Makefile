@@ -9,7 +9,7 @@
 #   make check                          every automated test (test/run_all.sh)
 #   make golden | uitest | tiletest | z88test   one group of tests
 #   make ZCC='zcc' ...                 build with another compiler (or set ZCC in the environment: the tests use it too)
-#   make engine                         regenerate engine/ and platform/zx from disassembly/sim_game.asm
+#   make engine                         regenerate engine/ and target/zx-original from disassembly/sim_game.asm
 #   make deadcode                       list engine code nothing reaches
 #   make clean
 #
@@ -30,18 +30,24 @@ GAME    = ui/main.c ui/game.c ui/text.c ui/textfmt.c ui/numfmt.asm ui/budget.c u
 # The table drawing of the screens, in assembler: for the targets that have HAVE_FIELDS (see ui/platform.h).
 FIELDS  = ui/fmtfields.asm
 # The sound hooks the engine calls: the platform's own, or none.
-SOUND   = platform/console/plat_sound.asm       # one bit sound through the Z88's COM register
+SOUND   = target/z88/plat_sound.asm              # one bit sound through the Z88's COM register
 NOSOUND = platform/common/nosound.asm
 CONSOLE = platform/console/plat_console.c platform/console/plat_font.asm
-CINC    = -Iplatform/console        # where plat_config.h is, for the console platform
-TINC    = -Iplatform/test_ui        # and for the headless test platform
+AQPLUS_PLATFORM = target/aqplus/plat_aqplus.c target/aqplus/plat_aqplus.asm
+ZX_PLATFORM = target/zx/plat_zx.c target/zx/plat_zx.asm
+Z88_PLATFORM = target/z88/plat_z88.c target/z88/plat_z88.asm
+CINC    = -Iplatform/console        # where plat_config.h is, for the shared console platforms
+AQINC   = -Itarget/aqplus           # Aquarius+'s own platform configuration
+ZXINC   = -Itarget/zx               # Spectrum's own platform configuration
+Z88INC  = -Itarget/z88              # Z88's own platform configuration
+TINC    = -Itarget/test_ui          # and for the headless test platform
 
 # Everything a build depends on.
 DEPS = Makefile $(wildcard ui/*.c ui/*.h engine/*.asm engine/*.h platform/common/*.asm \
-         platform/console/* platform/test_ui/*) assets/map_art.bin assets/udgs.bin
+         platform/console/* target/*/*) assets/map_art.bin assets/udgs.bin assets/icons.bin
 
 AQPLUS = build/aqplus/simcity.aqx
-NC200  = build/nc200/SIMCITY.COM
+NC200  = build/nc200/simcity.img
 Z88    = build/z88/SIMCITY.BAS
 Z88ROM = build/z88rom/simcity.epr
 ZX     = build/zx/simcity.tap
@@ -49,6 +55,9 @@ ZXP    = build/zx-print/simcity.tap
 TEST   = build/test/simcity.bin
 TESTP  = build/testpanel/simcity.bin
 TESTS  = build/testsprites/simcity.bin
+
+# Aquarius+ AQX programs are loaded below $C000; omit CRT facilities this build does not use.
+AQPLUS_PRAGMAS = target/aqplus/zpragma.inc
 
 .PHONY: all aqplus nc200 z88 z88rom zx zx-print test testpanel testsprites check golden uitest tiletest z88test engine deadcode clean
 
@@ -70,73 +79,73 @@ testsprites: $(TESTS)
 # pointers when printed, so the map gets the real tiles like the NC200.
 $(AQPLUS): $(DEPS)
 	@mkdir -p $(@D)
-	$(ZCC) +aquarius -clib=aqplus -subtype=aqx --generic-console -create-app $(COMMON) \
-	    $(CINC) -DTARGET_AQPLUS $(GAME) $(NOSOUND) $(FIELDS) $(CONSOLE) -o $(@D)/simcity
+	$(ZCC) +aquarius -clib=aqplus -subtype=aqx --generic-console -create-app $(COMMON) -pragma-include:$(AQPLUS_PRAGMAS) -pragma-define:CRT_TRIM_BSS=1 -pragma-define:CRT_AQPLUS_BANK3_RAM=1 -pragma-define:REGISTER_SP=0x4000 -pragma-define:CRT_ORG_CODE=0x4000 -pragma-redirect:CRT_FONT=_font_8x8_bbc_system \
+	    $(AQINC) -DTARGET_AQPLUS -DMAX_VIEW_W=40 -DMAX_VIEW_H=19 -Ca-DTARGET_AQPLUS -Ca-DSIM_STACK_TOP=0x3D00 $(GAME) $(NOSOUND) $(FIELDS) $(AQPLUS_PLATFORM) -o $(@D)/simcity
 
 # NC200: RAM subtype (the default ROM-card subtype cannot host self-modifying code).  Tiles
 # go through the console's font and UDG pointers (see platform/console/plat_config.h and plat_console.c).
 $(NC200): $(DEPS)
 	@mkdir -p $(@D)
-	$(ZCC) +nc -clib=nc200 -subtype=ram -create-app $(COMMON) $(CINC) \
+	$(ZCC) +nc -clib=nc200 -subtype=ncboot -create-app $(COMMON) $(CINC) \
 	    $(GAME) $(NOSOUND) $(FIELDS) $(CONSOLE) -o $(@D)/simcity
 
 # Z88 as a BASIC program: the same screen, without the ROM image.
 $(Z88): $(DEPS)
 	@mkdir -p $(@D)
-	$(ZCC) +z88 --generic-console -create-app $(CINC) -DTARGET_Z88 -Ca-DZ88_DI_SIM -DMAX_VIEW_W=32 -DMAX_VIEW_H=8 \
-	    $(COMMON) $(GAME) $(FIELDS) $(CONSOLE) platform/console/plat_z88.asm $(SOUND) -o $(@D)/simcity
+	$(ZCC) +z88 --generic-console -create-app $(Z88INC) -DTARGET_Z88 -Ca-DZ88_DI_SIM -DMAX_VIEW_W=32 -DMAX_VIEW_H=8 \
+	    $(COMMON) $(GAME) $(FIELDS) $(Z88_PLATFORM) $(SOUND) -o $(@D)/simcity
 
 # Z88 as a ROM application for a 32 KB card (code and tables in ROM, the data in the RAM OZ allocates;
-# see engine/sections.asm and platform/console/zpragma_z88rom.inc).  Output: simcity.epr and its banks.
+# see engine/sections.asm and target/z88/zpragma_rom.inc).  Output: simcity.epr and its banks.
 # --generic-console: the map is drawn in the console's graphics window with our tile font,
 # the status text goes to OZ's text window.  Z88_DI_SIM runs each simulation slice with OZ's interrupts off.
 # The version shown in the Z88's help page (make VERSION=1.1 z88rom).
 VERSION ?= 1.0.0
 
-Z88ROM_FLAGS = -subtype=app --generic-console -create-app -pragma-include:platform/console/zpragma_z88rom.inc \
-               $(CINC) -DTARGET_Z88 -Ca-DZ88_DI_SIM -DMAX_VIEW_W=32 -DMAX_VIEW_H=8 \
+Z88ROM_FLAGS = -subtype=app --generic-console -create-app -pragma-include:target/z88/zpragma_rom.inc \
+               $(Z88INC) -DTARGET_Z88 -Ca-DZ88_DI_SIM -DMAX_VIEW_W=32 -DMAX_VIEW_H=8 \
                -Cp-DAPP_VERSION=$(VERSION)
 
 $(Z88ROM): $(DEPS)
 	@mkdir -p $(@D)
-	$(ZCC) +z88 $(Z88ROM_FLAGS) $(COMMON) $(GAME) $(CONSOLE) platform/console/plat_z88.asm \
-	    platform/console/z88_dor.c $(SOUND) $(FIELDS) -o $(@D)/simcity.bin
+	$(ZCC) +z88 $(Z88ROM_FLAGS) $(COMMON) $(GAME) $(Z88_PLATFORM) \
+	    target/z88/z88_dor.c $(SOUND) $(FIELDS) -o $(@D)/simcity.bin
 
 # ZX Spectrum.  The memory-layout pragmas (stack at the top of RAM, 32 column console, no
-# 64 column font) are in platform/console/zpragma_zx.inc, which the tests use too.
+# 64 column font) are in target/zx/zpragma.inc, which the tests use too.
 #   -zorg=24000      below about that appmake embeds the program in a BASIC REM line at 23760
 #                    instead of using a separate loader, so the code would not be where it was linked.
 #   --reserve-regs-iy  the Spectrum ROM's interrupt routine needs IY to hold the system variables,
 #                    so compiled code must not use it.  sccz80 never does; other compilers may.
-ZX_PRAGMAS = platform/console/zpragma_zx.inc
+ZX_PRAGMAS = target/zx/zpragma.inc
 ZX_FLAGS = -zorg=24000 -pragma-include:$(ZX_PRAGMAS) --reserve-regs-iy -create-app $(COMMON) \
-           $(CINC) -DTARGET_ZX -Ca-DTARGET_ZX -DMAX_VIEW_W=32 -DMAX_VIEW_H=16
+           $(ZXINC) -DTARGET_ZX -Ca-DTARGET_ZX -DMAX_VIEW_W=32 -DMAX_VIEW_H=16
 
 $(ZX): $(DEPS)
 	@mkdir -p $(@D)
-	$(ZCC) +zx $(ZX_FLAGS) $(GAME) $(NOSOUND) $(CONSOLE) platform/console/plat_zx_blit.asm -o $(@D)/simcity
+	$(ZCC) +zx $(ZX_FLAGS) $(GAME) $(NOSOUND) $(ZX_PLATFORM) -o $(@D)/simcity
 
 # The same, but each tile is drawn by printing a character whose picture comes from the console's
 # font and UDG pointers, as on the NC200 and Aquarius+, instead of being copied to screen memory.
 # Slower (about 7000 T-states a tile against a few hundred); there to compare the two by eye.
 $(ZXP): $(DEPS)
 	@mkdir -p $(@D)
-	$(ZCC) +zx $(ZX_FLAGS) -DZX_PRINT $(GAME) $(NOSOUND) $(CONSOLE) -o $(@D)/simcity
+	$(ZCC) +zx $(ZX_FLAGS) -DZX_PRINT $(GAME) $(NOSOUND) $(ZX_PLATFORM) -o $(@D)/simcity
 
 # Headless: a scripted keyboard and a screen in RAM instead of the console, run under z88dk-ticks.
 $(TEST): $(DEPS)
 	@mkdir -p $(@D)
-	$(ZCC) +test $(COMMON) $(TINC) $(GAME) $(NOSOUND) platform/test_ui/plat_test.c -o $@
+	$(ZCC) +test $(COMMON) $(TINC) $(GAME) $(NOSOUND) target/test_ui/plat_test.c -o $@
 
 # The same with a separate text window and a 32x8 map, the shape of the Z88's screen.
 $(TESTP): $(DEPS)
 	@mkdir -p $(@D)
-	$(ZCC) +test $(COMMON) $(TINC) -DTEST_PANEL $(GAME) $(NOSOUND) $(FIELDS) platform/test_ui/plat_test.c -o $@
+	$(ZCC) +test $(COMMON) $(TINC) -DTEST_PANEL $(GAME) $(NOSOUND) $(FIELDS) target/test_ui/plat_test.c -o $@
 
 # The same, drawing the map from pictures (and the sprites over it), which the test reads back.
 $(TESTS): $(DEPS)
 	@mkdir -p $(@D)
-	$(ZCC) +test $(COMMON) $(TINC) -DTEST_PANEL -DTEST_SPRITES $(GAME) $(NOSOUND) $(FIELDS) platform/test_ui/plat_test.c -o $@
+	$(ZCC) +test $(COMMON) $(TINC) -DTEST_PANEL -DTEST_SPRITES $(GAME) $(NOSOUND) $(FIELDS) target/test_ui/plat_test.c -o $@
 
 check:
 	sh test/run_all.sh

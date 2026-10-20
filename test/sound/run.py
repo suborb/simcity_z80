@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The Z88's sound routines (platform/console/plat_sound.asm) play the Spectrum's effects through the COM register.
+"""The Z88's sound routines (target/z88/plat_sound.asm) play the Spectrum's effects through the COM register.
 
 Each routine is run under z88dk-ticks with its trace on, from which every byte written to port $B0 (the COM
 register) is read.  What is checked:
@@ -46,7 +46,7 @@ start:  ld      sp,$0F00
         ld      e,${e:02x}
         {call}
 stop:   jp      stop
-        INCLUDE "{ROOT}/platform/console/plat_sound.asm"
+        INCLUDE "{ROOT}/target/z88/plat_sound.asm"
 ''')
     subprocess.run(['z88dk-z80asm', '-b', '-m', f'-I{ROOT}/engine', '-DPORTABLE', asm], check=True, capture_output=True, cwd=tmp)
     syms = {}

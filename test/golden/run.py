@@ -4,7 +4,7 @@
 Both versions are built from the repository in a scratch directory:
 
   reference  disassembly/sim_game.asm          the original Spectrum program, untouched
-  portable   platform/test/test_platform.asm  the engine + headless test platform
+  portable   target/test/test_platform.asm    the engine + headless test platform
 
 The same city is loaded into each, the same number of simulation ticks is run
 under z88dk-ticks, and the levelmap, all minimaps and every engine variable are
@@ -62,19 +62,19 @@ def parse_map(path):
 
 def build(tmp):
     """Build the reference and portable images in tmp; return their paths."""
-    for d in ('assets', 'engine', 'platform', 'disassembly'):
+    for d in ('assets', 'engine', 'platform', 'target', 'disassembly'):
         junk = None if d == 'assets' else shutil.ignore_patterns('*.bin', '*.o', '*.map', '*.sym')
         shutil.copytree(os.path.join(ROOT, d), os.path.join(tmp, d), ignore=junk)
     run([Z80ASM, '-b', '-m', 'disassembly/sim_game.asm'], cwd=tmp)
-    run([Z80ASM, '-b', '-m', 'platform/zx/zx_game.asm'], cwd=tmp)
-    run([Z80ASM, '-Iengine', '-DPORTABLE', '-DSIM_STACK_FILL', '-b', '-m', 'platform/test/test_platform.asm'], cwd=tmp)
+    run([Z80ASM, '-b', '-m', 'target/zx-original/zx_game.asm'], cwd=tmp)
+    run([Z80ASM, '-Iengine', '-DPORTABLE', '-DSIM_STACK_FILL', '-b', '-m', 'target/test/test_platform.asm'], cwd=tmp)
     ref = ('disassembly/sim_game.bin', 'disassembly/sim_game.map')
-    po = ('platform/test/test_platform.bin', 'platform/test/test_platform.map')
+    po = ('target/test/test_platform.bin', 'target/test/test_platform.map')
     a = open(os.path.join(tmp, 'disassembly/sim_game.bin'), 'rb').read()
-    b = open(os.path.join(tmp, 'platform/zx/zx_game.bin'), 'rb').read()
+    b = open(os.path.join(tmp, 'target/zx-original/zx_game.bin'), 'rb').read()
     if a != b:
-        sys.exit('FAIL  the split Spectrum build (platform/zx) differs from the original disassembly')
-    print('PASS  platform/zx/zx_game.asm assembles to exactly the original binary '
+        sys.exit('FAIL  the split Spectrum build (target/zx-original) differs from the original disassembly')
+    print('PASS  target/zx-original/zx_game.asm assembles to exactly the original binary '
           f'({len(a)} bytes)')
     return [os.path.join(tmp, p) for p in ref + po]
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""ZX Spectrum tile drawing: the real console platform (platform/console) and engine
+"""ZX Spectrum tile drawing: the Spectrum target platform (target/zx) and engine
 art, built for +zx with the game's flags and run under z88dk-ticks.  Checks the
 Spectrum's screen memory against the art in assets/udgs.bin for every picture
 (map tiles and both ranges of large-zone pieces), the
@@ -26,12 +26,11 @@ PRINT = '--print' in sys.argv        # draw by printing characters instead of th
 def build():
     os.makedirs(OUT, exist_ok=True)
     env = os.environ
-    cmd = os.environ.get('ZCC', 'zcc -compiler=80cc -fframe-pointer').split() + ['+zx', f'-zorg={ZORG}', '-pragma-include:platform/console/zpragma_zx.inc', '-Ca-DPORTABLE',
+    cmd = os.environ.get('ZCC', 'zcc -compiler=80cc -fframe-pointer').split() + ['+zx', f'-zorg={ZORG}', '-pragma-include:target/zx/zpragma.inc', '-Ca-DPORTABLE',
            '-Ca-Iengine', '-Ca-I.', '-Iui', '-Cc-standard-escape-chars', '-m',
-           '-Iplatform/console', '-DTARGET_ZX', '-Ca-DTARGET_ZX', '-DHAVE_SPRITES'] + (['-DZX_PRINT'] if PRINT else []) + [ '-DMAX_VIEW_W=32', '-DMAX_VIEW_H=16',
+           '-Itarget/zx', '-DTARGET_ZX', '-Ca-DTARGET_ZX', '-DHAVE_SPRITES'] + (['-DZX_PRINT'] if PRINT else []) + [ '-DMAX_VIEW_W=32', '-DMAX_VIEW_H=16',
            'test/tiles/main.c', 'ui/sprites.c', 'engine/engine_c.asm', 'platform/common/hooks.asm', 'platform/common/nosound.asm',
-           'platform/console/plat_console.c', 'platform/console/plat_font.asm'] + \
-          ([] if PRINT else ['platform/console/plat_zx_blit.asm']) + [
+           'target/zx/plat_zx.c', 'target/zx/plat_zx.asm'] + [
            '-o', os.path.join(OUT, 'tiles')]
     r = subprocess.run(cmd, cwd=ROOT, env=env, capture_output=True, text=True)
     if r.returncode:

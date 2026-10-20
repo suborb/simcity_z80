@@ -474,6 +474,54 @@ static const struct field status_map_low[] = {              /* with icons: just 
     { 5,  5, F_STR,  0, &st_line[1] },
 };
 
+#ifdef HAVE_ICONS_TOP
+/* The Spectrum's arrangement across the whole 40 columns: the date, funds and population on row 0, the tool icons in
+   rows 1 and 2, then the tool and speed, the three demand bars, and the advisor (or the mini map's name). */
+#define TOP_PANEL_ROWS  6
+
+static const struct field top_status[] = {
+    { 0,  0, F_STR,  0, &st_month },
+    { 0,  8, F_U16,  0, &V_year },
+    { 0, 10, F_TEXT, 0, "FUNDS $" },
+    { 0, 17, F_L24,  0, V_money },
+    { 0, 27, F_TEXT, 0, "POP" },
+    { 0, 31, F_L24,  0, V_display_population },
+    { 3,  0, F_STR,  0, &st_tool },
+    { 3, 24, F_STR,  0, &st_speed },
+};
+static const struct field top_alert[] = {
+    { 5,  0, F_STR,  0, &st_alert },
+};
+static const struct field top_map[] = {
+    { 5,  0, F_TEXT, 0, "MAP:" },
+    { 5,  5, F_STR,  0, &st_line[1] },
+    { 5, 22, F_TEXT, 0, "M NEXT  X BACK" },
+};
+
+static void draw_status(void)
+{
+    char buf[41];
+
+    st_month = text_months[V_month];
+    st_tool = text_tools[tool];
+    st_speed = st_speeds[V_simulation_speed & 3];
+    st_alert = V_alertmessage < sizeof(text_alerts) / sizeof(text_alerts[0]) ? text_alerts[V_alertmessage] : "";
+    fmt_fields(top_status, sizeof(top_status) / sizeof(struct field));
+    fmt_blank(buf);
+    demand_bar(buf, 'R', V_RValve);
+    demand_bar(buf + 13, 'C', V_CValve);
+    demand_bar(buf + 26, 'I', V_IValve);
+    plat_text_puts(0, 4, buf);
+#ifdef HAVE_MINIMAP
+    if (map_view) {
+        st_line[1] = minimap_names[map_view];
+        fmt_fields(top_map, sizeof(top_map) / sizeof(struct field));
+    } else
+#endif
+        fmt_fields(top_alert, 1);
+    plat_icons(tool);
+}
+#else
 /* The status panel: five lines, so it fits the top third of even a 16 row screen. */
 static void draw_status(void)
 {
@@ -524,6 +572,7 @@ static void draw_status(void)
         fmt_fields(status_help, panel_h >= 7 ? 3 : 1);
     }
 }
+#endif
 #else
 static uint8_t append(char *buf, uint8_t n, const char *s)
 {
@@ -788,6 +837,14 @@ static void choose_layout(void)
     panel_col = panel_row = 0;
     panel_w = plat_text_cols();
     panel_h = plat_text_rows();
+#elif defined(HAVE_ICONS_TOP)
+    panel_col = panel_row = 0;
+    panel_w = cols;
+    panel_h = TOP_PANEL_ROWS;                       /* a short panel across the top: the map gets the rest */
+    map_row = TOP_PANEL_ROWS;
+    view_h = (uint8_t)(rows - TOP_PANEL_ROWS);
+    if (view_h > MAX_VIEW_H)
+        view_h = MAX_VIEW_H;
 #else
     view_h = (uint8_t)(rows - rows / 3);            /* the map takes the bottom two thirds */
     if (view_h > MAX_VIEW_H)
@@ -930,6 +987,7 @@ static void play_city(void)
             plat_text_clear();
             memset(&last_st, 0xFF, sizeof(last_st));
         }
+#ifndef HAVE_ICONS_TOP
         full = origin_x != last_ox || origin_y != last_oy || last_cx == 255;
         last_ox = origin_x;
         last_oy = origin_y;
@@ -939,6 +997,7 @@ static void play_city(void)
         } else {
             draw_view(full, map_dirty);
         }
+#endif
 
         /* the status panel only when something it shows has changed */
         memcpy(st.money, V_money, 3);
@@ -957,6 +1016,17 @@ static void play_city(void)
             last_st = st;
             draw_status();
         }
+#ifdef HAVE_ICONS_TOP                  /* the panel is at the top: it is drawn first, so a new screen does not show the map before it */
+        full = origin_x != last_ox || origin_y != last_oy || last_cx == 255;
+        last_ox = origin_x;
+        last_oy = origin_y;
+        if (map_view) {
+            draw_minimap(map_full);
+            map_full = 0;
+        } else {
+            draw_view(full, map_dirty);
+        }
+#endif
         plat_flush();
         map_dirty = 0;
         ++frame;

@@ -19,7 +19,7 @@ def main():
     os.makedirs(OUT, exist_ok=True)
     env = os.environ
     binary = os.path.join(OUT, 'fmt.bin')
-    r = subprocess.run(ZCC.split() + ['+test', '-m', '-Iui', '-Iplatform/test_ui', '-Ca-Iengine', '-Ca-I.', test_main(), 'ui/textfmt.c', 'ui/numfmt.asm',
+    r = subprocess.run(ZCC.split() + ['+test', '-m', '-Iui', '-Itarget/test_ui', '-Ca-Iengine', '-Ca-I.', test_main(), 'ui/textfmt.c', 'ui/numfmt.asm',
                                       '-o', binary], cwd=ROOT, env=env, capture_output=True, text=True)
     if r.returncode:
         print(r.stdout, r.stderr)
@@ -43,7 +43,7 @@ def main():
         if got != str(v) or n != len(str(v)):
             bad.append((v, got, n))
     # the table drawing in assembler: every kind of field, against a rendering of the same table made here
-    r = subprocess.run(ZCC.split() + ['+test', '-m', '-DHAVE_FIELDS', '-Iui', '-Iplatform/test_ui', '-Ca-Iengine', '-Ca-I.', 'test/fmt/fields.c',
+    r = subprocess.run(ZCC.split() + ['+test', '-m', '-DHAVE_FIELDS', '-Iui', '-Itarget/test_ui', '-Ca-Iengine', '-Ca-I.', 'test/fmt/fields.c',
                                       'ui/textfmt.c', 'ui/numfmt.asm', 'ui/fmtfields.asm', '-o', os.path.join(OUT, 'fields.bin')],
                        cwd=ROOT, env=env, capture_output=True, text=True)
     if r.returncode:

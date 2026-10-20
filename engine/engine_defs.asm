@@ -1,5 +1,5 @@
         INCLUDE "sections.asm"
-; Constants the engine needs (the Spectrum build gets these from platform/zx/zx_start.asm).
+; Constants the engine needs (the Spectrum build gets these from target/zx-original/zx_start.asm).
         defc        TILE_DIRT = 2
         defc        TILE_WATER = 0
         defc        TILE_H_ROAD = 7
