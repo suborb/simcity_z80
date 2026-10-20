@@ -1,7 +1,7 @@
 /* The mini maps: the whole city, two pixels a tile each way (192x192), drawn with plat_put_bitmap()
-   as 8x8 pictures.  The window is 64 pixels high, so 192x64 is shown: a page of 32 tile rows, a
-   third of the city.  Up and down flip it 24 tile rows at a time, so that a little of the last page stays in view.
-   A pixel is one bit, so what a tile holds is
+   as 8x8 pictures.  Compact targets show an 8-cell (64-pixel) high window and page it with up and down.
+   A larger target can set MINIMAP_CELLS_H to show more, or all 24 cell rows, at once.  A pixel is one bit,
+   so what a tile holds is
    shown by dithering: 0 to 4 of its 2x2 pixels lit for the city and power maps, and the density
    maps (pollution, traffic: 48x48; police and fire coverage: 24x24) in finer matrices. */
 #ifndef MINIMAP_H
@@ -19,8 +19,13 @@
 #define MM_CRIME     8      /* crime on the built-up tiles: far from the city's centre, less covered by police */
 #define MM_VIEWS     8      /* views 1..MM_VIEWS */
 
-#define MM_CELLS_W   24     /* the picture is 24x8 cells: 192x64 pixels */
-#define MM_CELLS_H   8
+#define MM_CELLS_W   24     /* the complete city picture is 24x24 cells: 192x192 pixels */
+#ifndef MINIMAP_CELLS_H
+#define MINIMAP_CELLS_H 8   /* the Z88-sized default */
+#endif
+#define MM_CELLS_H   MINIMAP_CELLS_H
+#define MM_PIXELS_H  (MM_CELLS_H * 8)
+#define MM_PICTURE_H (MM_CELLS_W * 8)
 
 extern const char *const minimap_names[MM_VIEWS + 1];
 

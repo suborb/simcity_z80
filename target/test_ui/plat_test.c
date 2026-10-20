@@ -6,14 +6,18 @@
 #include <stdint.h>
 #include "platform.h"
 
-/* Two shapes.  The default is one 64x24 screen with the status in its top third.  With
+/* Three shapes.  The default is one 64x24 screen with the status in its top third.  With
    TEST_PANEL the console is a 32x8 map, like the Z88's, and the text has a window of its own
-   (51x8) that the game draws the title and the status panel in. */
+   (51x8) that the game draws the title and the status panel in.  TEST_HIRES_MINIMAP is the
+   Aquarius+'s 40x25 bitmap display, used to check its taller map-window mini map. */
 #ifdef TEST_PANEL
 #define COLS 32
 #define ROWS 8
 #define TEXT_COLS 51
 #define TEXT_ROWS 8
+#elif defined(TEST_HIRES_MINIMAP)
+#define COLS 40
+#define ROWS 25
 #else
 #define COLS 64
 #define ROWS 24
@@ -226,7 +230,7 @@ void plat_put_bitmap(uint8_t col, uint8_t row, const uint8_t *art)
 
 uint16_t plat_clock(void) { return 0x1234; }
 void plat_idle(void) { }
-#ifdef TEST_PANEL
+#if defined(TEST_PANEL) || defined(TEST_HIRES_MINIMAP)
 /* The mini map tests want something in the coverage maps, which a city has none of until it has run
    for a year.  After the new city is made (the first frames), fill them with a pattern. */
 extern uint8_t minimaps[6912];

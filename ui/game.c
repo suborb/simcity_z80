@@ -332,14 +332,13 @@ static void invalidate_view(void)
 
 #ifdef HAVE_MINIMAP
 /* ---- the mini maps ---------------------------------------------------------------
-   The map window shows the city two pixels a tile, 192x64 of its 192x192 (see ui/minimap.h): a third
-   of it, which starts as the third with the cursor; up and down flip to the next.  A cell row is redrawn
-   every few frames to follow the simulation (a row of 24 cells is a lot of work), and the cursor's cell
-   every frame (it blinks, as in the city view). */
-#define MM_COL 4                            /* 24 cells wide, in the middle of 32 */
-#define MM_ROW 0
+   The city is 24 cells square at two pixels a tile (see ui/minimap.h).  The compact default is the
+   Z88's 24x8 window, with pages.  A platform can make it taller, but it remains in the normal map window
+   beneath the status panel.  A cell row is redrawn every few frames to follow the simulation (a row of
+   24 cells is a lot of work), and the cursor's cell every frame (it blinks, as in the city view). */
 
 static uint8_t mm_top;                      /* the pixel row shown at the top */
+static uint8_t mm_col, mm_row;               /* upper-left cell on the physical display */
 
 static void draw_minimap_cell(uint8_t cx, uint8_t cy)
 {
@@ -348,7 +347,7 @@ static void draw_minimap_cell(uint8_t cx, uint8_t cy)
     if (cy >= MM_CELLS_H)
         return;
     minimap_cell(map_view, cx, cy, mm_top, cur_x, cur_y, (frame & 4) != 0, art);
-    plat_put_bitmap((uint8_t)(MM_COL + cx), (uint8_t)(map_row + MM_ROW + cy), art);
+    plat_put_bitmap((uint8_t)(mm_col + cx), (uint8_t)(mm_row + cy), art);
 }
 
 static void draw_minimap(uint8_t full)
@@ -374,14 +373,22 @@ static void draw_minimap(uint8_t full)
     draw_minimap_cell(last_cx_, last_cy_);
 }
 
-/* Up and down flip the page of the city the picture shows (the cursor stays where it is).  A page is 64 pixels high
-   and the step 48, so that 16 pixels of what was shown stay on the screen: you can see where you were. */
+/* Up and down flip the page of the city the picture shows (the cursor stays where it is).  The step leaves
+   16 pixels of the last page in view: this is the old 48-pixel step on the Z88. */
 static void flip_page(int8_t dy)
 {
-    uint8_t top = (uint8_t)(mm_top + (dy < 0 ? -48 : 48));
+    uint8_t step, top;
 
-    if (top > 128)                          /* (it wrapped below 0, or ran past the end) */
-        top = dy < 0 ? 0 : 128;
+    if (MM_PIXELS_H >= MM_PICTURE_H)
+        return;                              /* the whole city is already on screen */
+    step = (uint8_t)(MM_PIXELS_H - 16);
+    if (dy < 0)
+        top = mm_top > step ? (uint8_t)(mm_top - step) : 0;
+    else {
+        top = (uint8_t)(mm_top + step);
+        if (top > MM_PICTURE_H - MM_PIXELS_H)
+            top = MM_PICTURE_H - MM_PIXELS_H;
+    }
     mm_top = top;
     map_full = 1;
 }
@@ -389,7 +396,7 @@ static void flip_page(int8_t dy)
 /* Show mini map v (1..MM_VIEWS), or 0 for the city again. */
 static void set_map_view(uint8_t v)
 {
-    if (v && (view_w < MM_COL + MM_CELLS_W || view_h < MM_ROW + MM_CELLS_H))
+    if (v && (view_w < MM_CELLS_W || view_h < MM_CELLS_H))
         return;                             /* nowhere to draw it */
     if (v == map_view)
         return;
@@ -398,6 +405,10 @@ static void set_map_view(uint8_t v)
     if (v) {
         map_full = 1;
         mm_top = (uint8_t)((cur_y >> 5) << 6);   /* the third of the city the cursor is in */
+        if (mm_top > MM_PICTURE_H - MM_PIXELS_H)
+            mm_top = MM_PICTURE_H - MM_PIXELS_H;
+        mm_col = (uint8_t)((cols - MM_CELLS_W) >> 1);
+        mm_row = map_row;
     } else {
         invalidate_view();
         last_cx = 255;                      /* a full pass over the city */

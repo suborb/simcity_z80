@@ -18,6 +18,7 @@
 #include "textfmt.h"
 #include "evaluation.h"
 #ifdef HAVE_EVALUATION
+#define EVAL_ROW(n)  (((n) * (MODAL_ROWS - 1) + 3) / 7)
 uint16_t eval_unpowered;
 
 static const uint8_t class_from[5][3] = {           /* population where each class starts, 24 bit */
@@ -90,48 +91,99 @@ static struct evaluation ev;
 static uint8_t migration[3];
 static const char *class_name, *level_name;
 
+#if MODAL_ROWS >= 24
+/* The full-screen arrangement keeps the Spectrum's sections: the question and approval, then the problems,
+   statistics and city category. */
 static const struct field head[] = {
-    { 0,  0, F_TEXT, 0,   "MAYOR APPROVAL" },
-    { 0, 17, F_TEXT, 0,   "YES" },
-    { 0, 25, F_U8,   '%', &ev.yes },
-    { 0, 28, F_TEXT, 0,   "NO" },
-    { 0, 36, F_U8,   '%', &ev.no },
+    { 0, 13, F_TEXT, 0,   "EVALUATION" },
+    { 2,  1, F_TEXT, 0,   "IS THE MAYOR DOING A GOOD JOB?" },
+    { 3, 14, F_U8,   '%', &ev.yes },
+    { 3, 18, F_TEXT, 0,   "YES" },
+    { 4, 14, F_U8,   '%', &ev.no },
+    { 4, 18, F_TEXT, 0,   "NO" },
 };
 
 static const struct field body[] = {
-    { 1,  0, F_TEXT, 0,   "TRAFFIC" },
-    { 1, 15, F_U8,   '%', ev.problem },
-    { 1, 18, F_TEXT, 0,   "POLLUTION" },
-    { 1, 36, F_U8,   '%', ev.problem + 1 },
-    { 2,  0, F_TEXT, 0,   "CRIME" },
-    { 2, 15, F_U8,   '%', ev.problem + 2 },
-    { 2, 18, F_TEXT, 0,   "FIRE" },
-    { 2, 36, F_U8,   '%', ev.problem + 3 },
-    { 3,  0, F_TEXT, 0,   "TAXES" },
-    { 3, 15, F_U8,   '%', ev.problem + 4 },
-    { 3, 18, F_TEXT, 0,   "HOUSE PRICES" },
-    { 3, 36, F_U8,   '%', ev.problem + 5 },
-    { 4,  0, F_TEXT, 0,   "UNEMPLOYMENT" },
-    { 4, 15, F_U8,   '%', ev.problem + 6 },
-    { 4, 18, F_TEXT, 0,   "CITY SCORE" },
-    { 4, 36, F_U16,  0,   &ev.score },
+    {  6,  1, F_TEXT, 0,   "WHAT ARE THE WORST PROBLEMS?" },
+    {  8,  1, F_TEXT, 0,   "TRAFFIC" },
+    {  8, 15, F_U8,   '%', ev.problem },
+    {  8, 20, F_TEXT, 0,   "POLLUTION" },
+    {  8, 39, F_U8,   '%', ev.problem + 1 },
+    {  9,  1, F_TEXT, 0,   "CRIME" },
+    {  9, 15, F_U8,   '%', ev.problem + 2 },
+    {  9, 20, F_TEXT, 0,   "FIRE" },
+    {  9, 39, F_U8,   '%', ev.problem + 3 },
+    { 10,  1, F_TEXT, 0,   "TAXES" },
+    { 10, 15, F_U8,   '%', ev.problem + 4 },
+    { 10, 20, F_TEXT, 0,   "HOUSE PRICES" },
+    { 10, 39, F_U8,   '%', ev.problem + 5 },
+    { 11,  1, F_TEXT, 0,   "UNEMPLOYMENT" },
+    { 11, 15, F_U8,   '%', ev.problem + 6 },
 };
 
 static const struct field nobody[] = {
-    { 1,  0, F_TEXT, 0,   "NOBODY LIVES HERE YET" },
+    {  8,  1, F_TEXT, 0,   "NOBODY LIVES HERE YET" },
 };
 
 static const struct field foot[] = {
-    { 5,  0, F_TEXT, 0,   "POPULATION" },
-    { 5, 17, F_U24,  0,   V_display_population },
-    { 5, 20, F_TEXT, 0,   "MIGRATION" },
-    { 5, 39, F_S24,  0,   migration },
-    { 6,  0, F_TEXT, 0,   "ASSESSED VALUE $" },
-    { 6, 16, F_K24,  0,   V_previous_city_score },
-    { 7,  0, F_STR,  0,   &class_name },
-    { 7, 14, F_STR,  0,   &level_name },
-    { 7, 31, F_TEXT, 0,   "ENTER OK" },
+    { 14,  1, F_TEXT, 0,   "POPULATION" },
+    { 14, 17, F_U24,  0,   V_display_population },
+    { 15,  1, F_TEXT, 0,   "MIGRATION" },
+    { 15, 17, F_S24,  0,   migration },
+    { 16,  1, F_TEXT, 0,   "ASSESSED VALUE $" },
+    { 16, 18, F_K24,  0,   V_previous_city_score },
+    { 19,  1, F_TEXT, 0,   "CATEGORY" },
+    { 19, 14, F_STR,  0,   &class_name },
+    { 20,  1, F_TEXT, 0,   "GAME LEVEL" },
+    { 20, 14, F_STR,  0,   &level_name },
+    { 21,  1, F_TEXT, 0,   "CITY SCORE" },
+    { 21, 17, F_U16,  0,   &ev.score },
+    { 23, 31, F_TEXT, 0,   "ENTER OK" },
 };
+#else
+static const struct field head[] = {
+    { EVAL_ROW(0),  0, F_TEXT, 0,   "MAYOR APPROVAL" },
+    { EVAL_ROW(0), 17, F_TEXT, 0,   "YES" },
+    { EVAL_ROW(0), 25, F_U8,   '%', &ev.yes },
+    { EVAL_ROW(0), 28, F_TEXT, 0,   "NO" },
+    { EVAL_ROW(0), 36, F_U8,   '%', &ev.no },
+};
+
+static const struct field body[] = {
+    { EVAL_ROW(1),  0, F_TEXT, 0,   "TRAFFIC" },
+    { EVAL_ROW(1), 15, F_U8,   '%', ev.problem },
+    { EVAL_ROW(1), 18, F_TEXT, 0,   "POLLUTION" },
+    { EVAL_ROW(1), 36, F_U8,   '%', ev.problem + 1 },
+    { EVAL_ROW(2),  0, F_TEXT, 0,   "CRIME" },
+    { EVAL_ROW(2), 15, F_U8,   '%', ev.problem + 2 },
+    { EVAL_ROW(2), 18, F_TEXT, 0,   "FIRE" },
+    { EVAL_ROW(2), 36, F_U8,   '%', ev.problem + 3 },
+    { EVAL_ROW(3),  0, F_TEXT, 0,   "TAXES" },
+    { EVAL_ROW(3), 15, F_U8,   '%', ev.problem + 4 },
+    { EVAL_ROW(3), 18, F_TEXT, 0,   "HOUSE PRICES" },
+    { EVAL_ROW(3), 36, F_U8,   '%', ev.problem + 5 },
+    { EVAL_ROW(4),  0, F_TEXT, 0,   "UNEMPLOYMENT" },
+    { EVAL_ROW(4), 15, F_U8,   '%', ev.problem + 6 },
+    { EVAL_ROW(4), 18, F_TEXT, 0,   "CITY SCORE" },
+    { EVAL_ROW(4), 36, F_U16,  0,   &ev.score },
+};
+
+static const struct field nobody[] = {
+    { EVAL_ROW(1),  0, F_TEXT, 0,   "NOBODY LIVES HERE YET" },
+};
+
+static const struct field foot[] = {
+    { EVAL_ROW(5),  0, F_TEXT, 0,   "POPULATION" },
+    { EVAL_ROW(5), 17, F_U24,  0,   V_display_population },
+    { EVAL_ROW(5), 20, F_TEXT, 0,   "MIGRATION" },
+    { EVAL_ROW(5), 39, F_S24,  0,   migration },
+    { EVAL_ROW(6),  0, F_TEXT, 0,   "ASSESSED VALUE $" },
+    { EVAL_ROW(6), 16, F_K24,  0,   V_previous_city_score },
+    { EVAL_ROW(7),  0, F_STR,  0,   &class_name },
+    { EVAL_ROW(7), 14, F_STR,  0,   &level_name },
+    { EVAL_ROW(7), 31, F_TEXT, 0,   "ENTER OK" },
+};
+#endif
 
 #define COUNT(a) (sizeof(a) / sizeof(struct field))
 
@@ -160,7 +212,7 @@ uint8_t evaluation_screen(void)
 {
     uint8_t k;
 
-    if (plat_text_rows() < 8 || plat_text_cols() < 40)
+    if (plat_text_rows() < MODAL_ROWS || plat_text_cols() < 40)
         return 0;
     evaluate(&ev);
     plat_text_clear();

@@ -18,44 +18,86 @@
 #include "textfmt.h"
 #ifdef HAVE_BUDGET
 #define MAX_TAX 20
-#define ROWS    8
+#define ROWS    MODAL_ROWS
+/* The compact design is an eight-row grid.  On an intermediate-height screen spread it over the available rows. */
+#define BUDGET_ROW(n)  (((n) * (MODAL_ROWS - 1) + 3) / 7)
 
 static uint8_t sel;                     /* 0 tax rate, 1 transport, 2 police, 3 fire */
 
+#if MODAL_ROWS >= 24
+/* The full-screen arrangement follows the Spectrum's groups, while using the extra height to make the money
+   figures and each service line independently readable. */
 static const struct field fields[] = {
-    { 0,  1, F_TEXT, 0,   "FISCAL BUDGET   TAX COLLECTED $" },
-    { 0, 32, F_L24,  0,   V_tax_collected },
-    { 1,  1, F_TEXT, 0,   "TAX RATE" },
-    { 1, 12, F_U8,   '%', &SMC_tax_rate },
-    { 2, 12, F_TEXT, 0,   "REQSTD   ALLCTD    FUND" },
-    { 3,  1, F_TEXT, 0,   "TRANSPORT" },
-    { 3, 18, F_U16,  0,   &V_Transport_Funding_Requested },
-    { 3, 27, F_U16,  0,   &V_Transport_Funding_Allocated },
-    { 3, 34, F_U8,   '%', &SMC_transport_percent },
-    { 4,  1, F_TEXT, 0,   "POLICE" },
-    { 4, 18, F_U16,  0,   &V_Budget_Police_Funding_Requested },
-    { 4, 27, F_U16,  0,   &V_Police_Funding_Allocated },
-    { 4, 34, F_U8,   '%', &SMC_police_percent },
-    { 5,  1, F_TEXT, 0,   "FIRE" },
-    { 5, 18, F_U16,  0,   &V_Budget_Fire_Funding_Requested },
-    { 5, 27, F_U16,  0,   &V_Fire_Funding_Allocated },
-    { 5, 34, F_U8,   '%', &SMC_fire_percent },
-    { 6,  1, F_TEXT, 0,   "CASH FLOW" },                   /* room for 7 digit funds: the row is 40 wide */
-    { 6, 18, F_S24,  0,   V_cashflow },
-    { 6, 20, F_TEXT, 0,   "FUNDS" },
-    { 6, 32, F_U24,  0,   V_previous_money },
-    { 6, 32, F_TEXT, 0,   ">" },
-    { 6, 40, F_U24,  0,   V_money_after_budget },
+    {  0,  1, F_TEXT, 0,   "FISCAL BUDGET" },
+    {  2,  1, F_TEXT, 0,   "TAX RATE" },
+    {  2, 12, F_U8,   '%', &SMC_tax_rate },
+    {  4,  1, F_TEXT, 0,   "TAX COLLECTED $" },
+    {  4, 16, F_L24,  0,   V_tax_collected },
+    {  6, 11, F_TEXT, 0,   "REQUESTED  ALLOCATED  FUNDING" },
+    {  8,  1, F_TEXT, 0,   "TRANSPORT" },
+    {  8, 20, F_U16,  0,   &V_Transport_Funding_Requested },
+    {  8, 31, F_U16,  0,   &V_Transport_Funding_Allocated },
+    {  8, 39, F_U8,   '%', &SMC_transport_percent },
+    { 10,  1, F_TEXT, 0,   "POLICE" },
+    { 10, 20, F_U16,  0,   &V_Budget_Police_Funding_Requested },
+    { 10, 31, F_U16,  0,   &V_Police_Funding_Allocated },
+    { 10, 39, F_U8,   '%', &SMC_police_percent },
+    { 12,  1, F_TEXT, 0,   "FIRE" },
+    { 12, 20, F_U16,  0,   &V_Budget_Fire_Funding_Requested },
+    { 12, 31, F_U16,  0,   &V_Fire_Funding_Allocated },
+    { 12, 39, F_U8,   '%', &SMC_fire_percent },
+    { 15,  1, F_TEXT, 0,   "CASH FLOW" },
+    { 15, 20, F_S24,  0,   V_cashflow },
+    { 17,  1, F_TEXT, 0,   "PREVIOUS FUNDS $" },
+    { 17, 18, F_L24,  0,   V_previous_money },
+    { 19,  1, F_TEXT, 0,   "CURRENT FUNDS $" },
+    { 19, 18, F_L24,  0,   V_money_after_budget },
 #ifdef HAVE_MENUS
-    { 7,  1, F_TEXT, 0,   "CURSORS SELECT AND CHANGE  ENTER OK" },
+    { 23,  1, F_TEXT, 0,   "CURSORS SELECT AND CHANGE  ENTER OK" },
 #else
-    { 7,  1, F_TEXT, 0,   "Q A SELECT  O P CHANGE  ENTER OK" },
+    { 23,  1, F_TEXT, 0,   "Q A SELECT  O P CHANGE  ENTER OK" },
 #endif
 };
+#else
+static const struct field fields[] = {
+    { BUDGET_ROW(0),  1, F_TEXT, 0,   "FISCAL BUDGET   TAX COLLECTED $" },
+    { BUDGET_ROW(0), 32, F_L24,  0,   V_tax_collected },
+    { BUDGET_ROW(1),  1, F_TEXT, 0,   "TAX RATE" },
+    { BUDGET_ROW(1), 12, F_U8,   '%', &SMC_tax_rate },
+    { BUDGET_ROW(2), 12, F_TEXT, 0,   "REQSTD   ALLCTD    FUND" },
+    { BUDGET_ROW(3),  1, F_TEXT, 0,   "TRANSPORT" },
+    { BUDGET_ROW(3), 18, F_U16,  0,   &V_Transport_Funding_Requested },
+    { BUDGET_ROW(3), 27, F_U16,  0,   &V_Transport_Funding_Allocated },
+    { BUDGET_ROW(3), 34, F_U8,   '%', &SMC_transport_percent },
+    { BUDGET_ROW(4),  1, F_TEXT, 0,   "POLICE" },
+    { BUDGET_ROW(4), 18, F_U16,  0,   &V_Budget_Police_Funding_Requested },
+    { BUDGET_ROW(4), 27, F_U16,  0,   &V_Police_Funding_Allocated },
+    { BUDGET_ROW(4), 34, F_U8,   '%', &SMC_police_percent },
+    { BUDGET_ROW(5),  1, F_TEXT, 0,   "FIRE" },
+    { BUDGET_ROW(5), 18, F_U16,  0,   &V_Budget_Fire_Funding_Requested },
+    { BUDGET_ROW(5), 27, F_U16,  0,   &V_Fire_Funding_Allocated },
+    { BUDGET_ROW(5), 34, F_U8,   '%', &SMC_fire_percent },
+    { BUDGET_ROW(6),  1, F_TEXT, 0,   "CASH FLOW" },                   /* room for 7 digit funds: the row is 40 wide */
+    { BUDGET_ROW(6), 18, F_S24,  0,   V_cashflow },
+    { BUDGET_ROW(6), 20, F_TEXT, 0,   "FUNDS" },
+    { BUDGET_ROW(6), 32, F_U24,  0,   V_previous_money },
+    { BUDGET_ROW(6), 32, F_TEXT, 0,   ">" },
+    { BUDGET_ROW(6), 40, F_U24,  0,   V_money_after_budget },
+#ifdef HAVE_MENUS
+    { BUDGET_ROW(7),  1, F_TEXT, 0,   "CURSORS SELECT AND CHANGE  ENTER OK" },
+#else
+    { BUDGET_ROW(7),  1, F_TEXT, 0,   "Q A SELECT  O P CHANGE  ENTER OK" },
+#endif
+};
+#endif
 
 static void draw(void)
 {
-    static const uint8_t item_row[4] = { 1, 3, 4, 5 };
+#if MODAL_ROWS >= 24
+    static const uint8_t item_row[4] = { 2, 8, 10, 12 };
+#else
+    static const uint8_t item_row[4] = { BUDGET_ROW(1), BUDGET_ROW(3), BUDGET_ROW(4), BUDGET_ROW(5) };
+#endif
 
     fmt_fields(fields, sizeof(fields) / sizeof(struct field));
     plat_text_puts(0, item_row[sel], ">");              /* the selected item */

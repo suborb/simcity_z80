@@ -6,6 +6,7 @@
 #define HAVE_BITMAP
 #define HAVE_BUDGET
 #define HAVE_EVALUATION
+#define MODAL_ROWS 8           /* the OZ text window */
 #define HAVE_MINIMAP
 #define HAVE_SPRITES
 #define HAVE_TEXT_WINDOW

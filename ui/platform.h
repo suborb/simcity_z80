@@ -7,6 +7,16 @@
 #include <stdint.h>
 #include "plat_config.h"       /* the platform's own: what it can do, and which features it has */
 
+/* Platforms with budget or evaluation screens state how many text rows their modal screens occupy.  The
+   shared layouts are designed on an 8-row grid and spread over MODAL_ROWS, so the Z88 stays compact while
+   full-screen targets can use their height. */
+#if (defined(HAVE_BUDGET) || defined(HAVE_EVALUATION)) && !defined(MODAL_ROWS)
+#error "a platform with modal screens must define MODAL_ROWS"
+#endif
+#if defined(MODAL_ROWS) && MODAL_ROWS < 8
+#error "MODAL_ROWS must be at least 8"
+#endif
+
 /* Key codes returned by plat_key().  Printable keys return their ASCII code. */
 #define KEY_NONE   0
 #define KEY_LEFT   8
@@ -76,8 +86,9 @@ extern void     plat_flush(void);               /* end of frame: show what was d
      HAVE_APPNAME      the machine can show what the city is called (plat_set_name(); the Z88's Index)
      HAVE_SOUND        a beeper behind the engine's sound hooks (the Makefile links the platform's sound code, or
                        platform/common/nosound.asm if there is none); `sound_enabled` is the player's on/off
-   and the optional features: HAVE_BUDGET, HAVE_EVALUATION, HAVE_MINIMAP, HAVE_SPRITES (see ui/*.c).  The
-   screens and the status panel drawn from tables of fields (HAVE_FIELDS) come with any of the screens. */
+   and the optional features: HAVE_BUDGET, HAVE_EVALUATION, HAVE_MINIMAP, HAVE_SPRITES (see ui/*.c).  A mini-map
+   target may set MINIMAP_CELLS_H (the default is the Z88's 8) to use more of its map window.  The screens and the
+   status panel drawn from tables of fields (HAVE_FIELDS) come with any of the screens. */
 #if defined(HAVE_BUDGET) || defined(HAVE_EVALUATION) || defined(HAVE_FILES) || defined(HAVE_ICONS) || defined(HAVE_APPNAME)
 #ifndef HAVE_FIELDS
 #define HAVE_FIELDS
@@ -85,6 +96,9 @@ extern void     plat_flush(void);               /* end of frame: show what was d
 #endif
 #if defined(HAVE_MINIMAP) && !defined(HAVE_BITMAP)
 #error "the mini maps need HAVE_BITMAP"
+#endif
+#if defined(MINIMAP_CELLS_H) && (MINIMAP_CELLS_H < 1 || MINIMAP_CELLS_H > 24)
+#error "MINIMAP_CELLS_H must be between 1 and 24"
 #endif
 #if defined(HAVE_ICONS) && !defined(HAVE_TILES) && !defined(HAVE_TEXT_WINDOW)
 #error "the icons need a text window, or pictures"

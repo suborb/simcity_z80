@@ -6,7 +6,9 @@
 #define HAVE_BITMAP
 #define HAVE_BUDGET
 #define HAVE_EVALUATION
+#define MODAL_ROWS 24          /* budget and evaluation use the full 40x24 text area */
 #define HAVE_MINIMAP
+#define MINIMAP_CELLS_H 19     /* use all 19 bitmap rows beneath the six-row status panel */
 #define HAVE_SPRITES
 #define HAVE_ICONS              /* the tools as 16x16 pictures */
 #define HAVE_ICONS_TOP          /* status panel across the top of the 40-column display */

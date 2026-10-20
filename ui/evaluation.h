@@ -1,4 +1,4 @@
-/* The evaluation screen: how the mayor is doing.  Modal; drawn in the text area, 8 rows of 40. */
+/* The evaluation screen: how the mayor is doing.  Modal; drawn in MODAL_ROWS rows of 40 columns. */
 #ifndef EVALUATION_H
 #define EVALUATION_H
 

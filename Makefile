@@ -54,12 +54,14 @@ ZX     = build/zx/simcity.tap
 ZXP    = build/zx-print/simcity.tap
 TEST   = build/test/simcity.bin
 TESTP  = build/testpanel/simcity.bin
+TESTM  = build/testmodal/simcity.bin
 TESTS  = build/testsprites/simcity.bin
+TESTH  = build/testhires/simcity.bin
 
 # Aquarius+ AQX programs are loaded below $C000; omit CRT facilities this build does not use.
 AQPLUS_PRAGMAS = target/aqplus/zpragma.inc
 
-.PHONY: all aqplus nc200 z88 z88rom zx zx-print test testpanel testsprites check golden uitest tiletest z88test engine deadcode clean
+.PHONY: all aqplus nc200 z88 z88rom zx zx-print test testpanel testmodal testsprites testhires check golden uitest tiletest z88test engine deadcode clean
 
 all: aqplus nc200 z88 zx
 
@@ -71,7 +73,9 @@ zx:     $(ZX)
 zx-print: $(ZXP)
 test:   $(TEST)
 testpanel: $(TESTP)
+testmodal: $(TESTM)
 testsprites: $(TESTS)
+testhires: $(TESTH)
 
 # Aquarius+: the .aqx loads from the Aquarius+ file browser.  --generic-console pulls in the
 # generic console driver, which can draw in the Aquarius+'s 320x200 bitmap mode (plat_init
@@ -142,10 +146,20 @@ $(TESTP): $(DEPS)
 	@mkdir -p $(@D)
 	$(ZCC) +test $(COMMON) $(TINC) -DTEST_PANEL $(GAME) $(NOSOUND) $(FIELDS) target/test_ui/plat_test.c -o $@
 
+# The same headless screen at 64x24, with the optional screens on: verifies their full-height layout.
+$(TESTM): $(DEPS)
+	@mkdir -p $(@D)
+	$(ZCC) +test $(COMMON) $(TINC) -DTEST_MODAL $(GAME) $(NOSOUND) $(FIELDS) target/test_ui/plat_test.c -o $@
+
 # The same, drawing the map from pictures (and the sprites over it), which the test reads back.
 $(TESTS): $(DEPS)
 	@mkdir -p $(@D)
 	$(ZCC) +test $(COMMON) $(TINC) -DTEST_PANEL -DTEST_SPRITES $(GAME) $(NOSOUND) $(FIELDS) target/test_ui/plat_test.c -o $@
+
+# A 40x25 Aquarius+-shaped screen: its 19-row map window holds the high-resolution mini map.
+$(TESTH): $(DEPS)
+	@mkdir -p $(@D)
+	$(ZCC) +test $(COMMON) $(TINC) -DTEST_HIRES_MINIMAP $(GAME) $(NOSOUND) $(FIELDS) target/test_ui/plat_test.c -o $@
 
 check:
 	sh test/run_all.sh

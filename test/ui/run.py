@@ -35,6 +35,28 @@ def build():
     return open(os.path.join(OUT, 'simcity.bin'), 'rb').read(), syms
 
 
+def build_modal():
+    out = os.path.join(ROOT, 'build', 'testmodal')
+    subprocess.run(['make', '-s', '-C', ROOT, 'build/testmodal/simcity.bin'], check=True, capture_output=True)
+    syms = {}
+    for line in open(os.path.join(out, 'simcity.map')):
+        m = re.match(r'(\S+)\s*=\s*\$([0-9A-Fa-f]+)', line)
+        if m:
+            syms[m.group(1)] = int(m.group(2), 16)
+    return open(os.path.join(out, 'simcity.bin'), 'rb').read(), syms
+
+
+def build_hires_minimap():
+    out = os.path.join(ROOT, 'build', 'testhires')
+    subprocess.run(['make', '-s', '-C', ROOT, 'build/testhires/simcity.bin'], check=True, capture_output=True)
+    syms = {}
+    for line in open(os.path.join(out, 'simcity.map')):
+        m = re.match(r'(\S+)\s*=\s*\$([0-9A-Fa-f]+)', line)
+        if m:
+            syms[m.group(1)] = int(m.group(2), 16)
+    return open(os.path.join(out, 'simcity.bin'), 'rb').read(), syms
+
+
 def run(binary, syms, keys, limit=4_000_000_000, patch=None, city=b''):
     """Run the game with the given key script; return (memory dump, symbols).  A build that asks for the city's name
     after the level (it has test_app_name) gets the name in `city` at the first title screen, and just ENTER after the others."""
@@ -267,25 +289,25 @@ def main():
           '\n'.join(text))
 
     # --- 6. the mini maps (on the 32x8 platform, which can draw bitmaps) ---
-    def bitmaps(mem):
-        """The 192x64 picture the game drew: the 24x8 cells at console column 4, as rows of 0/1."""
-        base = psyms['_test_bitmap']
+    def bitmaps(mem, symbols=psyms, cols=32, col=4, height=64, screen_row=0):
+        """The 24-cell-wide mini-map picture the game drew, as rows of 0/1."""
+        base = symbols['_test_bitmap']
         rows = []
-        for py in range(64):
+        for py in range(height):
             row = []
             for cx in range(24):
-                b = mem[base + ((py // 8) * 32 + 4 + cx) * 8 + py % 8]
+                b = mem[base + (((screen_row + py // 8) * cols + col + cx) * 8) + py % 8]
                 row += [(b >> (7 - i)) & 1 for i in range(8)]
             rows.append(row)
         return rows
 
     BAYER2 = [0, 2, 3, 1]
     BAYER4 = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5]
-    flags_at = psyms['_D_tile_flags']
 
-    def reference(mem, view, top):
+    def reference(mem, view, top, height=64, symbols=psyms):
         """The same picture worked out from the engine's memory, pixel by pixel (a tile is 2x2 pixels)."""
-        lm, mm = psyms['_levelmap'], psyms['_minimaps']
+        lm, mm = symbols['_levelmap'], symbols['_minimaps']
+        flags_at = symbols['_D_tile_flags']
 
         def tile_level(t):
             if t & 0x80: return 4
@@ -298,12 +320,12 @@ def main():
         flags_of = lambda t: 0x99 if t & 0x80 else mem[flags_at + t]
 
         def crime(tx, ty):
-            ccx, ccy = mem[psyms['_V_CCxy']], mem[psyms['_V_CCxy'] + 1]
+            ccx, ccy = mem[symbols['_V_CCxy']], mem[symbols['_V_CCxy'] + 1]
             d = min(31, abs(tx - ccx) + abs(ty - ccy))
             e = 0 if d == 0 else 15 - ((32 - d) >> 1)
             return max(0, e - mem[mm + 576 + (ty >> 2) * 24 + (tx >> 2)])
         out = []
-        for py in range(64):
+        for py in range(height):
             y = top + py
             row = []
             for x in range(192):
@@ -334,7 +356,7 @@ def main():
     def differences(got, want, top=64, cursor_y=48):
         """Pixels that differ, ignoring the 2x2 the cursor inverts (the cursor is at map 48, cursor_y)."""
         cursor = {(96 + i, 2 * cursor_y - top + j) for i in (0, 1) for j in (0, 1)}
-        return [(x, y) for y in range(64) for x in range(192) if got[y][x] != want[y][x] and (x, y) not in cursor]
+        return [(x, y) for y in range(len(got)) for x in range(192) if got[y][x] != want[y][x] and (x, y) not in cursor]
 
     KEY_M = ord('m')
     for view, name in ((1, 'city'), (2, 'pollution'), (3, 'police'), (4, 'fire'), (5, 'traffic'), (6, 'power'), (7, 'transport'), (8, 'crime')):
@@ -375,6 +397,20 @@ def main():
     check('a platform with menus: x does not quit (quit is in the menu)', mem[psyms['_test_frames']] >= 20, f"{mem[psyms['_test_frames']]} frames")
     mem = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE, 27] + [0] * 20)
     check('a platform with menus: escape does not quit either', mem[psyms['_test_frames']] >= 20, f"{mem[psyms['_test_frames']]} frames")
+
+    # --- 6a. a taller mini map in the Aquarius+'s 40x25 map window ---
+    hbin, hsyms = build_hires_minimap()
+    mem = run(hbin, hsyms, [LEVEL_MEDIUM, PAUSE, KEY_M] + [0] * 12)
+    got = bitmaps(mem, hsyms, 40, 8, 152, 6)
+    want = reference(mem, 1, 40, 152, hsyms)
+    d = differences(got, want, 40)
+    check('high-resolution mini map: all 19 map-window rows are used', not d, f'{len(d)} pixels differ, first {d[:4]}')
+    a = hsyms['_test_screen']
+    caption = mem[a + 5 * 40:a + 6 * 40].decode('latin1')
+    check('high-resolution mini map: the status-panel caption remains above the picture', 'MAP: CITY' in caption and 'M NEXT' in caption, repr(caption))
+    after_page_key = run(hbin, hsyms, [LEVEL_MEDIUM, PAUSE, KEY_M, KEY_UP] + [0] * 12)
+    d = differences(bitmaps(after_page_key, hsyms, 40, 8, 152, 6), reference(after_page_key, 1, 0, 152, hsyms), 0)
+    check('high-resolution mini map: up shows the remaining top strip of the city', not d, f'{len(d)} pixels differ, first {d[:4]}')
     mem = run(pbin, psyms, [LEVEL_MEDIUM, ord('+')] + [0] * 250)
     text = panes(mem)[1]
     check('the advisor message is on row 6 (below the icons), where the Z88 shows it', text[6].strip() and not text[3].strip(), '\n'.join(text))
@@ -508,6 +544,23 @@ def main():
     text = panes(mem)[1]
     check('evaluation: v opens it and enter closes it again',
           any('FUNDS' in r for r in text) and not any('MAYOR APPROVAL' in r for r in text), '\n'.join(text))
+
+    # --- 8b. full-height modal screens: the full layout follows the Spectrum's sections ---
+    mbin, msyms = build_modal()
+    mem = run(mbin, msyms, [LEVEL_MEDIUM, PAUSE, CMD_BUDGET, 0, 0])
+    text = screen(mem, msyms)
+    check('full-height budget: collection, cash flow and both funds figures have their own rows',
+          all(word in text[row] for row, word in ((0, 'FISCAL BUDGET'), (2, 'TAX RATE'), (4, 'TAX COLLECTED'),
+                                                    (6, 'REQUESTED'), (8, 'TRANSPORT'), (10, 'POLICE'), (12, 'FIRE'),
+                                                    (15, 'CASH FLOW'), (17, 'PREVIOUS FUNDS'),
+                                                    (19, 'CURRENT FUNDS'), (23, 'ENTER OK'))), '\n'.join(text))
+    mem = run(mbin, msyms, [LEVEL_MEDIUM, PAUSE, CMD_EVALUATION, 0, 0])
+    text = screen(mem, msyms)
+    check('full-height evaluation: approval, problems, statistics and category have their own sections',
+          all(word in text[row] for row, word in ((0, 'EVALUATION'), (2, 'GOOD JOB'), (3, 'YES'),
+                                                    (6, 'WORST PROBLEMS'), (8, 'TRAFFIC'), (11, 'UNEMPLOYMENT'),
+                                                    (14, 'POPULATION'), (16, 'ASSESSED VALUE'), (19, 'CATEGORY'),
+                                                    (21, 'CITY SCORE'), (23, 'ENTER OK'))), '\n'.join(text))
 
     # --- 9. the moving sprites, drawn over the map's pictures ---
     subprocess.run(['make', '-s', '-C', ROOT, 'build/testsprites/simcity.bin'], check=True, capture_output=True)

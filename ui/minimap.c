@@ -166,7 +166,7 @@ void minimap_cell(uint8_t v, uint8_t cx, uint8_t cy, uint8_t top, uint8_t cur_x,
 
     for (r = 0; r < 8; ++r)
         art[r] = row(views + v, (uint8_t)(cx * 4), (uint8_t)(top + cy * 8 + r));
-    if (mark && (cur_x >> 2) == cx && py < 64 && (py >> 3) == cy) {
+    if (mark && (cur_x >> 2) == cx && py < MM_PIXELS_H && (py >> 3) == cy) {
         r = (uint8_t)(py & 7);                      /* the tile's 2x2 pixels, inverted */
         art[r] ^= (uint8_t)(0xC0 >> ((cur_x & 3) * 2));
         art[r + 1] ^= (uint8_t)(0xC0 >> ((cur_x & 3) * 2));
