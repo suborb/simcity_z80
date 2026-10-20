@@ -251,7 +251,7 @@ def main():
     # --- 4b. the portable box + message menu used by the console targets -----------------------
     mem = run(binary, syms, [LEVEL_MEDIUM, KEY_ESC])
     scr = screen(mem, syms)
-    check('popup menu opens over the city', any('SIMCITY' in row for row in scr) and any('Game options' in row for row in scr), '\n'.join(scr))
+    check('popup menu opens over the city', any('SIMCITY' in row for row in scr) and any('GAME OPTIONS' in row for row in scr), '\n'.join(scr))
     mem = run(binary, syms, [LEVEL_MEDIUM, KEY_ESC, 13, KEY_DOWN, 13, ord('x'), 0, 0])
     scr = screen(mem, syms)
     check('popup menu toggles in place and X restores the city', any('FAST' in row for row in scr) and not any('SIMCITY' in row for row in scr), '\n'.join(scr))

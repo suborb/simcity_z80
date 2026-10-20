@@ -126,53 +126,53 @@ static uint8_t panel_w, panel_h;
 
 static const struct menu_item main_menu[] = {
 #ifdef HAVE_BUDGET
-    { "Budget", MENU_BUDGET },
+    { "BUDGET", MENU_BUDGET },
 #endif /* HAVE_POPUP_MENU */
 #ifdef HAVE_EVALUATION
-    { "Evaluation", MENU_EVALUATION },
+    { "EVALUATION", MENU_EVALUATION },
 #endif
 #ifdef HAVE_FILES
-    { "Save city", MENU_SAVE },
-    { "Load city", MENU_LOAD },
+    { "SAVE CITY", MENU_SAVE },
+    { "LOAD CITY", MENU_LOAD },
 #endif
 #ifdef HAVE_MINIMAP
-    { "Mini map", MENU_MAP_NEXT },
+    { "MINI MAP", MENU_MAP_NEXT },
 #endif
-    { "Game options", MENU_GAME_OPTIONS },
-    { "Building options", MENU_BUILD_OPTIONS },
-    { "Disasters", MENU_DISASTERS },
-    { "New city", MENU_NEW_CITY },
+    { "GAME OPTIONS", MENU_GAME_OPTIONS },
+    { "BUILDING OPTIONS", MENU_BUILD_OPTIONS },
+    { "DISASTERS", MENU_DISASTERS },
+    { "NEW CITY", MENU_NEW_CITY },
 #ifndef TARGET_AQPLUS
-    { "Quit", CMD_QUIT }
+    { "QUIT", CMD_QUIT }
 #endif
 };
 
 /* Each setting has one action; its label is refreshed to show its current value. */
 static struct menu_item game_options[] = {
-    { "Pause: running", MENU_PAUSE | MENU_TOGGLE },
-    { "Speed: normal", MENU_SPEED_NEXT | MENU_TOGGLE },
-    { "Auto budget: on", MENU_AUTOBUDGET_TOGGLE | MENU_TOGGLE },
+    { "PAUSE: RUNNING", MENU_PAUSE | MENU_TOGGLE },
+    { "SPEED: NORMAL", MENU_SPEED_NEXT | MENU_TOGGLE },
+    { "AUTO BUDGET: ON", MENU_AUTOBUDGET_TOGGLE | MENU_TOGGLE },
 #ifdef HAVE_SOUND
-    { "Sound: on", MENU_SOUND_TOGGLE | MENU_TOGGLE },
+    { "SOUND: ON", MENU_SOUND_TOGGLE | MENU_TOGGLE },
 #endif
-    { "Back", 0 }
+    { "BACK", 0 }
 };
 
 static struct menu_item build_options[] = {
-    { "Power: coal", MENU_POWER_TOGGLE | MENU_TOGGLE },
-    { "Auto bulldoze: on", MENU_BULLDOZE_TOGGLE | MENU_TOGGLE },
-    { "Back", 0 }
+    { "POWER: COAL", MENU_POWER_TOGGLE | MENU_TOGGLE },
+    { "AUTO BULLDOZE: ON", MENU_BULLDOZE_TOGGLE | MENU_TOGGLE },
+    { "BACK", 0 }
 };
 
 static struct menu_item disaster_menu[] = {
-    { "Start fire", MENU_DISASTER },
-    { "Start flood", MENU_DISASTER + 1 },
-    { "Earthquake", MENU_DISASTER + 2 },
-    { "Air crash", MENU_DISASTER + 3 },
-    { "Tornado", MENU_DISASTER + 4 },
-    { "Meltdown", MENU_DISASTER + 5 },
-    { "Random disasters: on", MENU_DISASTERS_TOGGLE | MENU_TOGGLE },
-    { "Back", 0 }
+    { "START FIRE", MENU_DISASTER },
+    { "START FLOOD", MENU_DISASTER + 1 },
+    { "EARTHQUAKE", MENU_DISASTER + 2 },
+    { "AIR CRASH", MENU_DISASTER + 3 },
+    { "TORNADO", MENU_DISASTER + 4 },
+    { "MELTDOWN", MENU_DISASTER + 5 },
+    { "RANDOM DISASTERS: ON", MENU_DISASTERS_TOGGLE | MENU_TOGGLE },
+    { "BACK", 0 }
 };
 
 #define MENU_COUNT(a) (sizeof(a) / sizeof(struct menu_item))
@@ -182,18 +182,18 @@ static void handle_key(uint8_t k);
 static void update_option_labels(void)
 {
     static const char * const speed[] = {
-        "Speed: fast", "Speed: normal", "Speed: slow", "Speed: paused"
+        "SPEED: FAST", "SPEED: NORMAL", "SPEED: SLOW", "SPEED: PAUSED"
     };
 
-    game_options[0].text = V_simulation_speed == 3 ? "Pause: paused" : "Pause: running";
+    game_options[0].text = V_simulation_speed == 3 ? "PAUSE: PAUSED" : "PAUSE: RUNNING";
     game_options[1].text = speed[V_simulation_speed];
-    game_options[2].text = V_auto_budget ? "Auto budget: on" : "Auto budget: off";
+    game_options[2].text = V_auto_budget ? "AUTO BUDGET: ON" : "AUTO BUDGET: OFF";
 #ifdef HAVE_SOUND
-    game_options[3].text = sound_enabled ? "Sound: on" : "Sound: off";
+    game_options[3].text = sound_enabled ? "SOUND: ON" : "SOUND: OFF";
 #endif
-    build_options[0].text = power_nuclear ? "Power: nuclear" : "Power: coal";
-    build_options[1].text = V_auto_bulldoze ? "Auto bulldoze: on" : "Auto bulldoze: off";
-    disaster_menu[6].text = V_disaster_reset ? "Random disasters: off" : "Random disasters: on";
+    build_options[0].text = power_nuclear ? "POWER: NUCLEAR" : "POWER: COAL";
+    build_options[1].text = V_auto_bulldoze ? "AUTO BULLDOZE: ON" : "AUTO BULLDOZE: OFF";
+    disaster_menu[6].text = V_disaster_reset ? "RANDOM DISASTERS: OFF" : "RANDOM DISASTERS: ON";
 }
 
 static uint8_t popup_menu(void)
@@ -893,17 +893,12 @@ static void handle_key(uint8_t k)
     case ' ': case KEY_ENTER:  apply_tool(); break;
     case ',': set_tool((uint8_t)(tool ? tool - 1 : NUM_TOOLS - 1)); break;
     case '.': set_tool((uint8_t)(tool + 1 < NUM_TOOLS ? tool + 1 : 0)); break;
-    case 'e': power_nuclear = !power_nuclear; break;
-    case 'h':
-        V_simulation_speed = (V_simulation_speed == 3) ? 1 : 3;
-        break;
     case '+':
         if (V_simulation_speed > 0 && V_simulation_speed < 3) --V_simulation_speed;
         break;
     case '-':
         if (V_simulation_speed < 2) ++V_simulation_speed;
         break;
-    case 'm': set_map_view((uint8_t)(map_view < MM_VIEWS ? map_view + 1 : 0)); break;
 #ifdef HAVE_MENUS
     case 'x':
         break;                              /* quit is in the menu */
@@ -927,29 +922,61 @@ static void handle_key(uint8_t k)
         if (map_view) set_map_view(0); else quit = 1;
         break;
 #endif
+    case 'b':
 #ifdef HAVE_POPUP_MENU
-    case MENU_BUDGET:          game_budget(); break;
-    case MENU_EVALUATION:      game_evaluation(); break;
-    case MENU_MAP_NEXT:        set_map_view((uint8_t)(map_view < MM_VIEWS ? map_view + 1 : 0)); break;
-    case MENU_NEW_CITY:        restart = quit = 1; break;
-    case MENU_PAUSE:           V_simulation_speed = (V_simulation_speed == 3) ? 1 : 3; break;
-    case MENU_SAVE:            game_save(); break;
-    case MENU_LOAD:            game_load(); break;
+    case MENU_BUDGET:
 #endif
+#ifndef TARGET_AQPLUS
+    case CMD_BUDGET:
+#endif
+        game_budget(); break;
+    case 'v':
+#ifdef HAVE_POPUP_MENU
+    case MENU_EVALUATION:
+#endif
+#ifndef TARGET_AQPLUS
+    case CMD_EVALUATION:
+#endif
+        game_evaluation(); break;
+    case 's':
+#ifdef HAVE_POPUP_MENU
+    case MENU_SAVE:
+#endif
+#ifndef TARGET_AQPLUS
+    case CMD_SAVE:
+#endif
+        game_save(); break;
+    case 'l':
+#ifdef HAVE_POPUP_MENU
+    case MENU_LOAD:
+#endif
+#ifndef TARGET_AQPLUS
+    case CMD_LOAD:
+#endif
+        game_load(); break;
+    case 'm':
+#ifdef HAVE_POPUP_MENU
+    case MENU_MAP_NEXT:
+#endif
+        set_map_view((uint8_t)(map_view < MM_VIEWS ? map_view + 1 : 0)); break;
+#ifdef HAVE_POPUP_MENU
+    case MENU_NEW_CITY:
+#endif
+#ifndef TARGET_AQPLUS
+    case CMD_NEW_CITY:
+#endif
+        restart = quit = 1; break;
+    case 'h':
+#ifdef HAVE_POPUP_MENU
+    case MENU_PAUSE:
+#endif
+#ifndef TARGET_AQPLUS
+    case CMD_PAUSE:
+#endif
+        V_simulation_speed = (V_simulation_speed == 3) ? 1 : 3; break;
 #ifndef TARGET_AQPLUS
     case CMD_QUIT: quit = 1; break;
     case CMD_MAP_OFF: set_map_view(0); break;
-    case 'b': case CMD_BUDGET: game_budget(); break;
-    case 'v': case CMD_EVALUATION: game_evaluation(); break;
-    case 's': case CMD_SAVE: game_save(); break;
-    case 'l': case CMD_LOAD: game_load(); break;
-    case CMD_NEW_CITY:         restart = quit = 1; break;
-    case CMD_PAUSE:            V_simulation_speed = (V_simulation_speed == 3) ? 1 : 3; break;
-#else
-    case 'b': game_budget(); break;
-    case 'v': game_evaluation(); break;
-    case 's': game_save(); break;
-    case 'l': game_load(); break;
 #endif
 #ifdef HAVE_POPUP_MENU
     case MENU_SPEED_NEXT:
@@ -963,9 +990,11 @@ static void handle_key(uint8_t k)
     case CMD_SPEED_NORMAL:     V_simulation_speed = 1; break;
     case CMD_SPEED_SLOW:       V_simulation_speed = 2; break;
 #endif
+    case 'e':
 #ifdef HAVE_POPUP_MENU
-    case MENU_POWER_TOGGLE:    power_nuclear = !power_nuclear; break;
+    case MENU_POWER_TOGGLE:
 #endif
+        power_nuclear = !power_nuclear; break;
 #ifndef TARGET_AQPLUS
     case CMD_POWER_COAL:       power_nuclear = 0; break;
     case CMD_POWER_NUCLEAR:    power_nuclear = 1; break;
@@ -1060,7 +1089,7 @@ static void title_screen(void)
 
     plat_text_clear();
     plat_text_puts(0, 0, "S I M C I T Y");
-    plat_text_puts(0, 2, "CHOOSE A LEVEL:  1 EASY  2 MEDIUM  3 HARD");
+    plat_text_puts(0, 2, "CHOOSE A LEVEL: 1 EASY 2 MEDIUM 3 HARD");
     plat_flush();
     do {
         seed++;
