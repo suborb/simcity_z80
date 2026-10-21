@@ -18,5 +18,7 @@
 #define HAVE_ICONS_TOP          /* status panel across the top of the 40-column display */
 #define PLAT_FIXED_COLS 40
 #define PLAT_FIXED_ROWS 25
+#define MAX_VIEW_W 40
+#define MAX_VIEW_H 19
 
 #endif

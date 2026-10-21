@@ -5,7 +5,8 @@ This is a work-in-progress disassembly of the ZX Spectrum version of Sim City.
 ## Background
 
 This disassembly was started back in 2000 with the aim of porting the whole
-game to the z88.
+game to the z88. Sufficient information has been determined to allow porting
+of the engine to other z80 machines.
 
 ## Analysis
 
@@ -19,8 +20,14 @@ This separation should make it possible to retarget the engine to run on any
 Z80 based computer.
 
 
+## Rebuild
 
-## Layout
+The rebuild utilises the original simulation engine and assets. Instead of being interrupt based, the
+simulation and UI cooperatively multitask which allows porting ot hardware where an interrupt source
+is not available.
+
+
+### Layout
 
 | Path | What |
 |---|---|
@@ -40,18 +47,14 @@ Z80 based computer.
 | `test/` | `run_all.sh` runs everything. |
 | `PORTING.md` | Strategy, status and plan. |
 
-## Building and testing
+### Building and testing
 
 Needs [z88dk](https://z88dk.org).
 
     make aqplus     # Aquarius+   -> build/aqplus/simcity.aqx
-    make nc200      # NC200       -> build/nc200/SIMCITY.COM
-    make z88        # Z88         -> build/z88/SIMCITY.BAS
     make z88rom     # Z88 ROM application, 32 KB card image -> build/z88rom/simcity.epr
-    make zx         # ZX Spectrum -> build/zx/simcity.tap
+    make zx         # ZX Spectrum -> build/zx/simcity.tap (incopmlete)
     make check      # golden master, tile drawing, UI tests, all builds
 
 z88dk's tools (`zcc`, `z88dk-z80asm`, `z88dk-ticks`) must be on the `PATH`.
 
-The ZX Spectrum build has been played; the Aquarius+, NC200 and Z88 builds compile
-and link but have not yet been run on hardware or an emulator.

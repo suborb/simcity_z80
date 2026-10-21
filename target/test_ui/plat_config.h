@@ -5,6 +5,17 @@
 #ifndef PLAT_CONFIG_H
 #define PLAT_CONFIG_H
 
+#if defined(TEST_PANEL)
+#define MAX_VIEW_W 32
+#define MAX_VIEW_H 8
+#elif defined(TEST_HIRES_MINIMAP)
+#define MAX_VIEW_W 40
+#define MAX_VIEW_H 19
+#else
+#define MAX_VIEW_W 80
+#define MAX_VIEW_H 25
+#endif
+
 #if defined(TEST_PANEL) || defined(TEST_MODAL) || defined(TEST_HIRES_MINIMAP)
 #ifdef TEST_PANEL
 #define HAVE_TEXT_WINDOW

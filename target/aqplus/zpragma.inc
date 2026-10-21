@@ -9,3 +9,12 @@
 #pragma redirect conio_map_colour = l_ret
 #pragma output CRT_DISABLELOADER = 1
 #pragma output CRT_COMPRESS_AQX = 1
+
+
+#pragma output REGISTER_SP = 0x3d00
+#pragma output CRT_ORG_CODE = 0x3d00
+
+#pragma output CRT_TRIM_BSS = 1
+#pragma output CRT_AQPLUS_BANK3_RAM = 1
+
+#pragma redirect CRT_FONT = _font_8x8_bbc_system

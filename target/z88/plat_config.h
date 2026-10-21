@@ -16,5 +16,7 @@
 #define HAVE_FILES
 #define HAVE_APPNAME
 #define HAVE_SOUND
+#define MAX_VIEW_W 32
+#define MAX_VIEW_H 8
 
 #endif
