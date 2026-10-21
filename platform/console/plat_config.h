@@ -10,6 +10,7 @@
 #define HAVE_EVALUATION
 #define MODAL_ROWS 16          /* NC200's 60x16 console */
 #define HAVE_MINIMAP
+#define HAVE_MINIMAP_CURSOR
 #define HAVE_SPRITES
 
 #endif

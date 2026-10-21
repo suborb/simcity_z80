@@ -173,4 +173,11 @@ void minimap_cell(uint8_t v, uint8_t cx, uint8_t cy, uint8_t top, uint8_t cur_x,
     }
 }
 
+#ifdef HAVE_MINIMAP_COLOUR
+uint8_t minimap_level(uint8_t v, uint8_t tx, uint8_t ty)
+{
+    return views[v].level(tx, ty);
+}
+#endif
+
 #endif

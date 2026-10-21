@@ -46,20 +46,6 @@ static void aq_set_mode(uint16_t m)
 void plat_init(void) { aq_set_mode(4); clrscr(); }
 void plat_exit(void) { aq_set_mode(1); clrscr(); }
 
-uint8_t plat_cols(void)
-{
-    unsigned int x, y;
-    screensize(&x, &y);
-    return (uint8_t)x;
-}
-
-uint8_t plat_rows(void)
-{
-    unsigned int x, y;
-    screensize(&x, &y);
-    return (uint8_t)y;
-}
-
 void plat_clear(void) { clrscr(); }
 void plat_put(uint8_t col, uint8_t row, uint8_t ch) { plat_aq_printc(col, row, ch); }
 
@@ -69,8 +55,6 @@ void plat_puts(uint8_t col, uint8_t row, const char *s)
         plat_aq_printc(col, row, (uint8_t)*s++);
 }
 
-uint8_t plat_text_cols(void) { return plat_cols(); }
-uint8_t plat_text_rows(void) { return plat_rows(); }
 void plat_text_clear(void) { plat_clear(); }
 void plat_text_puts(uint8_t col, uint8_t row, const char *s) { plat_puts(col, row, s); }
 
@@ -88,6 +72,26 @@ void plat_put_bitmap(uint8_t col, uint8_t row, const uint8_t *art)
 {
     put_bitmap(col, row, art, 0x07);                    /* white on black */
 }
+
+#ifdef HAVE_MINIMAP_COLOUR
+void plat_put_minimap(uint8_t col, uint8_t row, const uint8_t *art,
+                      uint8_t view, uint8_t level)
+{
+    uint8_t attr = 7;                         /* stable white city silhouette */
+
+    /* The original minimap uses an eight-step intensity ramp with equal ink
+       and paper: 0x49, 0x52, ..., 0x7f.  Density and coverage levels are 0..16
+       and 0..15 respectively, so halve them to get the 0..7 ramp index. */
+    if (view != 1) {
+        level >>= 1;
+        if (level > 7)
+            level = 7;
+        if (level)
+            attr = (uint8_t)((level * 9) | 0x40);
+    }
+    aq_blit8(col, row, art, aq_attr_byte(attr), 0);
+}
+#endif
 
 /* The tool icons: 16x16 pictures, four cells each. */
 #define NUM_ICONS 14

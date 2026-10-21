@@ -27,6 +27,7 @@ COMMON = -Ca-DPORTABLE -Ca-Iengine -Ca-I. -Iui -Cc-standard-escape-chars -m
 # HAVE_BUDGET and so on (see ui/platform.h), and compiles to nothing where it is off.
 GAME    = ui/main.c ui/game.c ui/text.c ui/textfmt.c ui/numfmt.asm ui/budget.c ui/evaluation.c ui/cityfile.c \
           ui/minimap.c ui/sprites.c ui/prompt.c engine/engine_c.asm platform/common/hooks.asm
+ENTROPY = platform/common/entropy.asm
 MENU    = ui/menu.c
 # The table drawing of the screens, in assembler: for the targets that have HAVE_FIELDS (see ui/platform.h).
 FIELDS  = ui/fmtfields.asm
@@ -87,20 +88,20 @@ testhires: $(TESTH)
 $(AQPLUS): $(DEPS)
 	@mkdir -p $(@D)
 	$(ZCC) +aquarius -clib=aqplus -subtype=aqx -create-app --generic-console $(COMMON) -pragma-include:$(AQPLUS_PRAGMAS) -pragma-define:CRT_TRIM_BSS=1 -pragma-define:CRT_AQPLUS_BANK3_RAM=1 -pragma-define:REGISTER_SP=0x3d00 -pragma-define:CRT_ORG_CODE=0x3d00 -pragma-redirect:CRT_FONT=_font_8x8_bbc_system \
-	    $(AQINC) -DTARGET_AQPLUS -DMAX_VIEW_W=40 -DMAX_VIEW_H=19 -Ca-DTARGET_AQPLUS -Ca-DSIM_STACK_TOP=0x3a00 $(GAME) $(MENU) $(NOSOUND) $(FIELDS) $(AQPLUS_PLATFORM) -o $(@D)/simcity
+	    $(AQINC) -DTARGET_AQPLUS -DMAX_VIEW_W=40 -DMAX_VIEW_H=19 -Ca-DTARGET_AQPLUS -Ca-DSIM_STACK_TOP=0x3a00 $(GAME) $(ENTROPY) $(MENU) $(NOSOUND) $(FIELDS) $(AQPLUS_PLATFORM) -o $(@D)/simcity
 
 # NC200: RAM subtype (the default ROM-card subtype cannot host self-modifying code).  Tiles
 # go through the console's font and UDG pointers (see platform/console/plat_config.h and plat_console.c).
 $(NC200): $(DEPS)
 	@mkdir -p $(@D)
 	$(ZCC) +nc -clib=nc200 -subtype=ncboot -create-app $(COMMON) $(CINC) \
-	    $(GAME) $(MENU) $(NOSOUND) $(FIELDS) $(CONSOLE) -o $(@D)/simcity
+	    $(GAME) $(ENTROPY) $(MENU) $(NOSOUND) $(FIELDS) $(CONSOLE) -o $(@D)/simcity
 
 # Z88 as a BASIC program: the same screen, without the ROM image.
 $(Z88): $(DEPS)
 	@mkdir -p $(@D)
 	$(ZCC) +z88 --generic-console -create-app $(Z88INC) -DTARGET_Z88 -Ca-DZ88_DI_SIM -DMAX_VIEW_W=32 -DMAX_VIEW_H=8 \
-	    $(COMMON) $(GAME) $(FIELDS) $(Z88_PLATFORM) $(SOUND) -o $(@D)/simcity
+	    $(COMMON) $(GAME) $(ENTROPY) $(FIELDS) $(Z88_PLATFORM) $(SOUND) -o $(@D)/simcity
 
 # Z88 as a ROM application for a 32 KB card (code and tables in ROM, the data in the RAM OZ allocates;
 # see engine/sections.asm and target/z88/zpragma_rom.inc).  Output: simcity.epr and its banks.
@@ -115,7 +116,7 @@ Z88ROM_FLAGS = -subtype=app --generic-console -create-app -pragma-include:target
 
 $(Z88ROM): $(DEPS)
 	@mkdir -p $(@D)
-	$(ZCC) +z88 $(Z88ROM_FLAGS) $(COMMON) $(GAME) $(Z88_PLATFORM) \
+	$(ZCC) +z88 $(Z88ROM_FLAGS) $(COMMON) $(GAME) $(ENTROPY) $(Z88_PLATFORM) \
 	    target/z88/z88_dor.c $(SOUND) $(FIELDS) -o $(@D)/simcity.bin
 
 # ZX Spectrum.  The memory-layout pragmas (stack at the top of RAM, 32 column console, no
@@ -130,14 +131,14 @@ ZX_FLAGS = -zorg=24000 -pragma-include:$(ZX_PRAGMAS) --reserve-regs-iy -create-a
 
 $(ZX): $(DEPS)
 	@mkdir -p $(@D)
-	$(ZCC) +zx $(ZX_FLAGS) $(GAME) $(NOSOUND) $(ZX_PLATFORM) -o $(@D)/simcity
+	$(ZCC) +zx $(ZX_FLAGS) $(GAME) $(ENTROPY) $(NOSOUND) $(ZX_PLATFORM) -o $(@D)/simcity
 
 # The same, but each tile is drawn by printing a character whose picture comes from the console's
 # font and UDG pointers, as on the NC200 and Aquarius+, instead of being copied to screen memory.
 # Slower (about 7000 T-states a tile against a few hundred); there to compare the two by eye.
 $(ZXP): $(DEPS)
 	@mkdir -p $(@D)
-	$(ZCC) +zx $(ZX_FLAGS) -DZX_PRINT $(GAME) $(NOSOUND) $(ZX_PLATFORM) -o $(@D)/simcity
+	$(ZCC) +zx $(ZX_FLAGS) -DZX_PRINT $(GAME) $(ENTROPY) $(NOSOUND) $(ZX_PLATFORM) -o $(@D)/simcity
 
 # Headless: a scripted keyboard and a screen in RAM instead of the console, run under z88dk-ticks.
 $(TEST): $(DEPS)

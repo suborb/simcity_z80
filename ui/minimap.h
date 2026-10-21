@@ -34,4 +34,8 @@ extern const char *const minimap_names[MM_VIEWS + 1];
 extern void minimap_cell(uint8_t v, uint8_t cx, uint8_t cy, uint8_t top, uint8_t cur_x, uint8_t cur_y,
                          uint8_t mark, uint8_t *art);
 
+#ifdef HAVE_MINIMAP_COLOUR
+extern uint8_t minimap_level(uint8_t v, uint8_t tx, uint8_t ty);
+#endif
+
 #endif

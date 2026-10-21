@@ -60,13 +60,21 @@
 
 extern void     plat_init(void);
 extern void     plat_exit(void);
+#ifdef PLAT_FIXED_COLS
+#define plat_cols() ((uint8_t)PLAT_FIXED_COLS)
+#define plat_rows() ((uint8_t)PLAT_FIXED_ROWS)
+#define plat_text_cols() plat_cols()
+#define plat_text_rows() plat_rows()
+#else
 extern uint8_t  plat_cols(void);                /* character columns */
 extern uint8_t  plat_rows(void);                /* character rows */
+#endif
 extern void     plat_put(uint8_t col, uint8_t row, uint8_t ch);
 extern void     plat_puts(uint8_t col, uint8_t row, const char *s);
 extern void     plat_clear(void);
 extern uint8_t  plat_key(void);                 /* KEY_NONE if no key is waiting */
 extern uint16_t plat_clock(void);               /* free running counter, for seeding */
+extern uint16_t plat_entropy(void);             /* inexpensive Z80 refresh-register sample */
 extern void     plat_idle(void);                /* called once per frame: may wait */
 extern void     plat_flush(void);               /* end of frame: show what was drawn */
 
@@ -111,8 +119,10 @@ extern void     plat_flush(void);               /* end of frame: show what was d
 
 /* The text area.  Where there is a text window the status text, the title and the screens go in it; elsewhere
    plat_text_puts() is plat_puts() and plat_text_clear() is plat_clear(). */
+#ifndef PLAT_FIXED_COLS
 extern uint8_t  plat_text_cols(void);
 extern uint8_t  plat_text_rows(void);
+#endif
 extern void     plat_text_clear(void);
 extern void     plat_text_puts(uint8_t col, uint8_t row, const char *s);
 
@@ -133,6 +143,16 @@ extern void     plat_put_tile(uint8_t col, uint8_t row, const uint8_t *art, uint
 #ifdef HAVE_BITMAP
 /* plat_put_bitmap() draws 8 bytes of 1bpp art (a byte a pixel row, bit 7 on the left) in a character cell. */
 extern void     plat_put_bitmap(uint8_t col, uint8_t row, const uint8_t *art);
+#endif
+
+#ifdef HAVE_MINIMAP_COLOUR
+/* Colour minimaps draw base city art and let the platform overlay a view-specific intensity. */
+extern void     plat_put_minimap(uint8_t col, uint8_t row, const uint8_t *art,
+                                 uint8_t view, uint8_t level
+#ifdef HAVE_MINIMAP_CURSOR
+                                 , uint8_t selected
+#endif
+                                 );
 #endif
 
 #if defined(HAVE_FILES) || defined(HAVE_APPNAME)

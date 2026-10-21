@@ -20,6 +20,9 @@
 #include "menu.h"
 #endif
 #ifdef HAVE_MINIMAP
+#ifndef MINIMAP_CHUNK_ROWS
+#define MINIMAP_CHUNK_ROWS MM_CELLS_H
+#endif
 #include "minimap.h"
 #endif
 #if defined(HAVE_SPRITES) && defined(HAVE_TILES)
@@ -452,6 +455,7 @@ static void draw_view(uint8_t full, uint8_t dirty)
 
 static uint8_t mm_top;                      /* the pixel row shown at the top */
 static uint8_t mm_col, mm_row;               /* upper-left cell on the physical display */
+static uint8_t mm_full_row;                  /* progress through a full minimap redraw */
 
 static void draw_minimap_cell(uint8_t cx, uint8_t cy)
 {
@@ -459,19 +463,47 @@ static void draw_minimap_cell(uint8_t cx, uint8_t cy)
 
     if (cy >= MM_CELLS_H)
         return;
-    minimap_cell(map_view, cx, cy, mm_top, cur_x, cur_y, (frame & 4) != 0, art);
+#ifdef HAVE_MINIMAP_COLOUR
+    minimap_cell(MM_CITY, cx, cy, mm_top, cur_x, cur_y, 0, art);
+    plat_put_minimap((uint8_t)(mm_col + cx), (uint8_t)(mm_row + cy), art, map_view,
+                     minimap_level(map_view, (uint8_t)(cx * 4),
+                                   (uint8_t)((mm_top >> 1) + cy * 4))
+#ifdef HAVE_MINIMAP_CURSOR
+                     , 0
+#endif
+                     );
+#else
+    minimap_cell(map_view, cx, cy, mm_top, cur_x, cur_y,
+#ifdef HAVE_MINIMAP_CURSOR
+                 (frame & 4) != 0,
+#else
+                 0,
+#endif
+                 art);
     plat_put_bitmap((uint8_t)(mm_col + cx), (uint8_t)(mm_row + cy), art);
+#endif
 }
 
-static void draw_minimap(uint8_t full)
+static uint8_t draw_minimap(uint8_t full)
 {
     static uint8_t refresh_row, last_cx_, last_cy_;
     uint8_t cx, cy;
 
     if (full) {
-        for (cy = 0; cy < MM_CELLS_H; ++cy)
+        /* A complete AQ+ minimap is large; draw a small row chunk per frame so
+           the keyboard is serviced between chunks instead of after the map. */
+        cy = mm_full_row;
+        for (;;) {
             for (cx = 0; cx < MM_CELLS_W; ++cx)
                 draw_minimap_cell(cx, cy);
+            ++cy;
+            if (cy >= MM_CELLS_H || (uint8_t)(cy - mm_full_row) == MINIMAP_CHUNK_ROWS)
+                break;
+        }
+        mm_full_row = cy;
+        if (mm_full_row < MM_CELLS_H)
+            return 1;
+        mm_full_row = 0;
     } else {
         if (!(frame & 3)) {
             if (++refresh_row >= MM_CELLS_H)
@@ -484,6 +516,7 @@ static void draw_minimap(uint8_t full)
     last_cx_ = (uint8_t)(cur_x >> 2);
     last_cy_ = (uint8_t)((uint8_t)(cur_y * 2 - mm_top) >> 3);       /* (8 or more: off the page, nothing is drawn) */
     draw_minimap_cell(last_cx_, last_cy_);
+    return 0;
 }
 
 /* Up and down flip the page of the city the picture shows (the cursor stays where it is).  The step leaves
@@ -513,9 +546,11 @@ static void set_map_view(uint8_t v)
         return;                             /* nowhere to draw it */
     if (v == map_view)
         return;
+    if (!map_view && v)
+        plat_clear();                           /* entering the minimap replaces the city layout */
     map_view = v;
-    plat_clear();                           /* the map window starts again either way */
     if (v) {
+        mm_full_row = 0;
         map_full = 1;
         mm_top = (uint8_t)((cur_y >> 5) << 6);   /* the third of the city the cursor is in */
         if (mm_top > MM_PICTURE_H - MM_PIXELS_H)
@@ -529,7 +564,7 @@ static void set_map_view(uint8_t v)
 
 #else
 #define MM_VIEWS 0
-#define draw_minimap(full)
+#define draw_minimap(full) 0
 #define set_map_view(v)
 #endif
 
@@ -1115,7 +1150,7 @@ static void title_screen(void)
         plat_set_name(city_name);
     }
 #endif
-    V_InitialSeed = (uint16_t)(seed ^ first ^ (plat_clock() - first)) | 1;     /* ...and the name took to type */
+    V_InitialSeed = (uint16_t)(seed ^ first ^ (plat_clock() - first) ^ plat_entropy()) | 1; /* ...and the name took to type */
     plat_text_clear();
     plat_text_puts(0, 0, "GENERATING LANDSCAPE...");
     plat_flush();
@@ -1223,8 +1258,7 @@ static void play_city(void)
         last_ox = origin_x;
         last_oy = origin_y;
         if (map_view) {
-            draw_minimap(map_full);
-            map_full = 0;
+            map_full = draw_minimap(map_full);
         } else {
             draw_view(full, map_dirty);
         }
@@ -1252,8 +1286,7 @@ static void play_city(void)
         last_ox = origin_x;
         last_oy = origin_y;
         if (map_view) {
-            draw_minimap(map_full);
-            map_full = 0;
+            map_full = draw_minimap(map_full);
         } else {
             draw_view(full, map_dirty);
         }

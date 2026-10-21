@@ -27,6 +27,7 @@
 #define HAVE_BUDGET
 #define HAVE_EVALUATION
 #define HAVE_MINIMAP
+#define HAVE_MINIMAP_CURSOR
 #define HAVE_SPRITES
 #endif
 

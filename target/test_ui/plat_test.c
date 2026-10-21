@@ -229,6 +229,7 @@ void plat_put_bitmap(uint8_t col, uint8_t row, const uint8_t *art)
 #endif
 
 uint16_t plat_clock(void) { return 0x1234; }
+uint16_t plat_entropy(void) { return 0; }
 void plat_idle(void) { }
 #if defined(TEST_PANEL) || defined(TEST_HIRES_MINIMAP)
 /* The mini map tests want something in the coverage maps, which a city has none of until it has run
