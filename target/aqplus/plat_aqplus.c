@@ -1,95 +1,53 @@
-/* Aquarius+ platform: 320x200 bitmap tiles and the z88dk generic console for text. */
+/* Aquarius+ platform: 320x200 bitmap tiles and text, drawn by the placer in plat_aqplus.asm, which also sets the
+   video mode and clears the screen: nothing of z88dk's console is used. */
 #include <stdint.h>
-#include <conio.h>
 #include <input.h>
-#include <sys/ioctl.h>
+#include "engine.h"
+#include "platform.h"
 #ifdef HAVE_FILES
 #include <fcntl.h>
 #endif
-#include "engine.h"
-#include "platform.h"
 
-static uint16_t aq_mode;
 static uint16_t clock_count;
 static uint8_t key_held;
 
-/* Aquarius+ palette entries for Spectrum colours, without and with BRIGHT. */
-static const uint8_t aq_colours[16] = {
-    0, 11, 14, 10, 13, 9, 3, 8,
-    0, 4, 1, 5, 2, 6, 3, 7
-};
+/* Colours are the Aquarius+'s own colour bytes (ink << 4 | paper, palette entries; see tools/make_aq_assets.py):
+   the tile and icon tables are converted when the game is built, so nothing is converted while drawing. */
+#define WHITE_ON_BLACK  0x80            /* light grey ink */
 
-static uint8_t aq_attr_byte(uint8_t attr)
-{
-    static uint8_t last_in = 0xFF, last_out;
-
-    if (attr != last_in) {
-        uint8_t b = (attr & 0x40) ? 8 : 0;
-
-        last_in = attr;
-        last_out = (uint8_t)((aq_colours[(attr & 7) | b] << 4) | aq_colours[((attr >> 3) & 7) | b]);
-    }
-    return last_out;
-}
-
-/* target/aqplus/plat_aqplus.asm */
+/* target/aqplus/plat_aqplus.asm: aq_blit8 is plat_put_tile as well (the tile attributes are colour bytes) */
 extern void aq_blit8(uint8_t col, uint8_t row, const uint8_t *art, uint8_t colour, uint8_t inverse) __smallc;
-extern void plat_aq_printc(uint8_t col, uint8_t row, uint8_t ch) __smallc;
+extern void plat_aq_printc(uint8_t col, uint8_t row, uint8_t ch) __smallc;    /* the same as plat_put */
 extern const uint8_t aq_icons[];
 
-static void aq_set_mode(uint16_t m)
-{
-    aq_mode = m;
-    console_ioctl(IOCTL_GENCON_SET_MODE, &aq_mode);
-}
-
-void plat_init(void) { aq_set_mode(4); clrscr(); }
-void plat_exit(void) { aq_set_mode(1); clrscr(); }
-
-void plat_clear(void) { clrscr(); }
-void plat_put(uint8_t col, uint8_t row, uint8_t ch) { plat_aq_printc(col, row, ch); }
-
-void plat_puts(uint8_t col, uint8_t row, const char *s)
-{
-    for (; *s && col < 40; ++col)       /* not past the right edge: it would wrap */
-        plat_aq_printc(col, row, (uint8_t)*s++);
-}
+/* plat_init, plat_exit, plat_clear, plat_put and plat_puts are in the assembler too */
 
 void plat_text_clear(void) { plat_clear(); }
 void plat_text_puts(uint8_t col, uint8_t row, const char *s) { plat_puts(col, row, s); }
 
-void plat_put_tile(uint8_t col, uint8_t row, const uint8_t *art, uint8_t attr, uint8_t inverse)
-{
-    aq_blit8(col, row, art, aq_attr_byte(attr), inverse);
-}
-
-static void put_bitmap(uint8_t col, uint8_t row, const uint8_t *art, uint8_t attr)
-{
-    aq_blit8(col, row, art, aq_attr_byte(attr), 0);
-}
-
 void plat_put_bitmap(uint8_t col, uint8_t row, const uint8_t *art)
 {
-    put_bitmap(col, row, art, 0x07);                    /* white on black */
+    aq_blit8(col, row, art, WHITE_ON_BLACK, 0);
 }
 
 #ifdef HAVE_MINIMAP_COLOUR
+/* The original minimap uses an eight-step intensity ramp with equal ink and paper (Spectrum bright colours 0x49,
+   0x52, ..., 0x7f); a solid cell of these Aquarius+ colours: blue, red, magenta, green, cyan, yellow, white. */
+static const uint8_t minimap_colours[8] = { WHITE_ON_BLACK, 0x44, 0x11, 0x55, 0x22, 0x66, 0x33, 0x77 };
+
 void plat_put_minimap(uint8_t col, uint8_t row, const uint8_t *art,
                       uint8_t view, uint8_t level)
 {
-    uint8_t attr = 7;                         /* stable white city silhouette */
+    uint8_t colour = WHITE_ON_BLACK;          /* stable white city silhouette */
 
-    /* The original minimap uses an eight-step intensity ramp with equal ink
-       and paper: 0x49, 0x52, ..., 0x7f.  Density and coverage levels are 0..16
-       and 0..15 respectively, so halve them to get the 0..7 ramp index. */
+    /* Density and coverage levels are 0..16 and 0..15 respectively, so halve them to get the 0..7 ramp index. */
     if (view != 1) {
         level >>= 1;
         if (level > 7)
             level = 7;
-        if (level)
-            attr = (uint8_t)((level * 9) | 0x40);
+        colour = minimap_colours[level];
     }
-    aq_blit8(col, row, art, aq_attr_byte(attr), 0);
+    aq_blit8(col, row, art, colour, 0);
 }
 #endif
 
@@ -98,16 +56,14 @@ void plat_put_minimap(uint8_t col, uint8_t row, const uint8_t *art,
 
 void plat_icons(uint8_t selected)
 {
-    uint8_t i, r, c, k, cell;
-    uint8_t art[8];
+    uint8_t i, r, c, cell;
 
     for (i = 0; i < NUM_ICONS; ++i)
         for (r = 0; r < 2; ++r)
             for (c = 0; c < 2; ++c) {
                 cell = (uint8_t)(i * 4 + r * 2 + c);
-                for (k = 0; k < 8; ++k)
-                    art[k] = i == selected ? (uint8_t)(aq_icons[cell * 8 + k] ^ 0xFF) : aq_icons[cell * 8 + k];
-                put_bitmap((uint8_t)(i * 2 + c), (uint8_t)(1 + r), art, (uint8_t)(aq_icons[NUM_ICONS * 32 + cell] & 0x7F));
+                aq_blit8((uint8_t)(i * 2 + c), (uint8_t)(1 + r), aq_icons + cell * 8,
+                         aq_icons[NUM_ICONS * 32 + cell], i == selected);
             }
 }
 

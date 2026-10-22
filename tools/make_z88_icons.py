@@ -46,11 +46,6 @@ def main():
                 out += bytes(cell_rows(icon, cx, cy))
     open(os.path.join(ROOT, 'assets', 'z88_icons.bin'), 'wb').write(out)
     print('assets/z88_icons.bin:', len(out), 'bytes')
-    # the Aquarius+ draws the icons whole: assets/icons.bin is the 14 x 4 cells of 8x8 pixels, then the
-    # 56 Spectrum attribute bytes of the cells (the game keeps them at udgs + 3240)
-    icons = UDGS[:14 * 4 * 8] + UDGS[3240:3240 + 14 * 4]
-    open(os.path.join(ROOT, 'assets', 'icons.bin'), 'wb').write(icons)
-    print('assets/icons.bin:', len(icons), 'bytes')
 
 
 if __name__ == '__main__':
