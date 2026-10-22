@@ -68,12 +68,7 @@ static uint8_t quit;
 static uint8_t restart;                 /* quit this city and start another */
 static uint8_t redraw;                  /* parts of the display a modal screen overwrote */
 #define REDRAW_ALL 1
-#define REDRAW_MAP 4                    /* a popup sits entirely in the city map area */
-#ifdef HAVE_ICONS_TOP
-#define POPUP_REDRAW REDRAW_MAP          /* six status rows; the centred box starts at row six */
-#else
-#define POPUP_REDRAW REDRAW_ALL          /* a shorter map area can be covered by the box */
-#endif
+#define REDRAW_MAP 4                    /* a popup sits entirely in the city map area: only the map is drawn again */
 #ifdef HAVE_TEXT_WINDOW
 #define REDRAW_TEXT 2                   /* the screens use the text window only: the map is as it was */
 #else
@@ -465,6 +460,66 @@ static void draw_view(uint8_t full, uint8_t dirty)
    beneath the status panel.  A cell row is redrawn every few frames to follow the simulation (a row of
    24 cells is a lot of work), and the cursor's cell every frame (it blinks, as in the city view). */
 
+#ifdef HAVE_MINIMAP_NATIVE
+/* Native pixel mini maps (see ui/minimap.h): the whole city, a row at a time.  A full pass draws a chunk of rows a frame
+   so that the keyboard is read in between; afterwards a few rows in turn each frame follow the simulation.  The map has
+   no cursor, and the cursor keys and the tools do nothing while it is shown. */
+#define MM_CHUNK_ROWS   12
+#define MM_REFRESH_ROWS 4
+static uint8_t mm_full_row;                  /* progress through a full redraw */
+
+static void draw_minirow(uint8_t sy)
+{
+#ifdef HAVE_MINIMAP_ART
+    minimap_row(map_view, sy);
+    plat_put_minirow(sy);
+#else
+    static uint8_t colours[MM_NATIVE_COLS];
+
+    minimap_row(map_view, sy, colours);
+    plat_put_minirow(sy, colours);
+#endif
+}
+
+static uint8_t draw_minimap(uint8_t full)
+{
+    static uint8_t refresh_row;
+    uint8_t n;
+
+    if (full) {
+        for (n = 0; n < MM_CHUNK_ROWS && mm_full_row < MM_NATIVE_ROWS; ++n)
+            draw_minirow(mm_full_row++);
+        if (mm_full_row < MM_NATIVE_ROWS)
+            return 1;
+        mm_full_row = 0;
+    } else {
+        for (n = 0; n < MM_REFRESH_ROWS; ++n) {
+            if (++refresh_row >= MM_NATIVE_ROWS)
+                refresh_row = 0;
+            draw_minirow(refresh_row);
+        }
+    }
+    return 0;
+}
+
+/* Show mini map v (1..MM_VIEWS), or 0 for the city again. */
+static void set_map_view(uint8_t v)
+{
+    if (v && view_h < MM_NATIVE_ROWS * 3 / 8)
+        return;                             /* nowhere to draw it: 144 pixel rows, 18 cells */
+    if (v == map_view)
+        return;
+    if (!map_view && v)
+        plat_clear();                       /* entering the mini map replaces the city layout */
+    map_view = v;
+    if (v) {
+        mm_full_row = 0;
+        map_full = 1;
+    } else {
+        last_cx = 255;                      /* a full pass over the city */
+    }
+}
+#else
 static uint8_t mm_top;                      /* the pixel row shown at the top */
 static uint8_t mm_col, mm_row;               /* upper-left cell on the physical display */
 static uint8_t mm_full_row;                  /* progress through a full minimap redraw */
@@ -574,6 +629,7 @@ static void set_map_view(uint8_t v)
     }
 }
 
+#endif /* HAVE_MINIMAP_NATIVE */
 #else
 #define MM_VIEWS 0
 #define draw_minimap(full) 0
@@ -819,7 +875,11 @@ static void clamp_view(void)
 
 static void move_cursor(int8_t dx, int8_t dy)
 {
-#ifdef HAVE_MINIMAP
+#ifdef HAVE_MINIMAP_NATIVE
+    if (map_view)
+        return;                             /* a map has no cursor */
+#endif
+#if defined(HAVE_MINIMAP) && !defined(HAVE_MINIMAP_NATIVE)
     if (map_view) {                         /* on a mini map up and down turn its pages */
         if (dy)
             flip_page(dy);
@@ -838,6 +898,11 @@ static void move_cursor(int8_t dx, int8_t dy)
 static void apply_tool(void)
 {
     uint8_t size = tool_size[tool];
+
+#ifdef HAVE_MINIMAP_NATIVE
+    if (map_view)
+        return;                             /* nothing is built from a map */
+#endif
     if (cur_x + size > MAP_W || cur_y + size > MAP_H)
         return;
     V_selected_tool = tool;
@@ -884,13 +949,19 @@ static void game_evaluation(void)
 #endif
 
 #ifdef HAVE_FILES
+#ifdef HAVE_POPUP_MENU
+#define file_done() (redraw |= (map_view ? REDRAW_ALL : REDRAW_MAP))   /* the dialogue is a box over the map */
+#else
+#define file_done() (redraw |= REDRAW_TEXT)
+#endif
+
 /* Save the city to a file, or load one. */
 static void game_save(void)
 {
     if (city_save() == CITY_QUIT)
         quit = 1;
     else
-        redraw |= REDRAW_TEXT;
+        file_done();
 }
 
 static void game_load(void)
@@ -902,9 +973,11 @@ static void game_load(void)
         quit = 1;
     } else if (r == CITY_BROKEN) {
         restart = quit = 1;                 /* the map was half read: a new city */
-    } else {
+    } else if (r == CITY_LOADED) {
         redraw = REDRAW_ALL;
-        tick_reset = r == CITY_LOADED;
+        tick_reset = 1;
+    } else {
+        file_done();                        /* nothing was loaded: the city as it was */
     }
 }
 #else
@@ -954,10 +1027,16 @@ static void handle_key(uint8_t k)
             set_map_view(0);             /* X is the documented mini-map back key */
         else {
             k = popup_menu();
+#ifdef HAVE_FILES
+            if (k == MENU_SAVE || k == MENU_LOAD) {
+                last_cx = 255;              /* the dialogue is a box too: show the map, not the menu's box, around it */
+                draw_view(1, 0);
+            }
+#endif
             if (k)
                 handle_key(k);
             if (!quit && !redraw)
-                redraw = POPUP_REDRAW;
+                redraw = REDRAW_MAP;
         }
         break;
 #else
@@ -1122,6 +1201,9 @@ static void choose_layout(void)
     panel_col = panel_row = 0;                      /* the status panel, the top third */
     panel_w = cols;
     panel_h = map_row;
+#endif
+#ifdef HAVE_POPUP_MENU
+    menu_area(map_row, view_h);                     /* the menus and dialogues are centred in the map */
 #endif
 }
 

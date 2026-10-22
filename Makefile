@@ -26,6 +26,8 @@ GAME    = ui/main.c ui/game.c ui/text.c ui/textfmt.c ui/numfmt.asm ui/budget.c u
           ui/minimap.c ui/sprites.c ui/prompt.c engine/engine_c.asm platform/common/hooks.asm
 ENTROPY = platform/common/entropy.asm
 MENU    = ui/menu.c
+# The native pixel mini map's row builder, in assembler (HAVE_MINIMAP_NATIVE: the Multi 8, and the headless tests of it)
+MMNATIVE = target/multi8/minimap_native.asm
 # The table drawing of the screens, in assembler: for the targets that have HAVE_FIELDS (see ui/platform.h).
 FIELDS  = ui/fmtfields.asm
 # The sound hooks the engine calls: the platform's own, or none.
@@ -40,7 +42,7 @@ Z88_PLATFORM = target/z88/plat_z88.c target/z88/plat_z88.asm
 
 
 # Everything a build depends on.
-DEPS = Makefile $(wildcard ui/*.c ui/*.h engine/*.asm engine/*.h platform/common/*.asm \
+DEPS = Makefile $(wildcard ui/*.c ui/*.h ui/*.asm engine/*.asm engine/*.h platform/common/*.asm \
          platform/console/*.[chai]* target/*/*.[chai]* target/*/*.inc) assets/map_art.bin assets/map_art_aq.bin assets/udgs.bin assets/icons.bin assets/icons_spec.bin
 
 AQPLUS = build/aqplus/simcity.aqx
@@ -55,8 +57,10 @@ TESTN  = build/testnarrow/simcity.bin
 TESTS  = build/testsprites/simcity.bin
 TESTO  = build/testoverlay/simcity.bin
 TESTH  = build/testhires/simcity.bin
+TESTK  = build/testnative/simcity.bin
+TESTA  = build/testart/simcity.bin
 
-.PHONY: all aqplus z88rom zx multi8 test testpanel testmodal testnarrow testsprites testoverlay testhires check golden uitest tiletest z88test engine deadcode clean
+.PHONY: all aqplus z88rom zx multi8 test testpanel testmodal testnarrow testsprites testoverlay testhires testnative testart check golden uitest tiletest z88test engine deadcode clean
 
 all: aqplus z88rom zx multi8
 
@@ -71,6 +75,8 @@ testnarrow: $(TESTN)
 testsprites: $(TESTS)
 testoverlay: $(TESTO)
 testhires: $(TESTH)
+testnative: $(TESTK)
+testart: $(TESTA)
 
 $(AQPLUS): $(DEPS)
 	@mkdir -p $(@D)
@@ -103,16 +109,24 @@ build/multi8/mp_tiles.bin: assets/cpc_tiles.bin tools/extract_cpc_tiles.py
 	@mkdir -p $(@D)
 	python3 tools/extract_cpc_tiles.py assets/cpc_tiles.bin --planes $@
 
+# The map's pictures at a quarter of the size for the mini maps (4 columns by 3 lines, 5 bytes each: HAVE_MINIMAP_ART)
+build/multi8/mp_mini.bin: assets/cpc_tiles.bin tools/extract_cpc_tiles.py
+	@mkdir -p $(@D)
+	python3 tools/extract_cpc_tiles.py assets/cpc_tiles.bin --mini $@
+
 # The image (code, data and the baked pictures) is loaded as one block from $0000 and must end below the uninitialised data,
 # which starts at MULTI8_BSS (and is not on the tape: its 16 KB of map and mini maps, and the cache of what each cell shows).
-MULTI8_BSS = 0xA200
+MULTI8_BSS = 0xA900     # (its end, about $F750, is below the doubling table at $F800 and the stack above it)
 
-$(MULTI8): $(DEPS) build/multi8/mp_tiles.bin
+$(MULTI8): $(DEPS) build/multi8/mp_tiles.bin build/multi8/mp_mini.bin
 	@mkdir -p $(@D)
 	$(ZCC) +multi8 -subtype=64k -create-app $(COMMON) -pragma-include:target/multi8/zpragma.inc \
-	    -Itarget/multi8 -DTARGET_MULTI8 -Ca-DTARGET_MULTI8 -Ca-D__crt_org_bss=$(MULTI8_BSS) $(GAME) $(ENTROPY) $(MENU) $(NOSOUND) $(FIELDS) $(MULTI8_PLATFORM) -o $(@D)/simcity
+	    -Itarget/multi8 -DTARGET_MULTI8 -Ca-DTARGET_MULTI8 -Ca-D__crt_org_bss=$(MULTI8_BSS) -Ca-DHAVE_MINIMAP_ART $(GAME) $(ENTROPY) $(MENU) $(NOSOUND) $(FIELDS) $(MMNATIVE) $(MULTI8_PLATFORM) -o $(@D)/simcity
 	@size=`wc -c < $(@D)/simcity`; echo "multi8 image: $$size bytes (limit $$(( $(MULTI8_BSS) )))"; \
 	    [ $$size -le $$(( $(MULTI8_BSS) )) ] || { echo "the image runs into the uninitialised data"; rm -f $@; exit 1; }
+	@# the placer's variables must be in the low RAM: the planes are paged over $8000-$BFFF while it draws
+	@v=`sed -n 's/^mp_flags *= \$$\([0-9A-Fa-f]*\).*/\1/p' $(@D)/simcity.map`; \
+	    [ -n "$$v" ] && [ $$(( 0x$$v )) -lt 32768 ] || { echo "the placer's variables are not below $$8000 (mp_flags at $$v)"; rm -f $@; exit 1; }
 
 # Headless: a scripted keyboard and a screen in RAM instead of the console, run under z88dk-ticks.
 $(TEST): $(DEPS)
@@ -148,6 +162,16 @@ $(TESTO): $(DEPS)
 $(TESTH): $(DEPS)
 	@mkdir -p $(@D)
 	$(ZCC) +test $(COMMON) -Itarget/test_ui  -DTEST_HIRES_MINIMAP $(GAME) $(MENU) $(NOSOUND) $(FIELDS) target/test_ui/plat_test.c -o $@
+
+# The same with the Multi 8's mini map, a colour a tile (HAVE_MINIMAP_NATIVE).
+$(TESTK): $(DEPS)
+	@mkdir -p $(@D)
+	$(ZCC) +test $(COMMON) -Itarget/test_ui  -DTEST_NATIVE_MINIMAP $(GAME) $(MENU) $(NOSOUND) $(FIELDS) $(MMNATIVE) target/test_ui/plat_test.c -o $@
+
+# ... and with the tiles' own pictures at a quarter of the size (HAVE_MINIMAP_ART; the assembler gets the same flag).
+$(TESTA): $(DEPS) build/multi8/mp_mini.bin
+	@mkdir -p $(@D)
+	$(ZCC) +test $(COMMON) -Itarget/test_ui  -DTEST_NATIVE_ART -Ca-DHAVE_MINIMAP_ART $(GAME) $(MENU) $(NOSOUND) $(FIELDS) $(MMNATIVE) target/test_ui/plat_test.c -o $@
 
 check:
 	sh test/run_all.sh

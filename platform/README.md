@@ -5,6 +5,7 @@
 | `common/hooks.asm` | The settings and hooks the engine expects (`engine/PLATFORM_INTERFACE.md`), for C programs. |
 | `console/` | z88dk conio and input front end for NC200 (`+nc -clib=nc200 -subtype=ram`). |
 | `../target/aqplus/` | Aquarius+-specific implementation: 320x200 bitmap renderer, its UI capabilities and AQX CRT settings. |
+| `../target/multi8/` | Mitsubishi Multi 8 implementation: 640x200 three plane colour screen, baked colour pictures, cassette, native pixel mini maps. |
 | `../target/zx/` | Spectrum-specific implementation: fast 8x8 bitmap renderer, its UI capabilities and CRT settings. |
 | `../target/zx-original/` | Reference Spectrum build: original UI segments and engine segments in original order; byte-identical to the disassembly. |
 | `../target/z88/` | Z88-specific implementation: OZ screen/menu integration, icons, sound and ROM CRT settings. |
@@ -20,17 +21,17 @@ the real tile graphics instead of characters, call `view_fetch()` for each
 visible cell: it returns 8 bytes of art and an attribute, exactly as the
 Spectrum draws them.
 
-The engine keeps its variables and some self-modifying code inline, so the
-program must run from RAM: the NC200 needs `-subtype=ram` (not a ROM card
-image), and on the Z88 the program must be RAM-resident.
+The Spectrum build of the engine keeps its variables and some self-modifying code inline, so it must run from RAM.
+The portable build (`-DPORTABLE`, which every platform here uses) has no self-modifying code and puts its tables, code
+and variables in sections of their own (`engine/sections.asm`), so a platform can keep the code in ROM (the Z88); the
+NC200 build still needs `-subtype=ram` (not a ROM card image).
 
-## Known limitations
+## Notes
 
-* One `sim_tick()` is about 6 million T-states. The Spectrum hid this by
-  running the simulation as a second task; here it blocks the UI for about
-  two seconds on a 3.5 MHz machine (about one second on the NC200). The
-  fix is to time-slice `process_ric_zones`, which is a loop over 96 rows.
-* The annual budget is automatic (`V_auto_budget = 1`); there is no budget
-  dialog yet, nor evaluation, minimap, disaster options, save/load or sound.
-* The shared UI draws characters; the tile graphics path is in the engine
-  (`view_cell`) and tested, but no platform uses it yet.
+* The simulation runs in slices (`sim_step()`, one map row each; `engine/coop.asm`), so a platform's frame loop stays
+  responsive between them; `ui/game.c` does the scheduling, so a platform only draws and reads keys.
+* What a platform draws is up to it: characters (`plat_put`), the engine's own 8x8 pictures (`view_fetch()`, which
+  returns 8 bytes of art and an attribute as the Spectrum draws them: `HAVE_TILES`), or its own versions of them (the
+  Aquarius+'s colour bytes, the Multi 8's baked colours).  The optional features (budget, evaluation, mini maps, sprites,
+  files, sound) are switched on in the platform's `plat_config.h`; `ui/platform.h` says what each needs.
+* A platform without them has the annual budget automatic (`V_auto_budget = 1`).

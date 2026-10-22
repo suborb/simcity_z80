@@ -221,6 +221,7 @@ class Machine:
         self.stray = []                                         # accesses a placer must not make while paged in
         self.ports = {}
         self.snapshot = None
+        self.low = {}                                           # the stores to the low RAM that a block copy to the screen reads
 
     def paged(self):
         return bool(self.port & 0x10)
@@ -281,11 +282,13 @@ def replay(trace_path, m, snap_pc):
             elif text == 'ld (hl),a' and hl >= 0x8000 and hl < 0xC000:
                 m.write(hl, a if or_mask is None else or_mask | m.read(hl))
                 or_mask = None
+            elif text == 'ld (hl),a' and hl < 0x8000:
+                m.low[hl] = a
             elif text.startswith('ld (hl),$') and 0x8000 <= hl < 0xC000:
                 m.write(hl, int(text[len('ld (hl),$'):], 16))
             elif text == 'ldir':
                 if 0x8000 <= de < 0xC000:
-                    m.write(de, m.read(hl) if 0x8000 <= hl < 0xC000 else 0)
+                    m.write(de, m.read(hl) if 0x8000 <= hl < 0xC000 else m.low.get(hl, 0))
             elif m.paged() and re.search(r'\((?:hl|de|bc)\)', text) and 0x8000 <= (hl if '(hl)' in text else de) < 0xC000:
                 pass
     return out_log, n
@@ -485,7 +488,210 @@ def main():
     print(('PASS' if ports == want else 'FAIL') + f'  plat_init sets the colour 80 column display and the CRT controller {[(hex(a), hex(b)) for a, b in ports]}')
     ok &= ports == want
     print(f'      ({count} instructions replayed, {m.wram_writes} stores went to the RAM under the screen)')
+    ok &= minirow_test()
+    ok &= minirow_art_test()
     return 0 if ok else 1
+
+
+HARNESS_ROWS = '''        SECTION code_user
+        org     $0100
+        PUBLIC  _font_8x8_bbc_system, __port29_copy, _view_tile_art
+        defc    _view_tile_art = 0
+        EXTERN  _plat_put_minirow, _plat_init
+start:  ld      sp,$7000
+        call    _plat_init
+        ld      ix,rows
+nextrow:
+        ld      a,(ix+0)
+        cp      255
+        jr      z,rowsdone
+        ld      h,0
+        ld      l,a
+        push    hl                      ; sy
+        ld      l,(ix+1)
+        ld      h,(ix+2)
+        push    hl                      ; the colours
+        call    _plat_put_minirow
+        pop     hl
+        pop     hl
+        ld      de,3
+        add     ix,de
+        jr      nextrow
+rowsdone:
+        ld      (sp_end),sp
+fin:    halt
+__port29_copy:
+        defb    $85
+sp_end: defw    0
+_font_8x8_bbc_system:
+        BINARY  "font.bin"
+rows:
+        ROWS
+'''
+
+
+HARNESS_ART = '''        SECTION code_user
+        org     $0100
+        PUBLIC  _font_8x8_bbc_system, __port29_copy, _view_tile_art, _mm_row
+        defc    _view_tile_art = 0
+        EXTERN  _plat_put_minirow, _plat_init
+start:  ld      sp,$7000
+        call    _plat_init
+        ld      ix,rows
+nextrow:
+        ld      a,(ix+0)
+        cp      255
+        jr      z,rowsdone
+        ld      e,(ix+1)
+        ld      d,(ix+2)                ; the row's data: into mm_row a byte at a time (the replay sees only these stores)
+        ld      hl,_mm_row
+        ld      bc,432
+fill:   ld      a,(de)
+        ld      (hl),a
+        inc     de
+        inc     hl
+        dec     bc
+        ld      a,b
+        or      c
+        jr      nz,fill
+        ld      h,0
+        ld      l,(ix+0)
+        push    hl                      ; sy
+        call    _plat_put_minirow
+        pop     hl
+        inc     ix
+        inc     ix
+        inc     ix
+        jr      nextrow
+rowsdone:
+        ld      (sp_end),sp
+fin:    halt
+__port29_copy:
+        defb    $85
+sp_end: defw    0
+_mm_row: defs   432
+_font_8x8_bbc_system:
+        BINARY  "font.bin"
+rows:
+        ROWS
+'''
+
+
+def minirow_art_test():
+    """plat_put_minirow with HAVE_MINIMAP_ART: for each plane the row's three lines of 48 bytes (mm_row: plane k line j at 144 k +
+    48 j) go to lines 52 + 3 sy, 53 + 3 sy and 54 + 3 sy of that plane, 16 bytes in."""
+    rng = random.Random(11)
+    sel = [0, 1, 47, 23, 24, 5, 5, 0]
+    data = [bytes(rng.randrange(256) for _ in range(432)) for _ in sel]
+    src = HARNESS_ART.replace('        ROWS\n', ''.join(f'        defb {sy}\n        defw d{i}\n' for i, sy in enumerate(sel)) + '        defb 255\n'
+                              + ''.join(f'd{i}:     defb {",".join(str(c) for c in d)}\n' for i, d in enumerate(data)))
+    model = [bytearray(0x4000) for _ in range(3)]
+    for sy, d in zip(sel, data):
+        for k in range(3):
+            for line in range(3):
+                for i in range(48):
+                    model[k][(52 + 3 * sy + line) * 80 + 16 + i] = d[k * 144 + line * 48 + i]
+    with tempfile.TemporaryDirectory() as tmp:
+        open(os.path.join(tmp, 'h.asm'), 'w').write(src)
+        open(os.path.join(tmp, 'font.bin'), 'wb').write(bytes(96 * 8))
+        os.makedirs(os.path.join(tmp, 'build', 'multi8'))
+        open(os.path.join(tmp, 'build', 'multi8', 'mp_tiles.bin'), 'wb').write(bytes(345 * 24))
+        out = subprocess.run([Z80ASM, '-b', '-m', '-DHAVE_MINIMAP_ART', '-I' + ROOT, '-oh.bin', 'h.asm',
+                              os.path.join(ROOT, 'target/multi8/plat_multi8.asm')], cwd=tmp, capture_output=True, text=True)
+        if out.returncode or out.stderr.strip():
+            print(out.stdout + out.stderr)
+            print('FAIL  the art mini map row test does not assemble')
+            return False
+        syms = {}
+        for line in open(os.path.join(tmp, 'h.map')):
+            m = re.match(r'(\S+)\s+= \$([0-9A-F]+) ;', line)
+            if m:
+                syms[m.group(1)] = int(m.group(2), 16)
+        img = bytearray(65536)
+        for sec in ('code_user', 'data_user', 'rodata_user', 'data_fcntl'):
+            p = os.path.join(tmp, f'h_{sec}.bin')
+            if os.path.exists(p):
+                b = open(p, 'rb').read()
+                img[syms[f'__{sec}_head']:syms[f'__{sec}_head'] + len(b)] = b
+        first = os.path.join(tmp, 'h.bin')
+        if os.path.exists(first) and os.path.getsize(first):
+            b = open(first, 'rb').read()
+            img[0x100:0x100 + len(b)] = b
+        open(os.path.join(tmp, 'img.bin'), 'wb').write(img)
+        with open(os.path.join(tmp, 'trace.txt'), 'w') as tf:
+            subprocess.run([TICKS, '-pc', '100', '-end', f'{syms["fin"]:x}', '-counter', '400000000', '-trace',
+                            '-output', 'mem.out', 'img.bin'], cwd=tmp, stdout=tf, stderr=subprocess.DEVNULL)
+        mem = open(os.path.join(tmp, 'mem.out'), 'rb').read()
+        m = Machine()
+        replay(os.path.join(tmp, 'trace.txt'), m, -1)
+    bad = [(p, i) for p in range(3) for i in range(80 * 200) if m.planes[p][i] != model[p][i]]
+    sp = mem[syms['sp_end']] | mem[syms['sp_end'] + 1] << 8
+    ok = not bad and sp == 0x7000 and m.port == IDLE
+    print(('PASS' if ok else 'FAIL') + f'  plat_put_minirow (art): {len(sel)} rows, each plane\'s three lines written to the right lines of that plane (a row drawn again is '
+          f'overwritten), the stack is balanced and the RAM under the screen is paged back in'
+          + (f' ({len(bad)} bytes differ, first plane {bad[0][0]} at offset {bad[0][1]}, line {bad[0][1] // 80}, byte {bad[0][1] % 80}; sp ${sp:04X}; port ${m.port:02X})' if bad or sp != 0x7000 or m.port != IDLE else ''))
+    return ok
+
+
+def minirow_test():
+    """plat_put_minirow: each of a row's 96 colours is a block of four pixels by three lines, in the right bytes of the planes."""
+    rng = random.Random(7)
+    sel = [0, 1, 2, 23, 24, 46, 47, 5, 5, 0]                       # the last rows again with other colours (they must overwrite)
+    data = [[rng.randrange(8) for _ in range(96)] for _ in sel]
+    data[1] = [7] * 96
+    data[2] = [0] * 96
+    data[8] = [x ^ 7 for x in data[7]]
+    src = HARNESS_ROWS.replace('        ROWS\n', ''.join(f'        defb {sy}\n        defw d{i}\n' for i, sy in enumerate(sel)) + '        defb 255\n'
+                                + ''.join(f'd{i}:     defb {",".join(str(c) for c in d)}\n' for i, d in enumerate(data)))
+    model = [bytearray(0x4000) for _ in range(3)]
+    for sy, d in zip(sel, data):
+        for x, c in enumerate(d):
+            for line in range(48 + 3 * sy, 48 + 3 * sy + 3):
+                for p in range(3):
+                    byte = line * 80 + 16 + x // 2
+                    mask = 0xF0 if x % 2 == 0 else 0x0F
+                    model[p][byte] = (model[p][byte] & ~mask & 0xFF) | (mask if (c >> p) & 1 else 0)
+    with tempfile.TemporaryDirectory() as tmp:
+        open(os.path.join(tmp, 'h.asm'), 'w').write(src)
+        open(os.path.join(tmp, 'font.bin'), 'wb').write(bytes(96 * 8))
+        os.makedirs(os.path.join(tmp, 'build', 'multi8'))
+        open(os.path.join(tmp, 'build', 'multi8', 'mp_tiles.bin'), 'wb').write(bytes(345 * 24))
+        out = subprocess.run([Z80ASM, '-b', '-m', '-I' + ROOT, '-oh.bin', 'h.asm', os.path.join(ROOT, 'target/multi8/plat_multi8.asm')],
+                             cwd=tmp, capture_output=True, text=True)
+        if out.returncode or out.stderr.strip():
+            print(out.stdout + out.stderr)
+            print('FAIL  the mini map row test does not assemble')
+            return False
+        syms = {}
+        for line in open(os.path.join(tmp, 'h.map')):
+            m = re.match(r'(\S+)\s+= \$([0-9A-F]+) ;', line)
+            if m:
+                syms[m.group(1)] = int(m.group(2), 16)
+        img = bytearray(65536)
+        for sec in ('code_user', 'data_user', 'rodata_user', 'data_fcntl'):
+            p = os.path.join(tmp, f'h_{sec}.bin')
+            if os.path.exists(p):
+                b = open(p, 'rb').read()
+                img[syms[f'__{sec}_head']:syms[f'__{sec}_head'] + len(b)] = b
+        first = os.path.join(tmp, 'h.bin')
+        if os.path.exists(first) and os.path.getsize(first):
+            b = open(first, 'rb').read()
+            img[0x100:0x100 + len(b)] = b
+        open(os.path.join(tmp, 'img.bin'), 'wb').write(img)
+        with open(os.path.join(tmp, 'trace.txt'), 'w') as tf:
+            subprocess.run([TICKS, '-pc', '100', '-end', f'{syms["fin"]:x}', '-counter', '400000000', '-trace',
+                            '-output', 'mem.out', 'img.bin'], cwd=tmp, stdout=tf, stderr=subprocess.DEVNULL)
+        mem = open(os.path.join(tmp, 'mem.out'), 'rb').read()
+        m = Machine()
+        replay(os.path.join(tmp, 'trace.txt'), m, -1)
+        top = mem[syms['mm_msk'] - 1:syms['mm_msk']]               # (the buffer's variables are in the low RAM: no check needed)
+    bad = [(p, i) for p in range(3) for i in range(80 * 200) if m.planes[p][i] != model[p][i]]
+    sp = mem[syms['sp_end']] | mem[syms['sp_end'] + 1] << 8
+    ok = not bad and sp == 0x7000 and m.port == IDLE
+    print(('PASS' if ok else 'FAIL') + f'  plat_put_minirow: {len(sel)} rows of 96 colours are blocks of 4x3 pixels in the three planes (a row drawn again is overwritten), '
+          f'the stack is balanced and the RAM under the screen is paged back in'
+          + (f' ({len(bad)} bytes differ, first plane {bad[0][0]} at offset {bad[0][1]}, line {bad[0][1] // 80}, byte {bad[0][1] % 80}; sp ${sp:04X}; port ${m.port:02X})' if bad or sp != 0x7000 or m.port != IDLE else ''))
+    return ok
 
 
 if __name__ == '__main__':

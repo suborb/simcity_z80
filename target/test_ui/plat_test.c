@@ -86,6 +86,34 @@ uint8_t plat_key(void)
 uint8_t plat_text_cols(void) { return TEXT_COLS; }
 uint8_t plat_text_rows(void) { return TEXT_ROWS; }
 
+
+uint16_t test_text_clears;               /* how often the whole text window was cleared */
+
+void plat_text_clear(void)
+{
+    uint8_t r, c;
+    ++test_text_clears;
+    for (r = 0; r < TEXT_ROWS; ++r)
+        for (c = 0; c < TEXT_COLS; ++c)
+            test_text[r][c] = ' ';
+}
+
+void plat_text_puts(uint8_t col, uint8_t row, const char *s)
+{
+    while (*s && col < TEXT_COLS) {
+        if (row < TEXT_ROWS)
+            test_text[row][col] = (uint8_t)*s;
+        ++col;
+        ++s;
+    }
+}
+#else
+uint8_t plat_text_cols(void) { return COLS; }
+uint8_t plat_text_rows(void) { return ROWS; }
+void plat_text_clear(void) { plat_clear(); }
+void plat_text_puts(uint8_t col, uint8_t row, const char *s) { plat_puts(col, row, s); }
+#endif
+
 #if defined(HAVE_FILES) || defined(HAVE_APPNAME)
 /* The line editor of the headless platform: the keys of the script, ENTER to finish, ESC to cancel, delete or cursor
    left to take a letter back; the line is echoed in the text window. */
@@ -118,33 +146,6 @@ uint8_t plat_text_input(uint8_t col, uint8_t row, char *buf, uint8_t max, uint8_
         }
     }
 }
-#endif
-
-uint16_t test_text_clears;               /* how often the whole text window was cleared */
-
-void plat_text_clear(void)
-{
-    uint8_t r, c;
-    ++test_text_clears;
-    for (r = 0; r < TEXT_ROWS; ++r)
-        for (c = 0; c < TEXT_COLS; ++c)
-            test_text[r][c] = ' ';
-}
-
-void plat_text_puts(uint8_t col, uint8_t row, const char *s)
-{
-    while (*s && col < TEXT_COLS) {
-        if (row < TEXT_ROWS)
-            test_text[row][col] = (uint8_t)*s;
-        ++col;
-        ++s;
-    }
-}
-#else
-uint8_t plat_text_cols(void) { return COLS; }
-uint8_t plat_text_rows(void) { return ROWS; }
-void plat_text_clear(void) { plat_clear(); }
-void plat_text_puts(uint8_t col, uint8_t row, const char *s) { plat_puts(col, row, s); }
 #endif
 
 #ifdef HAVE_APPNAME
@@ -231,7 +232,7 @@ uint8_t plat_file_load(const char *name, uint8_t *a, uint16_t alen, uint8_t *b, 
 }
 #endif
 
-#ifdef HAVE_BITMAP
+#if defined(HAVE_BITMAP) || defined(HAVE_TILES)
 uint8_t test_bitmap[ROWS][COLS][8];     /* what plat_put_bitmap drew in each cell */
 void plat_put_bitmap(uint8_t col, uint8_t row, const uint8_t *art)
 {
@@ -239,6 +240,44 @@ void plat_put_bitmap(uint8_t col, uint8_t row, const uint8_t *art)
     if (col < COLS && row < ROWS)
         for (i = 0; i < 8; ++i)
             test_bitmap[row][col][i] = art[i];
+}
+#endif
+
+#ifdef HAVE_MINIMAP_ART
+/* The mini map's rows as the platform is given them (mm_row: three planes of three lines of 48 bytes): some of them kept, as
+   the headless image has no room for all 48, and how often each of the 48 was drawn */
+#include "minimap.h"
+static const uint8_t test_minirow_keep[4] = { 5, 21, 22, 25 };
+uint8_t test_minirow[4][432];
+uint8_t test_minirow_n[48];
+void plat_put_minirow(uint8_t sy)
+{
+    uint8_t k;
+    uint16_t i;
+    if (sy < 48) {
+        for (k = 0; k < 4; ++k)
+            if (test_minirow_keep[k] == sy)
+                for (i = 0; i < 432; ++i)
+                    test_minirow[k][i] = mm_row[i];
+        ++test_minirow_n[sy];
+    }
+}
+#elif defined(HAVE_MINIMAP_NATIVE)
+/* The colours of some mini map rows as last drawn (the headless image has no room for all 48), and how often each of the
+   48 was drawn */
+static const uint8_t test_minirow_keep[4] = { 5, 21, 22, 25 };
+uint8_t test_minirow[4][96];
+uint8_t test_minirow_n[48];
+void plat_put_minirow(uint8_t sy, const uint8_t *colours)
+{
+    uint8_t i, k;
+    if (sy < 48) {
+        for (k = 0; k < 4; ++k)
+            if (test_minirow_keep[k] == sy)
+                for (i = 0; i < 96; ++i)
+                    test_minirow[k][i] = colours[i];
+        ++test_minirow_n[sy];
+    }
 }
 #endif
 
@@ -284,6 +323,13 @@ void plat_flush(void)
                 levelmap[42 * 96 + i] = 7;
                 levelmap[44 * 96 + i] = 60;
                 levelmap[46 * 96 + i] = 0x81;
+            }
+            for (i = 0; i < 12; ++i) {                  /* large zone rows (a marker, its group, a piece, then the rest), from the left */
+                static const uint8_t groups[12] = { 0x10, 0x11, 0x14, 0x15, 0x18, 0x19, 0x1A, 0x1D, 0x1E, 0x00, 0x12, 0x16 };
+                levelmap[50 * 96 + 40 + i * 4] = 0x81;
+                levelmap[50 * 96 + 41 + i * 4] = 0xC0 | groups[i];
+                levelmap[50 * 96 + 42 + i * 4] = 0xC0;
+                levelmap[50 * 96 + 43 + i * 4] = 0xC0;
             }
         }
     }

@@ -11,9 +11,9 @@
 #define HAVE_EVALUATION
 #define MODAL_ROWS 24          /* budget and evaluation use the full 40x24 text area */
 #define HAVE_MINIMAP
-#define HAVE_MINIMAP_COLOUR    /* the density views in colour (plat_put_minimap) */
-#define MINIMAP_CELLS_H 19     /* use all 19 bitmap rows beneath the six-row status panel */
-#define MINIMAP_CHUNK_ROWS 4
+#define HAVE_MINIMAP_NATIVE    /* mini maps in native pixels: the whole city, every other row (plat_put_minirow) */
+#define HAVE_MINIMAP_ART       /* the tiles' own pictures at a quarter of the size (the Makefile defines it for the assembler too).
+                                  Without it a tile is one flat colour and there is no picture data, for a target with less memory */
 #define HAVE_SPRITES
 #define HAVE_SPRITE_OVERLAY     /* the sprites go over the baked tiles, which have colours */
 #define HAVE_ICONS              /* the tools as 16x16 pictures */

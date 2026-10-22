@@ -20,6 +20,7 @@ uint8_t city_save(void)
         return CITY_SAVED;
     for (r = 0; r < 12; ++r)                        /* the file name, padded with spaces as the Spectrum keeps it */
         header[r] = name[r] && (r == 0 || header[r - 1] != ' ') ? name[r] : ' ';
+    prompt_status("SAVING...");
     memcpy(header + 12, V_money, 7);               /* money, the month and the year follow each other */
     city_name_to(header + 19);                      /* the city name */
     if (plat_file_save(name, header, CITY_HEADER, levelmap, MAP_W * MAP_H))
@@ -38,6 +39,7 @@ uint8_t city_load(void)
         return CITY_QUIT;
     if (r != 1)
         return CITY_SAVED;
+    prompt_status("LOADING...");
     r = plat_file_load(name, header, CITY_HEADER, levelmap, MAP_W * MAP_H);
     if (r) {                                        /* 1: nothing read; 2: the map is half read */
         prompt_say("COULD NOT LOAD THE CITY");

@@ -1,5 +1,5 @@
 /* What the game core needs from a platform.  Implemented once per kind of
-   display: platform/console (z88dk conio: NC200), target/aqplus, target/zx, target/z88, and
+   display: platform/console (z88dk conio: NC200), target/aqplus, target/multi8, target/zx, target/z88, and
    target/test_ui (headless). */
 #ifndef PLATFORM_H
 #define PLATFORM_H
@@ -97,7 +97,8 @@ extern void     plat_flush(void);               /* end of frame: show what was d
                        whole console and everything textual is drawn with plat_text_puts() in the window's
                        coordinates.  Without it the text shares the screen, the top third.
      HAVE_TILES        it can draw the game's own 8x8 pictures (plat_put_tile())
-     HAVE_BITMAP       it can draw pictures of the game's own making (plat_put_bitmap()); needed by HAVE_MINIMAP
+     HAVE_BITMAP       it can draw pictures of the game's own making (plat_put_bitmap()); needed by HAVE_MINIMAP (unless
+                       it draws the mini maps itself: HAVE_MINIMAP_NATIVE)
      HAVE_SPRITE_OVERLAY  with HAVE_SPRITES and HAVE_TILES: the train, plane and tornado are drawn over the cell's tile
                        (plat_put_overlay()) instead of replacing it with the tile's picture ORed with theirs
                        (plat_put_bitmap()), which keeps the tile's colours where a screen has them
@@ -107,21 +108,25 @@ extern void     plat_flush(void);               /* end of frame: show what was d
                        the tool, the demand bars and the advisor: a six row panel (no text window; ui/game.c)
      HAVE_MENUS        menus of its own, which have quit: the X key does not quit there, ESC leaves a mini map,
                        and the cursor keys move (Q, A, O and P do not)
-     HAVE_POPUP_MENU   use the shared console box + message selector: ESC opens it over the city; do not set this
-                       on a platform with native HAVE_MENUS
+     HAVE_POPUP_MENU   use the shared console box + message selector (ui/menu.c): ESC opens it over the city, centred in the
+                       map; the file dialogues (ui/prompt.c) are boxes too.  Do not set this on a platform with native
+                       HAVE_MENUS
      HAVE_FILES        files, for saving and loading a city (plat_file_save()/plat_file_load())
      HAVE_APPNAME      the machine can show what the city is called (plat_set_name(); the Z88's Index)
      HAVE_SOUND        a beeper behind the engine's sound hooks (the Makefile links the platform's sound code, or
                        platform/common/nosound.asm if there is none); `sound_enabled` is the player's on/off
    and the optional features: HAVE_BUDGET, HAVE_EVALUATION, HAVE_MINIMAP, HAVE_SPRITES (see ui/*.c).  A mini-map
-   target may set MINIMAP_CELLS_H (the default is the Z88's 8) to use more of its map window.  The screens and the
-   status panel drawn from tables of fields (HAVE_FIELDS) come with any of the screens. */
+   target may set MINIMAP_CELLS_H (the default is the Z88's 8) to use more of its map window.  One with a colour screen of
+   its own pixels can draw the mini maps itself instead, a row at a time (HAVE_MINIMAP_NATIVE: plat_put_minirow()): a
+   colour a tile, or with HAVE_MINIMAP_ART the tiles' own pictures at a quarter of the size with the views laid over them
+   (ui/minimap.h); there is no cursor on those maps and the cursor keys and the tools do nothing in them.  The screens
+   and the status panel drawn from tables of fields (HAVE_FIELDS) come with any of the screens. */
 #if defined(HAVE_BUDGET) || defined(HAVE_EVALUATION) || defined(HAVE_FILES) || defined(HAVE_ICONS) || defined(HAVE_APPNAME)
 #ifndef HAVE_FIELDS
 #define HAVE_FIELDS
 #endif
 #endif
-#if defined(HAVE_MINIMAP) && !defined(HAVE_BITMAP)
+#if defined(HAVE_MINIMAP) && !defined(HAVE_BITMAP) && !defined(HAVE_MINIMAP_NATIVE)
 #error "the mini maps need HAVE_BITMAP"
 #endif
 #if defined(MINIMAP_CELLS_H) && (MINIMAP_CELLS_H < 1 || MINIMAP_CELLS_H > 24)
@@ -167,6 +172,18 @@ extern void     plat_put_overlay(uint8_t col, uint8_t row, const uint8_t *art);
 #ifdef HAVE_BITMAP
 /* plat_put_bitmap() draws 8 bytes of 1bpp art (a byte a pixel row, bit 7 on the left) in a character cell. */
 extern void     plat_put_bitmap(uint8_t col, uint8_t row, const uint8_t *art);
+#endif
+
+#if defined(HAVE_MINIMAP_NATIVE) && defined(HAVE_MINIMAP_ART)
+/* With HAVE_MINIMAP_ART the platform draws row sy (0..47) of the mini map from mm_row (see ui/minimap.h): three planes
+   (blue, red, green: bits 0, 1 and 2 of a colour) of three lines of 48 bytes, 4 pixels a tile.  Row sy is lines 3 sy to
+   3 sy + 2 of a map 144 lines high, which the Multi 8 centres under the status panel. */
+extern void     plat_put_minirow(uint8_t sy);
+#elif defined(HAVE_MINIMAP_NATIVE)
+/* plat_put_minirow() draws row sy (0..47) of the mini map from 96 colours, one a tile column, each a block of pixels (the
+   Multi 8: 4x3 hardware pixels, so the map is 384x144).  Bit 0 of a colour is the blue plane, 1 the red, 2 the green.
+   The map is the whole city, and the map area must be at least 18 cell rows high. */
+extern void     plat_put_minirow(uint8_t sy, const uint8_t *colours);
 #endif
 
 #ifdef HAVE_MINIMAP_COLOUR

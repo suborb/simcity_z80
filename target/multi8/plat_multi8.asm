@@ -7,8 +7,12 @@
 ;     $8000 + row * 640 + col * 2          and the rest of its pixel rows are 80 bytes apart in each plane.
 ; The planes are paged in over $8000-$BFFF by port $2A (bits 0-3 are active low, one for each plane; bit 4 is set
 ; to see the planes and clear for the RAM underneath, where the uninitialised data lives), so nothing in
-; $8000-$BFFF can be read or written while a plane is paged in: the routines' own variables are in the data
-; section, which is in the low RAM with the code.  Interrupts are off (the startup code does that).
+; $8000-$BFFF can be read or written while a plane is paged in: the routines' own variables are in the code section
+; (at the end of this file), which is in the low RAM.  Interrupts are off (the startup code does that).
+;
+; Besides attribute cells it draws the map's pictures (plat_put_tile: baked in the machine's colours, no attributes), the
+; sprites over them (plat_put_overlay) and the mini map's rows (plat_put_minirow: native pixels, written to the planes
+; directly).  Each routine reads the keyboard when it is done (mp_keyscan).
 ;
 ; The routines take their arguments the way the game's C code passes them (smallc: first argument pushed first,
 ; the caller cleans up).  A cell is the Spectrum's: ink in attribute bits 0-2 and paper in 3-5.  A plane's byte
@@ -147,7 +151,7 @@ mp_one:
         jp      mp_copy
 
 ; void mp_tile1(uint8_t col, uint8_t row, const uint8_t *art, uint8_t attr, uint8_t inverse) __smallc
-; The 8 bytes of art, in the colours of attr (ink and paper swapped if `inverse`): the mini maps and the icons.
+; The 8 bytes of art, in the colours of attr (ink and paper swapped if `inverse`): the icons.
         PUBLIC  _mp_tile1
 _mp_tile1:
         ld      hl,2
@@ -247,7 +251,7 @@ mp_cell:
         pop     de
 mp_cell_nc:
         call    mp_scraddr
-        ld      a,c                     ; ink == paper (the density minimaps): a plain fill, with no picture to draw
+        ld      a,c                     ; ink == paper: a plain fill, with no picture to draw
         rrca
         rrca
         rrca
@@ -685,6 +689,193 @@ _plat_clear:
         ldir
         ret
 
+        IFDEF   HAVE_MINIMAP_ART
+; void plat_put_minirow(uint8_t sy) __smallc
+; Draws row sy (0..47) of the mini map from mm_row, which minimap_native.asm has filled in: for each plane, its three
+; lines of 48 bytes go to lines MM_LINE0 + 3 sy to + 2 of that plane, MM_BYTE bytes in from the left.  A tile is 4 pixels by
+; 3 lines.
+        EXTERN  _mm_row
+        defc    MM_LINE0 = 52           ; the map is 144 lines, centred in the 152 below the status panel
+        defc    MM_BYTE = 16            ; (80 - 48) / 2: centred
+        PUBLIC  _plat_put_minirow
+_plat_put_minirow:
+        ld      hl,2
+        add     hl,sp
+        ld      l,(hl)                  ; sy
+        ld      h,0
+        ld      d,h
+        ld      e,l
+        add     hl,hl
+        add     hl,hl
+        add     hl,hl
+        add     hl,hl                   ; 16 sy
+        or      a
+        sbc     hl,de                   ; 15 sy
+        add     hl,hl
+        add     hl,hl
+        add     hl,hl
+        add     hl,hl                   ; 240 sy: three lines of 80 bytes
+        ld      de,SCREEN + MM_LINE0 * 80 + MM_BYTE
+        add     hl,de
+        ld      (mm_dst),hl
+        ld      hl,_mm_row
+        ld      (mm_src),hl
+        xor     a
+mm_art_pl:
+        ld      (mm_msk),a              ; the plane: 0 blue, 1 red, 2 green
+        ld      e,a
+        ld      d,0
+        ld      hl,mm_sel
+        add     hl,de
+        ld      a,(hl)
+        out     (PORT_MEM),a            ; only this plane paged in
+        ld      hl,(mm_src)
+        ld      de,(mm_dst)
+        ld      bc,48
+        ldir
+        ld      hl,(mm_dst)
+        ld      de,80
+        add     hl,de
+        ex      de,hl
+        ld      hl,(mm_src)
+        ld      bc,48
+        add     hl,bc
+        ld      bc,48
+        ldir
+        ld      hl,(mm_dst)
+        ld      de,160
+        add     hl,de
+        ex      de,hl
+        ld      hl,(mm_src)
+        ld      bc,96
+        add     hl,bc
+        ld      bc,48
+        ldir
+        ld      a,MEM_IDLE
+        out     (PORT_MEM),a
+        ld      hl,(mm_src)
+        ld      de,144
+        add     hl,de
+        ld      (mm_src),hl
+        ld      a,(mm_msk)
+        inc     a
+        cp      3
+        jr      nz,mm_art_pl
+        jp      mp_keyscan
+mm_sel: defb    $3E, $3D, $3B           ; only the blue, red or green plane (see mp_one)
+
+        ELSE
+; void plat_put_minirow(uint8_t sy, const uint8_t *colours) __smallc
+; Flat colour mode.  Draws row sy (0..47) of the mini map from 96 colours (bit 0 blue, 1 red, 2 green), one a tile column.  A
+; tile is a block 4 pixels wide and 3 lines high, so a row is 384 pixels (48 bytes a plane) by 3 lines.  Each plane's 48
+; bytes are made from the colours (two tiles to a byte), then written to the row's three lines.
+        defc    MM_ROW = 6              ; the first cell row of the map (the status panel is above it)
+        defc    MM_BYTE = 16            ; (80 - 48) / 2: centred
+        PUBLIC  _plat_put_minirow
+_plat_put_minirow:
+        ld      hl,2
+        add     hl,sp
+        ld      e,(hl)
+        inc     hl
+        ld      d,(hl)                  ; de = the colours
+        inc     hl
+        ld      l,(hl)                  ; sy
+        ld      h,0
+        push    de
+        ld      d,h
+        ld      e,l
+        add     hl,hl
+        add     hl,hl
+        add     hl,hl
+        add     hl,hl                   ; 16 sy
+        or      a
+        sbc     hl,de                   ; 15 sy
+        add     hl,hl
+        add     hl,hl
+        add     hl,hl
+        add     hl,hl                   ; 240 sy: three lines of 80 bytes
+        ld      de,SCREEN + MM_ROW * 8 * 80 + MM_BYTE
+        add     hl,de
+        ld      (mm_dst),hl
+        pop     de
+        push    de
+        ld      hl,mm_buf
+        ld      c,1
+        call    mm_pack
+        pop     de
+        push    de
+        ld      hl,mm_buf + 48
+        ld      c,2
+        call    mm_pack
+        pop     de
+        ld      hl,mm_buf + 96
+        ld      c,4
+        call    mm_pack
+        ld      hl,mm_buf
+        ld      (mm_src),hl
+        ld      a,1
+mm_plane:
+        ld      (mm_msk),a
+        cpl
+        and     7
+        or      $38
+        out     (PORT_MEM),a            ; only this plane paged in
+        ld      de,(mm_dst)             ; the plane's 48 bytes to each of the three lines (nothing is read back from the plane)
+        ld      hl,(mm_src)
+        ld      bc,48
+        ldir
+        ld      hl,80
+        ld      de,(mm_dst)
+        add     hl,de
+        ex      de,hl
+        ld      hl,(mm_src)
+        ld      bc,48
+        ldir
+        ld      hl,160
+        ld      de,(mm_dst)
+        add     hl,de
+        ex      de,hl
+        ld      hl,(mm_src)
+        ld      bc,48
+        ldir
+        ld      hl,(mm_src)
+        ld      de,48
+        add     hl,de
+        ld      (mm_src),hl
+        ld      a,(mm_msk)
+        add     a,a
+        cp      8
+        jr      nz,mm_plane
+        ld      a,MEM_IDLE
+        out     (PORT_MEM),a
+        jp      mp_keyscan
+
+; 48 bytes at hl from the 96 colours at de: for the plane of mask c, a byte is a nibble of ones for a tile that has
+; the plane in its colour, then one for the next tile.  de goes on 96.
+mm_pack:
+        ld      b,48
+mm_pk:
+        ld      a,(de)
+        inc     de
+        and     c
+        add     a,$FF
+        sbc     a,a
+        and     $F0
+        ld      (hl),a
+        ld      a,(de)
+        inc     de
+        and     c
+        add     a,$FF
+        sbc     a,a
+        and     $0F
+        or      (hl)
+        ld      (hl),a
+        inc     hl
+        djnz    mm_pk
+        ret
+
+        ENDIF
+
 ; void plat_exit(void)
         PUBLIC  _plat_exit
 _plat_exit:
@@ -699,8 +890,9 @@ mp_nibbles:
         SECTION bss_user
 mp_cache: defs  40 * 25 * 3
 
-; The cell in hand, in the low RAM (see the top)
-        SECTION data_user
+; The cell in hand, in the low RAM (see the top).  These are in the code section, not data_user: the program's initialised
+; data is placed after the code and the strings, and grows over $8000 as the program does; the planes page over that.
+        SECTION code_user
 mp_m:    defs   4                       ; the planes drawn each way
 mp_pix:  defs   16                      ; the picture doubled across: two bytes a row
 mp_pix3: defs   48                      ; a baked picture doubled across: the three planes, sixteen bytes each
@@ -708,3 +900,7 @@ mp_scr:  defw   0
 mp_held: defb   0                       ; the code of the key that is down, or 0
 mp_event: defb  0                       ; the key pressed since plat_key last looked, or 0 ...
 mp_flags: defb  0                       ; ... and the flags (bit 7: shift) when it was
+mm_buf:  defs   144                     ; the flat-colour mini map row's three planes, 48 bytes each (the art mode has mm_row)
+mm_dst:  defw   0                       ; where the row's first line starts in a plane
+mm_msk:  defb   0                       ; the plane being written: 1, 2 or 4
+mm_src:  defw   0                       ; its 48 bytes

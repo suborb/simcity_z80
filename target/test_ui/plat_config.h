@@ -6,6 +6,14 @@
 #ifndef PLAT_CONFIG_H
 #define PLAT_CONFIG_H
 
+#ifdef TEST_NATIVE_ART                  /* ... with the tiles' own pictures at a quarter of the size */
+#define TEST_NATIVE_MINIMAP
+#define HAVE_MINIMAP_ART
+#endif
+#ifdef TEST_NATIVE_MINIMAP              /* the Aquarius+-shaped screen with the Multi 8's colour a tile mini map */
+#define TEST_HIRES_MINIMAP
+#endif
+
 #if defined(TEST_PANEL)
 #define MAX_VIEW_W 32
 #define MAX_VIEW_H 8
@@ -40,15 +48,25 @@
 #define HAVE_TILES
 #define HAVE_ICONS
 #define HAVE_ICONS_TOP
+#ifndef TEST_NATIVE_MINIMAP
+#define HAVE_FILES              /* the dialogues of a pop-up menu platform (ui/prompt.c) */
+#endif
 #define MODAL_ROWS 24
 #define MINIMAP_CELLS_H 19
 #endif
+#ifndef TEST_NATIVE_MINIMAP
 #define HAVE_BITMAP
+#endif
 #define HAVE_BUDGET
 #define HAVE_EVALUATION
 #define HAVE_MINIMAP
+#ifdef TEST_NATIVE_MINIMAP
+#define HAVE_MINIMAP_NATIVE
+#endif
 #define HAVE_MINIMAP_CURSOR
+#ifndef TEST_NATIVE_MINIMAP
 #define HAVE_SPRITES
+#endif
 #endif
 
 #ifdef TEST_SPRITES

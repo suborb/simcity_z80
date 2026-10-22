@@ -14,6 +14,14 @@ extern char city_name[CITY_NAME_LEN + 1];   /* the city's name, not padded */
    Returns 1 for a name, 0 if cancelled or empty, 2 if the platform asked to quit. */
 extern uint8_t prompt_ask(const char *title, const char *label, char *name, uint8_t max, uint8_t spaces);
 
+/* After a name is entered, show what is happening ("SAVING...") in the dialogue's last line, where the keys were.  Only
+   the shared pop-up boxes do this; the other platforms' prompt screens are left as they are. */
+#ifdef HAVE_POPUP_MENU
+extern void prompt_status(const char *status);
+#else
+#define prompt_status(s)
+#endif
+
 /* Show a message and wait for a key. */
 extern void prompt_say(const char *message);
 

@@ -56,7 +56,7 @@ draw_map:
         ld      (_map_dirty),a
         ret
 
-; hooks that do nothing yet
+; hooks the C platforms have no use for: the shared UI does these itself
 ui_budget_confirm:
 ui_choose_power_plant:
 print_budget_amounts:

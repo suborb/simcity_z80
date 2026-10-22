@@ -5,18 +5,31 @@
 #include "menu.h"
 
 #ifdef HAVE_POPUP_MENU
-#define MENU_WIDTH 26
-static const char top[] = "+------------------------+";
-static const char side[] = "|                        |";
+#define MENU_WIDTH 30                   /* wide enough for a file name's 24 characters (ui/prompt.c) */
+static const char top[] = "+----------------------------+";
+static const char side[] = "|                            |";
 
-static void box(uint8_t col, uint8_t row, uint8_t height)
+/* The rows the boxes are centred in: the map, which the game says (menu_area); else the whole screen. */
+static uint8_t area_row, area_rows;
+
+void menu_area(uint8_t row, uint8_t rows)
 {
-    uint8_t y;
+    area_row = row;
+    area_rows = rows;
+}
 
-    plat_puts(col, row, top);
+uint8_t menu_col, menu_row;
+
+void menu_box(uint8_t height)
+{
+    uint8_t y, r = area_rows ? area_rows : plat_rows();
+
+    menu_col = (uint8_t)((plat_cols() - MENU_WIDTH) >> 1);
+    menu_row = (uint8_t)(area_row + ((r - height) >> 1));
+    plat_puts(menu_col, menu_row, top);
     for (y = 1; y + 1 < height; ++y)
-        plat_puts(col, (uint8_t)(row + y), side);
-    plat_puts(col, (uint8_t)(row + height - 1), top);
+        plat_puts(menu_col, (uint8_t)(menu_row + y), side);
+    plat_puts(menu_col, (uint8_t)(menu_row + height - 1), top);
 }
 
 static void item(uint8_t col, uint8_t row, const struct menu_item *entry, uint8_t selected)
@@ -27,12 +40,11 @@ static void item(uint8_t col, uint8_t row, const struct menu_item *entry, uint8_
 
 uint8_t menu_choose(const char *title, const struct menu_item *items, uint8_t count)
 {
-    uint8_t col, row, height, i, selected = 0, old, k;
+    uint8_t col, row, i, selected = 0, old, k;
 
-    height = (uint8_t)(count + 4);
-    col = (uint8_t)((plat_cols() - MENU_WIDTH) >> 1);
-    row = (uint8_t)((plat_rows() - height) >> 1);
-    box(col, row, height);
+    menu_box((uint8_t)(count + 4));
+    col = menu_col;
+    row = menu_row;
     plat_puts((uint8_t)(col + 2), (uint8_t)(row + 1), title);
     for (i = 0; i < count; ++i)
         item((uint8_t)(col + 2), (uint8_t)(row + i + 2), &items[i], i == selected);

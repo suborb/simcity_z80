@@ -21,6 +21,59 @@ const char *const minimap_names[MM_VIEWS + 1] = {
     "", "CITY", "POLLUTION", "POLICE COVERAGE", "FIRE COVERAGE", "TRAFFIC", "POWER", "TRANSPORT", "CRIME"
 };
 
+#ifdef HAVE_MINIMAP_NATIVE
+/* The native pixel mini map: all 96 tile columns of every other tile row.  Every view but crime is built by the assembler
+   routine in target/multi8/minimap_native.asm (96 tiles a row is too slow in C).  Colours are 0 black, 1 blue, 2 red,
+   3 magenta, 4 green, 5 cyan, 6 yellow, 7 white. */
+#ifdef HAVE_MINIMAP_ART
+extern void minimap_fast(uint8_t v, uint8_t sy);
+#else
+extern void minimap_fast(uint8_t v, uint8_t sy, uint8_t *out);
+#endif
+
+static uint8_t crime(uint8_t tx, uint8_t ty)    /* 0..15 on built-up tiles: grows with the distance from the centre, falls with police cover */
+{
+    uint8_t t = levelmap[ty * (uint16_t)MAP_W + tx], d, e, p;
+
+    if (!(((t & 0x80) ? 0x99 : D_tile_flags[t]) & 0x10))
+        return 0;
+    d = (uint8_t)((tx > V_CCxy[0] ? tx - V_CCxy[0] : V_CCxy[0] - tx) + (ty > V_CCxy[1] ? ty - V_CCxy[1] : V_CCxy[1] - ty));
+    if (d > 31)
+        d = 31;
+    e = d ? (uint8_t)(15 - ((32 - d) >> 1)) : 0;
+    p = minimaps[MM_POLICE_OFFSET + (ty >> 2) * 24u + (tx >> 2)];
+    return e > p ? (uint8_t)(e - p) : 0;
+}
+
+#ifdef HAVE_MINIMAP_ART
+extern void minimap_tiles(uint8_t sy);
+
+void minimap_row(uint8_t v, uint8_t sy)
+{
+    uint8_t tx;
+
+    if (v != MM_CRIME) {
+        minimap_fast(v, sy);
+        return;
+    }
+    for (tx = 0; tx < MAP_W; ++tx)
+        mm_col[tx] = crime(tx, (uint8_t)(sy << 1)) >> 1;
+    minimap_tiles(sy);
+}
+#else
+void minimap_row(uint8_t v, uint8_t sy, uint8_t *out)
+{
+    uint8_t tx;
+
+    if (v != MM_CRIME) {
+        minimap_fast(v, sy, out);
+        return;
+    }
+    for (tx = 0; tx < MAP_W; ++tx)
+        out[tx] = crime(tx, (uint8_t)(sy << 1)) >> 1;
+}
+#endif
+#else
 static const uint8_t bayer2[4] = { 0, 2, 3, 1 };
 static const uint8_t bayer4[16] = { 0, 8, 2, 10,  12, 4, 14, 6,  3, 11, 1, 9,  15, 7, 13, 5 };
 
@@ -179,5 +232,7 @@ uint8_t minimap_level(uint8_t v, uint8_t tx, uint8_t ty)
     return views[v].level(tx, ty);
 }
 #endif
+
+#endif /* HAVE_MINIMAP_NATIVE */
 
 #endif

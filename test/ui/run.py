@@ -68,6 +68,28 @@ def build_hires_minimap():
     return open(os.path.join(out, 'simcity.bin'), 'rb').read(), syms
 
 
+def build_native_minimap():
+    out = os.path.join(ROOT, 'build', 'testnative')
+    subprocess.run(['make', '-s', '-C', ROOT, 'build/testnative/simcity.bin'], check=True, capture_output=True)
+    syms = {}
+    for line in open(os.path.join(out, 'simcity.map')):
+        m = re.match(r'(\S+)\s*=\s*\$([0-9A-Fa-f]+)', line)
+        if m:
+            syms[m.group(1)] = int(m.group(2), 16)
+    return open(os.path.join(out, 'simcity.bin'), 'rb').read(), syms
+
+
+def build_native_art():
+    out = os.path.join(ROOT, 'build', 'testart')
+    subprocess.run(['make', '-s', '-C', ROOT, 'build/testart/simcity.bin'], check=True, capture_output=True)
+    syms = {}
+    for line in open(os.path.join(out, 'simcity.map')):
+        m = re.match(r'(\S+)\s*=\s*\$([0-9A-Fa-f]+)', line)
+        if m:
+            syms[m.group(1)] = int(m.group(2), 16)
+    return open(os.path.join(out, 'simcity.bin'), 'rb').read(), syms
+
+
 def run(binary, syms, keys, limit=4_000_000_000, patch=None, city=b''):
     """Run the game with the given key script; return (memory dump, symbols).  A build that asks for the city's name
     after the level (it has test_app_name) gets the name in `city` at the first title screen, and just ENTER after the others."""
@@ -431,6 +453,164 @@ def main():
     after_page_key = run(hbin, hsyms, [LEVEL_MEDIUM, PAUSE, KEY_M, KEY_UP] + [0] * 12)
     d = differences(bitmaps(after_page_key, hsyms, 40, 8, 152, 6), reference(after_page_key, 1, 0, 152, hsyms), 0)
     check('high-resolution mini map: up shows the remaining top strip of the city', not d, f'{len(d)} pixels differ, first {d[:4]}')
+    # --- 6b. the pop-up menu and the file dialogues are boxes in the middle of the map (rows 6..24), not the screen ---
+    def box_rows(m, text=None):
+        """The screen's rows, and the first and last row of the box (the one round `text`, the screen's lowest row
+        of a box if none: the headless screen keeps the text under the pictures the game draws over it)."""
+        a = hsyms['_test_screen']
+        scr = [m[a + r * 40:a + (r + 1) * 40].decode('latin1') for r in range(25)]
+        edge = [r for r, row in enumerate(scr) if row.strip().startswith('+--') and row.strip().endswith('--+')]
+        if text is not None:
+            at = [r for r, row in enumerate(scr) if text in row]
+            if not at:
+                return scr, (None, None)
+            above = [r for r in edge if r < at[0]]
+            below = [r for r in edge if r > at[0]]
+            return scr, (above[-1], below[0]) if above and below else (None, None)
+        return scr, (edge[0], edge[-1]) if len(edge) >= 2 else (None, None)
+    mem = run(hbin, hsyms, [LEVEL_MEDIUM, PAUSE, KEY_ESC] + [0] * 8)
+    scr, (top, bottom) = box_rows(mem)
+    check('popup menu: it is centred in the map, below the status panel', top is not None and top >= 6 and abs((top - 6) - (24 - bottom)) <= 1,
+          f'box rows {top}..{bottom}')
+    mem = run(hbin, hsyms, [LEVEL_MEDIUM, PAUSE, KEY_ESC, KEY_DOWN, KEY_DOWN, 13] + [0] * 8)
+    scr, (top, bottom) = box_rows(mem, 'SAVE THIS CITY')
+    check('save: the dialogue is a box in the map asking for the file name',
+          top is not None and bottom - top == 6 and top >= 6 and abs((top - 6) - (24 - bottom)) <= 1 and any('SAVE THIS CITY' in r for r in scr)
+          and any('FILE NAME:' in r for r in scr), f'box rows {top}..{bottom}')
+    check('save: the dialogue leaves the status panel alone', any('FUNDS' in r for r in scr[:6]), '\n'.join(scr[:6]))
+    mem = run(hbin, hsyms, [LEVEL_MEDIUM, PAUSE, KEY_ESC, KEY_DOWN, KEY_DOWN, 13, ord('a'), ord('b'), 13, 13] + [0] * 8)
+    name = bytes(mem[hsyms['_test_file_name']:hsyms['_test_file_name'] + 3])
+    check('save: the file is written under the typed name', name == b'ab\0', repr(name))
+    # --- 6c. the colour a tile mini map (the Multi 8's reserve mode): the whole city, every other row ---
+    nbin, nsyms = build_native_minimap()
+
+    keep = [5, 21, 22, 25]                                     # the rows the test platform keeps
+
+    def rows48(m):
+        a = nsyms['_test_minirow']
+        return {sy: list(m[a + k * 96:a + (k + 1) * 96]) for k, sy in enumerate(keep)}
+    mem = run(nbin, nsyms, [LEVEL_MEDIUM, PAUSE, KEY_M, 0])
+    a = nsyms['_test_minirow_n']
+    drawn = sum(1 for r in range(48) if mem[a + r])
+    caption = mem[nsyms['_test_screen'] + 5 * 40:nsyms['_test_screen'] + 6 * 40].decode('latin1')
+    check('native mini map: the status says what was asked for at once, before the map is drawn',
+          'MAP: CITY' in caption and 0 < drawn < 48, f'{drawn} rows drawn; {caption!r}')
+    mem = run(nbin, nsyms, [LEVEL_MEDIUM, PAUSE, KEY_M] + [0] * 12)
+    a = nsyms['_test_minirow_n']
+    check('native mini map: all 48 rows are drawn', all(mem[a + r] for r in range(48)), [mem[a + r] for r in range(48)])
+    rows = rows48(mem)
+    cols = {c for r in rows.values() for c in r}
+    check('native mini map: the city is drawn in colours (dirt, water, trees...)', {0, 1, 4} <= cols and cols <= set(range(8)), sorted(cols))
+    check('native mini map: a road is white, houses cyan (the tiles the test puts in the city)',
+          rows[21][40:60] == [7] * 20 and rows[22][40:60] == [5] * 20, (rows[21][38:62], rows[22][38:62]))
+    want = []
+    for g in (0x10, 0x11, 0x14, 0x15, 0x18, 0x19, 0x1A, 0x1D, 0x1E, 0x00, 0x12, 0x16):     # a zone row's colour from its group
+        want += [5 if 0x11 <= g <= 0x14 else 6 if 0x15 <= g <= 0x18 else 3 if 0x1A <= g <= 0x1D else 2] * 4
+    check('native mini map: a large zone is residential cyan, commercial yellow, industrial magenta, or a service red, by its group',
+          rows[25][40:88] == want, str((rows[25][40:88], want)))
+    lm = mem[nsyms['_levelmap']:nsyms['_levelmap'] + 9216]
+    water = [(r, x) for r in rows for x in range(96) if lm[2 * r * 96 + x] == 0 and rows[r][x] not in (1, 6)]      # (6: the blinking cursor's tile, inverted)
+    check('native mini map: row sy shows tile row 2 sy, every tile column', not water, f'{len(water)} water tiles are not blue')
+    mem = run(nbin, nsyms, [LEVEL_MEDIUM, PAUSE, KEY_M, KEY_M] + [0] * 12)
+    rows = rows48(mem)
+    mm = mem[nsyms['_minimaps']:nsyms['_minimaps'] + 6912]
+    bad = [(r, x) for r in keep for x in range(96) if rows[r][x] != mm[1152 + r * 48 + (x >> 1)] >> 5]
+    check('native mini map: a density map (pollution) is eight colours, an eighth of its value, 48x48 over 96x96', not bad, bad[:6])
+    mem = run(nbin, nsyms, [LEVEL_MEDIUM, PAUSE, KEY_M] + [0] * 12 + [ord('x'), 0, 0])
+    caption = mem[nsyms['_test_screen'] + 5 * 40:nsyms['_test_screen'] + 6 * 40].decode('latin1')
+    check('native mini map: X goes back to the city', 'MAP:' not in caption, repr(caption))
+
+    # --- 6d. the same with the tiles' own pictures at a quarter of the size (HAVE_MINIMAP_ART), the views laid over them ---
+    abin, asyms = build_native_art()
+    mini = open(os.path.join(ROOT, 'build', 'multi8', 'mp_mini.bin'), 'rb').read()
+
+    def nib(rec, i):
+        return (rec[i >> 1] >> 4) if i % 2 == 0 else rec[i >> 1] & 15
+
+    def tile_nibbles(rec, c):
+        """A tile's nine nibbles (plane 0's three lines, plane 1's, plane 2's): its picture, or with a level c (1..7) its ground in that
+        colour, solid, and its shape (what is not its ground in any plane) as it is."""
+        n = [nib(rec, i) for i in range(9)]
+        if not c:
+            return n
+        g = [15 if (nib(rec, 9) >> k) & 1 else 0 for k in range(3)]
+        out = [0] * 9
+        for j in range(3):
+            d = (n[j] ^ g[0]) | (n[3 + j] ^ g[1]) | (n[6 + j] ^ g[2])
+            for k in range(3):
+                out[3 * k + j] = (n[3 * k + j] & d) | (~d & 15 if (c >> k) & 1 else 0)
+        return out
+
+    def row_bytes(recs, levels):
+        """What mm_row holds: nine blocks of 48 bytes, a byte for two tiles (the left tile in the high half)."""
+        tiles = [tile_nibbles(r, c) for r, c in zip(recs, levels)]
+        return bytes((tiles[2 * q][i] << 4) | tiles[2 * q + 1][i] for i in range(9) for q in range(48))
+
+    def city_recs(lm, ty):
+        recs, base, k = [], 0, 0
+        for tx in range(96):
+            t = lm[ty * 96 + tx]
+            if t < 94:
+                idx = t
+            elif t < 128:
+                idx = 2
+            else:
+                if t < 192:
+                    base = (lm[ty * 96 + tx + 1] & 63) * 8 + (lm[ty * 96 + tx + 2] & 7)
+                    k = 0
+                else:
+                    k += 1
+                idx = 94 + base + k
+            recs.append(mini[idx * 5:idx * 5 + 5])
+        return recs
+    keep = [5, 21, 22, 25]
+
+    def art_rows(m):
+        a = asyms['_test_minirow']
+        return {sy: bytes(m[a + k * 432:a + (k + 1) * 432]) for k, sy in enumerate(keep)}
+    mem = run(abin, asyms, [LEVEL_MEDIUM, PAUSE, KEY_M, 0])
+    a = asyms['_test_minirow_n']
+    drawn = sum(1 for r in range(48) if mem[a + r])
+    caption = mem[asyms['_test_screen'] + 5 * 40:asyms['_test_screen'] + 6 * 40].decode('latin1')
+    check('art mini map: the status says what was asked for at once, before the map is drawn', 'MAP: CITY' in caption and 0 < drawn < 48,
+          f'{drawn} rows drawn; {caption!r}')
+    mem = run(abin, asyms, [LEVEL_MEDIUM, PAUSE, KEY_M] + [0] * 16)
+    a = asyms['_test_minirow_n']
+    check('art mini map: all 48 rows are drawn', all(mem[a + r] for r in range(48)), [mem[a + r] for r in range(48)])
+    lm = mem[asyms['_levelmap']:asyms['_levelmap'] + 9216]
+    got = art_rows(mem)
+    bad = [sy for sy in keep if got[sy] != row_bytes(city_recs(lm, 2 * sy), [0] * 96)]
+    check('art mini map: each row is its tiles\' pictures (ordinary tiles and large zones) in the three planes, four pixels by three lines each',
+          not bad, f'rows {bad} differ')
+    mem = run(abin, asyms, [LEVEL_MEDIUM, PAUSE, KEY_M, KEY_M] + [0] * 16)
+    lm = mem[asyms['_levelmap']:asyms['_levelmap'] + 9216]
+    mm = mem[asyms['_minimaps']:asyms['_minimaps'] + 6912]
+    got = art_rows(mem)
+    bad = [sy for sy in keep if got[sy] != row_bytes(city_recs(lm, 2 * sy), [mm[1152 + sy * 48 + (x >> 1)] >> 5 for x in range(96)])]
+    check('art mini map: pollution is laid over the city: each tile\'s ground is the colour of its level (an eighth of its value), '
+          'solid, its shape as it is, and the picture as it is where there is no level', not bad, f'rows {bad} differ')
+    tf = mem[asyms['_D_tile_flags']:asyms['_D_tile_flags'] + 128]
+    water = {0, 1, 3, 4, 5, 68, 92, 93}
+    mem = run(abin, asyms, [LEVEL_MEDIUM, PAUSE] + [KEY_M] * 7 + [0] * 16)
+    lm = mem[asyms['_levelmap']:asyms['_levelmap'] + 9216]
+    got = art_rows(mem)
+
+    def transport_level(t):
+        return 7 if t < 128 and tf[t] & 6 else 1 if t in water else 0
+    bad = [sy for sy in keep if got[sy] != row_bytes(city_recs(lm, 2 * sy), [transport_level(lm[2 * sy * 96 + x]) for x in range(96)])]
+    check('art mini map: roads and rails are laid over the city in white, water in blue (transport)', not bad, f'rows {bad} differ')
+    mem = run(abin, asyms, [LEVEL_MEDIUM, PAUSE, KEY_M] + [0] * 16 + [ord('x'), 0, 0])
+    caption = mem[asyms['_test_screen'] + 5 * 40:asyms['_test_screen'] + 6 * 40].decode('latin1')
+    check('art mini map: X goes back to the city', 'MAP:' not in caption, repr(caption))
+    for name, b2, s2 in (('art', abin, asyms), ('native', nbin, nsyms)):
+        m0 = run(b2, s2, [LEVEL_MEDIUM, PAUSE, KEY_M] + [0] * 4)
+        m1 = run(b2, s2, [LEVEL_MEDIUM, PAUSE, KEY_M] + [ord('p')] * 5 + [ord('a')] * 3 + [ord(' ')] * 2 + [0] * 4)
+        check(f'{name} mini map: there is no cursor to move and nothing to build with: movement and the tools do nothing in it',
+              m0[s2['_cur_x']] == m1[s2['_cur_x']] and m0[s2['_cur_y']] == m1[s2['_cur_y']] and money(m0, s2) == money(m1, s2),
+              f"cursor {m1[s2['_cur_x']]},{m1[s2['_cur_y']]} funds {money(m1, s2)}")
+        m2 = run(b2, s2, [LEVEL_MEDIUM, PAUSE, KEY_M, ord('x')] + [ord('p')] * 5 + [0] * 4)
+        check(f'{name} mini map: back in the city the cursor moves again', m2[s2['_cur_x']] == m0[s2['_cur_x']] + 5, m2[s2['_cur_x']])
+
     mem = run(pbin, psyms, [LEVEL_MEDIUM, ord('+')] + [0] * 250)
     text = panes(mem)[1]
     check('the advisor message is on row 6 (below the icons), where the Z88 shows it', text[6].strip() and not text[3].strip(), '\n'.join(text))
