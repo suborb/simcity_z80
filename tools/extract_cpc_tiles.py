@@ -203,6 +203,39 @@ def planes(tile, pal):
     return bytes(out)
 
 
+LINES = ((0, 1, 2), (3, 4, 5), (6, 7))      # the pixel rows of a picture that make each of a mini map tile's three lines
+
+
+def mini(baked, threshold=2):
+    """A picture at a quarter of the size for the mini maps: 4 columns by 3 lines, each a colour taken from a block of the
+    baked picture (two columns by two or three rows).  The picture's ground is its commonest colour.  A block takes the
+    strongest other colour if at least `threshold` of its pixels have it, so thin roads and wires show; otherwise it is the
+    ground.  Returns 5 bytes: nine nibbles, plane (blue, red, green) 0..2 by line 0..2, bit 3 of a nibble the left column,
+    the first in the high half of byte 0; then the ground colour in the low half of byte 4."""
+    rows = [[sum((((baked[p * 8 + y] >> (7 - x)) & 1) << p) for p in range(3)) for x in range(8)] for y in range(8)]
+    count = {}
+    for row in rows:
+        for c in row:
+            count[c] = count.get(c, 0) + 1
+    ground = max(count, key=lambda c: (count[c], -c))
+    cells = []
+    for lines in LINES:
+        for i in range(4):
+            n = {}
+            for y in lines:
+                for x in (2 * i, 2 * i + 1):
+                    n[rows[y][x]] = n.get(rows[y][x], 0) + 1
+            n.pop(ground, None)
+            best = max(n, key=lambda c: (n[c], c)) if n else ground
+            cells.append(best if n and n[best] >= threshold else ground)
+    nibbles = []
+    for p in range(3):
+        for line in range(3):
+            nibbles.append(sum(((cells[line * 4 + i] >> p) & 1) << (3 - i) for i in range(4)))
+    nibbles.append(ground)                  # (the last nibble: the picture's ground colour, for views that draw its shape in another colour)
+    return bytes((nibbles[2 * m] << 4) | nibbles[2 * m + 1] for m in range(5))
+
+
 def preview(d, ram, table, name, scale=3):
     """The snapshot's screen (the CPC's: 32 columns at $C000, 80 bytes a character row) twice: as it is, and with each
     cell that is one of the table's pictures recoloured by palette_of()."""
@@ -238,6 +271,7 @@ def main():
     ap.add_argument('--palette', choices=('cpc', 'class'), default='class')
     ap.add_argument('--preview', help='a picture of the snapshot\'s map: its own colours beside ours')
     ap.add_argument('--planes', help='write the pictures as three Multi 8 colour planes (24 bytes each)')
+    ap.add_argument('--mini', help='write the pictures as the mini map shows them (5 bytes each: see mini()) for the Multi 8')
     ap.add_argument('--numbering', choices=('ours', 'cpc'), default='ours')
     args = ap.parse_args()
 
@@ -261,6 +295,12 @@ def main():
         out = b''.join(planes(table[j * 16:j * 16 + 16], palette_of(j)) for j in src)
         open(args.planes, 'wb').write(out)
         print(f'{len(src)} pictures, {len(out)} bytes of planes -> {args.planes}')
+
+    if args.mini:
+        src = [cpc_picture(i) for i in range(OURS)]
+        out = b''.join(mini(planes(table[j * 16:j * 16 + 16], palette_of(j))) for j in src)
+        open(args.mini, 'wb').write(out)
+        print(f'{len(src)} pictures, {len(out)} bytes of mini map pictures -> {args.mini}')
 
     if args.sheet:
         from PIL import Image
