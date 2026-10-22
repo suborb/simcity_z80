@@ -34,42 +34,47 @@ NOSOUND = platform/common/nosound.asm
 
 CONSOLE = platform/console/plat_console.c platform/console/plat_font.asm
 AQPLUS_PLATFORM = target/aqplus/plat_aqplus.c target/aqplus/plat_aqplus.asm
-ZX_PLATFORM = target/zx/plat_zx.c target/zx/plat_zx.asm
+ZX_PLATFORM = target/zx/plat_zx.asm
+MULTI8_PLATFORM = target/multi8/plat_multi8.c target/multi8/plat_multi8.asm
 Z88_PLATFORM = target/z88/plat_z88.c target/z88/plat_z88.asm
 
 
 # Everything a build depends on.
 DEPS = Makefile $(wildcard ui/*.c ui/*.h engine/*.asm engine/*.h platform/common/*.asm \
-         platform/console/* target/*/*) assets/map_art.bin assets/udgs.bin assets/icons.bin
+         platform/console/*.[chai]* target/*/*.[chai]* target/*/*.inc) assets/map_art.bin assets/map_art_aq.bin assets/udgs.bin assets/icons.bin assets/icons_spec.bin
 
 AQPLUS = build/aqplus/simcity.aqx
 NC200  = build/nc200/simcity.img
 Z88ROM = build/z88rom/simcity.epr
 ZX     = build/zx/simcity.tap
-ZXP    = build/zx-print/simcity.tap
+MULTI8 = build/multi8/simcity.cas
 TEST   = build/test/simcity.bin
 TESTP  = build/testpanel/simcity.bin
 TESTM  = build/testmodal/simcity.bin
+TESTN  = build/testnarrow/simcity.bin
 TESTS  = build/testsprites/simcity.bin
+TESTO  = build/testoverlay/simcity.bin
 TESTH  = build/testhires/simcity.bin
 
-.PHONY: all aqplus z88rom zx zx-print test testpanel testmodal testsprites testhires check golden uitest tiletest z88test engine deadcode clean
+.PHONY: all aqplus z88rom zx multi8 test testpanel testmodal testnarrow testsprites testoverlay testhires check golden uitest tiletest z88test engine deadcode clean
 
-all: aqplus z88rom zx
+all: aqplus z88rom zx multi8
 
 aqplus: $(AQPLUS)
 z88rom: $(Z88ROM)
 zx:     $(ZX)
-zx-print: $(ZXP)
+multi8: $(MULTI8)
 test:   $(TEST)
 testpanel: $(TESTP)
 testmodal: $(TESTM)
+testnarrow: $(TESTN)
 testsprites: $(TESTS)
+testoverlay: $(TESTO)
 testhires: $(TESTH)
 
 $(AQPLUS): $(DEPS)
 	@mkdir -p $(@D)
-	$(ZCC) +aquarius -clib=aqplus -subtype=aqx -create-app --generic-console $(COMMON) -pragma-include:target/aqplus/zpragma.inc \
+	$(ZCC) +aquarius -clib=aqplus -subtype=aqx -create-app $(COMMON) -pragma-include:target/aqplus/zpragma.inc \
 	    -Itarget/aqplus -DTARGET_AQPLUS -Ca-DTARGET_AQPLUS -Ca-DSIM_STACK_TOP=0x3a00 $(GAME) $(ENTROPY) $(MENU) $(NOSOUND) $(FIELDS) $(AQPLUS_PLATFORM) -o $(@D)/simcity
 
 
@@ -86,19 +91,28 @@ $(Z88ROM): $(DEPS)
 
 ZX_PRAGMAS = target/zx/zpragma.inc
 ZX_FLAGS = -pragma-include:target/zx/zpragma.inc --reserve-regs-iy -create-app $(COMMON) \
-           -Itarget/zx -DTARGET_ZX -Ca-DTARGET_ZX
+           -Itarget/zx -DTARGET_ZX -Ca-DTARGET_ZX -Ca-DFMT_WIDTH=32 -Ca-DSIM_STACK_SIZE=96
 
 $(ZX): $(DEPS)
 	@mkdir -p $(@D)
-	$(ZCC) +zx $(ZX_FLAGS) $(GAME) $(ENTROPY) $(NOSOUND) $(ZX_PLATFORM) -o $(@D)/simcity
+	$(ZCC) +zx $(ZX_FLAGS) $(GAME) $(ENTROPY) $(NOSOUND) $(FIELDS) $(ZX_PLATFORM) -o $(@D)/simcity
 
-# The same, but each tile is drawn by printing a character whose picture comes from the console's
-# font and UDG pointers, as on the NC200 and Aquarius+, instead of being copied to screen memory.
-# Slower (about 7000 T-states a tile against a few hundred); there to compare the two by eye.
-$(ZXP): $(DEPS)
+# The Mitsubishi Multi 8 in its all-RAM mode: the code in the low 32 KB, the uninitialised data under the video planes.
+# The map's pictures baked in the Multi 8's colours, from the CPC game's art (tools/extract_cpc_tiles.py).
+build/multi8/mp_tiles.bin: assets/cpc_tiles.bin tools/extract_cpc_tiles.py
 	@mkdir -p $(@D)
-	$(ZCC) +zx $(ZX_FLAGS) -DZX_PRINT $(GAME) $(ENTROPY) $(NOSOUND) $(ZX_PLATFORM) -o $(@D)/simcity
+	python3 tools/extract_cpc_tiles.py assets/cpc_tiles.bin --planes $@
 
+# The image (code, data and the baked pictures) is loaded as one block from $0000 and must end below the uninitialised data,
+# which starts at MULTI8_BSS (and is not on the tape: its 16 KB of map and mini maps, and the cache of what each cell shows).
+MULTI8_BSS = 0xA200
+
+$(MULTI8): $(DEPS) build/multi8/mp_tiles.bin
+	@mkdir -p $(@D)
+	$(ZCC) +multi8 -subtype=64k -create-app $(COMMON) -pragma-include:target/multi8/zpragma.inc \
+	    -Itarget/multi8 -DTARGET_MULTI8 -Ca-DTARGET_MULTI8 -Ca-D__crt_org_bss=$(MULTI8_BSS) $(GAME) $(ENTROPY) $(MENU) $(NOSOUND) $(FIELDS) $(MULTI8_PLATFORM) -o $(@D)/simcity
+	@size=`wc -c < $(@D)/simcity`; echo "multi8 image: $$size bytes (limit $$(( $(MULTI8_BSS) )))"; \
+	    [ $$size -le $$(( $(MULTI8_BSS) )) ] || { echo "the image runs into the uninitialised data"; rm -f $@; exit 1; }
 
 # Headless: a scripted keyboard and a screen in RAM instead of the console, run under z88dk-ticks.
 $(TEST): $(DEPS)
@@ -115,10 +129,20 @@ $(TESTM): $(DEPS)
 	@mkdir -p $(@D)
 	$(ZCC) +test $(COMMON) -Itarget/test_ui  -DTEST_MODAL $(GAME) $(NOSOUND) $(FIELDS) target/test_ui/plat_test.c -o $@
 
+# A 32x24 screen, like the Spectrum's, with the optional screens on: verifies their 32 column layouts.
+$(TESTN): $(DEPS)
+	@mkdir -p $(@D)
+	$(ZCC) +test $(COMMON) -Ca-DFMT_WIDTH=32 -Itarget/test_ui -DTEST_NARROW $(GAME) $(NOSOUND) $(FIELDS) target/test_ui/plat_test.c -o $@
+
 # The same, drawing the map from pictures (and the sprites over it), which the test reads back.
 $(TESTS): $(DEPS)
 	@mkdir -p $(@D)
 	$(ZCC) +test $(COMMON) -Itarget/test_ui  -DTEST_PANEL -DTEST_SPRITES $(GAME) $(NOSOUND) $(FIELDS) target/test_ui/plat_test.c -o $@
+
+# The same with the sprites drawn over their tiles (HAVE_SPRITE_OVERLAY), as a platform with colour does.
+$(TESTO): $(DEPS)
+	@mkdir -p $(@D)
+	$(ZCC) +test $(COMMON) -Itarget/test_ui  -DTEST_PANEL -DTEST_SPRITES -DTEST_OVERLAY $(GAME) $(NOSOUND) $(FIELDS) target/test_ui/plat_test.c -o $@
 
 # A 40x25 Aquarius+-shaped screen: its 19-row map window holds the high-resolution mini map.
 $(TESTH): $(DEPS)

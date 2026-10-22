@@ -17,9 +17,20 @@ echo
 echo "== engine is ROM-clean: no stores into its own code"
 python3 tools/find_dead.py --smc
 echo
+echo "== FINE_ZONE_LEVELS: the engine with a picture for every growth level (the CPC game's)"
+python3 test/fine_zones/run.py
+echo
 echo "== ZX Spectrum tile drawing: every picture through the real console code"
 python3 test/tiles/run.py
-python3 test/tiles/run.py --print
+echo
+echo "== Aquarius+ glyph placer and colour tables"
+python3 test/aqplus/run.py
+echo
+echo "== Multi 8 placer: three planes, paging and colours"
+python3 test/multi8/run.py
+echo
+echo "== z88dk's Multi 8 tape routines (tape_save, tape_load_to)"
+python3 test/multi8/tape.py
 echo
 echo "== the Z88's sound routines"
 python3 test/sound/run.py
@@ -35,7 +46,7 @@ python3 test/ui/run.py | grep -E "^(PASS|FAIL)|passed|FAILED"
 echo
 echo "== builds"
 status=0
-for t in aqplus nc200 z88 z88rom zx zx-print; do
+for t in aqplus z88rom zx multi8; do
     if make -s $t >/dev/null 2>&1; then echo "built $t"; else echo "FAIL  build $t"; status=1; fi
 done
 exit $status
