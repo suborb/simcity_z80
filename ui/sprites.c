@@ -47,6 +47,10 @@ void sprites_collect(struct sprite *s, uint8_t frame)
     s[2].id = (uint8_t)(1 + ((frame >> 3) & 1));    /* the two frames, swapping */
 }
 
+#ifdef HAVE_SPRITE_OVERLAY
+const uint8_t sprite_blank[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
+#endif
+
 void sprite_or(uint8_t id, uint8_t qx, uint8_t qy, const uint8_t *base, uint8_t *art)
 {
     const uint8_t *p = transport_sprites + id * 32u + qy * 16u + qx;

@@ -365,6 +365,17 @@ static void draw_cell(uint8_t cx, uint8_t cy)
     view_y = my;
     view_fetch();
 #ifdef DRAW_SPRITES
+#ifdef HAVE_SPRITE_OVERLAY
+    {
+        /* a coloured screen keeps the tile's colours: the tile, then the sprite's own pixels over it */
+        uint8_t art[8];
+
+        plat_put_tile(cx, (uint8_t)(map_row + cy), view_art, view_attr, cursor);
+        if (sprites_cell(sprites, mx, my, sprite_blank, art))
+            plat_put_overlay(cx, (uint8_t)(map_row + cy), art);
+        return;
+    }
+#else
     {
         uint8_t art[8], key = sprites_cell(sprites, mx, my, view_art, art), i;
 
@@ -376,6 +387,7 @@ static void draw_cell(uint8_t cx, uint8_t cy)
             return;
         }
     }
+#endif
 #endif
     plat_put_tile(cx, (uint8_t)(map_row + cy), view_art, view_attr, cursor);
 #else
@@ -568,21 +580,17 @@ static void set_map_view(uint8_t v)
 #define set_map_view(v)
 #endif
 
-/* "R   |## " : a letter, three cells for shortfall, a bar, three cells for demand. */
+/* "R   |## " : a letter, three cells for shortfall, a bar, three cells for demand: the seven bars for -3..3 */
+static const char demand_bars[7][8] = {
+    "###|   ", " ##|   ", "  #|   ", "   |   ", "   |#  ", "   |## ", "   |###"
+};
+
 static void demand_bar(char *b, char name, int16_t v)
 {
-    int16_t n = v / 32;
-    uint8_t i;
-    for (i = 0; i < 8; ++i)
-        b[i] = ' ';
+    int16_t n = v < 0 ? -(-v >> 5) : v >> 5;            /* v / 32, rounded towards 0 */
+
     b[0] = name;
-    b[4] = '|';
-    if (n > 3) n = 3;
-    if (n < -3) n = -3;
-    if (n > 0)
-        for (i = 0; i < (uint8_t)n; ++i) b[5 + i] = '#';
-    else
-        for (i = 0; i < (uint8_t)(-n); ++i) b[3 - i] = '#';
+    memcpy(b + 1, demand_bars[n > 3 ? 6 : n < -3 ? 0 : n + 3], 7);
 }
 
 static const char *const help_page[3] = {

@@ -18,6 +18,9 @@
 #elif defined(TEST_HIRES_MINIMAP)
 #define COLS 40
 #define ROWS 25
+#elif defined(TEST_NARROW)
+#define COLS 32
+#define ROWS 24
 #else
 #define COLS 64
 #define ROWS 24
@@ -175,6 +178,17 @@ void plat_put_tile(uint8_t col, uint8_t row, const uint8_t *art, uint8_t attr, u
     if (col < COLS && row < ROWS)
         for (i = 0; i < 8; ++i)
             test_bitmap[row][col][i] = inverse ? (uint8_t)~art[i] : art[i];
+}
+#endif
+
+#ifdef HAVE_SPRITE_OVERLAY
+/* A platform that draws a sprite over its tile: the picture's own pixels are ORed in (which is what the composite was) */
+void plat_put_overlay(uint8_t col, uint8_t row, const uint8_t *art)
+{
+    uint8_t i;
+    if (col < COLS && row < ROWS)
+        for (i = 0; i < 8; ++i)
+            test_bitmap[row][col][i] |= art[i];
 }
 #endif
 

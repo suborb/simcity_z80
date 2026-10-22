@@ -14,7 +14,7 @@ extern uint8_t fmt_dec3(char *b, uint8_t *t);
 
 #ifdef HAVE_FIELDS
 extern uint8_t  fmt_str(char *b, uint8_t n, const char *s); /* s at b[n..]; returns the column after it */
-extern void     fmt_blank(char *b);                         /* 40 spaces and a NUL */
+extern void     fmt_blank(char *b);                         /* FMT_WIDTH (40, or a narrower display's) spaces and a NUL */
 
 /* A screen as a table: what goes where.  fmt_fields() lays the fields out a row at a time (they must
    be in row order) and writes each row to the text area with plat_text_puts(). */

@@ -24,7 +24,9 @@
 ; sim_tick called directly (not through sim_step) calls ui_budget_confirm instead.
 ; ------------------------------------------------------------------------
 
-SIM_STACK_SIZE  equ     256             ; the engine nests a few calls deep, plus interrupts
+        IFNDEF  SIM_STACK_SIZE
+SIM_STACK_SIZE  equ     256             ; the engine nests a few calls deep (28 bytes: test/golden), plus interrupts
+        ENDIF                           ; (a build can say less: -Ca-DSIM_STACK_SIZE=n)
 
         MACRO   SIM_SAVE_REGS
         push    af

@@ -39,9 +39,9 @@ uint8_t fmt_str(char *b, uint8_t n, const char *s)
 void fmt_blank(char *b)
 {
     uint8_t i;
-    for (i = 0; i < 40; ++i)
+    for (i = 0; i < FMT_WIDTH; ++i)
         b[i] = ' ';
-    b[40] = 0;
+    b[FMT_WIDTH] = 0;
 }
 
 /* Called by the table drawing (fmtfields.asm) with a finished row. */

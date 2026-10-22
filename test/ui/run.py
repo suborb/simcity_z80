@@ -46,6 +46,17 @@ def build_modal():
     return open(os.path.join(out, 'simcity.bin'), 'rb').read(), syms
 
 
+def build_narrow():
+    out = os.path.join(ROOT, 'build', 'testnarrow')
+    subprocess.run(['make', '-s', '-C', ROOT, 'build/testnarrow/simcity.bin'], check=True, capture_output=True)
+    syms = {}
+    for line in open(os.path.join(out, 'simcity.map')):
+        m = re.match(r'(\S+)\s*=\s*\$([0-9A-Fa-f]+)', line)
+        if m:
+            syms[m.group(1)] = int(m.group(2), 16)
+    return open(os.path.join(out, 'simcity.bin'), 'rb').read(), syms
+
+
 def build_hires_minimap():
     out = os.path.join(ROOT, 'build', 'testhires')
     subprocess.run(['make', '-s', '-C', ROOT, 'build/testhires/simcity.bin'], check=True, capture_output=True)
@@ -88,9 +99,9 @@ def run(binary, syms, keys, limit=4_000_000_000, patch=None, city=b''):
     return open(dump, 'rb').read()
 
 
-def screen(mem, syms):
+def screen(mem, syms, cols=COLS):
     a = syms['_test_screen']
-    return [mem[a + r * COLS:a + (r + 1) * COLS].decode('latin1') for r in range(ROWS)]
+    return [mem[a + r * cols:a + (r + 1) * cols].decode('latin1') for r in range(ROWS)]
 
 
 def levelmap(mem, syms):
@@ -571,39 +582,64 @@ def main():
                                                     (14, 'POPULATION'), (16, 'ASSESSED VALUE'), (19, 'CATEGORY'),
                                                     (21, 'CITY SCORE'), (23, 'ENTER OK'))), '\n'.join(text))
 
-    # --- 9. the moving sprites, drawn over the map's pictures ---
-    subprocess.run(['make', '-s', '-C', ROOT, 'build/testsprites/simcity.bin'], check=True, capture_output=True)
-    ssyms = {}
-    for line in open(os.path.join(ROOT, 'build', 'testsprites', 'simcity.map')):
-        m = re.match(r'(\S+)\s*=\s*\$([0-9A-Fa-f]+)', line)
-        if m:
-            ssyms[m.group(1)] = int(m.group(2), 16)
-    sbin = open(os.path.join(ROOT, 'build', 'testsprites', 'simcity.bin'), 'rb').read()
-    spr = open(os.path.join(ROOT, 'assets', 'transport.spr'), 'rb').read()
+    # --- 8c. the 32 column layouts, on a 32x24 screen (the Spectrum's shape) ---
+    nbin, nsyms = build_narrow()
+    mem = run(nbin, nsyms, [LEVEL_MEDIUM, PAUSE, CMD_BUDGET, 0, 0])
+    text = screen(mem, nsyms, 32)
+    check('32 column budget: every group on its own row',
+          all(word in text[row] for row, word in ((0, 'FISCAL BUDGET'), (2, 'TAX RATE'), (4, 'TAX COLLECTED'),
+                                                    (6, 'REQSTD'), (8, 'TRANSPORT'), (10, 'POLICE'), (12, 'FIRE'),
+                                                    (15, 'CASH FLOW'), (17, 'PREVIOUS FUNDS'),
+                                                    (19, 'CURRENT FUNDS'), (23, 'ENTER OK'))), '\n'.join(text))
+    check('32 column budget: the figures sit under their headings (the % of each service in column 28)',
+          all(text[r][28] == '%' and text[r][16].isdigit() and text[r][23].isdigit() for r in (8, 10, 12))
+          and text[2][12] == '%', '\n'.join(text))
+    mem = run(nbin, nsyms, [LEVEL_MEDIUM, PAUSE, CMD_EVALUATION, 0, 0])
+    text = screen(mem, nsyms, 32)
+    check('32 column evaluation: approval, the problems one to a row, statistics and category',
+          all(word in text[row] for row, word in ((0, 'EVALUATION'), (2, 'GOOD JOB'), (3, 'YES'), (4, 'NO'),
+                                                    (6, 'WORST PROBLEMS'), (8, 'TRAFFIC'), (9, 'POLLUTION'),
+                                                    (10, 'CRIME'), (11, 'FIRE'), (12, 'TAXES'), (13, 'HOUSE PRICES'),
+                                                    (14, 'UNEMPLOYMENT'), (16, 'POPULATION'), (17, 'MIGRATION'),
+                                                    (18, 'ASSESSED VALUE'), (20, 'CATEGORY'), (21, 'GAME LEVEL'),
+                                                    (22, 'CITY SCORE'), (23, 'ENTER OK'))), '\n'.join(text))
+    check('32 column evaluation: the percentages line up (the % in column 22) and nothing is left of the screen',
+          all(text[r][22] == '%' for r in range(8, 15)) and text[3][14] == '%', '\n'.join(text))
 
-    def cells(mem):
-        b = ssyms['_test_bitmap']
-        return {(c, r): bytes(mem[b + (r * 32 + c) * 8:b + (r * 32 + c) * 8 + 8]) for r in range(8) for c in range(32)}
+    # --- 9. the moving sprites, drawn over the map's pictures (composited into them, and drawn over them) ---
+    for tgt in ('testsprites', 'testoverlay'):
+        subprocess.run(['make', '-s', '-C', ROOT, 'build/' + tgt + '/simcity.bin'], check=True, capture_output=True)
+        ssyms = {}
+        for line in open(os.path.join(ROOT, 'build', tgt, 'simcity.map')):
+            m = re.match(r'(\S+)\s*=\s*\$([0-9A-Fa-f]+)', line)
+            if m:
+                ssyms[m.group(1)] = int(m.group(2), 16)
+        sbin = open(os.path.join(ROOT, 'build', tgt, 'simcity.bin'), 'rb').read()
+        spr = open(os.path.join(ROOT, 'assets', 'transport.spr'), 'rb').read()
 
-    with_s = cells(run(sbin, ssyms, [LEVEL_MEDIUM, PAUSE] + [0] * 20))
-    without = cells(run(sbin, ssyms, [LEVEL_MEDIUM, PAUSE] + [0] * 20, patch={'_test_poke_sprites': b'\0'}))
-    # origin of the view is (32, 44): the train at map (40, 46) is console cell (8, 2), the plane at (36, 45) is (4, 1)
-    want = {}
-    for (c0, r0, sid) in ((8, 2, 3), (4, 1, 0)):
-        for qy in (0, 1):
-            for qx in (0, 1):
-                base = without[(c0 + qx, r0 + qy)]
-                want[(c0 + qx, r0 + qy)] = bytes(base[r] | spr[sid * 32 + (qy * 8 + r) * 2 + qx] for r in range(8))
-    wrong = [(k, with_s[k].hex(), v.hex()) for k, v in want.items() if with_s[k] != v]
-    check('sprites: the train and the plane are drawn over the tiles, 2x2 cells each', not wrong, str(wrong[:3]))
-    check('sprites: they changed the pictures of those cells (not all: water is solid already)', sum(with_s[k] != without[k] for k in want) >= 4)
-    other = [k for k in with_s if k not in want and k != (16, 4) and with_s[k] != without[k]]
-    check('sprites: no other cell is touched', not other, str(other[:5]))
-    mem = run(sbin, ssyms, [LEVEL_MEDIUM, PAUSE] + [0] * 20 + [KEY_RIGHT] * 40 + [0] * 10)
-    moved = cells(mem)
-    # the view scrolled right once the cursor passed its edge: the sprite must have moved on the screen with the map
-    check('sprites: they scroll with the map (the cells where they were no longer hold them)',
-          any(moved[(8, 2)] != with_s[(8, 2)] for _ in [0]))
+        def cells(mem):
+            b = ssyms['_test_bitmap']
+            return {(c, r): bytes(mem[b + (r * 32 + c) * 8:b + (r * 32 + c) * 8 + 8]) for r in range(8) for c in range(32)}
+
+        with_s = cells(run(sbin, ssyms, [LEVEL_MEDIUM, PAUSE] + [0] * 20))
+        without = cells(run(sbin, ssyms, [LEVEL_MEDIUM, PAUSE] + [0] * 20, patch={'_test_poke_sprites': b'\0'}))
+        # origin of the view is (32, 44): the train at map (40, 46) is console cell (8, 2), the plane at (36, 45) is (4, 1)
+        want = {}
+        for (c0, r0, sid) in ((8, 2, 3), (4, 1, 0)):
+            for qy in (0, 1):
+                for qx in (0, 1):
+                    base = without[(c0 + qx, r0 + qy)]
+                    want[(c0 + qx, r0 + qy)] = bytes(base[r] | spr[sid * 32 + (qy * 8 + r) * 2 + qx] for r in range(8))
+        wrong = [(k, with_s[k].hex(), v.hex()) for k, v in want.items() if with_s[k] != v]
+        check(tgt + ' sprites: the train and the plane are drawn over the tiles, 2x2 cells each', not wrong, str(wrong[:3]))
+        check(tgt + ' sprites: they changed the pictures of those cells (not all: water is solid already)', sum(with_s[k] != without[k] for k in want) >= 4)
+        other = [k for k in with_s if k not in want and k != (16, 4) and with_s[k] != without[k]]
+        check(tgt + ' sprites: no other cell is touched', not other, str(other[:5]))
+        mem = run(sbin, ssyms, [LEVEL_MEDIUM, PAUSE] + [0] * 20 + [KEY_RIGHT] * 40 + [0] * 10)
+        moved = cells(mem)
+        # the view scrolled right once the cursor passed its edge: the sprite must have moved on the screen with the map
+        check(tgt + ' sprites: they scroll with the map (the cells where they were no longer hold them)',
+              any(moved[(8, 2)] != with_s[(8, 2)] for _ in [0]))
 
     # --- 10. saving and loading a city ---
     CMD_SAVE, CMD_LOAD = 0xA6, 0xA7

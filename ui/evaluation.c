@@ -33,11 +33,11 @@ static uint16_t rnd = 1;
 
 static uint8_t ge24(const uint8_t *a, const uint8_t *b)     /* a >= b, 24 bit */
 {
-    uint8_t i = 3;
-    while (i--)
-        if (a[i] != b[i])
-            return a[i] > b[i];
-    return 1;
+    if (a[2] != b[2])
+        return a[2] > b[2];
+    if (a[1] != b[1])
+        return a[1] > b[1];
+    return a[0] >= b[0];
 }
 
 static uint8_t clip(int16_t v)                      /* the Spectrum's ckpercent */
@@ -91,7 +91,55 @@ static struct evaluation ev;
 static uint8_t migration[3];
 static const char *class_name, *level_name;
 
-#if MODAL_ROWS >= 24
+#if MODAL_COLS < 40
+/* The 32 column arrangement: the same sections, with the problems one to a row. */
+static const struct field head[] = {
+    { 0, 11, F_TEXT, 0,   "EVALUATION" },
+    { 2,  1, F_TEXT, 0,   "IS THE MAYOR DOING A GOOD JOB?" },
+    { 3, 14, F_U8,   '%', &ev.yes },
+    { 3, 18, F_TEXT, 0,   "YES" },
+    { 4, 14, F_U8,   '%', &ev.no },
+    { 4, 18, F_TEXT, 0,   "NO" },
+};
+
+static const struct field body[] = {
+    {  6,  1, F_TEXT, 0,   "WHAT ARE THE WORST PROBLEMS?" },
+    {  8,  1, F_TEXT, 0,   "TRAFFIC" },
+    {  8, 22, F_U8,   '%', ev.problem },
+    {  9,  1, F_TEXT, 0,   "POLLUTION" },
+    {  9, 22, F_U8,   '%', ev.problem + 1 },
+    { 10,  1, F_TEXT, 0,   "CRIME" },
+    { 10, 22, F_U8,   '%', ev.problem + 2 },
+    { 11,  1, F_TEXT, 0,   "FIRE" },
+    { 11, 22, F_U8,   '%', ev.problem + 3 },
+    { 12,  1, F_TEXT, 0,   "TAXES" },
+    { 12, 22, F_U8,   '%', ev.problem + 4 },
+    { 13,  1, F_TEXT, 0,   "HOUSE PRICES" },
+    { 13, 22, F_U8,   '%', ev.problem + 5 },
+    { 14,  1, F_TEXT, 0,   "UNEMPLOYMENT" },
+    { 14, 22, F_U8,   '%', ev.problem + 6 },
+};
+
+static const struct field nobody[] = {
+    {  8,  1, F_TEXT, 0,   "NOBODY LIVES HERE YET" },
+};
+
+static const struct field foot[] = {
+    { 16,  1, F_TEXT, 0,   "POPULATION" },
+    { 16, 20, F_U24,  0,   V_display_population },
+    { 17,  1, F_TEXT, 0,   "MIGRATION" },
+    { 17, 20, F_S24,  0,   migration },
+    { 18,  1, F_TEXT, 0,   "ASSESSED VALUE $" },
+    { 18, 18, F_K24,  0,   V_previous_city_score },
+    { 20,  1, F_TEXT, 0,   "CATEGORY" },
+    { 20, 11, F_STR,  0,   &class_name },
+    { 21,  1, F_TEXT, 0,   "GAME LEVEL" },
+    { 21, 12, F_STR,  0,   &level_name },
+    { 22,  1, F_TEXT, 0,   "CITY SCORE" },
+    { 22, 20, F_U16,  0,   &ev.score },
+    { 23, 24, F_TEXT, 0,   "ENTER OK" },
+};
+#elif MODAL_ROWS >= 24
 /* The full-screen arrangement keeps the Spectrum's sections: the question and approval, then the problems,
    statistics and city category. */
 static const struct field head[] = {
@@ -212,7 +260,7 @@ uint8_t evaluation_screen(void)
 {
     uint8_t k;
 
-    if (plat_text_rows() < MODAL_ROWS || plat_text_cols() < 40)
+    if (plat_text_rows() < MODAL_ROWS || plat_text_cols() < MODAL_COLS)
         return 0;
     evaluate(&ev);
     plat_text_clear();

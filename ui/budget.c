@@ -24,7 +24,36 @@
 
 static uint8_t sel;                     /* 0 tax rate, 1 transport, 2 police, 3 fire */
 
-#if MODAL_ROWS >= 24
+#if MODAL_COLS < 40
+/* The 32 column arrangement: the same groups, with the numbers packed under their headings. */
+static const struct field fields[] = {
+    {  0,  1, F_TEXT, 0,   "FISCAL BUDGET" },
+    {  2,  1, F_TEXT, 0,   "TAX RATE" },
+    {  2, 12, F_U8,   '%', &SMC_tax_rate },
+    {  4,  1, F_TEXT, 0,   "TAX COLLECTED $" },
+    {  4, 16, F_L24,  0,   V_tax_collected },
+    {  6, 11, F_TEXT, 0,   "REQSTD ALLCTD FUND" },
+    {  8,  1, F_TEXT, 0,   "TRANSPORT" },
+    {  8, 17, F_U16,  0,   &V_Transport_Funding_Requested },
+    {  8, 24, F_U16,  0,   &V_Transport_Funding_Allocated },
+    {  8, 28, F_U8,   '%', &SMC_transport_percent },
+    { 10,  1, F_TEXT, 0,   "POLICE" },
+    { 10, 17, F_U16,  0,   &V_Budget_Police_Funding_Requested },
+    { 10, 24, F_U16,  0,   &V_Police_Funding_Allocated },
+    { 10, 28, F_U8,   '%', &SMC_police_percent },
+    { 12,  1, F_TEXT, 0,   "FIRE" },
+    { 12, 17, F_U16,  0,   &V_Budget_Fire_Funding_Requested },
+    { 12, 24, F_U16,  0,   &V_Fire_Funding_Allocated },
+    { 12, 28, F_U8,   '%', &SMC_fire_percent },
+    { 15,  1, F_TEXT, 0,   "CASH FLOW" },
+    { 15, 22, F_S24,  0,   V_cashflow },
+    { 17,  1, F_TEXT, 0,   "PREVIOUS FUNDS $" },
+    { 17, 17, F_L24,  0,   V_previous_money },
+    { 19,  1, F_TEXT, 0,   "CURRENT FUNDS $" },
+    { 19, 16, F_L24,  0,   V_money_after_budget },
+    { 23,  0, F_TEXT, 0,   "Q A SELECT  O P CHANGE  ENTER OK" },
+};
+#elif MODAL_ROWS >= 24
 /* The full-screen arrangement follows the Spectrum's groups, while using the extra height to make the money
    figures and each service line independently readable. */
 static const struct field fields[] = {
@@ -93,7 +122,7 @@ static const struct field fields[] = {
 
 static void draw(void)
 {
-#if MODAL_ROWS >= 24
+#if MODAL_COLS < 40 || MODAL_ROWS >= 24
     static const uint8_t item_row[4] = { 2, 8, 10, 12 };
 #else
     static const uint8_t item_row[4] = { BUDGET_ROW(1), BUDGET_ROW(3), BUDGET_ROW(4), BUDGET_ROW(5) };
@@ -126,7 +155,7 @@ uint8_t budget_screen(void)
 {
     uint8_t k;
 
-    if (plat_text_rows() < ROWS || plat_text_cols() < 40)
+    if (plat_text_rows() < ROWS || plat_text_cols() < MODAL_COLS)
         return 0;                       /* nowhere to put it: the engine's figures stand */
     sel = 0;
     budget_recalc();

@@ -10,6 +10,10 @@
         MODULE  fmtfields
         INCLUDE "sections.asm"
 
+        IFNDEF  FMT_WIDTH
+        defc    FMT_WIDTH = 40          ; a narrower display's row is its width (the Makefile: -Ca-DFMT_WIDTH=32)
+        ENDIF
+
         PUBLIC  _fmt_run, _fmt_count, _fmt_row
         EXTERN  _bcd24
         EXTERN  _fmt_flush
@@ -25,7 +29,7 @@ fr_kind:    defb    0
 fr_unit:    defb    0
 fr_neg:     defb    0
 fr_len:     defb    0
-fr_buf:     defs    41
+fr_buf:     defs    FMT_WIDTH+1
 fr_t:       defs    7
 fr_d:       defs    8
         IN_CODE
@@ -238,7 +242,7 @@ fr_dest:
 fr_blank:
         ld      hl,fr_buf
         ld      de,fr_buf+1
-        ld      bc,39
+        ld      bc,FMT_WIDTH-1
         ld      (hl),' '
         ldir
         xor     a

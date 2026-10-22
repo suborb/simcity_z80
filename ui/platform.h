@@ -16,6 +16,20 @@
 #if defined(MODAL_ROWS) && MODAL_ROWS < 8
 #error "MODAL_ROWS must be at least 8"
 #endif
+/* The two screens have a layout for 40 or more columns (the default) and one for the 32 of many Z80 machines
+   (a platform with a 32 column display sets MODAL_COLS to 32, and MODAL_ROWS to 24). */
+#ifndef MODAL_COLS
+#define MODAL_COLS 40
+#endif
+#if MODAL_COLS < 40 && (!defined(MODAL_ROWS) || MODAL_ROWS < 24)
+#error "the 32 column layouts need MODAL_ROWS 24"
+#endif
+/* How wide a row of the table screens (ui/textfmt.h) is: 40, or a narrower display's width, which the platform's
+   plat_config.h says (FMT_WIDTH).  The Makefile gives the assembler the same number as -Ca-DFMT_WIDTH=n
+   (ui/fmtfields.asm). */
+#ifndef FMT_WIDTH
+#define FMT_WIDTH 40
+#endif
 
 /* Key codes returned by plat_key().  Printable keys return their ASCII code. */
 #define KEY_NONE   0
@@ -84,6 +98,9 @@ extern void     plat_flush(void);               /* end of frame: show what was d
                        coordinates.  Without it the text shares the screen, the top third.
      HAVE_TILES        it can draw the game's own 8x8 pictures (plat_put_tile())
      HAVE_BITMAP       it can draw pictures of the game's own making (plat_put_bitmap()); needed by HAVE_MINIMAP
+     HAVE_SPRITE_OVERLAY  with HAVE_SPRITES and HAVE_TILES: the train, plane and tornado are drawn over the cell's tile
+                       (plat_put_overlay()) instead of replacing it with the tile's picture ORed with theirs
+                       (plat_put_bitmap()), which keeps the tile's colours where a screen has them
      HAVE_ICONS        the tools as small pictures in rows 3 and 4 of the text area (plat_icons()); the status
                        panel then has the advisor message on row 6 and no key tips
      HAVE_ICONS_TOP    with HAVE_ICONS: the date, funds and population are on row 0, the icons in rows 1 and 2, then
@@ -135,9 +152,16 @@ extern void     plat_icons(uint8_t selected);
 /* Tile graphics: plat_put_tile() draws one of the engine's 8x8 pictures in a character cell.
      art      8 bytes of 1bpp art, as returned by view_fetch() (a pointer into the engine's tile table, which
               the platform may use to tell tiles apart)
-     attr     the Spectrum-format attribute for the picture (colour platforms)
+     attr     the attribute byte for the picture: Spectrum format (colour platforms), or the Aquarius+'s own colour
+              byte, where its engine art (assets/map_art_aq.bin, tools/make_aq_assets.py) comes converted
      inverse  1 for the blinking cursor: the picture with its pixels inverted */
 extern void     plat_put_tile(uint8_t col, uint8_t row, const uint8_t *art, uint8_t attr, uint8_t inverse);
+#endif
+
+#ifdef HAVE_SPRITE_OVERLAY
+/* plat_put_overlay() draws the pixels set in 8 bytes of 1bpp art (a byte a pixel row, bit 7 on the left) over what is in
+   a character cell, in the platform's colour for sprites; the rest of the cell is left as it is. */
+extern void     plat_put_overlay(uint8_t col, uint8_t row, const uint8_t *art);
 #endif
 
 #ifdef HAVE_BITMAP

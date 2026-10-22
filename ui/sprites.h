@@ -25,4 +25,10 @@ extern uint8_t sprites_cell(const struct sprite *s, uint8_t mx, uint8_t my, cons
 /* One quarter of a picture ORed onto 8 bytes: quarter (qx, qy), each 0 or 1.  Used by sprites_cell. */
 extern void sprite_or(uint8_t id, uint8_t qx, uint8_t qy, const uint8_t *base, uint8_t *art);
 
+#ifdef HAVE_SPRITE_OVERLAY
+/* Eight zero bytes: the base for sprites_cell() on a platform that draws the sprite over the tile itself
+   (HAVE_SPRITE_OVERLAY, ui/platform.h), which wants the sprite's own pixels. */
+extern const uint8_t sprite_blank[8];
+#endif
+
 #endif

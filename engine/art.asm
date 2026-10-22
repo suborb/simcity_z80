@@ -10,6 +10,10 @@
 ;
 ; In udgs.bin the same tables start at +536, +1288, +3296 and +3390.  The Spectrum
 ; build has the whole file in target/zx-original/zx_udgs.asm.
+;
+; The Aquarius+ build (TARGET_AQPLUS) has assets/map_art_aq.bin instead: the same, with the attribute bytes
+; converted to the colour bytes its bitmap wants (tools/make_aq_assets.py), so view_fetch's attribute goes
+; straight to the screen.
 ; ------------------------------------------------------------------------
         defc    ART_TILES      = 0
         defc    ART_ZONES      = 752
@@ -18,5 +22,9 @@
 
         IN_RODATA
 view_udgs:
+        IFDEF   TARGET_AQPLUS
+        BINARY  "assets/map_art_aq.bin"
+        ELSE
         BINARY  "assets/map_art.bin"
+        ENDIF
         IN_CODE

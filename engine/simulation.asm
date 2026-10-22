@@ -2114,6 +2114,37 @@ D_zone_handler_config:                  ; $8813 / 34835 - per-zone config: (tile
         defb    8,6,0,10                ;nuclear
         defb    10,7,0,$1e              ;port
         defb    $0c,$08,$00,$28         ;airport
+        IFDEF   FINE_ZONE_LEVELS
+        ; A zone's type is the group (piece / 8) of the first piece of its picture, and a picture is nine pieces: the
+        ; residential pictures start at piece 136, the commercial at 208 and the industrial at 298.  (Group $22
+        ; and $2b start no picture.)
+        defb    $11,$09,$00,$50         ;residential level 1
+        defb    $12,$09,$01,$60
+        defb    $13,$09,$02,$70
+        defb    $14,$09,$03,$80
+        defb    $15,$09,$04,$90
+        defb    $16,$09,$05,$a0
+        defb    $17,$09,$06,$b0
+        defb    $18,$09,$07,$c0
+        defb    $1a,$0a,$00,$04         ;commercial level 1
+        defb    $1b,$0a,$01,$08
+        defb    $1c,$0a,$02,$0c
+        defb    $1d,$0a,$03,$10
+        defb    $1e,$0a,$04,$14
+        defb    $1f,$0a,$05,$18
+        defb    $20,$0a,$06,$1c
+        defb    $21,$0a,$07,$20
+        defb    $23,$0a,$08,$24
+        defb    $24,$0a,$09,$28
+        defb    $25,$0b,$00,$08         ;industrial level 1
+        defb    $26,$0b,$01,$10
+        defb    $27,$0b,$02,$18
+        defb    $28,$0b,$03,$20
+        defb    $29,$0b,$04,$28
+        defb    $2a,$0b,$05,$30
+        defb    $2c,$0b,$06,$38
+        defb    $2d,$0b,$07,$40
+        ELSE
         defb    $11,$09,$00,$60         ;residential density 1
         defb    $12,$09,$01,$80         ;residential density 2
         defb    $13,$09,$02,$a0         ;residential density 3
@@ -2126,6 +2157,7 @@ D_zone_handler_config:                  ; $8813 / 34835 - per-zone config: (tile
         defb    $1b,$0b,$01,$20         ;industrial density 2
         defb    $1c,$0b,$02,$30         ;industrial density 3
         defb    $1d,$0b,$03,$40         ;industrial density 4
+        ENDIF
         defb    $ff,$ff                 ;sentinel
         IN_CODE
 
@@ -2682,9 +2714,11 @@ L8b37:
         ld      a,(V_zone_growth_factor)
         cp      8
         jr      nc,L8ba9                ; (30)
-        srl     a
+        IFNDEF  FINE_ZONE_LEVELS
+        srl     a                       ; two growth levels to a picture
+        ENDIF
         ld      bc,(V_map_iter_xy)
-        ld      de,136
+        ld      de,136                  ; (FINE_ZONE_LEVELS: eight pictures, one for each level)
         jp      write_zone_print_entries
 
 ;35735
@@ -2774,6 +2808,10 @@ do_commercial_zone_scan:                                    ; $8BEB / 35819 - Sc
         cp      0
         jr      z,L8c4a                 ; (28)
         dec     a
+        IFDEF   FINE_ZONE_LEVELS
+        ld      bc,(V_map_iter_xy)      ; ten pictures, one for each level
+        ld      de,208
+        ELSE
         ld      c,a
         ld      b,0
         ld      hl,D_density_class_table
@@ -2781,6 +2819,7 @@ do_commercial_zone_scan:                                    ; $8BEB / 35819 - Sc
         ld      a,(hl)
         ld      bc,(V_map_iter_xy)
         ld      de,172
+        ENDIF
         jp      write_zone_print_entries
 
 ;8c41, 35905 
@@ -2857,9 +2896,14 @@ do_industrial_zone_scan:                                    ; $8C82 / 35970 - Sc
         cp      0
         jr      z,L8cfa                 ; (50)
         dec     a
+        IFDEF   FINE_ZONE_LEVELS
+        ld      bc,(V_map_iter_xy)      ; eight pictures, one for each level
+        ld      de,298
+        ELSE
         srl     a
         ld      bc,(V_map_iter_xy)
         ld      de,208
+        ENDIF
         call    write_zone_print_entries
 
 .L8cd5  ld      a,(V_ind_growth_index)

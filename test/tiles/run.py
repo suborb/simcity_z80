@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""ZX Spectrum tile drawing: the Spectrum target platform (target/zx) and engine
-art, built for +zx with the game's flags and run under z88dk-ticks.  Checks the
-Spectrum's screen memory against the art in assets/udgs.bin for every picture
-(map tiles and both ranges of large-zone pieces), the
-inverted cursor, the colours, and that text afterwards uses the standard font.
+"""ZX Spectrum drawing: the Spectrum target platform (target/zx) and engine art, built for +zx with the
+game's flags and run under z88dk-ticks.  Checks the Spectrum's screen memory against the art in assets/udgs.bin
+for every picture (map tiles and both ranges of large-zone pieces), the inverted cursor, the colours, the
+sprites, and the text: it is drawn from the ROM's font, which under ticks (there is no ROM) the harness fills
+with a font of its own, in black on white, clipped at the right edge, and plat_clear blanks the screen.
 
-  usage: test/tiles/run.py [--print]      (--print: the print-a-character drawing instead of the blit)
+  usage: test/tiles/run.py
 """
 import os
 import re
@@ -20,7 +20,9 @@ TILE_BASE = 536
 N_ART = 94 + 251
 
 
-PRINT = '--print' in sys.argv        # draw by printing characters instead of the direct blit
+ROM_FONT = 0x3D00                    # the ROM's font, characters 32..127
+TEXT_ATTR = 0x38
+FONT = bytes((i * 37 + (i >> 3) * 11 + 5) & 255 for i in range(96 * 8))      # the harness's own font
 
 
 def build():
@@ -28,9 +30,9 @@ def build():
     env = os.environ
     cmd = os.environ.get('ZCC', 'zcc -compiler=80cc -fframe-pointer').split() + ['+zx', f'-zorg={ZORG}', '-pragma-include:target/zx/zpragma.inc', '-Ca-DPORTABLE',
            '-Ca-Iengine', '-Ca-I.', '-Iui', '-Cc-standard-escape-chars', '-m',
-           '-Itarget/zx', '-DTARGET_ZX', '-Ca-DTARGET_ZX', '-DHAVE_SPRITES'] + (['-DZX_PRINT'] if PRINT else []) + [ '-DMAX_VIEW_W=32', '-DMAX_VIEW_H=16',
+           '-Itarget/zx', '-DTARGET_ZX', '-Ca-DTARGET_ZX', '-DHAVE_SPRITES'] + [ '-DMAX_VIEW_W=32', '-DMAX_VIEW_H=16',
            'test/tiles/main.c', 'ui/sprites.c', 'engine/engine_c.asm', 'platform/common/hooks.asm', 'platform/common/nosound.asm',
-           'target/zx/plat_zx.c', 'target/zx/plat_zx.asm'] + [
+           'target/zx/plat_zx.asm'] + [
            '-o', os.path.join(OUT, 'tiles')]
     r = subprocess.run(cmd, cwd=ROOT, env=env, capture_output=True, text=True)
     if r.returncode:
@@ -51,7 +53,9 @@ def run(syms):
         os.remove(dump)
     end = syms['__Exit']
     binary = open(path, 'rb').read()
-    image = bytes(ZORG) + binary
+    rom = bytearray(ZORG)
+    rom[ROM_FONT:ROM_FONT + len(FONT)] = FONT
+    image = bytes(rom) + binary
     img_path = os.path.join(OUT, 'tiles.img')
     open(img_path, 'wb').write(image)
     subprocess.run(['z88dk-ticks', '-pc', f'{ZORG:x}', '-end', f'{end:x}',
@@ -96,10 +100,23 @@ def main():
         art, attr = cell(mem, col, 12)
         check(f'cursor over picture {i} is inverted', art == inv(i) and attr == 0x47, f'{art.hex()} {attr:02x}')
 
-    # Text goes through the console as before.  Under ticks there is no ROM, so its
-    # font reads as blanks; a text cell holding anything else would be a stray tile.
-    check('text is printed by the console, untouched by the tiles',
-          cell(mem, 0, 14)[0] == bytes(8) and cell(mem, 0, 18)[0] == bytes(8))
+    # Text: the ROM's font (here the harness's own), black on white, clipped at column 31.
+    def glyph(ch):
+        return FONT[(ord(ch) - 32) * 8:(ord(ch) - 32) * 8 + 8]
+    bad = []
+    for row, col0, text in ((14, 0, 'HELLO SIMCITY 123'), (18, 0, 'AFTER'), (22, 28, 'ABCD'), (23, 0, 'EFGH'), (23, 30, 'XY'), (19, 20, '~')):
+        for k, ch in enumerate(text):
+            art, attr = cell(mem, col0 + k, row)
+            if art != glyph(ch) or attr != TEXT_ATTR:
+                bad.append((row, col0 + k, ch, art.hex(), attr))
+    check('text is drawn from the ROM font in the standard colours', not bad, str(bad[:3]))
+    # A line that runs off the right edge carries on in the next row ("ABCDEFGH" from column 28 of row 22 gives EFGH
+    # at the start of row 23, checked above); at the bottom of the screen it stops ("XYZ" from column 30 of row 23:
+    # Z would be written over the attributes, so the attribute of the first cell must be as the test drew it).
+    check('text wraps to the next row, and stops at the bottom of the screen',
+          cell(mem, 0, 0)[1] == 0x08 and cell(mem, 1, 0)[1] == 0x09)
+    check('plat_clear blanked the screen (a tile drawn before it is gone, the rest is untouched)',
+          cell(mem, 31, 17) == (bytes(8), TEXT_ATTR) and cell(mem, 13, 13) == (bytes(8), TEXT_ATTR))
     art, attr = cell(mem, 0, 16)
     want = ART[TILE_BASE + 8 * 200:TILE_BASE + 8 * 200 + 8]
     check('picture after text still correct', art == want and attr == 0x46, f'{art.hex()} {attr:02x}')
