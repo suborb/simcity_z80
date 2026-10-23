@@ -16,6 +16,9 @@ minimaps:                                   ; $A950 / 43344
 ;
 ; level- 9216 filled with 0x02
 ; At 50256
+        IFDEF   LEVELMAP_ROOM
+        defs    LEVELMAP_ROOM       ; (opt-in: bytes before the map for a platform's file header, so that the two are saved together)
+        ENDIF
 .levelmap
         defs        9216,2
         IN_CODE
