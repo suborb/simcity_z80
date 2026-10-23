@@ -52,6 +52,35 @@ void plat_bar(uint8_t col, uint8_t row, uint8_t cells, uint8_t fill, uint8_t att
 }
 #endif
 
+#if defined(HAVE_DEMAND_BARS) && !defined(HAVE_TEXT_COLOUR)
+#error "the demand bars use the colour screens' palette (HAVE_TEXT_COLOUR)"
+#endif
+
+#ifdef HAVE_DEMAND_BARS
+/* A demand indicator: the letter, then seven cells of 8 pixels with the zero mark at pixel 27 and `level` pixels (the zones, +-27) of
+   green to its right or red to its left, ink on the dark grey track.  A cell has two colours, so the zero mark is a white line only
+   when the demand is nothing; otherwise the fill starting next to it shows where it is. */
+void plat_demand(uint8_t col, uint8_t row, char name, int8_t level)
+{
+    uint8_t k, b, bits, a[8], colour;
+    int16_t x;
+
+    plat_put(col, row, (uint8_t)name);
+    colour = (uint8_t)(aq_pal[level > 0 ? COL_GREEN : level < 0 ? COL_RED : COL_WHITE] << 4 | 15);
+    for (k = 0; k < 7; ++k) {
+        bits = 0;
+        for (b = 0; b < 8; ++b) {
+            x = 8 * k + b;
+            if (level == 0 ? x == 27 : (level > 0 ? x > 27 && x <= 27 + level : x < 27 && x >= 27 + level))
+                bits |= (uint8_t)(0x80 >> b);
+        }
+        for (b = 0; b < 8; ++b)
+            a[b] = (b && b < 7) ? bits : 0;
+        aq_blit8((uint8_t)(col + 1 + k), row, a, colour, 0);
+    }
+}
+#endif
+
 void plat_text_clear(void) { plat_clear(); }
 void plat_text_puts(uint8_t col, uint8_t row, const char *s) { plat_puts(col, row, s); }
 

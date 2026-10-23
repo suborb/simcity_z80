@@ -95,6 +95,8 @@ $(AQPLUS): $(DEPS)
 	@mkdir -p $(@D)
 	$(ZCC) +aquarius -clib=aqplus -subtype=aqx -create-app $(COMMON) -pragma-include:target/aqplus/zpragma.inc \
 	    -Itarget/aqplus -DTARGET_AQPLUS -Ca-DTARGET_AQPLUS -Ca-DSIM_STACK_TOP=0x3a00 $(GAME) $(ENTROPY) $(MENU) $(NOSOUND) $(FIELDS) $(AQPLUS_PLATFORM) -o $(@D)/simcity
+	@end=`sed -n 's/^__BSS_END_tail *= \$$\([0-9A-Fa-f]*\).*/\1/p' $(@D)/simcity.map`; \
+	    [ $$(( 0x$$end )) -le 65535 ] || { echo "the uninitialised data ends at $$end: past the top of the memory (make aqplus_boot has room for more)"; rm -f $@; exit 1; }
 
 
 # The Aquarius+ with all its RAM (z88dk's -subtype=aqxboot: a bootstrap maps RAM pages 56-59 into the four banks and loads the image at
@@ -103,7 +105,7 @@ $(AQPLUS): $(DEPS)
 $(AQPLUS_BOOT): $(DEPS)
 	@mkdir -p $(@D)
 	$(ZCC) +aquarius -clib=aqplus -subtype=aqxboot -create-app $(COMMON) -pragma-include:target/aqplus/zpragma_aqxboot.inc \
-	    -Itarget/aqplus -DTARGET_AQPLUS -Ca-DTARGET_AQPLUS -Ca-DSIM_STACK_TOP=0x0c00 $(GAME) $(ENTROPY) $(MENU) $(NOSOUND) $(FIELDS) $(AQPLUS_PLATFORM) -o $(@D)/simcity.bin
+	    -Itarget/aqplus -DTARGET_AQPLUS -DAQPLUS_ALLRAM -Ca-DTARGET_AQPLUS -Ca-DSIM_STACK_TOP=0x0c00 $(GAME) $(ENTROPY) $(MENU) $(NOSOUND) $(FIELDS) $(AQPLUS_PLATFORM) -o $(@D)/simcity.bin
 	@for s in _aq_blit8 aq_cell _plat_put _plat_clear _plat_init aq_scratch aq_box _font_8x8_bbc_system _view_tile_art _aq_icons; do \
 	    v=`sed -n "s/^$$s *= \$$\([0-9A-Fa-f]*\).*/\1/p" $(@D)/simcity.map | head -1`; \
 	    [ -z "$$v" ] || [ $$(( 0x$$v )) -lt 49152 ] || { echo "$$s is not below $$C000 (at $$v)"; rm -f $@; exit 1; }; done
