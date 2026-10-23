@@ -5,7 +5,9 @@
 | `common/hooks.asm` | The settings and hooks the engine expects (`engine/PLATFORM_INTERFACE.md`), for C programs. |
 | `console/` | z88dk conio and input front end for NC200 (`+nc -clib=nc200 -subtype=ram`). |
 | `../target/aqplus/` | Aquarius+-specific implementation: 320x200 bitmap renderer, its UI capabilities and AQX CRT settings. |
+| `../target/common/` | Code and pictures shared by targets with the same screen: the 640x200, 3 bits a pixel mini map row builder (Multi 8, PC-8801). |
 | `../target/multi8/` | Mitsubishi Multi 8 implementation: 640x200 three plane colour screen, baked colour pictures, cassette, native pixel mini maps. |
+| `../target/pc88/` | NEC PC-8801 implementation: the same screen, drawn with the V2 ALU (or plane by plane), ALU scrolling, keyboard matrix. |
 | `../target/zx/` | Spectrum-specific implementation: fast 8x8 bitmap renderer, its UI capabilities and CRT settings. |
 | `../target/zx-original/` | Reference Spectrum build: original UI segments and engine segments in original order; byte-identical to the disassembly. |
 | `../target/z88/` | Z88-specific implementation: OZ screen/menu integration, icons, sound and ROM CRT settings. |

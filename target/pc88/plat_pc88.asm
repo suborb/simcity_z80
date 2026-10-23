@@ -42,7 +42,7 @@
 ; The baked map pictures
         SECTION data_fcntl
 mp_tiles:
-        BINARY  "build/multi8/mp_tiles.bin"
+        BINARY  "build/common/tiles_640x200_3bpp.bin"
 
 ; The 14 tool icons: four cells each, then their attributes
         SECTION rodata_user
@@ -886,7 +886,7 @@ mp_clear_cache:
         ret
 
 ; void plat_put_minirow(uint8_t sy) __smallc
-; Draws row sy (0..47) of the mini map from mm_row (minimap_native.asm): each plane's three lines of 48 bytes go to lines
+; Draws row sy (0..47) of the mini map from mm_row (minimap_640x200_3bpp.asm): each plane's three lines of 48 bytes go to lines
 ; MM_LINE0 + 3 sy to + 2.
         EXTERN  _mm_row
         defc    MM_LINE0 = 52           ; 144 lines, centred below the status panel

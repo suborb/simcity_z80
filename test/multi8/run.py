@@ -410,8 +410,8 @@ def main():
     with tempfile.TemporaryDirectory() as tmp:
         open(os.path.join(tmp, 'h.asm'), 'w').write(src)
         open(os.path.join(tmp, 'font.bin'), 'wb').write(font)
-        os.makedirs(os.path.join(tmp, 'build', 'multi8'))
-        open(os.path.join(tmp, 'build', 'multi8', 'mp_tiles.bin'), 'wb').write(blob)
+        os.makedirs(os.path.join(tmp, 'build', 'common'))
+        open(os.path.join(tmp, 'build', 'common', 'tiles_640x200_3bpp.bin'), 'wb').write(blob)
         out = subprocess.run([Z80ASM, '-b', '-m', '-I' + ROOT, '-oh.bin', 'h.asm',
                               os.environ.get('MP_ASM', os.path.join(ROOT, 'target/multi8/plat_multi8.asm'))],
                              cwd=tmp, capture_output=True, text=True)
@@ -594,8 +594,8 @@ def minirow_art_test():
     with tempfile.TemporaryDirectory() as tmp:
         open(os.path.join(tmp, 'h.asm'), 'w').write(src)
         open(os.path.join(tmp, 'font.bin'), 'wb').write(bytes(96 * 8))
-        os.makedirs(os.path.join(tmp, 'build', 'multi8'))
-        open(os.path.join(tmp, 'build', 'multi8', 'mp_tiles.bin'), 'wb').write(bytes(345 * 24))
+        os.makedirs(os.path.join(tmp, 'build', 'common'))
+        open(os.path.join(tmp, 'build', 'common', 'tiles_640x200_3bpp.bin'), 'wb').write(bytes(345 * 24))
         out = subprocess.run([Z80ASM, '-b', '-m', '-DHAVE_MINIMAP_ART', '-I' + ROOT, '-oh.bin', 'h.asm',
                               os.path.join(ROOT, 'target/multi8/plat_multi8.asm')], cwd=tmp, capture_output=True, text=True)
         if out.returncode or out.stderr.strip():
@@ -654,8 +654,8 @@ def minirow_test():
     with tempfile.TemporaryDirectory() as tmp:
         open(os.path.join(tmp, 'h.asm'), 'w').write(src)
         open(os.path.join(tmp, 'font.bin'), 'wb').write(bytes(96 * 8))
-        os.makedirs(os.path.join(tmp, 'build', 'multi8'))
-        open(os.path.join(tmp, 'build', 'multi8', 'mp_tiles.bin'), 'wb').write(bytes(345 * 24))
+        os.makedirs(os.path.join(tmp, 'build', 'common'))
+        open(os.path.join(tmp, 'build', 'common', 'tiles_640x200_3bpp.bin'), 'wb').write(bytes(345 * 24))
         out = subprocess.run([Z80ASM, '-b', '-m', '-I' + ROOT, '-oh.bin', 'h.asm', os.path.join(ROOT, 'target/multi8/plat_multi8.asm')],
                              cwd=tmp, capture_output=True, text=True)
         if out.returncode or out.stderr.strip():

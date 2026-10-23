@@ -26,8 +26,9 @@ GAME    = ui/main.c ui/game.c ui/text.c ui/textfmt.c ui/numfmt.asm ui/budget.c u
           ui/minimap.c ui/sprites.c ui/prompt.c engine/engine_c.asm platform/common/hooks.asm
 ENTROPY = platform/common/entropy.asm
 MENU    = ui/menu.c
-# The native pixel mini map's row builder, in assembler (HAVE_MINIMAP_NATIVE: the Multi 8, and the headless tests of it)
-MMNATIVE = target/multi8/minimap_native.asm
+# The native pixel mini map's row builder, in assembler (HAVE_MINIMAP_NATIVE): for 640x200 screens of 3 bits a pixel (three planes,
+# 8 colours): the Multi 8, the PC-8801, and the headless tests of it
+MMNATIVE = target/common/minimap_640x200_3bpp.asm
 # The table drawing of the screens, in assembler: for the targets that have HAVE_FIELDS (see ui/platform.h).
 FIELDS  = ui/fmtfields.asm
 # The sound hooks the engine calls: the platform's own, or none.
@@ -108,22 +109,24 @@ $(ZX): $(DEPS)
 	@mkdir -p $(@D)
 	$(ZCC) +zx $(ZX_FLAGS) $(GAME) $(ENTROPY) $(NOSOUND) $(FIELDS) $(ZX_PLATFORM) -o $(@D)/simcity
 
-# The Mitsubishi Multi 8 in its all-RAM mode: the code in the low 32 KB, the uninitialised data under the video planes.
-# The map's pictures baked in the Multi 8's colours, from the CPC game's art (tools/extract_cpc_tiles.py).
-build/multi8/mp_tiles.bin: assets/cpc_tiles.bin tools/extract_cpc_tiles.py
+# The map's pictures baked for 640x200 screens of 3 bits a pixel (the Multi 8 and the PC-8801), from the CPC game's art
+# (tools/extract_cpc_tiles.py).
+
+build/common/tiles_640x200_3bpp.bin: assets/cpc_tiles.bin tools/extract_cpc_tiles.py
 	@mkdir -p $(@D)
 	python3 tools/extract_cpc_tiles.py assets/cpc_tiles.bin --planes $@
 
 # The map's pictures at a quarter of the size for the mini maps (4 columns by 3 lines, 5 bytes each: HAVE_MINIMAP_ART)
-build/multi8/mp_mini.bin: assets/cpc_tiles.bin tools/extract_cpc_tiles.py
+build/common/minitiles_640x200_3bpp.bin: assets/cpc_tiles.bin tools/extract_cpc_tiles.py
 	@mkdir -p $(@D)
 	python3 tools/extract_cpc_tiles.py assets/cpc_tiles.bin --mini $@
 
+# The Mitsubishi Multi 8 in its all-RAM mode: the code in the low 32 KB, the uninitialised data under the video planes.
 # The image (code, data and the baked pictures) is loaded as one block from $0000 and must end below the uninitialised data,
 # which starts at MULTI8_BSS (and is not on the tape: its 16 KB of map and mini maps, and the cache of what each cell shows).
 MULTI8_BSS = 0xA900     # (its end, about $F750, is below the doubling table at $F800 and the stack above it)
 
-$(MULTI8): $(DEPS) build/multi8/mp_tiles.bin build/multi8/mp_mini.bin
+$(MULTI8): $(DEPS) build/common/tiles_640x200_3bpp.bin build/common/minitiles_640x200_3bpp.bin
 	@mkdir -p $(@D)
 	$(ZCC) +multi8 -subtype=64k -create-app $(COMMON) -pragma-include:target/multi8/zpragma.inc \
 	    -Itarget/multi8 -DTARGET_MULTI8 -Ca-DTARGET_MULTI8 -Ca-D__crt_org_bss=$(MULTI8_BSS) -Ca-DHAVE_MINIMAP_ART $(GAME) $(ENTROPY) $(MENU) $(NOSOUND) $(FIELDS) $(MMNATIVE) $(MULTI8_PLATFORM) -o $(@D)/simcity
@@ -139,7 +142,7 @@ PC88_BSS = 0xAC00
 PC88_CLIB ?=                    # -clib=v1: no ALU, for the original PC-8801 (plane by plane)
 PC88_IMAGE_LIMIT = 0xA600       # (the doubling table is at $A600-$A7FF, and the stack gets the rest, down from the uninitialised data)
 
-$(PC88): $(DEPS) build/multi8/mp_tiles.bin build/multi8/mp_mini.bin
+$(PC88): $(DEPS) build/common/tiles_640x200_3bpp.bin build/common/minitiles_640x200_3bpp.bin
 	@mkdir -p $(@D)
 	$(ZCC) +pc88 -subtype=disk $(PC88_CLIB) -create-app $(COMMON) -pragma-include:target/pc88/zpragma.inc \
 	    -Itarget/pc88 -DTARGET_PC88 -Ca-DTARGET_PC88 -Ca-D__crt_org_bss=$(PC88_BSS) -Ca-DHAVE_MINIMAP_ART $(GAME) $(ENTROPY) $(MENU) $(NOSOUND) $(FIELDS) $(MMNATIVE) $(PC88_PLATFORM) -o $(@D)/simcity.bin
@@ -195,7 +198,7 @@ $(TESTK): $(DEPS)
 	$(ZCC) +test $(COMMON) -Itarget/test_ui  -DTEST_NATIVE_MINIMAP $(GAME) $(MENU) $(NOSOUND) $(FIELDS) $(MMNATIVE) target/test_ui/plat_test.c -o $@
 
 # ... and with the tiles' own pictures at a quarter of the size (HAVE_MINIMAP_ART; the assembler gets the same flag).
-$(TESTA): $(DEPS) build/multi8/mp_mini.bin
+$(TESTA): $(DEPS) build/common/minitiles_640x200_3bpp.bin
 	@mkdir -p $(@D)
 	$(ZCC) +test $(COMMON) -Itarget/test_ui  -DTEST_NATIVE_ART -Ca-DHAVE_MINIMAP_ART $(GAME) $(MENU) $(NOSOUND) $(FIELDS) $(MMNATIVE) target/test_ui/plat_test.c -o $@
 

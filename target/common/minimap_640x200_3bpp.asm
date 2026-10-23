@@ -1,5 +1,5 @@
 ; Row builder for the native pixel mini maps (HAVE_MINIMAP_NATIVE, see ui/minimap.h), in assembler because C is too slow
-; for 96 tiles a row.  Plain Z80 on the engine's tables; drawing is the platform's plat_put_minirow().  Row sy covers
+; for 96 tiles a row.  For 640x200 screens of 3 bits a pixel, three planes (the Multi 8, the PC-8801).  Plain Z80 on the engine's tables; drawing is the platform's plat_put_minirow().  Row sy covers
 ; tile row 2 * sy.  Colours are 3 bits: bit 0 blue, 1 red, 2 green.  Both entry points keep IX.
 ;
 ; Flat colour mode:
@@ -15,7 +15,7 @@
 ; mm_row is the row as three planes (blue, red, green) of three lines of 48 bytes, 4 pixels a tile, the left tile in the
 ; high nibble: plane k, line j at 144 k + 48 j.  It is in low RAM so that a platform with paged video memory can copy
 ; from it.
-        MODULE  minimap_native
+        MODULE  minimap_640x200_3bpp
         INCLUDE "sections.asm"
 
         PUBLIC  _minimap_fast
@@ -736,5 +736,5 @@ mm_p2_2:
         
         IN_RODATA
 mm_mini:                                ; the pictures at a quarter of the size, 5 bytes each (tools/extract_cpc_tiles.py --mini)
-        BINARY  "build/multi8/mp_mini.bin"
+        BINARY  "build/common/minitiles_640x200_3bpp.bin"
         ENDIF

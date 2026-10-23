@@ -44,7 +44,7 @@
 ; variables must while a plane is paged over $8000-$BFFF): the pictures are read only with the RAM under the planes paged in
         SECTION data_fcntl
 mp_tiles:
-        BINARY  "build/multi8/mp_tiles.bin"
+        BINARY  "build/common/tiles_640x200_3bpp.bin"
 
 ; The 14 tool icons: four 8x8 cells each, then their attribute bytes (tools/make_multi8_assets.py)
         SECTION rodata_user
@@ -691,7 +691,7 @@ _plat_clear:
 
         IFDEF   HAVE_MINIMAP_ART
 ; void plat_put_minirow(uint8_t sy) __smallc
-; Draws row sy (0..47) of the mini map from mm_row, which minimap_native.asm has filled in: for each plane, its three
+; Draws row sy (0..47) of the mini map from mm_row, which target/common/minimap_640x200_3bpp.asm has filled in: for each plane, its three
 ; lines of 48 bytes go to lines MM_LINE0 + 3 sy to + 2 of that plane, MM_BYTE bytes in from the left.  A tile is 4 pixels by
 ; 3 lines.
         EXTERN  _mm_row

@@ -549,7 +549,7 @@ def main():
 
     # --- 6d. the same with the tiles' own pictures at a quarter of the size (HAVE_MINIMAP_ART), the views laid over them ---
     abin, asyms = build_native_art()
-    mini = open(os.path.join(ROOT, 'build', 'multi8', 'mp_mini.bin'), 'rb').read()
+    mini = open(os.path.join(ROOT, 'build', 'common', 'minitiles_640x200_3bpp.bin'), 'rb').read()
 
     def nib(rec, i):
         return (rec[i >> 1] >> 4) if i % 2 == 0 else rec[i >> 1] & 15

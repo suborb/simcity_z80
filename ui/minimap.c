@@ -23,7 +23,7 @@ const char *const minimap_names[MM_VIEWS + 1] = {
 
 #ifdef HAVE_MINIMAP_NATIVE
 /* The native pixel mini map: all 96 tile columns of every other tile row.  Every view but crime is built by the assembler
-   routine in target/multi8/minimap_native.asm (96 tiles a row is too slow in C).  Colours are 0 black, 1 blue, 2 red,
+   routine in target/common/minimap_640x200_3bpp.asm (96 tiles a row is too slow in C).  Colours are 0 black, 1 blue, 2 red,
    3 magenta, 4 green, 5 cyan, 6 yellow, 7 white. */
 #ifdef HAVE_MINIMAP_ART
 extern void minimap_fast(uint8_t v, uint8_t sy);
