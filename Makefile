@@ -51,7 +51,7 @@ DEPS = Makefile $(wildcard ui/*.c ui/*.h ui/*.asm engine/*.asm engine/*.h platfo
          platform/console/*.[chai]* target/*/*.[chai]* target/*/*.inc) assets/map_art.bin assets/map_art_aq.bin assets/udgs.bin assets/icons.bin assets/icons_spec.bin assets/cpc_icons.bin
 
 AQPLUS = build/aqplus/simcity.aqx
-AQPLUS_BOOT = build/aqplus_boot/simcity.aqx
+AQPLUS_ALLRAM = build/aqplus_allram/simcity.aqx
 NC200  = build/nc200/simcity.img
 Z88ROM = build/z88rom/simcity.epr
 ZX     = build/zx/simcity.tap
@@ -69,12 +69,12 @@ TESTK  = build/testnative/simcity.bin
 TESTA  = build/testart/simcity.bin
 TESTSC = build/testscroll/simcity.bin
 
-.PHONY: all aqplus aqplus_boot z88rom zx multi8 pc88 sam test testpanel testmodal testnarrow testsprites testoverlay testhires testnative testart testscroll check golden uitest tiletest z88test engine deadcode clean
+.PHONY: all aqplus aqplus_allram z88rom zx multi8 pc88 sam test testpanel testmodal testnarrow testsprites testoverlay testhires testnative testart testscroll check golden uitest tiletest z88test engine deadcode clean
 
 all: aqplus z88rom zx multi8 pc88 sam
 
 aqplus: $(AQPLUS)
-aqplus_boot: $(AQPLUS_BOOT)
+aqplus_allram: $(AQPLUS_ALLRAM)
 z88rom: $(Z88ROM)
 zx:     $(ZX)
 multi8: $(MULTI8)
@@ -96,15 +96,15 @@ $(AQPLUS): $(DEPS)
 	$(ZCC) +aquarius -clib=aqplus -subtype=aqx -create-app $(COMMON) -pragma-include:target/aqplus/zpragma.inc \
 	    -Itarget/aqplus -DTARGET_AQPLUS -Ca-DTARGET_AQPLUS -Ca-DSIM_STACK_TOP=0x3a00 $(GAME) $(ENTROPY) $(MENU) $(NOSOUND) $(FIELDS) $(AQPLUS_PLATFORM) -o $(@D)/simcity
 	@end=`sed -n 's/^__BSS_END_tail *= \$$\([0-9A-Fa-f]*\).*/\1/p' $(@D)/simcity.map`; \
-	    [ $$(( 0x$$end )) -le 65535 ] || { echo "the uninitialised data ends at $$end: past the top of the memory (make aqplus_boot has room for more)"; rm -f $@; exit 1; }
+	    [ $$(( 0x$$end )) -le 65535 ] || { echo "the uninitialised data ends at $$end: past the top of the memory (make aqplus_allram has room for more)"; rm -f $@; exit 1; }
 
 
-# The Aquarius+ with all its RAM (z88dk's -subtype=aqxboot: a bootstrap maps RAM pages 56-59 into the four banks and loads the image at
-# $0200, see zpragma_aqxboot.inc).  The video is paged over bank 3 while a cell is drawn, so the placer, and what it reads, must be
-# below $C000, and so must the stacks (they are at $0200-$0FFF, under the code, which starts at $1000: zpragma_aqxboot.inc).
-$(AQPLUS_BOOT): $(DEPS)
+# The Aquarius+ with all its RAM (z88dk's -subtype=allram: a bootstrap maps RAM pages 56-59 into the four banks and loads the image at
+# $0200, see zpragma_allram.inc).  The video is paged over bank 3 while a cell is drawn, so the placer, and what it reads, must be
+# below $C000, and so must the stacks (they are at $0200-$0FFF, under the code, which starts at $1000: zpragma_allram.inc).
+$(AQPLUS_ALLRAM): $(DEPS)
 	@mkdir -p $(@D)
-	$(ZCC) +aquarius -clib=aqplus -subtype=aqxboot -create-app $(COMMON) -pragma-include:target/aqplus/zpragma_aqxboot.inc \
+	$(ZCC) +aquarius -clib=aqplus -subtype=allram -create-app $(COMMON) -pragma-include:target/aqplus/zpragma_allram.inc \
 	    -Itarget/aqplus -DTARGET_AQPLUS -DAQPLUS_ALLRAM -Ca-DTARGET_AQPLUS -Ca-DSIM_STACK_TOP=0x0c00 $(GAME) $(ENTROPY) $(MENU) $(NOSOUND) $(FIELDS) $(AQPLUS_PLATFORM) -o $(@D)/simcity.bin
 	@for s in _aq_blit8 aq_cell _plat_put _plat_clear _plat_init aq_scratch aq_box _font_8x8_bbc_system _view_tile_art _aq_icons; do \
 	    v=`sed -n "s/^$$s *= \$$\([0-9A-Fa-f]*\).*/\1/p" $(@D)/simcity.map | head -1`; \

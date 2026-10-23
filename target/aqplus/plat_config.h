@@ -15,7 +15,7 @@
 #define MINIMAP_CHUNK_ROWS 4
 #define HAVE_SPRITES
 #define HAVE_ICONS              /* the tools as 16x16 pictures */
-#ifdef AQPLUS_ALLRAM            /* the all-RAM build (make aqplus_boot) has room for these: the one that loads below bank 3 does not */
+#ifdef AQPLUS_ALLRAM            /* the all-RAM build (make aqplus_allram) has room for these: the one that loads below bank 3 does not */
 #define HAVE_TEXT_COLOUR        /* the budget and evaluation screens coloured, with bars (plat_text_attr, plat_bar) */
 #define MODAL_NARROW            /* ... in their 32 column arrangement, */
 #define MODAL_X 4               /* ... centred in the 40 columns */
