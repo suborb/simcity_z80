@@ -6,6 +6,10 @@
 #define HAVE_TILES
 #define HAVE_BITMAP
 #define HAVE_POPUP_MENU     /* shared box + message selector over the bitmap */
+/* the box's frame in the placer's line pieces (plat_sam.asm): 1 and 2 the top corners, 3 and 4 the bottom ones, 5 across, 6 down */
+#define BOX_TOP    "\1\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\2"
+#define BOX_BOTTOM "\3\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\4"
+#define BOX_SIDE   "\6                            \6"
 #define HAVE_FILES          /* saving and loading a city as a SAMDOS file */
 #define FILE_NAME_MAX 10    /* SAMDOS names are 10 characters */
 #define HAVE_BUDGET

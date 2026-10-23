@@ -190,11 +190,14 @@ extern void     plat_text_attr(uint8_t col, uint8_t row, uint8_t n, uint8_t attr
 extern void     plat_bar(uint8_t col, uint8_t row, uint8_t cells, uint8_t fill, uint8_t attr);
 #endif
 
+/* HAVE_POPUP_MENU: the frame of the boxes is +, - and | unless plat_config.h defines BOX_TOP, BOX_BOTTOM and BOX_SIDE, three strings of
+   MENU_WIDTH (30) characters, the corners and lines being character codes the platform's plat_put() draws as it likes (the SAM's are 1 to 6). */
+
 #ifdef HAVE_DEMAND_BARS
-/* plat_demand() draws a demand indicator as a bar chart in cells (a colour display): the letter `name` in the cell at (col, row), then
-   seven cells to its right: the middle one is the zero mark, and `level` (-3..3: the demand over 32, as the text bars show it) cells
-   beyond it are filled, to the right (green: more is wanted) if it is positive and to the left (red: too much) if it is negative.
-   Without HAVE_DEMAND_BARS the game prints the text bars of demand_bars[] in ui/game.c. */
+/* plat_demand() draws a demand indicator as a bar chart (a colour display): the letter `name` in the cell at (col, row) and a bar
+   after it with a zero mark in the middle, `level` (-27..27) steps of fill from it: to the right (green: more is wanted) if it is
+   positive and to the left (red: too much) if it is negative.  A step is a zone of imbalance, so a platform with a coarser display
+   scales it (3 cells of 9 steps, say).  Without HAVE_DEMAND_BARS the game prints the text bars of demand_bars[] in ui/game.c. */
 extern void     plat_demand(uint8_t col, uint8_t row, char name, int8_t level);
 #endif
 

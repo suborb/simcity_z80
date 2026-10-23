@@ -700,11 +700,14 @@ static const char demand_bars[7][8] = {
 };
 
 #ifdef HAVE_DEMAND_BARS
-static int8_t demand_level(int16_t v)                  /* v / 32, rounded towards 0, within -3..3 */
+/* The demand as a number of zones: the engine's valve is 8 to a zone of imbalance, less an offset it keeps (26 for R, 30 for C and I) so
+   that a city with nothing built shows nothing; within -27..27. */
+static int8_t demand_level(int16_t v, int16_t offset)
 {
-    int16_t n = v < 0 ? -(-v >> 5) : v >> 5;
+    int16_t n = v + offset;
 
-    return (int8_t)(n > 3 ? 3 : n < -3 ? -3 : n);
+    n = n < 0 ? -(-n >> 3) : n >> 3;
+    return (int8_t)(n > 27 ? 27 : n < -27 ? -27 : n);
 }
 #else
 static void demand_bar(char *b, char name, int16_t v)
@@ -855,9 +858,9 @@ static void draw_status(void)
         plat_text_puts(22, 4, buf);
     }
 #ifdef HAVE_DEMAND_BARS
-    plat_demand(22, 1, 'R', demand_level(V_RValve));
-    plat_demand(22, 2, 'C', demand_level(V_CValve));
-    plat_demand(22, 3, 'I', demand_level(V_IValve));
+    plat_demand(22, 1, 'R', demand_level(V_RValve, 26));
+    plat_demand(22, 2, 'C', demand_level(V_CValve, 30));
+    plat_demand(22, 3, 'I', demand_level(V_IValve, 30));
 #else
     demand_bar(buf, 'R', V_RValve);
     plat_text_puts(22, 1, buf);

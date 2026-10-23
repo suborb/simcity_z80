@@ -124,11 +124,19 @@ static const struct field nobody[] = {
     {  8,  1, F_TEXT, 0,   "NOBODY LIVES HERE YET" },
 };
 
+#ifdef HAVE_TEXT_COLOUR
+#define NUM_COL    21                       /* the numbers end in one column, a gap after the labels; the values (the class and level) start in one */
+#define VALUE_COL  12
+#else
+#define NUM_COL    20
+#define CLASS_COL  11
+#define VALUE_COL  12
+#endif
 static const struct field foot[] = {
     { 16,  1, F_TEXT, 0,   "POPULATION" },
-    { 16, 20, F_U24,  0,   V_display_population },
+    { 16, NUM_COL, F_U24,  0,   V_display_population },
     { 17,  1, F_TEXT, 0,   "MIGRATION" },
-    { 17, 20, F_S24,  0,   migration },
+    { 17, NUM_COL, F_S24,  0,   migration },
     { 18,  1, F_TEXT, 0,   "ASSESSED VALUE $" },
 #ifdef HAVE_TEXT_COLOUR
     { 18, 17, F_K24,  0,   V_previous_city_score },
@@ -136,11 +144,15 @@ static const struct field foot[] = {
     { 18, 18, F_K24,  0,   V_previous_city_score },
 #endif
     { 20,  1, F_TEXT, 0,   "CATEGORY" },
-    { 20, 11, F_STR,  0,   &class_name },
+#ifdef HAVE_TEXT_COLOUR
+    { 20, VALUE_COL, F_STR,  0,   &class_name },
+#else
+    { 20, CLASS_COL, F_STR,  0,   &class_name },
+#endif
     { 21,  1, F_TEXT, 0,   "GAME LEVEL" },
-    { 21, 12, F_STR,  0,   &level_name },
+    { 21, VALUE_COL, F_STR,  0,   &level_name },
     { 22,  1, F_TEXT, 0,   "CITY SCORE" },
-    { 22, 20, F_U16,  0,   &ev.score },
+    { 22, NUM_COL, F_U16,  0,   &ev.score },
     { 23, 24, F_TEXT, 0,   "ENTER OK" },
 };
 #elif MODAL_ROWS >= 24
@@ -248,9 +260,9 @@ static void decorate(void)
 
     plat_text_attr(0, 0, 32, PLAT_ATTR(COL_WHITE, COL_BLUE));
     plat_text_attr(1, 2, 30, PLAT_ATTR(COL_CYAN, COL_BLACK));
-    plat_text_attr(1, 16, 16, PLAT_ATTR(COL_YELLOW, COL_BLACK));
+    plat_text_attr(1, 16, 10, PLAT_ATTR(COL_YELLOW, COL_BLACK));       /* the labels only: the figures are white */
     plat_text_attr(1, 17, 9, PLAT_ATTR(COL_YELLOW, COL_BLACK));
-    plat_text_attr(1, 18, 16, PLAT_ATTR(COL_YELLOW, COL_BLACK));
+    plat_text_attr(1, 18, 15, PLAT_ATTR(COL_YELLOW, COL_BLACK));
     plat_text_attr(1, 20, 8, PLAT_ATTR(COL_YELLOW, COL_BLACK));
     plat_text_attr(1, 21, 10, PLAT_ATTR(COL_YELLOW, COL_BLACK));
     plat_text_attr(1, 22, 10, PLAT_ATTR(COL_YELLOW, COL_BLACK));

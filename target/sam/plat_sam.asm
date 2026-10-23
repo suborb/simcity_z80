@@ -586,9 +586,9 @@ pi_nc:
         ret
 
 ; void plat_demand(uint8_t col, uint8_t row, char name, int8_t level) __smallc
-; A demand indicator as a bar chart: the letter in the cell (col, row), then seven cells, each a solid colour bar six lines tall with
-; a gap on its right and black above and below.  The middle one is the zero mark (white); `level` (-3..3) cells from it to the right
-; are green and to the left red, and the rest dark grey.  (ST palette entries: 10 light green, 12 light red, 8 dark grey, 15 white.)
+; A demand indicator as a bar chart: the letter in the cell (col, row), then a bar seven cells (56 pixels) wide on a dark grey track,
+; with a white line in the middle (pixel 27) and `level` (-27..27) pixels of fill from it: to the right green, to the left red.  A pixel
+; is a zone of imbalance.  (ST palette entries: 10 light green, 12 light red, 8 dark grey, 15 white.)
         PUBLIC  _plat_demand
         defc    DM_GREEN = 10
         defc    DM_RED = 12
@@ -610,89 +610,76 @@ _plat_demand:
         ld      b,(hl)                  ; col
         ld      (mp_drc),bc             ; (c = the row first, then b = the column)
         call    mp_char                 ; white on black
+        ld      bc,(mp_drc)
+        ld      a,b
+        inc     a
+        ld      (mp_tc),a               ; the bar starts a cell on
+        ld      a,c
+        ld      (mp_tc + 1),a
         xor     a
         ld      (mp_dk),a
 dm_cell:
-        ld      a,(mp_dk)
-        sub     3
-        ld      e,a                     ; this cell's place from the middle: -3..3
-        jr      z,dm_zero
-        jp      m,dm_left
-        ld      a,(mp_dlev)             ; to the right of the middle: green if the level reaches it
-        bit     7,a
-        jr      nz,dm_empty
-        cp      e
-        jr      c,dm_empty
-        ld      a,DM_GREEN
-        jr      dm_draw
-dm_left:
-        ld      a,(mp_dlev)             ; to the left: red if the (negative) level reaches it
-        bit     7,a
-        jr      z,dm_empty
-        cp      e
-        jr      c,dm_red
-        jr      nz,dm_empty
-dm_red:
-        ld      a,DM_RED
-        jr      dm_draw
-dm_zero:
-        ld      a,DM_ZERO
-        jr      dm_draw
-dm_empty:
-        ld      a,DM_EMPTY
-dm_draw:
-        ld      c,a                     ; the colour: eight lines of four bytes
+        ld      a,(mp_dk)               ; the line of this cell: four bytes, a colour for each pixel
+        add     a,a
+        add     a,a
+        add     a,a
+        ld      b,a                     ; the cell's first pixel
+        ld      hl,mp_bp
+        ld      e,4
+dm_byte:
+        call    dm_colour
         rlca
         rlca
         rlca
         rlca
-        ld      e,a                     ; the colour in the high nibble (the cell's last byte: its right pixel is the gap)
-        or      c
-        ld      d,a                     ; the colour in both
-        ld      hl,mp_pix
-        xor     a
-        ld      (hl),a                  ; line 0 black
-        inc     hl
+        ld      d,a
+        inc     b
+        call    dm_colour
+        or      d
         ld      (hl),a
         inc     hl
-        ld      (hl),a
-        inc     hl
-        ld      (hl),a
-        inc     hl
-        ld      b,6
-dm_line:
-        ld      (hl),d
-        inc     hl
-        ld      (hl),d
-        inc     hl
-        ld      (hl),d
-        inc     hl
-        ld      (hl),e
-        inc     hl
-        djnz    dm_line
-        xor     a
-        ld      (hl),a                  ; line 7 black
-        inc     hl
-        ld      (hl),a
-        inc     hl
-        ld      (hl),a
-        inc     hl
-        ld      (hl),a
-        ld      a,(mp_dk)               ; the cell: column + 1 + k
-        ld      hl,(mp_drc)             ; l = the row, h = the column
-        add     a,h
-        inc     a
-        ld      b,a
-        ld      a,l
-        call    mp_scraddr
-        ex      de,hl
-        ld      hl,mp_pix
-        call    mp_blit
+        inc     b
+        dec     e
+        jr      nz,dm_byte
+        call    mp_bar_cell
         ld      hl,mp_dk
         inc     (hl)
         ld      a,(hl)
         cp      7
-        jp      nz,dm_cell
+        jr      nz,dm_cell
+        ret
+
+; a = the palette entry of pixel b (0 to 55) of a demand bar.  Uses a and c only.
+dm_colour:
+        ld      a,b
+        cp      27
+        jr      z,dc_zero
+        jr      c,dc_left
+        ld      a,(mp_dlev)             ; right of the middle: green if the level is positive and reaches this pixel
+        or      a
+        jr      z,dc_empty
+        jp      m,dc_empty
+        add     a,27
+        cp      b
+        jr      c,dc_empty
+        ld      a,DM_GREEN
+        ret
+dc_left:
+        ld      a,(mp_dlev)             ; left of it: red if the level is negative and reaches this pixel
+        or      a
+        jp      p,dc_empty
+        add     a,27
+        cp      b
+        jr      z,dc_red
+        jr      nc,dc_empty
+dc_red:
+        ld      a,DM_RED
+        ret
+dc_zero:
+        ld      a,DM_ZERO
+        ret
+dc_empty:
+        ld      a,DM_EMPTY
         ret
 
 ; Read a cell back from the screen: hl = its address; the 32 bytes go to mp_pix.
@@ -776,6 +763,51 @@ ta_next:
         ld      hl,mp_tn
         dec     (hl)
         jr      nz,ta_cell
+        ret
+
+; One cell of a bar: the line in mp_bp, four bytes, six times between two black lines, drawn at the cell (column mp_tc, row mp_tc + 1),
+; and mp_tc moves on a cell.
+mp_bar_cell:
+        ld      hl,mp_pix               ; black, six lines of the pattern, black
+        xor     a
+        ld      (hl),a
+        inc     hl
+        ld      (hl),a
+        inc     hl
+        ld      (hl),a
+        inc     hl
+        ld      (hl),a
+        inc     hl
+        ex      de,hl
+        ld      b,6
+br_line:
+        ld      hl,mp_bp
+        ld      c,4
+br_copy:
+        ld      a,(hl)
+        ld      (de),a
+        inc     hl
+        inc     de
+        dec     c
+        jr      nz,br_copy
+        djnz    br_line
+        xor     a
+        ld      (de),a
+        inc     de
+        ld      (de),a
+        inc     de
+        ld      (de),a
+        inc     de
+        ld      (de),a
+        ld      a,(mp_tc)
+        ld      b,a
+        ld      a,(mp_tc + 1)
+        call    mp_scraddr
+        ex      de,hl
+        ld      hl,mp_pix
+        call    mp_blit
+        ld      hl,mp_tc
+        inc     (hl)
         ret
 
 ; void plat_bar(uint8_t col, uint8_t row, uint8_t cells, uint8_t fill, uint8_t attr) __smallc
@@ -863,46 +895,7 @@ br_r:
         ld      a,b
         cp      8
         jr      nz,br_byte
-        ld      hl,mp_pix               ; black, six lines of the pattern, black
-        xor     a
-        ld      (hl),a
-        inc     hl
-        ld      (hl),a
-        inc     hl
-        ld      (hl),a
-        inc     hl
-        ld      (hl),a
-        inc     hl
-        ex      de,hl
-        ld      b,6
-br_line:
-        ld      hl,mp_bp
-        ld      c,4
-br_copy:
-        ld      a,(hl)
-        ld      (de),a
-        inc     hl
-        inc     de
-        dec     c
-        jr      nz,br_copy
-        djnz    br_line
-        xor     a
-        ld      (de),a
-        inc     de
-        ld      (de),a
-        inc     de
-        ld      (de),a
-        inc     de
-        ld      (de),a
-        ld      a,(mp_tc)
-        ld      b,a
-        ld      a,(mp_tc + 1)
-        call    mp_scraddr
-        ex      de,hl
-        ld      hl,mp_pix
-        call    mp_blit
-        ld      hl,mp_tc
-        inc     (hl)
+        call    mp_bar_cell
         ld      hl,mp_bn + 1
         dec     (hl)
         jp      nz,br_cell
@@ -969,6 +962,20 @@ _plat_put:
         ld      b,(hl)
         ; a = ch, b = col, c = row
 mp_char:
+        cp      32
+        jr      nc,mp_ch_font
+        ld      l,a                     ; a line piece for the boxes' frames: codes 1 to 6
+        ld      h,0
+        add     hl,hl
+        add     hl,hl
+        add     hl,hl
+        ld      de,mp_box - 8
+        add     hl,de
+        ex      de,hl
+        ld      a,c
+        ld      c,TEXT_ATTR
+        jp      mp_cell
+mp_ch_font:
         ld      l,a
         ld      h,0
         add     hl,hl
@@ -1309,6 +1316,16 @@ mp_ktab:
         defb    13,'l','k','j','h',';',':',0
         defb    ' ',0,'m','n','b',',','.',0
         defb    0,11,10,8,9,0,0,0
+
+; The line pieces of the boxes' frames, pipes two pixels thick with rounded corners: 1 top left, 2 top right, 3 bottom left, 4 bottom
+; right, 5 across, 6 down
+mp_box:
+        defb    $00,$00,$00,$0F,$1F,$18,$18,$18
+        defb    $00,$00,$00,$F0,$F8,$18,$18,$18
+        defb    $18,$18,$18,$1F,$0F,$00,$00,$00
+        defb    $18,$18,$18,$F8,$F0,$00,$00,$00
+        defb    $00,$00,$00,$FF,$FF,$00,$00,$00
+        defb    $18,$18,$18,$18,$18,$18,$18,$18
 
 ; The overlay's nibble table: 16 entries of two bytes, a nibble's four pixels as a byte pair, a set pixel white (palette entry 15), the
 ; others left as they are.  It is copied to the second half of the aligned tables at mp_space, whose first half is made for the text's

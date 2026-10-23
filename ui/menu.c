@@ -6,8 +6,15 @@
 
 #ifdef HAVE_POPUP_MENU
 #define MENU_WIDTH 30                   /* wide enough for a file name's 24 characters (ui/prompt.c) */
+#ifdef BOX_TOP                          /* a platform with line drawing characters says what the frame is made of (plat_config.h) */
+static const char top[] = BOX_TOP;
+static const char bottom[] = BOX_BOTTOM;
+static const char side[] = BOX_SIDE;
+#else
 static const char top[] = "+----------------------------+";
 static const char side[] = "|                            |";
+#define bottom top
+#endif
 
 /* The rows the boxes are centred in: the map, which the game says (menu_area); else the whole screen. */
 static uint8_t area_row, area_rows;
@@ -29,7 +36,7 @@ void menu_box(uint8_t height)
     plat_puts(menu_col, menu_row, top);
     for (y = 1; y + 1 < height; ++y)
         plat_puts(menu_col, (uint8_t)(menu_row + y), side);
-    plat_puts(menu_col, (uint8_t)(menu_row + height - 1), top);
+    plat_puts(menu_col, (uint8_t)(menu_row + height - 1), bottom);
 }
 
 static void item(uint8_t col, uint8_t row, const struct menu_item *entry, uint8_t selected)
