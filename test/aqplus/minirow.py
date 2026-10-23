@@ -4,7 +4,7 @@
 The block between `#ifdef HAVE_MINIMAP_SQUARE` and its `#endif` is cut out of the file and compiled with the host's compiler against stubs of
 the video copy (aq_vcopy writes into a model of the 16 KB video page) and of aq_blit8 and plat_text_puts; random rows of colours go in, and the
 page is compared with a model written here from the description: a tile is a solid 2x2 block for the colours that are something built or a
-road, water is two pixels corner to corner, dirt and trees are black; the cell colours are the ink of the highest density level (white for none), red or yellow
+road, water is two pixels corner to corner, dirt and trees are black; the cell colours are, for a density, the highest level's colour in ink and paper both (a solid cell; none is the white map), red or yellow
 for power, white on black otherwise.
 """
 import os
@@ -16,7 +16,7 @@ import tempfile
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 MM_COL0 = 4
-DENSITY = [0x70, 0xF0, 0x40, 0x60, 0x20, 0x30, 0x10, 0x50]
+DENSITY = [0x70, 0xBB, 0x44, 0x66, 0x22, 0x33, 0x11, 0x55]
 POWER = [0x70, 0x30, 0x10]
 SOLID = {2, 3, 5, 6, 7}
 
