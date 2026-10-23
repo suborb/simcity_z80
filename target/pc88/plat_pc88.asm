@@ -332,6 +332,7 @@ mp_cell_nc:
         and     7
         jr      z,mp_solid
         call    mp_double               ; the picture doubled across, into mp_pix
+mp_draw_pix:
         ld      a,__CLIB_PC8800_V2_ENABLED
         or      a
         jr      z,mp_planes
@@ -610,6 +611,67 @@ mp_double:
         ENDR
         ret
 
+; void plat_text_attr(uint8_t col, uint8_t row, uint8_t n, uint8_t attr) __smallc
+; Recolours n cells of text already drawn (white on black): the cell's blue plane has the glyph (all three have), so it is read back
+; and drawn again in the attribute's ink and paper.
+        PUBLIC  _plat_text_attr
+_plat_text_attr:
+        ld      hl,2
+        add     hl,sp
+        ld      a,(hl)
+        ld      (mp_ta + 3),a           ; attr
+        inc     hl
+        inc     hl
+        ld      a,(hl)
+        ld      (mp_ta),a               ; n
+        inc     hl
+        inc     hl
+        ld      a,(hl)
+        ld      (mp_ta + 1),a           ; row
+        inc     hl
+        inc     hl
+        ld      a,(hl)
+        ld      (mp_ta + 2),a           ; col
+ta_cell:
+        ld      a,(mp_ta + 2)
+        ld      b,a
+        ld      a,(mp_ta + 1)
+        ld      hl,mp_ta + 3
+        ld      c,(hl)
+        call    mp_forget
+        call    mp_scraddr              ; (a = row, b = col)
+        xor     a
+        call    mp_plane                ; the blue plane
+        ld      hl,(mp_scr)
+        ld      de,mp_pix
+        ld      b,8
+ta_rd:
+        ld      a,(hl)
+        ld      (de),a
+        inc     hl
+        inc     de
+        ld      a,(hl)
+        ld      (de),a
+        inc     de
+        ld      a,79
+        add     a,l
+        ld      l,a
+        jr      nc,ta_nc
+        inc     h
+ta_nc:
+        djnz    ta_rd
+        xor     a
+        out     (PLANE_OFF),a
+        ld      a,(mp_ta + 3)
+        ld      (mp_attr),a
+        call    mp_draw_pix             ; (it ends in mp_poll, which returns)
+        ld      hl,mp_ta + 2
+        inc     (hl)
+        ld      hl,mp_ta
+        dec     (hl)
+        jr      nz,ta_cell
+        ret
+
 ; void plat_put_overlay(uint8_t col, uint8_t row, const uint8_t *art) __smallc
 ; The pixels set in 8 bytes of art, white, over the cell: a sprite.
         PUBLIC  _plat_put_overlay
@@ -726,6 +788,20 @@ _plat_put:
         ld      b,(hl)
         ; a = ch, b = col, c = row
 mp_char:
+        cp      32
+        jr      nc,mp_ch_font
+        ld      l,a                     ; a line piece for the boxes' frames: codes 1 to 6
+        ld      h,0
+        add     hl,hl
+        add     hl,hl
+        add     hl,hl
+        ld      de,mp_box - 8
+        add     hl,de
+        ex      de,hl
+        ld      a,c
+        ld      c,TEXT_ATTR
+        jp      mp_cell
+mp_ch_font:
         ld      l,a
         ld      h,0
         add     hl,hl
@@ -888,6 +964,7 @@ mp_clear_cache:
         ldir
         ret
 
+        IFDEF   HAVE_MINIMAP_ART
 ; void plat_put_minirow(uint8_t sy) __smallc
 ; Draws row sy (0..47) of the mini map from mm_row (minimap_640x200_3bpp.asm): each plane's three lines of 48 bytes go to lines
 ; MM_LINE0 + 3 sy to + 2.
@@ -954,6 +1031,148 @@ mm_art_pl:
         cp      3
         jr      nz,mm_art_pl
         jp      mp_poll
+        ELSE
+; void plat_put_minirow(uint8_t sy, const uint8_t *colours) __smallc
+; Flat colour mode: draws row sy (0..47) of the mini map from 96 colours (bit 0 blue, 1 red, 2 green), one a tile column.  A tile is a
+; block 4 pixels wide and 3 lines high, so a row is 384 pixels (48 bytes a plane) by 3 lines.  Each plane's 48 bytes are made from the
+; colours (two tiles to a byte), then written to the row's three lines.
+        defc    MM_LINE0 = 52           ; 144 lines, centred below the status panel
+        defc    MM_BYTE = 16            ; (80 - 48) / 2: centred
+        PUBLIC  _plat_put_minirow
+_plat_put_minirow:
+        ld      hl,2
+        add     hl,sp
+        ld      e,(hl)
+        inc     hl
+        ld      d,(hl)                  ; de = the colours
+        inc     hl
+        ld      l,(hl)                  ; sy
+        ld      h,0
+        push    de
+        ld      d,h
+        ld      e,l
+        add     hl,hl
+        add     hl,hl
+        add     hl,hl
+        add     hl,hl                   ; 16 sy
+        or      a
+        sbc     hl,de                   ; 15 sy
+        add     hl,hl
+        add     hl,hl
+        add     hl,hl
+        add     hl,hl                   ; 240 sy: three lines of 80 bytes
+        ld      de,SCREEN + MM_LINE0 * 80 + MM_BYTE
+        add     hl,de
+        ld      (mm_dst),hl
+        ld      a,$AA                   ; the checker a tile of the base map (colour bit 3) is drawn in
+        ld      (mm_pat),a
+        pop     de
+        push    de
+        ld      hl,mm_buf
+        ld      c,1
+        call    mm_pack
+        pop     de
+        push    de
+        ld      hl,mm_buf + 48
+        ld      c,2
+        call    mm_pack
+        pop     de
+        push    de
+        ld      hl,mm_buf + 96
+        ld      c,4
+        call    mm_pack
+        ld      a,$55                   ; the middle line has the other half of it
+        ld      (mm_pat),a
+        pop     de
+        push    de
+        ld      hl,mm_buf + 144
+        ld      c,1
+        call    mm_pack
+        pop     de
+        push    de
+        ld      hl,mm_buf + 192
+        ld      c,2
+        call    mm_pack
+        pop     de
+        ld      hl,mm_buf + 240
+        ld      c,4
+        call    mm_pack
+        ld      hl,mm_buf
+        ld      (mm_src),hl
+        xor     a
+mm_plane:
+        ld      (mm_msk),a              ; the plane: 0 blue, 1 red, 2 green
+        call    mp_plane
+        ld      de,(mm_dst)             ; the plane's 48 bytes to each of the three lines
+        ld      hl,(mm_src)
+        ld      bc,48
+        ldir
+        ld      hl,80
+        ld      de,(mm_dst)
+        add     hl,de
+        ex      de,hl
+        ld      hl,(mm_src)
+        ld      bc,144
+        add     hl,bc
+        ld      bc,48
+        ldir
+        ld      hl,160
+        ld      de,(mm_dst)
+        add     hl,de
+        ex      de,hl
+        ld      hl,(mm_src)
+        ld      bc,48
+        ldir
+        xor     a
+        out     (PLANE_OFF),a
+        ld      hl,(mm_src)
+        ld      de,48
+        add     hl,de
+        ld      (mm_src),hl
+        ld      a,(mm_msk)
+        inc     a
+        cp      3
+        jr      nz,mm_plane
+        jp      mp_poll
+
+; 48 bytes at hl from the 96 colours at de: for the plane of mask c, a byte is a nibble of ones for a tile that has the plane in its
+; colour, then one for the next tile.  de goes on 96.
+mm_pack:
+        ld      b,48
+mm_pk:
+        ld      a,(de)
+        inc     de
+        call    mm_nib
+        and     $F0
+        ld      (hl),a
+        ld      a,(de)
+        inc     de
+        call    mm_nib
+        and     $0F
+        or      (hl)
+        ld      (hl),a
+        inc     hl
+        djnz    mm_pk
+        ret
+
+; a = $FF if the colour in a has the plane of mask c, else 0; a tile of the base map (bit 3 of the colour) gets the checker mm_pat of it
+mm_nib:
+        bit     3,a
+        jr      nz,mm_dim
+        and     c
+        add     a,$FF
+        sbc     a,a
+        ret
+mm_dim:
+        and     c
+        add     a,$FF
+        sbc     a,a
+        push    hl
+        ld      hl,mm_pat
+        and     (hl)
+        pop     hl
+        ret
+        ENDIF
 
 ; void plat_scroll(uint8_t row, uint8_t rows, int8_t dx, int8_t dy) __smallc
 ; The view's origin moved by (dx, dy) cells: cell (x, y) is now at (x - dx, y - dy).  The map is one linear block of pixels,
@@ -1258,6 +1477,16 @@ mp_sy:   defb   0
 mp_up:   defb   0                       ; plat_init has been called
 mp_mode: defb   $98                     ; port $32 with the ALU off (the V2 machines)
 mp_attr: defb   0                       ; the cell's attribute
+; The line pieces of the boxes' frames, pipes two pixels thick with rounded corners: 1 top left, 2 top right, 3 bottom left, 4 bottom
+; right, 5 across, 6 down (codes the frames' strings in plat_config.h have, below the space: mp_char takes them for these)
+mp_box:
+        defb    $00,$00,$00,$0F,$1F,$18,$18,$18
+        defb    $00,$00,$00,$F0,$F8,$18,$18,$18
+        defb    $18,$18,$18,$1F,$0F,$00,$00,$00
+        defb    $18,$18,$18,$F8,$F0,$00,$00,$00
+        defb    $00,$00,$00,$FF,$FF,$00,$00,$00
+        defb    $18,$18,$18,$18,$18,$18,$18,$18
+mp_ta:   defs   4                       ; plat_text_attr: the count, the row, the column and the attribute
 mp_k:    defs   4                       ; how each plane is drawn
 mp_pn:   defb   0                       ; the plane being drawn
 mp_pix:  defs   16                      ; the picture doubled across: two bytes a row
@@ -1266,6 +1495,8 @@ mp_scr:  defw   0
 mp_tick: defb   0                       ; draws since the keyboard was looked at
 mp_held: defb   0                       ; the code of the key that is down, or 0
 mp_event: defb  0                       ; the key pressed since plat_key last looked, or 0
+mm_buf:  defs   288                     ; the flat-colour mini map row's three planes, 48 bytes each (the art mode has mm_row)
+mm_pat:  defb   0                       ; the checker a tile of the base map is drawn in on this line: $AA, or $55 on the middle one
 mm_dst:  defw   0                       ; where the row's first line starts in a plane
 mm_msk:  defb   0                       ; the plane being written
 mm_src:  defw   0                       ; its 48 bytes

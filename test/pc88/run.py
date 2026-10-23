@@ -335,7 +335,10 @@ def main():
             ok &= scroll_test(v2, steps)
     for v2 in (1, 0):
         ok &= run(v2) == 0
-    ok &= minirow_art_test()
+    for v2 in (1, 0):
+        ok &= text_attr_test(v2)
+    ok &= minirow_art_test(True)
+    ok &= minirow_art_test(False)
     return 0 if ok else 1
 
 
@@ -756,30 +759,226 @@ rows:
 '''
 
 
-def minirow_art_test():
-    """plat_put_minirow: for each plane, the row's three lines of 48 bytes (mm_row: plane k line j at 144 k + 48 j) go to lines
-    52 + 3 sy, 53 + 3 sy and 54 + 3 sy of that plane, 16 bytes in."""
-    rng = random.Random(11)
-    sel = [0, 1, 47, 23, 24, 5, 5, 0]
-    data = [bytes(rng.randrange(256) for _ in range(432)) for _ in sel]
-    src = HARNESS_ART.replace('V2FLAG', '1').replace('        ROWS\n', ''.join(f'        defb {sy}\n        defw d{i}\n' for i, sy in enumerate(sel)) + '        defb 255\n'
-                              + ''.join(f'd{i}:     defb {",".join(str(c) for c in d)}\n' for i, d in enumerate(data)))
+HARNESS_FLAT = '''        SECTION code_user
+        org     $0100
+        PUBLIC  _font_8x8_bbc_system, __CLIB_PC8800_V2_ENABLED, _view_tile_art
+        defc    __CLIB_PC8800_V2_ENABLED = V2FLAG
+        defc    _view_tile_art = 0
+        EXTERN  _plat_put_minirow, _plat_init
+start:  ld      sp,$7000
+        call    _plat_init
+        ld      ix,rows
+nextrow:
+        ld      a,(ix+0)
+        cp      255
+        jr      z,rowsdone
+        ld      h,0
+        ld      l,(ix+0)
+        push    hl                      ; sy
+        ld      e,(ix+1)
+        ld      d,(ix+2)
+        push    de                      ; the colours
+        call    _plat_put_minirow
+        pop     de
+        pop     hl
+        inc     ix
+        inc     ix
+        inc     ix
+        jr      nextrow
+rowsdone:
+        ld      (sp_end),sp
+fin:    halt
+sp_end: defw    0
+_font_8x8_bbc_system:
+        BINARY  "font.bin"
+rows:
+        ROWS
+'''
+
+
+HARNESS_ATTR = '''        SECTION code_user
+        org     $0100
+        PUBLIC  _font_8x8_bbc_system, __CLIB_PC8800_V2_ENABLED, _view_tile_art
+        defc    __CLIB_PC8800_V2_ENABLED = V2FLAG
+        defc    _view_tile_art = 0
+        EXTERN  _plat_put, _plat_text_attr, _plat_init
+start:  ld      sp,$7000
+        call    _plat_init
+        ld      ix,ops
+next:   ld      a,(ix+0)
+        cp      255
+        jr      z,done
+        ld      h,0
+        ld      l,(ix+1)
+        push    hl                      ; col
+        ld      l,(ix+2)
+        push    hl                      ; row
+        ld      l,(ix+3)
+        push    hl                      ; the character, or the count
+        ld      a,(ix+0)
+        or      a
+        jr      nz,attr
+        call    _plat_put
+        pop     hl
+        pop     hl
+        pop     hl
+        jr      advance
+attr:   ld      l,(ix+4)
+        push    hl                      ; the attribute
+        call    _plat_text_attr
+        pop     hl
+        pop     hl
+        pop     hl
+        pop     hl
+advance:
+        ld      de,5
+        add     ix,de
+        jr      next
+done:   ld      (sp_end),sp
+fin:    halt
+sp_end: defw    0
+_font_8x8_bbc_system:
+        BINARY  "font.bin"
+ops:
+        OPS
+'''
+
+
+def text_attr_test(v2):
+    """plat_text_attr: text is drawn (white on black), recoloured, drawn again as a screen of tables does and recoloured again: the
+    planes are what each cell would be drawn as in its last attribute."""
+    rng = random.Random(7)
+    font = bytes(rng.randrange(256) for _ in range(96 * 8))
+    ops = []
+    state = {}                                             # (col, row) -> [char, attr]
+
+    def put(col, row, ch):
+        ops.append((0, col, row, ord(ch), 0))
+        state[(col, row)] = [ch, 7]
+
+    def attr(col, row, n, a):
+        ops.append((1, col, row, n, a))
+        for c in range(col, col + n):                      # (a cell with nothing drawn is a blank glyph, in the paper colour)
+            state.setdefault((c, row), [None, 7])[1] = a
+    text = 'FISCAL BUDGET AND SO ON'
+    for row in (0, 2, 9, 23):                              # drawn plain, then coloured over more than the text
+        for i, ch in enumerate(text):
+            put(i + 4, row, ch)
+        attr(4, row, 32, 0x0F)                             # white on blue
+    for row in (3, 4):                                     # coloured in pieces, as a row of labels and figures is
+        for i, ch in enumerate(text):
+            put(i + 4, row, ch)
+        attr(4, row, 6, 0x06)                              # yellow on black
+        attr(10, row, 9, 0x2D)
+        attr(19, row, 8, 0x3A)
+    for row in (0, 2, 3):                                  # the screen drawn again, as a step does: plain, then coloured again
+        for i, ch in enumerate(text):
+            put(i + 4, row, ch)
+        attr(4, row, 12, 0x12 if row == 0 else 0x07)
+    attr(0, 5, 3, 0x0F)
+    src = HARNESS_ATTR.replace('V2FLAG', str(v2)).replace('        OPS\n', ''.join(f'        defb {k},{c},{r},{a},{b}\n' for k, c, r, a, b in ops) + '        defb 255\n')
     model = [bytearray(0x4000) for _ in range(3)]
-    for sy, d in zip(sel, data):
-        for k in range(3):
-            for line in range(3):
-                for i in range(48):
-                    model[k][(52 + 3 * sy + line) * 80 + 16 + i] = d[k * 144 + line * 48 + i]
+
+    def double(b):
+        w = 0
+        for i in range(7, -1, -1):
+            w = w << 2 | (3 if b >> i & 1 else 0)
+        return w >> 8, w & 0xFF
+    for (col, row), (ch, a) in state.items():
+        glyph = bytes(8) if ch is None else font[(ord(ch) - 32) * 8:(ord(ch) - 32) * 8 + 8]
+        for p in range(3):
+            ink = 0xFF if a >> p & 1 else 0
+            paper = 0xFF if a >> (3 + p) & 1 else 0
+            for r in range(8):
+                for half, px in enumerate(double(glyph[r])):
+                    model[p][row * 640 + r * 80 + col * 2 + half] = (px & ink) | (~px & 0xFF & paper)
     with tempfile.TemporaryDirectory() as tmp:
         open(os.path.join(tmp, 'h.asm'), 'w').write(src)
-        open(os.path.join(tmp, 'font.bin'), 'wb').write(bytes(96 * 8))
+        open(os.path.join(tmp, 'font.bin'), 'wb').write(font)
         os.makedirs(os.path.join(tmp, 'build', 'common'))
         open(os.path.join(tmp, 'build', 'common', 'tiles_640x200_3bpp.bin'), 'wb').write(bytes(345 * 24))
         out = subprocess.run([Z80ASM, '-b', '-m', '-DDBL_AT=0x8000', '-I' + ROOT, '-oh.bin', 'h.asm',
                               os.path.join(ROOT, 'target/pc88/plat_pc88.asm')], cwd=tmp, capture_output=True, text=True)
         if out.returncode or out.stderr.strip():
             print(out.stdout + out.stderr)
-            print('FAIL  the art mini map row test does not assemble')
+            print('FAIL  the text recolour test does not assemble')
+            return False
+        syms = {}
+        for line in open(os.path.join(tmp, 'h.map')):
+            m = re.match(r'(\S+)\s+= \$([0-9A-F]+) ;', line)
+            if m:
+                syms[m.group(1)] = int(m.group(2), 16)
+        img = bytearray(65536)
+        for sec in ('code_user', 'data_user', 'rodata_user', 'data_fcntl'):
+            pth = os.path.join(tmp, f'h_{sec}.bin')
+            if os.path.exists(pth):
+                b = open(pth, 'rb').read()
+                img[syms[f'__{sec}_head']:syms[f'__{sec}_head'] + len(b)] = b
+        first = os.path.join(tmp, 'h.bin')
+        if os.path.exists(first) and os.path.getsize(first):
+            b = open(first, 'rb').read()
+            img[0x100:0x100 + len(b)] = b
+        open(os.path.join(tmp, 'img.bin'), 'wb').write(img)
+        with open(os.path.join(tmp, 'trace.txt'), 'w') as tf:
+            subprocess.run([TICKS, '-pc', '100', '-end', f'{syms["fin"]:x}', '-counter', '400000000', '-trace',
+                            '-output', 'mem.out', 'img.bin'], cwd=tmp, stdout=tf, stderr=subprocess.DEVNULL)
+        mem = open(os.path.join(tmp, 'mem.out'), 'rb').read()
+        m = Machine()
+        replay(os.path.join(tmp, 'trace.txt'), m, -1)
+    bad = [(p, i) for p in range(3) for i in range(80 * 200) if m.planes[p][i] != model[p][i]]
+    if os.environ.get('DUMPBAD'):
+        print(sorted({(i % 80 // 2, i // 640) for p, i in bad})[:40])
+    sp = mem[syms['sp_end']] | mem[syms['sp_end'] + 1] << 8
+    ok = not bad and sp == 0x7000 and m.sel() == 0 and m.plane == 0
+    print(('PASS' if ok else 'FAIL') + f'  [{"V2" if v2 else "V1"}] plat_text_attr: {len(ops)} operations (text, recoloured, drawn again, recoloured again): the planes equal the model, '
+          f'the stack is balanced and the RAM under the screen is paged back in'
+          + (f' ({len(bad)} bytes differ, first plane {bad[0][0]} at offset {bad[0][1]}, line {bad[0][1] // 80}, byte {bad[0][1] % 80}; sp ${sp:04X})' if not ok else ''))
+    return ok
+
+
+def minirow_art_test(art=True):
+    """plat_put_minirow: for each plane, the row's three lines of 48 bytes (mm_row: plane k line j at 144 k + 48 j) go to lines
+    52 + 3 sy, 53 + 3 sy and 54 + 3 sy of that plane, 16 bytes in."""
+    rng = random.Random(11)
+    sel = [0, 1, 47, 23, 24, 5, 5, 0]
+    model = [bytearray(0x4000) for _ in range(3)]
+    if art:
+        data = [bytes(rng.randrange(256) for _ in range(432)) for _ in sel]
+        src = HARNESS_ART.replace('V2FLAG', '1').replace('        ROWS\n', ''.join(f'        defb {sy}\n        defw d{i}\n' for i, sy in enumerate(sel)) + '        defb 255\n'
+                                  + ''.join(f'd{i}:     defb {",".join(str(c) for c in d)}\n' for i, d in enumerate(data)))
+        for sy, d in zip(sel, data):
+            for k in range(3):
+                for line in range(3):
+                    for i in range(48):
+                        model[k][(52 + 3 * sy + line) * 80 + 16 + i] = d[k * 144 + line * 48 + i]
+    else:                                   # flat colours: 96 a row (0..7), blocks of 4 pixels by 3 lines in the three planes
+        data = [[rng.randrange(16) for _ in range(96)] for _ in sel]
+        data[1] = [7] * 96
+        data[2] = [0] * 96
+        src = HARNESS_FLAT.replace('V2FLAG', '1').replace('        ROWS\n', ''.join(f'        defb {sy}\n        defw d{i}\n' for i, sy in enumerate(sel)) + '        defb 255\n'
+                                  + ''.join(f'd{i}:     defb {",".join(str(c) for c in d)}\n' for i, d in enumerate(data)))
+        for sy, d in zip(sel, data):
+            for x, c in enumerate(d):
+                for line in range(52 + 3 * sy, 52 + 3 * sy + 3):
+                    for k in range(3):
+                        byte = line * 80 + 16 + x // 2
+                        mask = 0xF0 if x % 2 == 0 else 0x0F
+                        if c & 8:                   # the base map's tile: a checker of its colour, the other way round on the middle line
+                            mask &= 0x55 if (line - 52 - 3 * sy) == 1 else 0xAA
+                            full = 0xF0 if x % 2 == 0 else 0x0F
+                            model[k][byte] = (model[k][byte] & ~full & 0xFF) | (mask if (c >> k) & 1 else 0)
+                        else:
+                            model[k][byte] = (model[k][byte] & ~mask & 0xFF) | (mask if (c >> k) & 1 else 0)
+    with tempfile.TemporaryDirectory() as tmp:
+        open(os.path.join(tmp, 'h.asm'), 'w').write(src)
+        open(os.path.join(tmp, 'font.bin'), 'wb').write(bytes(96 * 8))
+        os.makedirs(os.path.join(tmp, 'build', 'common'))
+        open(os.path.join(tmp, 'build', 'common', 'tiles_640x200_3bpp.bin'), 'wb').write(bytes(345 * 24))
+        out = subprocess.run([Z80ASM, '-b', '-m', '-DDBL_AT=0x8000'] + (['-DHAVE_MINIMAP_ART'] if art else []) + ['-I' + ROOT, '-oh.bin', 'h.asm',
+                              os.path.join(ROOT, 'target/pc88/plat_pc88.asm')], cwd=tmp, capture_output=True, text=True)
+        if out.returncode or out.stderr.strip():
+            print(out.stdout + out.stderr)
+            print('FAIL  the mini map row test does not assemble')
             return False
         syms = {}
         for line in open(os.path.join(tmp, 'h.map')):
@@ -807,7 +1006,7 @@ def minirow_art_test():
     sp = mem[syms['sp_end']] | mem[syms['sp_end'] + 1] << 8
     paged = m.sel() == 0 and m.plane == 0
     ok = not bad and sp == 0x7000 and paged
-    print(('PASS' if ok else 'FAIL') + f'  plat_put_minirow (art): {len(sel)} rows, each plane\'s three lines written to the right lines of that plane (a row drawn again is '
+    print(('PASS' if ok else 'FAIL') + f'  plat_put_minirow ({"art" if art else "flat colours"}): {len(sel)} rows, each plane\'s three lines written to the right lines of that plane (a row drawn again is '
           f'overwritten), the stack is balanced and the RAM under the screen is paged back in'
           + (f' ({len(bad)} bytes differ, first plane {bad[0][0]} at offset {bad[0][1]}, line {bad[0][1] // 80}, byte {bad[0][1] % 80}; sp ${sp:04X}; plane {m.plane})' if not ok else ''))
     return ok

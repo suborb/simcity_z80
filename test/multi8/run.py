@@ -637,20 +637,21 @@ def minirow_test():
     """plat_put_minirow: each of a row's 96 colours is a block of four pixels by three lines, in the right bytes of the planes."""
     rng = random.Random(7)
     sel = [0, 1, 2, 23, 24, 46, 47, 5, 5, 0]                       # the last rows again with other colours (they must overwrite)
-    data = [[rng.randrange(8) for _ in range(96)] for _ in sel]
+    data = [[rng.randrange(16) for _ in range(96)] for _ in sel]
     data[1] = [7] * 96
     data[2] = [0] * 96
-    data[8] = [x ^ 7 for x in data[7]]
+    data[8] = [x ^ 7 for x in data[7]]                              # (colour bit 3 is a tile of the base map: a checker)
     src = HARNESS_ROWS.replace('        ROWS\n', ''.join(f'        defb {sy}\n        defw d{i}\n' for i, sy in enumerate(sel)) + '        defb 255\n'
                                 + ''.join(f'd{i}:     defb {",".join(str(c) for c in d)}\n' for i, d in enumerate(data)))
     model = [bytearray(0x4000) for _ in range(3)]
     for sy, d in zip(sel, data):
         for x, c in enumerate(d):
-            for line in range(48 + 3 * sy, 48 + 3 * sy + 3):
+            for line in range(52 + 3 * sy, 52 + 3 * sy + 3):
                 for p in range(3):
                     byte = line * 80 + 16 + x // 2
-                    mask = 0xF0 if x % 2 == 0 else 0x0F
-                    model[p][byte] = (model[p][byte] & ~mask & 0xFF) | (mask if (c >> p) & 1 else 0)
+                    full = 0xF0 if x % 2 == 0 else 0x0F
+                    mask = full & ((0x55 if line == 53 + 3 * sy else 0xAA) if c & 8 else 0xFF)
+                    model[p][byte] = (model[p][byte] & ~full & 0xFF) | (mask if (c >> p) & 1 else 0)
     with tempfile.TemporaryDirectory() as tmp:
         open(os.path.join(tmp, 'h.asm'), 'w').write(src)
         open(os.path.join(tmp, 'font.bin'), 'wb').write(bytes(96 * 8))
