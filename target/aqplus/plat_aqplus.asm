@@ -22,6 +22,24 @@ _aq_icons:
         PUBLIC  _aq_blit8
         PUBLIC  _plat_put_tile
         defc    PORT_BANK2 = $F2
+        IFDEF   AQ_VIDEO_BANK2          ; the all-RAM build (aqxboot): the video is paged over bank 2 ($8000); the stack and the buffers are in bank 3
+        defc    VID_PORT = $F2
+        defc    VID_BASE = $80          ; the high byte of the bitmap's address, and of the colour RAM's
+        defc    VID_COLOUR = $A0
+        MACRO   VID_PAGE_OUT
+        ld      a,AQ_BANK2_PAGE         ; the RAM that is in bank 2 (the bootstrap's: 58)
+        out     (PORT_BANK2),a
+        ENDM
+        ELSE                            ; the video is paged over bank 3 ($C000) where the buffers are
+        defc    VID_PORT = $F3
+        defc    VID_BASE = $C0
+        defc    VID_COLOUR = $E0
+        MACRO   VID_PAGE_OUT
+        in      a,(PORT_BANK2)
+        inc     a
+        out     (PORT_BANK3),a
+        ENDM
+        ENDIF
         defc    PORT_BANK3 = $F3
 
 _plat_put_tile:
@@ -48,7 +66,7 @@ _aq_blit8:
 aq_cell:
         ld      h,a
         ld      a,20                    ; the video RAM
-        out     (PORT_BANK3),a
+        out     (VID_PORT),a
         ld      a,h
         add     a,a
         add     a,a
@@ -63,7 +81,7 @@ aq_cell:
         add     a,l
         ld      l,a
         ld      a,h
-        adc     a,$E0
+        adc     a,VID_COLOUR
         ld      h,a                     ; + col, in the colour RAM
         ld      (hl),c
         ex      af,af'
@@ -77,7 +95,7 @@ aq_cell:
         or      b                       ; + col: its low bits are free
         ld      l,a
         ld      a,h
-        or      $C0
+        or      VID_BASE
         ld      h,a
         ld      bc,40
         REPT    7
@@ -88,9 +106,7 @@ aq_cell:
         ENDR
         ld      a,(de)
         ld      (hl),a
-        in      a,(PORT_BANK2)
-        inc     a
-        out     (PORT_BANK3),a
+        VID_PAGE_OUT
         ret
 
 ; The pixels of the picture at de, inverted, into aq_scratch; de = aq_scratch.  Keeps hl and c.
@@ -190,20 +206,18 @@ _plat_init:
         PUBLIC  _plat_clear
 _plat_clear:
         ld      a,20                    ; the video RAM
-        out     (PORT_BANK3),a
-        ld      hl,$C000
-        ld      de,$C001
+        out     (VID_PORT),a
+        ld      hl,VID_BASE * 256
+        ld      de,VID_BASE * 256 + 1
         ld      bc,40 * 25 * 8 - 1
         ld      (hl),l
         ldir
-        ld      hl,$E000
-        ld      de,$E001
+        ld      hl,VID_COLOUR * 256
+        ld      de,VID_COLOUR * 256 + 1
         ld      bc,40 * 25 - 1
         ld      (hl),TEXT_COLOUR
         ldir
-        in      a,(PORT_BANK2)
-        inc     a
-        out     (PORT_BANK3),a
+        VID_PAGE_OUT
         ret
 
 ; void plat_exit(void): back to the text screen
@@ -213,7 +227,6 @@ _plat_exit:
         out     (PORT_VCTRL),a
         ret
 
-; The inverted copy of a picture that aq_invert makes.
-        SECTION bss_user
+; The inverted copy of a picture that aq_invert makes: in the code section, so that it is not under the video RAM (bank 2 in the all-RAM build).
 aq_scratch:
         defs    8

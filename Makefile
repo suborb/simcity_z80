@@ -51,6 +51,7 @@ DEPS = Makefile $(wildcard ui/*.c ui/*.h ui/*.asm engine/*.asm engine/*.h platfo
          platform/console/*.[chai]* target/*/*.[chai]* target/*/*.inc) assets/map_art.bin assets/map_art_aq.bin assets/udgs.bin assets/icons.bin assets/icons_spec.bin assets/cpc_icons.bin
 
 AQPLUS = build/aqplus/simcity.aqx
+AQPLUS_BOOT = build/aqplus_boot/simcity.aqx
 NC200  = build/nc200/simcity.img
 Z88ROM = build/z88rom/simcity.epr
 ZX     = build/zx/simcity.tap
@@ -68,11 +69,12 @@ TESTK  = build/testnative/simcity.bin
 TESTA  = build/testart/simcity.bin
 TESTSC = build/testscroll/simcity.bin
 
-.PHONY: all aqplus z88rom zx multi8 pc88 sam test testpanel testmodal testnarrow testsprites testoverlay testhires testnative testart testscroll check golden uitest tiletest z88test engine deadcode clean
+.PHONY: all aqplus aqplus_boot z88rom zx multi8 pc88 sam test testpanel testmodal testnarrow testsprites testoverlay testhires testnative testart testscroll check golden uitest tiletest z88test engine deadcode clean
 
 all: aqplus z88rom zx multi8 pc88 sam
 
 aqplus: $(AQPLUS)
+aqplus_boot: $(AQPLUS_BOOT)
 z88rom: $(Z88ROM)
 zx:     $(ZX)
 multi8: $(MULTI8)
@@ -94,6 +96,17 @@ $(AQPLUS): $(DEPS)
 	$(ZCC) +aquarius -clib=aqplus -subtype=aqx -create-app $(COMMON) -pragma-include:target/aqplus/zpragma.inc \
 	    -Itarget/aqplus -DTARGET_AQPLUS -Ca-DTARGET_AQPLUS -Ca-DSIM_STACK_TOP=0x3a00 $(GAME) $(ENTROPY) $(MENU) $(NOSOUND) $(FIELDS) $(AQPLUS_PLATFORM) -o $(@D)/simcity
 
+
+# The Aquarius+ with all its RAM (z88dk's -subtype=aqxboot: a bootstrap maps RAM pages 56-59 into the four banks and loads the image at
+# $0200, see zpragma_aqxboot.inc).  The video is paged over bank 3 while a cell is drawn, so the placer, and what it reads, must be
+# below $8000 (the video is paged over bank 2 here: AQ_VIDEO_BANK2, and the stack and the buffers are in bank 3).
+$(AQPLUS_BOOT): $(DEPS)
+	@mkdir -p $(@D)
+	$(ZCC) +aquarius -clib=aqplus -subtype=aqxboot -create-app $(COMMON) -pragma-include:target/aqplus/zpragma_aqxboot.inc \
+	    -Itarget/aqplus -DTARGET_AQPLUS -Ca-DTARGET_AQPLUS -Ca-DAQ_VIDEO_BANK2 -Ca-DAQ_BANK2_PAGE=58 $(GAME) $(ENTROPY) $(MENU) $(NOSOUND) $(FIELDS) $(AQPLUS_PLATFORM) -o $(@D)/simcity.bin
+	@for s in _aq_blit8 aq_cell _plat_put _plat_clear _plat_init _font_8x8_bbc_system _view_tile_art _aq_icons; do \
+	    v=`sed -n "s/^$$s *= \$$\([0-9A-Fa-f]*\).*/\1/p" $(@D)/simcity.map | head -1`; \
+	    [ -z "$$v" ] || [ $$(( 0x$$v )) -lt 32768 ] || { echo "$$s is not below $$8000 (at $$v)"; rm -f $@; exit 1; }; done
 
 
 Z88ROM_FLAGS = -subtype=app --generic-console -create-app -pragma-include:target/z88/zpragma_rom.inc \
