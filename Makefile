@@ -138,9 +138,9 @@ $(MULTI8): $(DEPS) build/common/tiles_640x200_3bpp.bin build/common/minitiles_64
 
 # The NEC PC-8801 in its all-RAM mode (a bootable disk): code and data from $0000, the stack under the uninitialised data,
 # which starts at PC88_BSS and runs over $C000, where the screen is paged in.  It shares the Multi 8's pictures.
-PC88_BSS = 0xAC00
+PC88_BSS = 0xB600
 PC88_CLIB ?=                    # -clib=v1: no ALU, for the original PC-8801 (plane by plane)
-PC88_IMAGE_LIMIT = 0xA600       # (the doubling table is at $A600-$A7FF, and the stack gets the rest, down from the uninitialised data)
+PC88_IMAGE_LIMIT = 0xB100       # (the doubling table is at $B100-$B2FF, and the stack gets the rest, down from the uninitialised data)
 
 $(PC88): $(DEPS) build/common/tiles_640x200_3bpp.bin build/common/minitiles_640x200_3bpp.bin
 	@mkdir -p $(@D)

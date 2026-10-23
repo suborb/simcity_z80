@@ -491,15 +491,14 @@ def scroll_test(v2, steps):
         for x in range(40):
             n = cells[y][x]
             row = 6 + y
-            ent = cache + (row * 40 + x) * 3
-            key = mem[ent + 2]
+            ent = cache + ((row - 6) * 40 + x) * 2
+            word = mem[ent] | mem[ent + 1] << 8
             if n is None:
-                if key != 0x40:
-                    bad_cache.append((x, y, 'exposed, key', hex(key)))
+                if word != 0xFFFF:
+                    bad_cache.append((x, y, 'exposed, word', hex(word)))
                 continue
-            got = mem[ent] | mem[ent + 1] << 8
-            if got != art + 8 * n or key != 0x80:
-                bad_cache.append((x, y, hex(got), hex(art + 8 * n), hex(key)))
+            if word != art + 8 * n:
+                bad_cache.append((x, y, hex(word), hex(art + 8 * n)))
             for p in range(3):
                 for r in range(8):
                     for half, px in enumerate(double(blob[n * 24 + p * 8 + r])):

@@ -34,10 +34,12 @@
         IFDEF   DBL_AT                  ; (the test has the screen in flat memory)
         defc    DBL = DBL_AT
         ELSE
-        defc    DBL = $A600             ; 512 bytes, low RAM: pictures are drawn with a plane paged in
+        defc    DBL = $B100             ; 512 bytes, low RAM: pictures are drawn with a plane paged in
         ENDIF
         defc    DBL_HI = DBL / 256
         defc    TEXT_ATTR = 7           ; white on black
+        defc    MAP_ROW = 6             ; the map's cell rows: the only ones with a cache entry
+        defc    MAP_ROWS = 19
 
 ; The baked map pictures
         SECTION data_fcntl
@@ -74,12 +76,7 @@ mp_alu_off:
 _plat_put_tile:
         ld      hl,2
         add     hl,sp
-        ld      a,(hl)
-        ld      c,$80                   ; the cache key: $80, or $81 inverted
-        or      a
-        jr      z,mp_t_plain
-        inc     c
-mp_t_plain:
+        ld      c,(hl)                  ; inverse (0 or 1)
         inc     hl
         inc     hl
         inc     hl
@@ -94,7 +91,7 @@ mp_t_plain:
         ld      b,(hl)
         call    mp_cached
         ret     c
-        ; a = row, b = col, c = key, de = art: the picture's three planes
+        ; a = row, b = col, c = inverse, de = art: the picture's three planes
         push    af
         push    bc
         ex      de,hl
@@ -230,7 +227,7 @@ _mp_tile1:
         or      a
         call    nz,mp_swap
         ld      a,c
-        and     $3F                     ; the colours: the cache's key
+        and     $3F                     ; the colours
         ld      c,a
         inc     hl
         inc     hl
@@ -242,18 +239,20 @@ _mp_tile1:
         inc     hl
         inc     hl
         ld      b,(hl)
-        call    mp_cached
-        ret     c
+        call    mp_forget
         jr      mp_cell_nc
 
-; A cell that already shows this picture is left alone: mp_cache has each cell's art address and key (colours, or $80/$81 for
-; map pictures), $40 if drawn some other way.  a = row, b = col, c = key, de = art.  Carry if it is as wanted; else the
-; entry is updated.  Keeps a, b, c, de.
+; A map cell that already shows this picture is left alone: mp_cache has a word for each cell of the map, its art address
+; xor the inverse flag (art addresses differ by 8 or more), or $FFFF if it shows something else.  a = row, b = col, c = inverse, de = art.  Carry if it
+; is as wanted; else the entry is updated.  Keeps a, b, c, de.
 mp_cached:
         push    af
         push    de
         call    mp_entry
-        pop     de
+        jr      c,mp_nocache
+        ld      a,e
+        xor     c
+        ld      e,a                     ; de = the word
         ld      a,(hl)
         cp      e
         jr      nz,mp_miss
@@ -261,10 +260,7 @@ mp_cached:
         ld      a,(hl)
         cp      d
         jr      nz,mp_miss1
-        inc     hl
-        ld      a,(hl)
-        cp      c
-        jr      nz,mp_miss2
+        pop     de
         pop     af
         scf
         ret
@@ -273,17 +269,20 @@ mp_miss:
         inc     hl
 mp_miss1:
         ld      (hl),d
-        inc     hl
-mp_miss2:
-        ld      (hl),c
+mp_nocache:
+        pop     de
         pop     af
         or      a
         ret
 
-; hl = the cache entry of cell a = row, b = column.  Keeps a, b, c.
+; hl = the cache entry of cell a = row, b = column; carry if the cell is not in the map.  Keeps a, b, c, de.
 mp_entry:
         push    af
         push    de
+        sub     MAP_ROW
+        jr      c,mp_outside
+        cp      MAP_ROWS
+        jr      nc,mp_outside
         ld      l,a
         ld      h,0
         add     hl,hl
@@ -297,24 +296,31 @@ mp_entry:
         ld      e,b
         ld      d,0
         add     hl,de
-        ld      d,h
-        ld      e,l
-        add     hl,hl
-        add     hl,de                   ; * 3
+        add     hl,hl                   ; * 2
         ld      de,mp_cache
         add     hl,de
         pop     de
         pop     af
+        or      a
+        ret
+mp_outside:
+        pop     de
+        pop     af
+        scf
+        ret
+
+; The cell shows something the cache does not know: forget it.  Keeps a, b, c, de.
+mp_forget:
+        call    mp_entry
+        ret     c
+        ld      (hl),$FF
+        inc     hl
+        ld      (hl),$FF
         ret
 
 ; Other drawing in a cell: the cache no longer applies
 mp_cell:
-        push    de
-        call    mp_entry
-        inc     hl
-        inc     hl
-        ld      (hl),$40
-        pop     de
+        call    mp_forget
 mp_cell_nc:
         call    mp_scraddr
         ld      a,c
@@ -625,10 +631,7 @@ _plat_put_overlay:
         pop     af
         push    af
         push    bc
-        call    mp_entry                ; the cell no longer shows what the cache says
-        inc     hl
-        inc     hl
-        ld      (hl),$40
+        call    mp_forget
         pop     bc
         pop     af
         call    mp_scraddr
@@ -880,8 +883,8 @@ mp_clear_pl:
 mp_clear_cache:
         ld      hl,mp_cache             ; and no cell shows what the cache says
         ld      de,mp_cache + 1
-        ld      bc,40 * 25 * 3 - 1
-        ld      (hl),$40
+        ld      bc,40 * MAP_ROWS * 2 - 1
+        ld      (hl),$FF
         ldir
         ret
 
@@ -993,7 +996,7 @@ _plat_scroll:
         pop     de
         add     hl,de
         ld      (mp_sdelta),hl
-        ; the cache: delta = (dy * 40 + dx) * 3 bytes
+        ; the cache: delta = (dy * 40 + dx) * 2 bytes
         ld      a,(mp_sdy)
         call    mp_sext
         add     hl,hl
@@ -1009,10 +1012,7 @@ _plat_scroll:
         call    mp_sext
         pop     de
         add     hl,de
-        ld      d,h
-        ld      e,l
-        add     hl,hl
-        add     hl,de                   ; * 3
+        add     hl,hl                   ; * 2
         ld      (mp_sdelta_c),hl
         ; the screen block: SCREEN + row * 640, rows * 640 bytes
         ld      a,(mp_srow)
@@ -1055,14 +1055,15 @@ mp_sc_pl:
         xor     a
         out     (PLANE_OFF),a
 mp_sc_cache:
-        ; the cache: rows * 120 bytes from mp_cache + row * 120
+        ; the cache: rows * 80 bytes from mp_cache + (row - MAP_ROW) * 80
         ld      a,(mp_srow)
-        call    mp_x120
+        sub     MAP_ROW
+        call    mp_x80
         ld      de,mp_cache
         add     hl,de
         ld      (mp_sstart),hl
         ld      a,(mp_srows)
-        call    mp_x120
+        call    mp_x80
         ld      (mp_slen),hl
         ld      hl,(mp_sdelta_c)
         ld      (mp_sdelta),hl
@@ -1086,7 +1087,8 @@ mp_sc_rows:
         ld      c,a
         ld      a,(mp_srow)
         add     a,c
-        call    mp_x120                 ; (keeps b)
+        sub     MAP_ROW
+        call    mp_x80                  ; (keeps b)
         ld      de,mp_cache
         add     hl,de
         push    hl
@@ -1129,7 +1131,8 @@ mp_sc_col:
 mp_sc_row:
         push    bc
         ld      a,(mp_sy)
-        call    mp_x120
+        sub     MAP_ROW
+        call    mp_x80
         ld      de,mp_cache
         add     hl,de
         ld      a,(mp_scol)
@@ -1139,8 +1142,7 @@ mp_sc_row:
         ld      c,l
         ld      h,d
         ld      l,e
-        add     hl,hl
-        add     hl,de                   ; col * 3
+        add     hl,hl                   ; col * 2
         add     hl,bc
         ld      a,(mp_scnt)
         ld      c,a
@@ -1199,28 +1201,26 @@ mp_sext:
         ld      h,a
         ret
 
-; hl = a * 120 (a below 25)
-mp_x120:
+; hl = a * 80 (a below 19)
+mp_x80:
         ld      l,a
         ld      h,0
         add     hl,hl
         add     hl,hl
-        add     hl,hl                   ; 8 a
+        add     hl,hl
+        add     hl,hl                   ; 16 a
         ld      d,h
         ld      e,l
         add     hl,hl
-        add     hl,hl
-        add     hl,hl
-        add     hl,hl                   ; 128 a
-        or      a
-        sbc     hl,de                   ; 120 a
+        add     hl,hl                   ; 64 a
+        add     hl,de                   ; 80 a
         ret
 
-; Mark bc cache entries from hl (key $40)
+; Mark bc cache entries from hl as unknown
 mp_inv:
+        ld      (hl),$FF
         inc     hl
-        inc     hl
-        ld      (hl),$40
+        ld      (hl),$FF
         inc     hl
         dec     bc
         ld      a,b
@@ -1238,9 +1238,9 @@ _plat_exit:
 mp_nibbles:
         defb    $00,$03,$0C,$0F,$30,$33,$3C,$3F,$C0,$C3,$CC,$CF,$F0,$F3,$FC,$FF
 
-; What each cell shows (40 x 25 of three bytes); under the screen, so used only with the RAM paged in
+; What each map cell shows (40 x 19 words); under the screen, so used only with the RAM paged in
         SECTION bss_user
-mp_cache: defs  40 * 25 * 3
+mp_cache: defs  40 * MAP_ROWS * 2
 
 ; The placer's variables: in the code section so that they stay in the low RAM
         SECTION code_user
