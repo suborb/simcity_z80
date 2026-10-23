@@ -111,17 +111,27 @@ $(ZX): $(DEPS)
 	@mkdir -p $(@D)
 	$(ZCC) +zx $(ZX_FLAGS) $(GAME) $(ENTROPY) $(NOSOUND) $(FIELDS) $(ZX_PLATFORM) -o $(@D)/simcity
 
-# The map's pictures baked for 640x200 screens of 3 bits a pixel (the Multi 8 and the PC-8801), from the CPC game's art
-# (tools/extract_cpc_tiles.py).
+# The map's pictures baked for 640x200 screens of 3 bits a pixel (the Multi 8 and the PC-8801), and at a quarter of the size for
+# the mini maps (4 columns by 3 lines, 5 bytes each: HAVE_MINIMAP_ART).  They are made from the art of one of two games:
+#   make TILESET=cpc    the Amstrad CPC game's (assets/cpc_tiles.bin, tools/extract_cpc_tiles.py); the default
+#   make TILESET=st     the Atari ST game's (assets/st_tiles.bin, tools/st_tiles_3bpp.py), in the colours ST_COLOURS says
+# Changing TILESET (or ST_COLOURS) makes the pictures again, and so rebuilds the programs that have them.
+TILESET ?= cpc
+ST_COLOURS ?= meadow
+TILES_TOOL = $(if $(filter st,$(TILESET)),tools/st_tiles_3bpp.py,tools/extract_cpc_tiles.py)
+TILES_ARGS = $(if $(filter st,$(TILESET)),--colours $(ST_COLOURS),)
+TILES_STAMP = build/common/.tiles-$(TILESET)$(if $(filter st,$(TILESET)),-$(ST_COLOURS),)
 
-build/common/tiles_640x200_3bpp.bin: assets/cpc_tiles.bin tools/extract_cpc_tiles.py
+$(TILES_STAMP):
 	@mkdir -p $(@D)
-	python3 tools/extract_cpc_tiles.py assets/cpc_tiles.bin --planes $@
+	@rm -f build/common/.tiles-* build/common/*_640x200_3bpp.bin
+	@touch $@
 
-# The map's pictures at a quarter of the size for the mini maps (4 columns by 3 lines, 5 bytes each: HAVE_MINIMAP_ART)
-build/common/minitiles_640x200_3bpp.bin: assets/cpc_tiles.bin tools/extract_cpc_tiles.py
-	@mkdir -p $(@D)
-	python3 tools/extract_cpc_tiles.py assets/cpc_tiles.bin --mini $@
+build/common/tiles_640x200_3bpp.bin: $(TILES_STAMP) assets/$(TILESET)_tiles.bin $(TILES_TOOL)
+	python3 $(TILES_TOOL) assets/$(TILESET)_tiles.bin $(TILES_ARGS) --planes $@
+
+build/common/minitiles_640x200_3bpp.bin: $(TILES_STAMP) assets/$(TILESET)_tiles.bin $(TILES_TOOL)
+	python3 $(TILES_TOOL) assets/$(TILESET)_tiles.bin $(TILES_ARGS) --mini $@
 
 # The Mitsubishi Multi 8 in its all-RAM mode: the code in the low 32 KB, the uninitialised data under the video planes.
 # The image (code, data and the baked pictures) is loaded as one block from $0000 and must end below the uninitialised data,

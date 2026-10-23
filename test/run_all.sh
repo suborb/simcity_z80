@@ -38,6 +38,9 @@ echo
 echo "== PC-8801 disk routines against the real disk unit (MAME; skipped without PC88_ROMS)"
 python3 test/pc88/disk.py
 echo
+echo "== the Atari ST art for the 3 bit targets (skipped without the art)"
+python3 test/st_tiles/run.py
+echo
 echo "== z88dk's Multi 8 tape routines (tape_save, tape_load_to)"
 python3 test/multi8/tape.py
 echo
