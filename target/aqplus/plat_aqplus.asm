@@ -27,7 +27,7 @@ _aq_icons:
         defc    VID_BASE = $80          ; the high byte of the bitmap's address, and of the colour RAM's
         defc    VID_COLOUR = $A0
         MACRO   VID_PAGE_OUT
-        ld      a,AQ_BANK2_PAGE         ; the RAM that is in bank 2 (the bootstrap's: 58)
+        ld      a,(aq_page2)            ; the RAM that was in bank 2 (plat_init read it)
         out     (PORT_BANK2),a
         ENDM
         ELSE                            ; the video is paged over bank 3 ($C000) where the buffers are
@@ -197,6 +197,10 @@ aq_puts_next:
         EXTERN  set_default_palette
         PUBLIC  _plat_init
 _plat_init:
+        IFDEF   AQ_VIDEO_BANK2
+        in      a,(PORT_BANK2)          ; the RAM page the video is paged over, to put back after every cell
+        ld      (aq_page2),a
+        ENDIF
         call    set_default_palette
         ld      a,VCTRL_BITMAP
         out     (PORT_VCTRL),a
@@ -230,3 +234,7 @@ _plat_exit:
 ; The inverted copy of a picture that aq_invert makes: in the code section, so that it is not under the video RAM (bank 2 in the all-RAM build).
 aq_scratch:
         defs    8
+        IFDEF   AQ_VIDEO_BANK2
+aq_page2:
+        defb    0                       ; (in the code section, not under the video RAM)
+        ENDIF

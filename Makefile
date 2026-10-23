@@ -103,7 +103,7 @@ $(AQPLUS): $(DEPS)
 $(AQPLUS_BOOT): $(DEPS)
 	@mkdir -p $(@D)
 	$(ZCC) +aquarius -clib=aqplus -subtype=aqxboot -create-app $(COMMON) -pragma-include:target/aqplus/zpragma_aqxboot.inc \
-	    -Itarget/aqplus -DTARGET_AQPLUS -Ca-DTARGET_AQPLUS -Ca-DAQ_VIDEO_BANK2 -Ca-DAQ_BANK2_PAGE=58 $(GAME) $(ENTROPY) $(MENU) $(NOSOUND) $(FIELDS) $(AQPLUS_PLATFORM) -o $(@D)/simcity.bin
+	    -Itarget/aqplus -DTARGET_AQPLUS -Ca-DTARGET_AQPLUS -Ca-DAQ_VIDEO_BANK2 $(GAME) $(ENTROPY) $(MENU) $(NOSOUND) $(FIELDS) $(AQPLUS_PLATFORM) -o $(@D)/simcity.bin
 	@for s in _aq_blit8 aq_cell _plat_put _plat_clear _plat_init _font_8x8_bbc_system _view_tile_art _aq_icons; do \
 	    v=`sed -n "s/^$$s *= \$$\([0-9A-Fa-f]*\).*/\1/p" $(@D)/simcity.map | head -1`; \
 	    [ -z "$$v" ] || [ $$(( 0x$$v )) -lt 32768 ] || { echo "$$s is not below $$8000 (at $$v)"; rm -f $@; exit 1; }; done
