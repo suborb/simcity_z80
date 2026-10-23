@@ -1,0 +1,31 @@
+/* MGT SAM Coupe capabilities for the shared game UI: screen mode 4, 256x192 pixels of 16 colours, used as 32 columns of 8x8
+   cells (target/sam/plat_sam.asm). */
+#ifndef PLAT_CONFIG_H
+#define PLAT_CONFIG_H
+
+#define HAVE_TILES
+#define HAVE_BITMAP
+#define HAVE_POPUP_MENU     /* shared box + message selector over the bitmap */
+#define HAVE_FILES          /* saving and loading a city as a SAMDOS file */
+#define FILE_NAME_MAX 10    /* SAMDOS names are 10 characters */
+#define HAVE_BUDGET
+#define HAVE_EVALUATION
+#define MODAL_COLS 32          /* a 32 column display: the budget and evaluation screens use 32 columns of the 24 rows */
+#define MODAL_ROWS 24
+#define FMT_WIDTH 32            /* a row of a table screen: the display's width (and -Ca-DFMT_WIDTH=32: the Makefile) */
+#define HAVE_MINIMAP
+#define HAVE_MINIMAP_NATIVE    /* the whole city, every other row, in colour (plat_put_minirow) */
+#define HAVE_NARROW_TITLE      /* the level menu a line to a choice (ui/game.c) */
+#define HAVE_CLEAR_MAP          /* a mini map clears the screen below the panel only (plat_clear_map) */
+#define HAVE_DEMAND_BARS        /* the R, C and I demand as coloured bar charts (plat_demand) */
+#define HAVE_SPRITES
+#define HAVE_SPRITE_OVERLAY     /* the sprites go over the baked tiles, which have colours */
+#define HAVE_ICONS              /* the tools as 16x16 pictures */
+#define HAVE_ICONS_TOP          /* status panel across the top of the display */
+#define HAVE_ICONS_2X7          /* ... with the icons in two rows of seven, 24x14 pixels each (ui/game.c) */
+#define PLAT_FIXED_COLS 32
+#define PLAT_FIXED_ROWS 24
+#define MAX_VIEW_W 32
+#define MAX_VIEW_H 17
+
+#endif

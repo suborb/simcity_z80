@@ -42,6 +42,7 @@ AQPLUS_PLATFORM = target/aqplus/plat_aqplus.c target/aqplus/plat_aqplus.asm
 ZX_PLATFORM = target/zx/plat_zx.asm
 MULTI8_PLATFORM = target/multi8/plat_multi8.c target/multi8/plat_multi8.asm
 PC88_PLATFORM = target/pc88/plat_pc88.c target/pc88/plat_pc88.asm target/pc88/plat_pc88_files.asm
+SAM_PLATFORM_NOFILES = target/sam/plat_sam.c target/sam/plat_sam.asm
 Z88_PLATFORM = target/z88/plat_z88.c target/z88/plat_z88.asm
 
 
@@ -55,6 +56,7 @@ Z88ROM = build/z88rom/simcity.epr
 ZX     = build/zx/simcity.tap
 MULTI8 = build/multi8/simcity.cas
 PC88   = build/pc88/simcity.d88
+SAM    = build/sam/simcity.mgt
 TEST   = build/test/simcity.bin
 TESTP  = build/testpanel/simcity.bin
 TESTM  = build/testmodal/simcity.bin
@@ -66,15 +68,16 @@ TESTK  = build/testnative/simcity.bin
 TESTA  = build/testart/simcity.bin
 TESTSC = build/testscroll/simcity.bin
 
-.PHONY: all aqplus z88rom zx multi8 pc88 test testpanel testmodal testnarrow testsprites testoverlay testhires testnative testart testscroll check golden uitest tiletest z88test engine deadcode clean
+.PHONY: all aqplus z88rom zx multi8 pc88 sam test testpanel testmodal testnarrow testsprites testoverlay testhires testnative testart testscroll check golden uitest tiletest z88test engine deadcode clean
 
-all: aqplus z88rom zx multi8 pc88
+all: aqplus z88rom zx multi8 pc88 sam
 
 aqplus: $(AQPLUS)
 z88rom: $(Z88ROM)
 zx:     $(ZX)
 multi8: $(MULTI8)
 pc88:   $(PC88)
+sam:    $(SAM)
 test:   $(TEST)
 testpanel: $(TESTP)
 testmodal: $(TESTM)
@@ -163,6 +166,31 @@ $(PC88): $(DEPS) build/common/tiles_640x200_3bpp.bin build/common/minitiles_640x
 	@# the placer's variables must be in the low RAM: the screen is paged over $$C000-$$FFFF while it draws
 	@v=`sed -n 's/^mm_src *= \$$\([0-9A-Fa-f]*\).*/\1/p' $(@D)/simcity.map`; \
 	    [ -n "$$v" ] && [ $$(( 0x$$v )) -lt 49152 ] || { echo "the placer's variables are not below $$C000 (mm_src at $$v)"; rm -f $@; exit 1; }
+
+# The MGT SAM Coupe in its all RAM mode, screen mode 4 (256x192, 16 colours): the program, its data and its stack in the low 32 KB, the
+# uninitialised data in the next 32 KB (which the startup code pages in over $8000-$FFFF), and the baked pictures in the 32 KB after that,
+# where the placer pages them in a picture at a time (the screen is paged over the data window to draw).  The disk image is that
+# one file, padded to a block boundary, so the loader's pages follow each other.
+SAM_BSS = 0x9000        # the code and the placer's variables are in the low 32 KB; the rest of the image may run on into the high window, and the uninitialised data starts after it
+
+$(SAM): $(DEPS) build/sam/tiles.bin
+	@mkdir -p $(@D)
+	$(ZCC) +sam -subtype=allram $(COMMON) -pragma-include:target/sam/zpragma.inc \
+	    -Itarget/sam -DTARGET_SAM -Ca-DTARGET_SAM -Ca-D__crt_org_bss=$(SAM_BSS) -Ca-DFMT_WIDTH=32 target/sam/plat_sam_files.asm $(GAME) $(ENTROPY) $(MENU) $(NOSOUND) $(FIELDS) $(MMNATIVE) $(LINEEDIT) $(SAM_PLATFORM_NOFILES) -o $(@D)/simcity.bin
+	@size=`wc -c < $(@D)/simcity.bin`; echo "sam image: $$size bytes (the uninitialised data starts at $$(( $(SAM_BSS) )))"; \
+	    [ $$size -le $$(( $(SAM_BSS) )) ] || { echo "the image runs into the uninitialised data"; rm -f $@; exit 1; }
+	@# the placer's variables must be in the low 32 KB: the screen is paged over the high window while it draws
+	@v=`sed -n 's/^mp_pix *= \$$\([0-9A-Fa-f]*\).*/\1/p' $(@D)/simcity.map`; \
+	    [ -n "$$v" ] && [ $$(( 0x$$v )) -lt 32768 ] || { echo "the placer's variables are not below $$8000 (mp_pix at $$v)"; rm -f $@; exit 1; }
+	@# the file code's buffer is in one 16 KB page of the data (the DOS takes a page and an offset): $$8000-$$BFFF
+	@v=`sed -n 's/^fs_stage *= \$$\([0-9A-Fa-f]*\).*/\1/p' $(@D)/simcity.map`; \
+	    [ -n "$$v" ] && [ $$(( 0x$$v )) -ge 32768 ] && [ $$(( 0x$$v + 9500 )) -le 49152 ] || { echo "the file buffer is not within $$8000-$$BFFF (fs_stage at $$v)"; rm -f $@; exit 1; }
+	python3 -c "import sys; d = open('$(@D)/simcity.bin', 'rb').read(); d += bytes(65536 - len(d)) + open('build/sam/tiles.bin', 'rb').read(); open('$(@D)/simcity.all', 'wb').write(d)"
+	z88dk-appmake +mgt -b $(@D)/simcity.all --org 0 --exec --default-dosfile $$ZCCCFG/../target/sam/classic/samdos2.bin -o $@
+
+build/sam/tiles.bin: assets/st_tiles.bin assets/st_icons.bin tools/st_tiles_3bpp.py
+	@mkdir -p $(@D)
+	python3 tools/st_tiles_3bpp.py assets/st_tiles.bin --icons assets/st_icons.bin --sam $@
 
 # Headless: a scripted keyboard and a screen in RAM instead of the console, run under z88dk-ticks.
 $(TEST): $(DEPS)

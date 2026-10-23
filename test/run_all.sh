@@ -61,4 +61,10 @@ status=0
 for t in aqplus z88rom zx multi8; do
     if make -s $t >/dev/null 2>&1; then echo "built $t"; else echo "FAIL  build $t"; status=1; fi
 done
+if [ -n "$SAM_MAME" ]; then
+    echo "== SAM Coupe: save a city as a SAMDOS file and load it back (MAME in \$SAM_MAME; make sam first)"
+    test/sam/roundtrip.sh || status=1
+else
+    echo "== SAM Coupe file round trip skipped (set SAM_MAME to the MAME directory)"
+fi
 exit $status
