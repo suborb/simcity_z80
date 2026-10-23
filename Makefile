@@ -29,6 +29,8 @@ MENU    = ui/menu.c
 # The native pixel mini map's row builder, in assembler (HAVE_MINIMAP_NATIVE): for 640x200 screens of 3 bits a pixel (three planes,
 # 8 colours): the Multi 8, the PC-8801, and the headless tests of it
 MMNATIVE = target/common/minimap_640x200_3bpp.asm
+# The file name editor of the targets that draw their own text (in assembler: the Multi 8 and the PC-8801)
+LINEEDIT = target/common/line_editor.asm
 # The table drawing of the screens, in assembler: for the targets that have HAVE_FIELDS (see ui/platform.h).
 FIELDS  = ui/fmtfields.asm
 # The sound hooks the engine calls: the platform's own, or none.
@@ -39,7 +41,7 @@ CONSOLE = platform/console/plat_console.c platform/console/plat_font.asm
 AQPLUS_PLATFORM = target/aqplus/plat_aqplus.c target/aqplus/plat_aqplus.asm
 ZX_PLATFORM = target/zx/plat_zx.asm
 MULTI8_PLATFORM = target/multi8/plat_multi8.c target/multi8/plat_multi8.asm
-PC88_PLATFORM = target/pc88/plat_pc88.c target/pc88/plat_pc88.asm
+PC88_PLATFORM = target/pc88/plat_pc88.c target/pc88/plat_pc88.asm target/pc88/plat_pc88_files.asm
 Z88_PLATFORM = target/z88/plat_z88.c target/z88/plat_z88.asm
 
 
@@ -129,7 +131,7 @@ MULTI8_BSS = 0xA900     # (its end, about $F750, is below the doubling table at 
 $(MULTI8): $(DEPS) build/common/tiles_640x200_3bpp.bin build/common/minitiles_640x200_3bpp.bin
 	@mkdir -p $(@D)
 	$(ZCC) +multi8 -subtype=64k -create-app $(COMMON) -pragma-include:target/multi8/zpragma.inc \
-	    -Itarget/multi8 -DTARGET_MULTI8 -Ca-DTARGET_MULTI8 -Ca-D__crt_org_bss=$(MULTI8_BSS) -Ca-DHAVE_MINIMAP_ART $(GAME) $(ENTROPY) $(MENU) $(NOSOUND) $(FIELDS) $(MMNATIVE) $(MULTI8_PLATFORM) -o $(@D)/simcity
+	    -Itarget/multi8 -DTARGET_MULTI8 -Ca-DTARGET_MULTI8 -Ca-D__crt_org_bss=$(MULTI8_BSS) -Ca-DHAVE_MINIMAP_ART $(GAME) $(ENTROPY) $(MENU) $(NOSOUND) $(FIELDS) $(MMNATIVE) $(LINEEDIT) $(MULTI8_PLATFORM) -o $(@D)/simcity
 	@size=`wc -c < $(@D)/simcity`; echo "multi8 image: $$size bytes (limit $$(( $(MULTI8_BSS) )))"; \
 	    [ $$size -le $$(( $(MULTI8_BSS) )) ] || { echo "the image runs into the uninitialised data"; rm -f $@; exit 1; }
 	@# the placer's variables must be in the low RAM: the planes are paged over $8000-$BFFF while it draws
@@ -145,7 +147,7 @@ PC88_IMAGE_LIMIT = 0xB100       # (the doubling table is at $B100-$B2FF, and the
 $(PC88): $(DEPS) build/common/tiles_640x200_3bpp.bin build/common/minitiles_640x200_3bpp.bin
 	@mkdir -p $(@D)
 	$(ZCC) +pc88 -subtype=disk $(PC88_CLIB) -create-app $(COMMON) -pragma-include:target/pc88/zpragma.inc \
-	    -Itarget/pc88 -DTARGET_PC88 -Ca-DTARGET_PC88 -Ca-D__crt_org_bss=$(PC88_BSS) -Ca-DHAVE_MINIMAP_ART $(GAME) $(ENTROPY) $(MENU) $(NOSOUND) $(FIELDS) $(MMNATIVE) $(PC88_PLATFORM) -o $(@D)/simcity.bin
+	    -Itarget/pc88 -DTARGET_PC88 -Ca-DTARGET_PC88 -Ca-D__crt_org_bss=$(PC88_BSS) -Ca-DHAVE_MINIMAP_ART $(GAME) $(ENTROPY) $(MENU) $(NOSOUND) $(FIELDS) $(MMNATIVE) $(LINEEDIT) $(PC88_PLATFORM) -o $(@D)/simcity.bin
 	@size=`wc -c < $(@D)/simcity.bin`; echo "pc88 image: $$size bytes (limit $$(( $(PC88_IMAGE_LIMIT) )))"; \
 	    [ $$size -le $$(( $(PC88_IMAGE_LIMIT) )) ] || { echo "the image runs into the stack"; rm -f $@; exit 1; }
 	@# the placer's variables must be in the low RAM: the screen is paged over $$C000-$$FFFF while it draws

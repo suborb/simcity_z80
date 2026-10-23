@@ -32,6 +32,9 @@ echo
 echo "== PC-8801 placer: plane paging and the ALU, V1 and V2"
 python3 test/pc88/run.py
 echo
+echo "== PC-8801 file routines and the file name editor (a disk in memory, scripted keys)"
+python3 test/pc88/files.py
+echo
 echo "== PC-8801 disk routines against the real disk unit (MAME; skipped without PC88_ROMS)"
 python3 test/pc88/disk.py
 echo

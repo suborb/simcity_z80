@@ -91,30 +91,6 @@ uint8_t plat_file_load(const char *name, uint8_t *a, uint16_t alen, uint8_t *b, 
         return 1;
     return (uint16_t)tape_load_to(b, blen) == blen ? 0 : 2;
 }
-
-/* A tiny editor for file names, drawing with the placer. */
-uint8_t plat_text_input(uint8_t col, uint8_t row, char *buf, uint8_t max, uint8_t spaces)
-{
-    uint8_t n = 0, k;
-
-    buf[0] = 0;
-    for (;;) {
-        k = wait_key();
-        if (k == KEY_ENTER)
-            return n != 0;
-        if (k == KEY_ESC)
-            return 0;
-        if ((k == KEY_LEFT || k == 127) && n) {
-            --n;
-            plat_put((uint8_t)(col + n), row, ' ');
-        } else if (k >= (spaces ? ' ' : '!') && k < 127 && n < max) {
-            buf[n] = (char)k;
-            plat_put((uint8_t)(col + n), row, k);
-            ++n;
-        }
-        buf[n] = 0;
-    }
-}
 #endif
 
 uint16_t plat_clock(void) { return clock_count; }
