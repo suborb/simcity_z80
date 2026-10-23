@@ -68,6 +68,17 @@ def build_hires_minimap():
     return open(os.path.join(out, 'simcity.bin'), 'rb').read(), syms
 
 
+def build_scroll():
+    out = os.path.join(ROOT, 'build', 'testscroll')
+    subprocess.run(['make', '-s', '-C', ROOT, 'build/testscroll/simcity.bin'], check=True, capture_output=True)
+    syms = {}
+    for line in open(os.path.join(out, 'simcity.map')):
+        m = re.match(r'(\S+)\s*=\s*\$([0-9A-Fa-f]+)', line)
+        if m:
+            syms[m.group(1)] = int(m.group(2), 16)
+    return open(os.path.join(out, 'simcity.bin'), 'rb').read(), syms
+
+
 def build_native_minimap():
     out = os.path.join(ROOT, 'build', 'testnative')
     subprocess.run(['make', '-s', '-C', ROOT, 'build/testnative/simcity.bin'], check=True, capture_output=True)
@@ -453,6 +464,22 @@ def main():
     after_page_key = run(hbin, hsyms, [LEVEL_MEDIUM, PAUSE, KEY_M, KEY_UP] + [0] * 12)
     d = differences(bitmaps(after_page_key, hsyms, 40, 8, 152, 6), reference(after_page_key, 1, 0, 152, hsyms), 0)
     check('high-resolution mini map: up shows the remaining top strip of the city', not d, f'{len(d)} pixels differ, first {d[:4]}')
+    # --- 6b. scrolling the map by moving its pixels (HAVE_SCROLL): the same picture as drawing every cell ---
+    sbin, ssyms = build_scroll()
+    script = [LEVEL_MEDIUM, PAUSE] + moves(30, 0) + moves(0, 22) + moves(-26, 0) + moves(0, -30) + moves(12, 12) + moves(-3, 40) + [0] * 10
+    plain = run(hbin, hsyms, script)
+    moved = run(sbin, ssyms, script)
+
+    def map_pictures(mem, symbols):
+        b = symbols['_test_bitmap']
+        return mem[b + 6 * 40 * 8:b + 25 * 40 * 8]
+
+    scrolls = moved[ssyms['_test_scrolls']] | moved[ssyms['_test_scrolls'] + 1] << 8
+    diff = [i for i, (a, b) in enumerate(zip(map_pictures(plain, hsyms), map_pictures(moved, ssyms))) if a != b]
+    check('scrolling by moving pixels: the map is drawn %d times by scrolling, and is the same picture as drawing every cell' % scrolls,
+          scrolls > 10 and not diff,
+          f'{scrolls} scrolls; {len(diff)} bytes differ, first cells (col,row) {sorted({((i // 8) % 40, (i // 8) // 40) for i in diff})[:8]}')
+
     # --- 6b. the pop-up menu and the file dialogues are boxes in the middle of the map (rows 6..24), not the screen ---
     def box_rows(m, text=None):
         """The screen's rows, and the first and last row of the box (the one round `text`, the screen's lowest row

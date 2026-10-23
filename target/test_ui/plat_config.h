@@ -6,6 +6,10 @@
 #ifndef PLAT_CONFIG_H
 #define PLAT_CONFIG_H
 
+#ifdef TEST_SCROLL                      /* the Aquarius+-shaped screen, whose platform can scroll the map by moving its pixels */
+#define TEST_HIRES_MINIMAP
+#define HAVE_SCROLL
+#endif
 #ifdef TEST_NATIVE_ART                  /* ... with the tiles' own pictures at a quarter of the size */
 #define TEST_NATIVE_MINIMAP
 #define HAVE_MINIMAP_ART

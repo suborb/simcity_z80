@@ -106,7 +106,9 @@ extern void     plat_flush(void);               /* end of frame: show what was d
                        panel then has the advisor message on row 6 and no key tips
      HAVE_ICONS_TOP    with HAVE_ICONS: the date, funds and population are on row 0, the icons in rows 1 and 2, then
                        the tool, the demand bars and the advisor: a six row panel (no text window; ui/game.c)
-     HAVE_MENUS        menus of its own, which have quit: the X key does not quit there, ESC leaves a mini map,
+     HAVE_SCROLL       the platform can move the map's pixels (plat_scroll()), so a scroll draws only the new cells (used when
+                     the map is as wide as the screen)
+   HAVE_MENUS        menus of its own, which have quit: the X key does not quit there, ESC leaves a mini map,
                        and the cursor keys move (Q, A, O and P do not)
      HAVE_POPUP_MENU   use the shared console box + message selector (ui/menu.c): ESC opens it over the city, centred in the
                        map; the file dialogues (ui/prompt.c) are boxes too.  Do not set this on a platform with native
@@ -161,6 +163,13 @@ extern void     plat_icons(uint8_t selected);
               byte, where its engine art (assets/map_art_aq.bin, tools/make_aq_assets.py) comes converted
      inverse  1 for the blinking cursor: the picture with its pixels inverted */
 extern void     plat_put_tile(uint8_t col, uint8_t row, const uint8_t *art, uint8_t attr, uint8_t inverse);
+#endif
+
+#ifdef HAVE_SCROLL
+/* plat_scroll() scrolls the map (cell rows row to row + rows - 1, the whole width): the view's origin moved by (dx, dy), so
+   what was in cell (x, y) is now in (x - dx, y - dy).  The cells that come into view are left undefined; the game draws them.
+   The platform keeps what it knows of the cells in step.  |dx| < width, |dy| < rows. */
+extern void     plat_scroll(uint8_t row, uint8_t rows, int8_t dx, int8_t dy);
 #endif
 
 #ifdef HAVE_SPRITE_OVERLAY

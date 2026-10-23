@@ -182,6 +182,22 @@ void plat_put_tile(uint8_t col, uint8_t row, const uint8_t *art, uint8_t attr, u
 }
 #endif
 
+#ifdef HAVE_SCROLL
+/* The scroll on the picture memory; the cells that come into view hold a mark the game must draw over. */
+uint16_t test_scrolls;
+void plat_scroll(uint8_t row, uint8_t rows, int8_t dx, int8_t dy)
+{
+    int16_t x, y, i;
+    uint8_t (*b)[COLS][8] = test_bitmap + row;
+
+    ++test_scrolls;
+    for (y = dy > 0 ? 0 : rows - 1; y >= 0 && y < rows; y += dy > 0 ? 1 : -1)
+        for (x = dx > 0 ? 0 : COLS - 1; x >= 0 && x < COLS; x += dx > 0 ? 1 : -1)
+            for (i = 0; i < 8; ++i)
+                b[y][x][i] = (x + dx >= 0 && x + dx < COLS && y + dy >= 0 && y + dy < rows) ? b[y + dy][x + dx][i] : 0xA5;
+}
+#endif
+
 #ifdef HAVE_SPRITE_OVERLAY
 /* A platform that draws a sprite over its tile: the picture's own pixels are ORed in (which is what the composite was) */
 void plat_put_overlay(uint8_t col, uint8_t row, const uint8_t *art)

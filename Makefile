@@ -61,8 +61,9 @@ TESTO  = build/testoverlay/simcity.bin
 TESTH  = build/testhires/simcity.bin
 TESTK  = build/testnative/simcity.bin
 TESTA  = build/testart/simcity.bin
+TESTSC = build/testscroll/simcity.bin
 
-.PHONY: all aqplus z88rom zx multi8 pc88 test testpanel testmodal testnarrow testsprites testoverlay testhires testnative testart check golden uitest tiletest z88test engine deadcode clean
+.PHONY: all aqplus z88rom zx multi8 pc88 test testpanel testmodal testnarrow testsprites testoverlay testhires testnative testart testscroll check golden uitest tiletest z88test engine deadcode clean
 
 all: aqplus z88rom zx multi8 pc88
 
@@ -80,6 +81,7 @@ testoverlay: $(TESTO)
 testhires: $(TESTH)
 testnative: $(TESTK)
 testart: $(TESTA)
+testscroll: $(TESTSC)
 
 $(AQPLUS): $(DEPS)
 	@mkdir -p $(@D)
@@ -181,6 +183,11 @@ $(TESTO): $(DEPS)
 $(TESTH): $(DEPS)
 	@mkdir -p $(@D)
 	$(ZCC) +test $(COMMON) -Itarget/test_ui  -DTEST_HIRES_MINIMAP $(GAME) $(MENU) $(NOSOUND) $(FIELDS) target/test_ui/plat_test.c -o $@
+
+# The same with the map scrolled by moving its pixels (HAVE_SCROLL): the test compares it with the one that draws it all.
+$(TESTSC): $(DEPS)
+	@mkdir -p $(@D)
+	$(ZCC) +test $(COMMON) -Itarget/test_ui  -DTEST_SCROLL $(GAME) $(MENU) $(NOSOUND) $(FIELDS) target/test_ui/plat_test.c -o $@
 
 # The same with the Multi 8's mini map, a colour a tile (HAVE_MINIMAP_NATIVE).
 $(TESTK): $(DEPS)

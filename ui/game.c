@@ -404,6 +404,52 @@ static void draw_footprint(int16_t cx, int16_t cy, uint8_t size)   /* view cells
                 draw_cell((uint8_t)x, (uint8_t)y);
 }
 
+#ifdef HAVE_SCROLL
+/* The view's origin has moved a few cells: the platform moves its pixels (plat_scroll) and only the cells that come into view
+   are drawn.  The cursor and sprites move with the picture; the cursor's old cells are redrawn if it moved. */
+static int8_t scroll_dx, scroll_dy;
+
+static uint8_t scroll_or_full(uint8_t full, uint8_t last_ox, uint8_t last_oy)
+{
+    int16_t dx = (int16_t)origin_x - last_ox, dy = (int16_t)origin_y - last_oy;
+
+    if (full && last_cx != 255 && view_w == plat_cols() && dx > -(int16_t)view_w && dx < view_w && dy > -(int16_t)view_h && dy < view_h) {
+        scroll_dx = (int8_t)dx;
+        scroll_dy = (int8_t)dy;
+        return 2;
+    }
+    return full;
+}
+
+static void scroll_view(void)
+{
+    uint8_t x, y, y0, y1;
+
+    plat_scroll(map_row, view_h, scroll_dx, scroll_dy);
+    if (scroll_dy) {
+        y0 = scroll_dy > 0 ? (uint8_t)(view_h - scroll_dy) : 0;
+        y1 = scroll_dy > 0 ? view_h : (uint8_t)-scroll_dy;
+        for (y = y0; y < y1; ++y)
+            for (x = 0; x < view_w; ++x)
+                draw_cell(x, y);
+    }
+    if (scroll_dx)
+        for (y = 0; y < view_h; ++y) {
+            if (scroll_dy && y >= y0 && y < y1)
+                continue;
+            if (scroll_dx > 0)
+                for (x = (uint8_t)(view_w - scroll_dx); x < view_w; ++x)
+                    draw_cell(x, y);
+            else
+                for (x = 0; x < (uint8_t)-scroll_dx; ++x)
+                    draw_cell(x, y);
+        }
+    if (last_cx < view_w && last_cy < view_h)
+        draw_footprint((int16_t)last_cx - scroll_dx, (int16_t)last_cy - scroll_dy, last_size);
+    last_cx = 254;                          /* (255 means a full pass) */
+}
+#endif
+
 static void draw_view(uint8_t full, uint8_t dirty)
 {
     static uint8_t refresh_row;
@@ -412,7 +458,11 @@ static void draw_view(uint8_t full, uint8_t dirty)
 #ifdef DRAW_SPRITES
     sprites_collect(sprites, frame);
 #endif
-    if (full) {
+#ifdef HAVE_SCROLL
+    if (full == 2)
+        scroll_view();
+#endif
+    if (full == 1) {
         for (cy = 0; cy < view_h; ++cy)
             for (cx = 0; cx < view_w; ++cx)
                 draw_cell(cx, cy);
@@ -437,7 +487,7 @@ static void draw_view(uint8_t full, uint8_t dirty)
         }
     }
 #ifdef DRAW_SPRITES
-    if (!full)                              /* a sprite that moved, changed or went: its old cells and its new */
+    if (full != 1)                          /* a sprite that moved, changed or went: its old cells and its new */
         for (cx = 0; cx < MAX_SPRITES; ++cx)
             if (memcmp(&sprites[cx], &last_sprites[cx], sizeof(struct sprite))) {
                 if (last_sprites[cx].on)
@@ -1345,6 +1395,9 @@ static void play_city(void)
         }
 #ifndef HAVE_ICONS_TOP
         full = origin_x != last_ox || origin_y != last_oy || last_cx == 255;
+#ifdef HAVE_SCROLL
+        full = scroll_or_full(full, last_ox, last_oy);
+#endif
         last_ox = origin_x;
         last_oy = origin_y;
         if (map_view) {
@@ -1373,6 +1426,9 @@ static void play_city(void)
         }
 #ifdef HAVE_ICONS_TOP                  /* the panel is at the top: it is drawn first, so a new screen does not show the map before it */
         full = origin_x != last_ox || origin_y != last_oy || last_cx == 255;
+#ifdef HAVE_SCROLL
+        full = scroll_or_full(full, last_ox, last_oy);
+#endif
         last_ox = origin_x;
         last_oy = origin_y;
         if (map_view) {
