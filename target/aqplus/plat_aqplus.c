@@ -262,7 +262,7 @@ void plat_put_minirow(uint8_t ty, const uint8_t *colours, const uint8_t *base, u
         for (cx = 0; cx < 24; ++cx)
             for (i = 0; i < 4; ++i) {
                 c = (uint8_t)(colours[cx * 4 + i] & 7);
-                w = dens ? c : c == 2 ? 2 : c == 7 ? 1 : 0;
+                w = dens ? c : c == 2 ? 2 : c == 6 ? 1 : 0;      /* power: the builder has unpowered buildings 2 and powered tiles 6 */
                 if (w > mm_cell[cx])
                     mm_cell[cx] = w;
             }

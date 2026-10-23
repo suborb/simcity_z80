@@ -59,21 +59,8 @@ def main():
     b = src.index('#endif', src.rindex('plat_minimap_key')) + len('#endif')
     block = src[a:b]
     rng = random.Random(5)
-    rows = []                                                      # (ty, view, usebase, colours, base)
-    for view in (1, 2, 3, 4, 5, 6, 7, 8):
-        for cell_row in (0, 7, 23):                                 # whole cell rows, in order, as the game draws them
-            for k in range(4):
-                ty = cell_row * 4 + k
-                dens = view in (2, 3, 4, 5, 8)
-                colours = [rng.randrange(8) for _ in range(96)]
-                if view == 6:
-                    colours = [rng.choice((0, 1, 2, 7)) for _ in range(96)]
-                if view == 7:
-                    colours = [rng.choice((0, 1, 7)) for _ in range(96)]
-                if cell_row == 7 and k == 0 and dens:               # a cell with no density at all
-                    colours = [0 if i < 8 else c for i, c in enumerate(colours)]
-                base = [rng.randrange(8) for _ in range(96)]
-                rows.append((ty, view, 1 if dens else 0, colours, base))
+    ok = True
+    total_rows = 0
     with tempfile.TemporaryDirectory() as tmp:
         open(os.path.join(tmp, 't.c'), 'w').write(DRIVER.replace('BLOCK', block))
         r = subprocess.run(['cc', '-O0', '-w', '-o', os.path.join(tmp, 't'), os.path.join(tmp, 't.c')], capture_output=True, text=True)
@@ -81,40 +68,62 @@ def main():
             print(r.stderr)
             print('FAIL  the mini map block does not compile on the host')
             return 1
-        stdin = ''.join(f'{ty} {view} {ub} ' + ' '.join(map(str, c)) + ' ' + ' '.join(map(str, bs)) + '\n' for ty, view, ub, c, bs in rows)
-        out = subprocess.run([os.path.join(tmp, 't')], input=stdin, capture_output=True, text=True).stdout.split('\n')
+        for view in (1, 2, 3, 4, 5, 6, 7, 8):                       # each view on a fresh page: the views draw over each other
+            rows = []                                                # (ty, view, usebase, colours, base)
+            for cell_row in (0, 7, 23):                              # whole cell rows, in order, as the game draws them
+                modes = [rng.choice(('none', 'powered', 'unpowered')) for _ in range(24)]       # (power: what is in each cell)
+                for k in range(4):
+                    ty = cell_row * 4 + k
+                    dens = view in (2, 3, 4, 5, 8)
+                    colours = [rng.randrange(8) for _ in range(96)]
+                    if view == 6:                                   # the builder: 6 a powered tile, 2 a building without power
+                        pool = {'none': (0, 1), 'powered': (0, 1, 6), 'unpowered': (0, 1, 6, 2)}
+                        colours = [rng.choice(pool[modes[i // 4]]) for i in range(96)]
+                        for cx in range(24):                        # (an unpowered cell has one for certain, in its first row)
+                            if modes[cx] == 'unpowered' and k == 0:
+                                colours[cx * 4] = 2
+                    if view == 7:
+                        colours = [rng.choice((0, 1, 7)) for _ in range(96)]
+                    if cell_row == 7 and k == 0 and dens:           # a cell with no density at all
+                        colours = [0 if i < 8 else c for i, c in enumerate(colours)]
+                    base = [rng.randrange(8) for _ in range(96)]
+                    rows.append((ty, view, 1 if dens else 0, colours, base))
+            total_rows += len(rows)
+            stdin = ''.join(f'{ty} {v} {ub} ' + ' '.join(map(str, c)) + ' ' + ' '.join(map(str, bs)) + '\n' for ty, v, ub, c, bs in rows)
+            out = subprocess.run([os.path.join(tmp, 't')], input=stdin, capture_output=True, text=True).stdout.split('\n')
 
-    # the model: the video page after all the rows were drawn in order (each view's rows over the last one's: so model them in order)
-    page = bytearray(0x4000)
-    cellmax = [0] * 24
-    for ty, view, ub, colours, base in rows:
-        src_c = base if ub else colours
-        cy, r = ty >> 2, (ty & 3) * 2
-        for cx in range(24):
-            b0 = b1 = 0
-            for i in range(4):
-                c = src_c[cx * 4 + i] & 7
-                l0, l1 = (0b11, 0b11) if c in SOLID else ((0b10, 0b01) if c == 1 else (0, 0))
-                b0 = (b0 << 2 | l0) & 0xFF
-                b1 = (b1 << 2 | l1) & 0xFF
-            page[cy * 320 + r * 40 + MM_COL0 + cx] = b0
-            page[cy * 320 + (r + 1) * 40 + MM_COL0 + cx] = b1
-        dens = view in (2, 3, 4, 5, 8)
-        if ty & 3 == 0:
+            # the model, written from the description
+            page = bytearray(0x4000)
             cellmax = [0] * 24
-        for cx in range(24):
-            for i in range(4):
-                c = colours[cx * 4 + i] & 7
-                w = c if dens else (2 if c == 2 else 1 if c == 7 else 0) if view == 6 else 0
-                cellmax[cx] = max(cellmax[cx], w)
-        if ty & 3 == 3:
-            for cx in range(24):
-                page[0x2000 + cy * 40 + MM_COL0 + cx] = DENSITY[cellmax[cx]] if dens else POWER[cellmax[cx]] if view == 6 else 0x70
-    got = bytes.fromhex(next(l for l in out if len(l) == 0x8000))
-    bad = [i for i in range(0x4000) if got[i] != page[i]]
-    ok = not bad
-    print(('PASS' if ok else 'FAIL') + f'  plat_put_minirow: {len(rows)} rows over the eight views: the pixel lines and the cell colours equal the model'
-          + (f' ({len(bad)} bytes differ, first at offset ${bad[0]:04X}: {got[bad[0]]:02X}, wanted {page[bad[0]]:02X})' if bad else ''))
+            for ty, v, ub, colours, base in rows:
+                src_c = base if ub else colours
+                cy, r = ty >> 2, (ty & 3) * 2
+                for cx in range(24):
+                    b0 = b1 = 0
+                    for i in range(4):
+                        c = src_c[cx * 4 + i] & 7
+                        l0, l1 = (0b11, 0b11) if c in SOLID else ((0b10, 0b01) if c == 1 else (0, 0))
+                        b0 = (b0 << 2 | l0) & 0xFF
+                        b1 = (b1 << 2 | l1) & 0xFF
+                    page[cy * 320 + r * 40 + MM_COL0 + cx] = b0
+                    page[cy * 320 + (r + 1) * 40 + MM_COL0 + cx] = b1
+                dens = v in (2, 3, 4, 5, 8)
+                if ty & 3 == 0:
+                    cellmax = [0] * 24
+                for cx in range(24):
+                    for i in range(4):
+                        c = colours[cx * 4 + i] & 7
+                        w = c if dens else (2 if c == 2 else 1 if c == 6 else 0) if v == 6 else 0
+                        cellmax[cx] = max(cellmax[cx], w)
+                if ty & 3 == 3:
+                    for cx in range(24):
+                        page[0x2000 + cy * 40 + MM_COL0 + cx] = DENSITY[cellmax[cx]] if dens else POWER[cellmax[cx]] if v == 6 else 0x70
+            got = bytes.fromhex(next(l for l in out if len(l) == 0x8000))
+            bad = [i for i in range(0x4000) if got[i] != page[i]]
+            if bad:
+                print(f'FAIL  view {view}: {len(bad)} bytes differ, first at offset ${bad[0]:04X}: {got[bad[0]]:02X}, wanted {page[bad[0]]:02X}')
+                ok = False
+    print(('PASS' if ok else 'FAIL') + f'  plat_put_minirow: {total_rows} rows over the eight views, each on a fresh page: the pixel lines and the cell colours equal the model')
     keys = [l for l in out if l.startswith('blit') or l.startswith('text')]
     has = lambda s: any(s in l for l in keys)
     ok2 = has('text 28 6 LOW') and has('text 28 14 HIGH') and has('text 29 6 BUILT') and has('text 29 7 NO PWR') and \
