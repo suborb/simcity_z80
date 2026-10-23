@@ -6,6 +6,7 @@
 #define HAVE_TILES
 #define HAVE_BITMAP
 #define HAVE_POPUP_MENU     /* shared box + message selector over the bitmap */
+#define HAVE_FILES          /* saving and loading a city on the disk */
 #define HAVE_BUDGET
 #define HAVE_EVALUATION
 #define MODAL_ROWS 24          /* budget and evaluation use the full 40x24 text area */

@@ -32,6 +32,9 @@ echo
 echo "== PC-8801 placer: plane paging and the ALU, V1 and V2"
 python3 test/pc88/run.py
 echo
+echo "== PC-8801 disk routines against the real disk unit (MAME; skipped without PC88_ROMS)"
+python3 test/pc88/disk.py
+echo
 echo "== z88dk's Multi 8 tape routines (tape_save, tape_load_to)"
 python3 test/multi8/tape.py
 echo
