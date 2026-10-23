@@ -233,7 +233,7 @@ extern void aq_vcopy(uint16_t offset, const uint8_t *src, uint8_t n) __smallc;
 extern uint8_t aq_mm_buf[72];
 
 static const uint8_t mm_pattern[8] = { 0, 9, 15, 15, 0, 15, 15, 15 };       /* line 0 in bits 3-2 and line 1 in bits 1-0 */
-static const uint8_t mm_density[8] = { 0x70, 0xBB, 0x44, 0x66, 0x22, 0x33, 0x11, 0x55 };   /* from none (the map, white on black) to the most: a solid cell (ink and paper the same) of dark blue, blue, cyan, green, yellow, red, magenta */
+static const uint8_t mm_density[8] = { 0x70, 0xBB, 0x44, 0x66, 0x22, 0x33, 0x55, 0x11 };   /* from none (the map, white on black) to the most: a solid cell (ink and paper the same) of dark blue, blue, cyan, green, yellow, magenta, red */
 static const uint8_t mm_power[3] = { 0x70, 0x30, 0x10 };                    /* nothing, all powered (yellow), some without (red) */
 static uint8_t mm_cell[24];
 
