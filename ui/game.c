@@ -902,7 +902,10 @@ static const struct field top_alert27[] = {
 };
 
 #ifdef HAVE_MINIMAP_SQUARE
-/* The sidebar of a square mini map (eight columns at the right of the screen): the date, the money, the population, the view,
+#ifndef MM_SIDE_COL
+#define MM_SIDE_COL 24                      /* the sidebar's first column: after the 24 cells of the picture (a wider display can centre them: plat_config.h) */
+#endif
+/* The sidebar of a square mini map (eight columns at the right of the picture): the date, the money, the population, the view,
    its key (the platform's), the demand, the speed and the keys.  Only plat_text_puts() and plat_demand(): a field table would print
    whole rows, picture and all. */
 static const char *const sidebar_names[MM_VIEWS + 1] = {
@@ -919,7 +922,7 @@ static void side_puts(uint8_t row, const char *s)       /* the text padded to th
     while (i < 8)
         b[i++] = ' ';
     b[8] = 0;
-    plat_text_puts(24, row, b);
+    plat_text_puts(MM_SIDE_COL, row, b);
 }
 
 static void side_number(uint8_t row, char lead, const uint8_t *v)
@@ -936,7 +939,7 @@ static void side_number(uint8_t row, char lead, const uint8_t *v)
     while (n < 8)
         b[n++] = ' ';
     b[8] = 0;
-    plat_text_puts(24, row, b);
+    plat_text_puts(MM_SIDE_COL, row, b);
 }
 
 static void draw_map_sidebar(void)
@@ -952,15 +955,15 @@ static void draw_map_sidebar(void)
     while (n < 8)
         b[n++] = ' ';
     b[8] = 0;
-    plat_text_puts(24, 0, b);
+    plat_text_puts(MM_SIDE_COL, 0, b);
     side_number(1, '$', V_money);
     side_puts(2, "POP");
     side_number(3, 0, V_display_population);
     side_puts(5, sidebar_names[map_view]);
     plat_minimap_key(map_view);
-    plat_demand(24, 17, 'R', demand_level(V_RValve, 26));
-    plat_demand(24, 18, 'C', demand_level(V_CValve, 30));
-    plat_demand(24, 19, 'I', demand_level(V_IValve, 30));
+    plat_demand(MM_SIDE_COL, 17, 'R', demand_level(V_RValve, 26));
+    plat_demand(MM_SIDE_COL, 18, 'C', demand_level(V_CValve, 30));
+    plat_demand(MM_SIDE_COL, 19, 'I', demand_level(V_IValve, 30));
     side_puts(21, st_speeds[V_simulation_speed & 3]);
     side_puts(22, "M NEXT");
     side_puts(23, "X BACK");

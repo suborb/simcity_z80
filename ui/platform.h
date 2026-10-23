@@ -255,7 +255,8 @@ extern void     plat_put_minirow(uint8_t sy);
                                            `view`: what a colour is depends on the view, so the platform has its own palette for each.
                                            For a density (pollution, cover, traffic, crime) base has the city's colours of the row, to
                                            show where the density is none (0 otherwise)
-     plat_minimap_key(view)                draws the key to the colours of the view in the sidebar's rows 5 to 15 (columns 24 up)
+     plat_minimap_key(view)                draws the key to the colours of the view in the sidebar's rows 5 to 15 (columns MM_SIDE_COL up: 24, unless
+                                           plat_config.h defines it, to centre the picture and the sidebar on a wider display)
    Opening one clears the whole screen, and the status panel is not drawn while it is open. */
 extern void plat_put_minirow(uint8_t ty, const uint8_t *colours, const uint8_t *base, uint8_t view);
 extern void plat_minimap_key(uint8_t view);

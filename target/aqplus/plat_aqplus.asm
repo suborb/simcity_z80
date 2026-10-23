@@ -266,6 +266,44 @@ aq_col_fill:
         VID_PAGE_OUT
         ret
 
+; void aq_vcopy(uint16_t offset, const uint8_t *src, uint8_t n) __smallc
+; n bytes from src into the video RAM page at `offset` (the bitmap from 0: 40 bytes a pixel row, 320 a cell row; the colour RAM from $2000).
+; src must be below the video window (the mini map's row buffer is: aq_mm_buf, in the code section).
+        PUBLIC  _aq_vcopy
+        PUBLIC  _aq_mm_buf
+_aq_vcopy:
+        ld      hl,2
+        add     hl,sp
+        ld      b,(hl)                  ; n
+        inc     hl
+        inc     hl
+        ld      e,(hl)
+        inc     hl
+        ld      d,(hl)                  ; src
+        inc     hl
+        ld      c,(hl)
+        inc     hl
+        ld      a,(hl)                  ; the offset
+        add     a,VID_BASE
+        ld      h,a
+        ld      l,c                     ; hl = where, de = from
+        ld      a,b
+        or      a
+        ret     z
+        ld      c,b
+        ld      b,0
+        ld      a,20                    ; the video RAM
+        out     (VID_PORT),a
+        ex      de,hl
+        ldir
+        VID_PAGE_OUT
+        ret
+
+; The mini map's row buffers (the pixel lines of a row of tiles, 24 bytes each, then the 24 colour bytes of the cells), in the code section
+; so that it is not under the video RAM.
+_aq_mm_buf:
+        defs    72
+
 ; void plat_exit(void): back to the text screen
         PUBLIC  _plat_exit
 _plat_exit:

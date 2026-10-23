@@ -25,6 +25,7 @@ python3 test/tiles/run.py
 echo
 echo "== Aquarius+ glyph placer and colour tables"
 python3 test/aqplus/run.py
+python3 test/aqplus/minirow.py
 echo
 echo "== Multi 8 placer: three planes, paging and colours"
 python3 test/multi8/run.py

@@ -24,9 +24,9 @@ Z80ASM = 'z88dk-z80asm'
 ROWS, COLS = 25, 40
 
 HARNESS = '''        SECTION code_user
-        org     $8000
+        org     $2000
         PUBLIC  _font_8x8_bbc_system, set_default_palette
-        EXTERN  _aq_blit8, _plat_put_tile, _plat_aq_printc, _plat_puts, _plat_clear, _aq_colours
+        EXTERN  _aq_blit8, _plat_put_tile, _plat_aq_printc, _plat_puts, _plat_clear, _aq_colours, _aq_vcopy
 start:  ld      sp,$7000
         ld      ix,cases
 next:   ld      a,(ix+0)
@@ -75,6 +75,8 @@ nexttext:
         ld      a,(ix+4)
         cp      2
         jr      z,colourrun
+        cp      3
+        jr      z,vcopyrun
         or      a
         jr      nz,onechar
         call    _plat_puts
@@ -93,6 +95,20 @@ colourrun:                              ; aq_colours(col, row, n, colour): the w
         jr      textadvance
 onechar:
         call    _plat_aq_printc
+        jr      textcalled
+vcopyrun:                               ; aq_vcopy(offset, vsrc, n): the record's col is n and its word the offset
+        pop     hl                      ; offset
+        pop     de                      ; (the row: not used)
+        pop     bc                      ; n in c
+        push    hl
+        ld      hl,vsrc
+        push    hl
+        push    bc
+        call    _aq_vcopy
+        ld      hl,6
+        add      hl,sp
+        ld      sp,hl
+        jr      textadvance
 textcalled:
         ld      hl,6
         add     hl,sp
@@ -123,6 +139,7 @@ set_default_palette:
         ret
 _font_8x8_bbc_system:
         BINARY  "font.bin"
+vsrc:   defb    0x11,0x22,0x33,0x44,0x55,0x66,0x77,0x88,0x99,0xAA,0xBB,0xCC,0xDD,0xEE,0xF1,0xF2,0xF3,0xF4,0xF5,0xF6,0xF7,0xF8,0xF9,0xFA
 sp_end: defw    0
 texts:
         TEXTS
@@ -159,6 +176,7 @@ def main():
              (10, 12, 'abcdefghijklmnopqrstuvwxyz{|}~'), (0, 13, '0123456789'),
              (2, 15, '\x01\x05\x05\x02'), (2, 16, '\x06  \x06'), (2, 17, '\x03\x05\x05\x04')]     # a frame: the line pieces are codes 1 to 6
     runs = [(4, 0, 12, 0x31), (0, 24, 40, 0x6A), (30, 5, 10, 0x2F), (39, 7, 1, 0x15), (10, 12, 0, 0x77), (2, 15, 4, 0x4E), (7, 3, 33, 0xB1)]   # (col, row, n, colour)
+    vcopies = [(24, 4), (24, 320 * 3 + 40 * 5 + 4), (24, 0x2000 + 40 * 2 + 4), (1, 0x1F3F), (7, 0x0100)]   # aq_vcopy(offset, vsrc, n)
     chars = [(5, 14, 'A'), (39, 24, '~'), (0, 0, ' '), (20, 20, '@'), (9, 19, '\x04'), (10, 19, '\x06')]
     strings = ''
     tspec = ''
@@ -171,6 +189,8 @@ def main():
         tspec += f'        defb {col},{row}\n        defw {ord(ch)}\n        defb 1\n'
     for col, row, n_cells, colour in runs:                     # the colour of cells already drawn (aq_colours, kind 2)
         tspec += f'        defb {col},{row}\n        defw {n_cells | colour << 8}\n        defb 2\n'
+    for n_bytes, offset in vcopies:                           # aq_vcopy, kind 3: col is n, the word the offset
+        tspec += f'        defb {n_bytes},0\n        defw {offset}\n        defb 3\n'
     tspec += '        defb 255\n' + strings
 
     src = HARNESS.replace('        TEXTS\n', tspec)
@@ -204,9 +224,14 @@ def main():
         for r in range(8):
             bank[row * 320 + r * 40 + col] = glyph(ch, r)
         bank[0x2000 + row * 40 + col] = TEXT_COLOUR
+    vsrc = [0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xF1, 0xF2, 0xF3, 0xF4, 0xF5, 0xF6, 0xF7, 0xF8, 0xF9, 0xFA]
+    for n_bytes, offset in vcopies:                            # (after the colour runs, as the harness does them: the order of the records)
+        pass
     for col, row, n_cells, colour in runs:                     # only the colour bytes change
         for c in range(col, col + n_cells):
             bank[0x2000 + row * 40 + c] = colour
+    for n_bytes, offset in vcopies:
+        bank[offset:offset + n_bytes] = bytes(vsrc[:n_bytes])
 
     with tempfile.TemporaryDirectory() as tmp:
         open(os.path.join(tmp, 'h.asm'), 'w').write(src)
@@ -225,13 +250,13 @@ def main():
             if m:
                 syms[m.group(1)] = int(m.group(2), 16)
         img = bytearray(65536)
-        img[0x8000:0x8000 + len(code)] = code
+        img[0x2000:0x2000 + len(code)] = code
         open(os.path.join(tmp, 'img.bin'), 'wb').write(img)
         # first up to the clear (everything the cells and the text drew), then on through it and the one cell after it
-        subprocess.run([TICKS, '-pc', '8000', '-end', f'{syms["textdone"]:x}', '-counter', '400000000',
+        subprocess.run([TICKS, '-pc', '2000', '-end', f'{syms["textdone"]:x}', '-counter', '400000000',
                         '-output', 'mem0.out', 'img.bin'], cwd=tmp, capture_output=True)
         mem0 = open(os.path.join(tmp, 'mem0.out'), 'rb').read()
-        subprocess.run([TICKS, '-pc', '8000', '-end', f'{syms["textdone"] + 4:x}', '-counter', '400000000',
+        subprocess.run([TICKS, '-pc', '2000', '-end', f'{syms["textdone"] + 4:x}', '-counter', '400000000',
                         '-output', 'mem.out', 'img.bin'], cwd=tmp, capture_output=True)
         mem = open(os.path.join(tmp, 'mem.out'), 'rb').read()
     before = bytes(bank)
