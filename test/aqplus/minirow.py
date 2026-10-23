@@ -4,7 +4,7 @@
 The block between `#ifdef HAVE_MINIMAP_SQUARE` and its `#endif` is cut out of the file and compiled with the host's compiler against stubs of
 the video copy (aq_vcopy writes into a model of the 16 KB video page) and of aq_blit8 and plat_text_puts; random rows of colours go in, and the
 page is compared with a model written here from the description: a tile is a solid 2x2 block for the colours that are something built or a
-road, water is two pixels corner to corner, dirt and trees are black; the cell colours are the paper of the highest density level, red or yellow
+road, water is two pixels corner to corner, dirt and trees are black; the cell colours are the ink of the highest density level (white for none), red or yellow
 for power, white on black otherwise.
 """
 import os
@@ -16,7 +16,7 @@ import tempfile
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 MM_COL0 = 4
-DENSITY = [0x70, 0x7B, 0x74, 0x79, 0x72, 0x0C, 0x03, 0x71]
+DENSITY = [0x70, 0xF0, 0x40, 0x60, 0x20, 0x30, 0x10, 0x50]
 POWER = [0x70, 0x30, 0x10]
 SOLID = {2, 3, 5, 6, 7}
 
@@ -126,7 +126,10 @@ def main():
     print(('PASS' if ok else 'FAIL') + f'  plat_put_minirow: {total_rows} rows over the eight views, each on a fresh page: the pixel lines and the cell colours equal the model')
     keys = [l for l in out if l.startswith('blit') or l.startswith('text')]
     has = lambda s: any(s in l for l in keys)
-    ok2 = has('text 28 6 LOW') and has('text 28 14 HIGH') and has('text 29 6 BUILT') and has('text 29 7 NO PWR') and \
+    blits = [l.split() for l in keys if l.startswith('blit')]                  # blit col row art0 colour: the city's two, the density's seven, power's three
+    swatches = blits[2:9]
+    ok_sw = [int(b[4], 16) for b in swatches] == DENSITY[1:8] and all(b[3] == 'ff' for b in swatches) and [int(b[2]) for b in swatches] == list(range(7, 14))
+    ok2 = ok_sw and has('text 28 6 LOW') and has('text 28 14 HIGH') and has('text 29 6 BUILT') and has('text 29 7 NO PWR') and \
         sum(l.startswith('blit 28') for l in keys) == 2 + 7 + 3
     print(('PASS' if ok2 else 'FAIL') + '  plat_minimap_key: the city, density and power keys draw their swatches and labels at the sidebar column')
     return 0 if ok and ok2 else 1

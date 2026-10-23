@@ -226,14 +226,14 @@ void plat_flush(void) {}
    pixels, white on black.  plat_put_minirow() gets the 96 colours of a row of tiles (0..7 as ui/minimap.c's builder makes them: dirt 0, water 1,
    services 2, industry 3, trees 4, housing 5, shops 6, roads and the like 7) and draws the tile as a solid block when there is something built
    or a road, water as two pixels corner to corner, and nothing for dirt and trees.  A cell has only two colours, so a view's colours are the
-   cell's: for a density its level (the highest in the 4x4 tiles) is the paper under the white map, and for power the cell is red when anything in
+   cell's: for a density its level (the highest in the 4x4 tiles) is the colour of the map's pixels there (white where there is none), and for power the cell is red when anything in
    it has none and yellow when all has. */
 #define MM_COL0 4
 extern void aq_vcopy(uint16_t offset, const uint8_t *src, uint8_t n) __smallc;
 extern uint8_t aq_mm_buf[72];
 
 static const uint8_t mm_pattern[8] = { 0, 9, 15, 15, 0, 15, 15, 15 };       /* line 0 in bits 3-2 and line 1 in bits 1-0 */
-static const uint8_t mm_density[8] = { 0x70, 0x7B, 0x74, 0x79, 0x72, 0x0C, 0x03, 0x71 };   /* ink << 4 | paper, from none to the most */
+static const uint8_t mm_density[8] = { 0x70, 0xF0, 0x40, 0x60, 0x20, 0x30, 0x10, 0x50 };   /* the ink on black, from none (white) to the most: dark grey, blue, cyan, green, yellow, red, magenta */
 static const uint8_t mm_power[3] = { 0x70, 0x30, 0x10 };                    /* nothing, all powered (yellow), some without (red) */
 static uint8_t mm_cell[24];
 
@@ -303,10 +303,10 @@ void plat_minimap_key(uint8_t view)
         key_cell(6, key_solid, 0x70, "ROAD");
         key_cell(7, key_water, 0x70, "WATER");
         break;
-    default:                                /* a density: none, the levels, the most (the paper under the map) */
+    default:                                /* a density: none, the levels, the most (the colour of the map) */
         plat_text_puts(MM_SIDE_COL, 6, "LOW");
         for (i = 1; i < 8; ++i)
-            aq_blit8(MM_SIDE_COL, (uint8_t)(6 + i), key_solid, (uint8_t)((mm_density[i] & 15) << 4), 0);
+            aq_blit8(MM_SIDE_COL, (uint8_t)(6 + i), key_solid, mm_density[i], 0);
         plat_text_puts(MM_SIDE_COL, 14, "HIGH");
         break;
     }
