@@ -97,7 +97,12 @@ aq_cell:
         ld      a,(de)
         ld      (hl),a
         VID_PAGE_OUT
+        IFDEF   HAVE_SOUND
+        EXTERN  ay_poll
+        jp      ay_poll                 ; (the sound's ticks go on while the screen is drawn)
+        ELSE
         ret
+        ENDIF
 
 ; The pixels of the picture at de, inverted, into aq_scratch; de = aq_scratch.  Keeps hl and c.
 aq_invert:

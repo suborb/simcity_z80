@@ -27,6 +27,9 @@ echo "== Aquarius+ glyph placer and colour tables"
 python3 test/aqplus/run.py
 python3 test/aqplus/minirow.py
 echo
+echo "== AY sound effect player"
+python3 test/ay_sfx/run.py
+echo
 echo "== Multi 8 placer: three planes, paging and colours"
 python3 test/multi8/run.py
 echo

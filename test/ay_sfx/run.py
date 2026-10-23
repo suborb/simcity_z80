@@ -1,0 +1,151 @@
+#!/usr/bin/env python3
+"""The AY sound effect player (target/common/ay_sfx.asm) under z88dk-ticks.
+
+Every effect in assets/st_sounds.bin is started and ticked until it has finished and a little more; the writes to the chip's ports (found in
+the instruction trace) are compared tick by tick with what tools/extract_st_sounds.py's own decoder says the packed effect holds: the three
+registers set at the start, then for each tick channel C's tone (two registers), its noise and its volume, then silence.  Also with the
+frame skip that makes 50 Hz of a 60 Hz display (AY_SKIP) and with the Multi 8's ports.
+
+  usage: test/ay_sfx/run.py
+"""
+import os
+import re
+import subprocess
+import sys
+import tempfile
+
+ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+sys.path.insert(0, os.path.join(ROOT, 'tools'))
+import extract_st_sounds as st                      # (its packer and its decoder)
+
+Z80ASM = 'z88dk-z80asm'
+TICKS = 'z88dk-ticks'
+
+HARNESS = '''        SECTION code_user
+        org     $2000
+        EXTERN  ay_start, ay_tick
+start:  ld      sp,$7000
+        ld      ix,plan
+next:   ld      a,(ix+0)                ; the effect
+        cp      255
+        jr      z,fin
+        out     ($FD),a                 ; (a marker: an effect starts)
+        call    ay_start
+        ld      b,(ix+1)                ; the calls of ay_tick
+tloop:  ld      a,b
+        out     ($FE),a                 ; (a marker: a call of ay_tick)
+        push    bc
+        call    ay_tick
+        pop     bc
+        djnz    tloop
+        inc     ix
+        inc     ix
+        jr      next
+fin:    halt
+plan:
+PLAN
+'''
+
+
+def run_trace(effects_ticks, defines, addr_port, data_port):
+    with tempfile.TemporaryDirectory() as tmp:
+        plan = ''.join(f'        defb {e},{t}\n' for e, t in effects_ticks) + '        defb 255\n'
+        open(os.path.join(tmp, 'h.asm'), 'w').write(HARNESS.replace('PLAN\n', plan))
+        out = subprocess.run([Z80ASM, '-b', '-m', '-I' + ROOT] + defines + ['-oh.bin', 'h.asm', os.path.join(ROOT, 'target/common/ay_sfx.asm')],
+                             cwd=tmp, capture_output=True, text=True)
+        if out.returncode or out.stderr.strip():
+            print(out.stdout + out.stderr)
+            return None
+        syms = {}
+        for line in open(os.path.join(tmp, 'h.map')):
+            m = re.match(r'(\S+)\s+= \$([0-9A-F]+) ;', line)
+            if m:
+                syms[m.group(1)] = int(m.group(2), 16)
+        code = open(os.path.join(tmp, 'h_code_user.bin'), 'rb').read()
+        img = bytearray(65536)
+        img[0x2000:0x2000 + len(code)] = code
+        open(os.path.join(tmp, 'img.bin'), 'wb').write(img)
+        with open(os.path.join(tmp, 'trace.txt'), 'w') as tf:
+            subprocess.run([TICKS, '-pc', '2000', '-end', f'{syms["fin"]:x}', '-counter', '400000000', '-trace', 'img.bin'],
+                           cwd=tmp, stdout=tf, stderr=subprocess.DEVNULL)
+        reg_re = re.compile(r'pc=(\w+), \[pc\]=\w+,\s+bc=(\w+),\s+de=(\w+),\s+hl=(\w+),\s+af=(\w+)')
+        ins_re = re.compile(r'^\s+out\s+\(\$([0-9a-fA-F]+)\),a\s+;\[(\w+)\]')
+        a = 0
+        effects, reg = [], 0
+        for line in open(os.path.join(tmp, 'trace.txt'), errors='replace'):
+            if line.startswith('pc='):
+                g = reg_re.match(line)
+                a = int(g.group(5), 16) >> 8
+                continue
+            g = ins_re.match(line)
+            if not g:
+                continue
+            port = int(g.group(1), 16)
+            if port == 0xFD:
+                effects.append({'effect': a, 'start': [], 'ticks': []})
+            elif port == 0xFE:
+                effects[-1]['ticks'].append([])
+            elif port == addr_port:
+                reg = a
+            elif port == data_port:
+                (effects[-1]['ticks'][-1] if effects[-1]['ticks'] else effects[-1]['start']).append((reg, a))
+        return effects
+
+
+def expected(blob, effect, calls, skip, acc=0):
+    """The writes the player should make for the effect's first `calls` calls of ay_tick."""
+    at = blob[1 + 2 * effect] | blob[2 + 2 * effect] << 8
+    mixer, ticks = st.unpack_effect(blob, at)
+    start = [(8, 0), (9, 0), (7, mixer)]
+    out, n, active = [], 0, True
+    for _ in range(calls):
+        if not active:
+            out.append([])
+            continue
+        if skip:
+            acc += skip
+            if acc > 255:
+                acc &= 255
+                out.append([])                      # a frame that is not a tick
+                continue
+        if n < len(ticks):
+            period, vol = ticks[n]
+            out.append([(4, period & 255), (5, period >> 8), (6, period & 31), (10, vol)])
+            n += 1
+        else:
+            out.append([(10, 0)])                   # the end: silence
+            active = False
+    return start, out, acc
+
+
+def main():
+    blob = open(os.path.join(ROOT, 'assets', 'st_sounds.bin'), 'rb').read()
+    count = blob[0]
+    lengths = []
+    for k in range(count):
+        at = blob[1 + 2 * k] | blob[2 + 2 * k] << 8
+        lengths.append(len(st.unpack_effect(blob, at)[1]))
+    ok = True
+    for name, defines, addr, data, skip in (('AQ+ ports', [], 0xF7, 0xF6, 0), ('60 Hz skip', ['-DAY_SKIP=43'], 0xF7, 0xF6, 43),
+                                            ('Multi 8 ports', ['-DAY_ADDR_PORT=24', '-DAY_DATA_PORT=25'], 24, 25, 0)):
+        plan = [(k, min(255, int(lengths[k] * (1.25 if skip else 1)) + 4)) for k in range(count)]
+        got = run_trace(plan, defines, addr, data)
+        if got is None:
+            print('FAIL  the player does not assemble')
+            return 1
+        bad = []
+        acc = 0                                      # (the frame skip's accumulator carries on from one effect to the next)
+        for k, (e, calls) in enumerate(plan):
+            want_start, want, acc = expected(blob, e, calls, skip, acc)
+            g = got[k]
+            if g['start'] != want_start or len(g['ticks']) != calls or g['ticks'] != want:
+                first = next((i for i in range(min(len(want), len(g['ticks']))) if want[i] != g['ticks'][i]), None)
+                bad.append((e, first, want[first] if first is not None else None, g['ticks'][first] if first is not None else None, g['start'], want_start))
+        print(('PASS' if not bad else 'FAIL') + f'  [{name}] {count} effects, every tick of every effect writes what the packed data says'
+              + (f' (bad: {bad[:2]})' if bad else ''))
+        ok &= not bad
+    return 0 if ok else 1
+
+
+if __name__ == '__main__':
+    sys.exit(main())

@@ -218,7 +218,12 @@ uint8_t plat_file_load(const char *name, uint8_t *a, uint16_t alen, uint8_t *b, 
 #endif
 
 uint16_t plat_clock(void) { return clock_count; }
+#ifdef HAVE_SOUND
+extern void ay_poll(void);                          /* a tick of the sound if a frame has begun */
+void plat_idle(void) { ++clock_count; ay_poll(); }
+#else
 void plat_idle(void) { ++clock_count; }
+#endif
 void plat_flush(void) {}
 
 #ifdef HAVE_MINIMAP_SQUARE

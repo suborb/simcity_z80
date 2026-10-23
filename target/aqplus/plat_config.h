@@ -17,6 +17,7 @@
 #define MODAL_NARROW            /* ... in their 32 column arrangement, */
 #define MODAL_X 4               /* ... centred in the 40 columns */
 #define HAVE_DEMAND_BARS        /* the R, C and I demand as coloured bar charts (plat_demand) */
+#define HAVE_SOUND              /* the Atari ST game's effects on the AY-3-8910 (target/aqplus/plat_sound.asm) */
 #define HAVE_MINIMAP_NATIVE     /* the mini maps a row of tiles at a time (plat_put_minirow), as the SAM Coupe's: a square picture, a sidebar */
 #define HAVE_MINIMAP_SQUARE
 #define MM_SIDE_COL 28          /* the picture's 24 cells start at column 4, centred in the 40, and the sidebar is after them */
