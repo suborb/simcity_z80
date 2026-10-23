@@ -27,8 +27,7 @@ CELLREC = 6                             # bytes in a cell's record: col, row, ar
 
 HARNESS = '''        SECTION code_user
         org     $0100
-        PUBLIC  _font_8x8_bbc_system, __CLIB_PC8800_V2_ENABLED, _view_tile_art, _mm_row
-        defc    __CLIB_PC8800_V2_ENABLED = V2FLAG
+        PUBLIC  _font_8x8_bbc_system, _pc88_v2mode, _view_tile_art, _mm_row
         defc    _view_tile_art = art            ; picture n is at 8 * n from it (the placer only subtracts); the same address as the 1 bit art
         EXTERN  _plat_put_tile, _mp_tile1, _plat_put_overlay, _plat_put_bitmap, _plat_put, _plat_puts, _plat_clear, _plat_init
 start:  ld      sp,$7000
@@ -189,6 +188,9 @@ textdone:
 fin:    halt
 sp_end: defw    0
 _mm_row: defs   432
+_pc88_v2mode:
+        ld      hl,V2FLAG
+        ret
 _font_8x8_bbc_system:
         BINARY  "font.bin"
 bitmaps:
@@ -354,8 +356,7 @@ def table_test():
 
 HARNESS_SCROLL = '''        SECTION code_user
         org     $0100
-        PUBLIC  _font_8x8_bbc_system, __CLIB_PC8800_V2_ENABLED, _view_tile_art, _mm_row
-        defc    __CLIB_PC8800_V2_ENABLED = V2FLAG
+        PUBLIC  _font_8x8_bbc_system, _pc88_v2mode, _view_tile_art, _mm_row
         defc    _view_tile_art = art
         EXTERN  _plat_put_tile, _plat_scroll, _plat_init
 start:  ld      sp,$7000
@@ -425,6 +426,9 @@ fin:    halt
 idx:    defw    0
 sp_end: defw    0
 _mm_row: defs   432
+_pc88_v2mode:
+        ld      hl,V2FLAG
+        ret
 _font_8x8_bbc_system:
         BINARY  "font.bin"
 scrolls:
@@ -454,7 +458,7 @@ def scroll_test(v2, steps):
         open(os.path.join(tmp, 'font.bin'), 'wb').write(bytes(96 * 8))
         os.makedirs(os.path.join(tmp, 'build', 'common'))
         open(os.path.join(tmp, 'build', 'common', 'tiles_640x200_3bpp.bin'), 'wb').write(blob)
-        out = subprocess.run([Z80ASM, '-b', '-m', '-DDBL_AT=0x8000', '-I' + ROOT, '-oh.bin', 'h.asm',
+        out = subprocess.run([Z80ASM, '-b', '-m', '-DDBL_AT=0x8000', '-DHAVE_SCROLL', '-I' + ROOT, '-oh.bin', 'h.asm',
                               os.path.join(ROOT, 'target/pc88/plat_pc88.asm')], cwd=tmp, capture_output=True, text=True)
         if out.returncode or out.stderr.strip():
             print(out.stdout + out.stderr)
@@ -715,8 +719,7 @@ def run(v2):
 
 HARNESS_ART = '''        SECTION code_user
         org     $0100
-        PUBLIC  _font_8x8_bbc_system, __CLIB_PC8800_V2_ENABLED, _view_tile_art, _mm_row
-        defc    __CLIB_PC8800_V2_ENABLED = V2FLAG
+        PUBLIC  _font_8x8_bbc_system, _pc88_v2mode, _view_tile_art, _mm_row
         defc    _view_tile_art = 0
         EXTERN  _plat_put_minirow, _plat_init
 start:  ld      sp,$7000
@@ -752,6 +755,9 @@ rowsdone:
 fin:    halt
 sp_end: defw    0
 _mm_row: defs   432
+_pc88_v2mode:
+        ld      hl,V2FLAG
+        ret
 _font_8x8_bbc_system:
         BINARY  "font.bin"
 rows:
@@ -761,8 +767,7 @@ rows:
 
 HARNESS_FLAT = '''        SECTION code_user
         org     $0100
-        PUBLIC  _font_8x8_bbc_system, __CLIB_PC8800_V2_ENABLED, _view_tile_art
-        defc    __CLIB_PC8800_V2_ENABLED = V2FLAG
+        PUBLIC  _font_8x8_bbc_system, _pc88_v2mode, _view_tile_art
         defc    _view_tile_art = 0
         EXTERN  _plat_put_minirow, _plat_init
 start:  ld      sp,$7000
@@ -789,6 +794,9 @@ rowsdone:
         ld      (sp_end),sp
 fin:    halt
 sp_end: defw    0
+_pc88_v2mode:
+        ld      hl,V2FLAG
+        ret
 _font_8x8_bbc_system:
         BINARY  "font.bin"
 rows:
@@ -798,8 +806,7 @@ rows:
 
 HARNESS_ATTR = '''        SECTION code_user
         org     $0100
-        PUBLIC  _font_8x8_bbc_system, __CLIB_PC8800_V2_ENABLED, _view_tile_art
-        defc    __CLIB_PC8800_V2_ENABLED = V2FLAG
+        PUBLIC  _font_8x8_bbc_system, _pc88_v2mode, _view_tile_art
         defc    _view_tile_art = 0
         EXTERN  _plat_put, _plat_text_attr, _plat_init
 start:  ld      sp,$7000
@@ -837,6 +844,9 @@ advance:
 done:   ld      (sp_end),sp
 fin:    halt
 sp_end: defw    0
+_pc88_v2mode:
+        ld      hl,V2FLAG
+        ret
 _font_8x8_bbc_system:
         BINARY  "font.bin"
 ops:
@@ -846,7 +856,10 @@ ops:
 
 def text_attr_test(v2):
     """plat_text_attr: text is drawn (white on black), recoloured, drawn again as a screen of tables does and recoloured again: the
-    planes are what each cell would be drawn as in its last attribute."""
+    planes are what each cell would be drawn as in its last attribute.  The routine reads each cell's glyph back from the blue plane,
+    which the tracer's flat memory does not have: it reads the last value stored there, which the V1 draws leave as the glyph and the
+    V2 draws (the ALU: the ink's store, then the paper's, the complement) leave inverted, so the model takes that as the glyph.  (The
+    real V2 machine, MAME's, shows the right colours.)"""
     rng = random.Random(7)
     font = bytes(rng.randrange(256) for _ in range(96 * 8))
     ops = []
@@ -854,12 +867,14 @@ def text_attr_test(v2):
 
     def put(col, row, ch):
         ops.append((0, col, row, ord(ch), 0))
-        state[(col, row)] = [ch, 7]
+        state[(col, row)] = [ch, 7, False]
 
     def attr(col, row, n, a):
         ops.append((1, col, row, n, a))
         for c in range(col, col + n):                      # (a cell with nothing drawn is a blank glyph, in the paper colour)
-            state.setdefault((c, row), [None, 7])[1] = a
+            e = state.setdefault((c, row), [None, 7, False])
+            e[1] = a
+            e[2] = True                                    # (read back since it was drawn)
     text = 'FISCAL BUDGET AND SO ON'
     for row in (0, 2, 9, 23):                              # drawn plain, then coloured over more than the text
         for i, ch in enumerate(text):
@@ -884,8 +899,10 @@ def text_attr_test(v2):
         for i in range(7, -1, -1):
             w = w << 2 | (3 if b >> i & 1 else 0)
         return w >> 8, w & 0xFF
-    for (col, row), (ch, a) in state.items():
+    for (col, row), (ch, a, flip) in state.items():
         glyph = bytes(8) if ch is None else font[(ord(ch) - 32) * 8:(ord(ch) - 32) * 8 + 8]
+        if v2 and flip:                                     # what the tracer's flat memory gives the read back: with the ALU a cell's last store is its
+            glyph = bytes(b ^ 0xFF for b in glyph)          # complement (the paper's, after the ink's), where the real planes have the glyph
         for p in range(3):
             ink = 0xFF if a >> p & 1 else 0
             paper = 0xFF if a >> (3 + p) & 1 else 0
@@ -926,8 +943,11 @@ def text_attr_test(v2):
         m = Machine()
         replay(os.path.join(tmp, 'trace.txt'), m, -1)
     bad = [(p, i) for p in range(3) for i in range(80 * 200) if m.planes[p][i] != model[p][i]]
-    if os.environ.get('DUMPBAD'):
-        print(sorted({(i % 80 // 2, i // 640) for p, i in bad})[:40])
+    if os.environ.get('DUMPBAD') and bad:
+        print(sorted({(i % 80 // 2, i // 640) for p, i in bad})[:30])
+        for (c0, r0) in ((4, 9), (4, 2), (20, 2)):
+            for pl in range(3):
+                print('cell', c0, r0, 'plane', pl, 'got', [hex(m.planes[pl][r0 * 640 + y * 80 + c0 * 2]) for y in range(8)], 'want', [hex(model[pl][r0 * 640 + y * 80 + c0 * 2]) for y in range(8)])
     sp = mem[syms['sp_end']] | mem[syms['sp_end'] + 1] << 8
     ok = not bad and sp == 0x7000 and m.sel() == 0 and m.plane == 0
     print(('PASS' if ok else 'FAIL') + f'  [{"V2" if v2 else "V1"}] plat_text_attr: {len(ops)} operations (text, recoloured, drawn again, recoloured again): the planes equal the model, '

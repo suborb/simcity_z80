@@ -48,11 +48,12 @@
 mp_tiles:
         BINARY  "build/common/tiles_640x200_3bpp.bin"
 
-; The 14 tool icons: four 8x8 cells each, then their attribute bytes (tools/make_multi8_assets.py)
+; The 14 tool icons of the Amstrad CPC game: four cells each, a cell 8 rows of two bytes (the pens' low and high bits), see
+; tools/extract_cpc_icons.py
         SECTION rodata_user
         PUBLIC  _mp_icons
 _mp_icons:
-        BINARY  "assets/icons_spec.bin"
+        BINARY  "assets/cpc_icons.bin"
 
         SECTION code_user
 
@@ -99,6 +100,7 @@ mp_t_plain:
         ld      de,mp_tiles
         add     hl,de
         ex      de,hl                   ; de = its planes
+mp_pl_go:
         push    ix                      ; (the C code's frame pointer: kept)
         ld      ix,mp_pix3
         ld      b,24
@@ -151,6 +153,28 @@ mp_one:
         ld      hl,(mp_scr)
         ld      bc,79
         jp      mp_copy
+
+; void mp_planar(uint8_t col, uint8_t row, const uint8_t *planes, uint8_t inverse) __smallc
+; A cell from 24 bytes: a plane (blue, red, green) of eight rows after another, as plat_put_tile draws the map's pictures
+; (the complement if `inverse`).  Not cached: the icons are not in the map.
+        PUBLIC  _mp_planar
+_mp_planar:
+        ld      hl,2
+        add     hl,sp
+        ld      c,(hl)                  ; inverse (0 or 1)
+        inc     hl
+        inc     hl
+        ld      e,(hl)
+        inc     hl
+        ld      d,(hl)                  ; de = the planes
+        inc     hl
+        ld      a,(hl)                  ; row
+        inc     hl
+        inc     hl
+        ld      b,(hl)                  ; col
+        push    af
+        push    bc
+        jp      mp_pl_go
 
 ; void mp_tile1(uint8_t col, uint8_t row, const uint8_t *art, uint8_t attr, uint8_t inverse) __smallc
 ; The 8 bytes of art, in the colours of attr (ink and paper swapped if `inverse`): the icons.
@@ -887,36 +911,11 @@ _plat_put_minirow:
         ld      a,$AA                   ; the checker a tile of the base map (colour bit 3) is drawn in
         ld      (mm_pat),a
         pop     de
-        push    de
         ld      hl,mm_buf
-        ld      c,1
-        call    mm_pack
-        pop     de
-        push    de
-        ld      hl,mm_buf + 48
-        ld      c,2
-        call    mm_pack
-        pop     de
-        push    de
-        ld      hl,mm_buf + 96
-        ld      c,4
-        call    mm_pack
+        call    mm_pack3
         ld      a,$55                   ; the middle line has the other half of it
         ld      (mm_pat),a
-        pop     de
-        push    de
-        ld      hl,mm_buf + 144
-        ld      c,1
-        call    mm_pack
-        pop     de
-        push    de
-        ld      hl,mm_buf + 192
-        ld      c,2
-        call    mm_pack
-        pop     de
-        ld      hl,mm_buf + 240
-        ld      c,4
-        call    mm_pack
+        call    mm_pack3
         ld      hl,mm_buf
         ld      (mm_src),hl
         ld      a,1
@@ -957,6 +956,19 @@ mm_plane:
         ld      a,MEM_IDLE
         out     (PORT_MEM),a
         jp      mp_keyscan
+
+; The three planes' 48 bytes each, from hl on, from the colours at de (kept)
+mm_pack3:
+        ld      c,1
+mm_p3:
+        push    de
+        call    mm_pack
+        pop     de
+        sla     c
+        ld      a,c
+        cp      8
+        jr      nz,mm_p3
+        ret
 
 ; 48 bytes at hl from the 96 colours at de: for the plane of mask c, a byte is a nibble of ones for a tile that has
 ; the plane in its colour, then one for the next tile.  de goes on 96.

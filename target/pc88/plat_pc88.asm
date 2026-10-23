@@ -9,7 +9,7 @@
 ; Every PC-8801 pages the planes in one at a time (ports $5C-$5E, $5F for the RAM).  The V2 machines also have an ALU:
 ; with port $32 bit 6 and port $35 bit 7 one store reaches all three planes, and port $34 says what it does to each (set the
 ; stored byte's pixels, clear them, or nothing).  Text, solid cells, sprites and clearing use it; the map's pictures, which
-; have a colour a pixel, are written a plane at a time on both.  __CLIB_PC8800_V2_ENABLED chooses (-clib=v1: no ALU).
+; have a colour a pixel, are written a plane at a time on both.  pc88_v2mode() (z88dk: the DIP switch) says whether there is an ALU, once, in plat_init.
 ;
 ; Each drawing routine looks at the keyboard now and then (mp_poll).  Arguments are the game's C calling convention (smallc).
 ; A cell's attribute is the Spectrum's: ink in bits 0-2, paper in 3-5.  A plane's byte for a pixel row:
@@ -23,7 +23,7 @@
         SECTION code_user
         EXTERN  _font_8x8_bbc_system
         EXTERN  _view_tile_art          ; picture n is at 8 * n from it
-        EXTERN  __CLIB_PC8800_V2_ENABLED
+        EXTERN  _pc88_v2mode
 
         defc    PLANE0 = $5C            ; blue; red is $5D and green $5E
         defc    PLANE_OFF = $5F         ; the RAM again
@@ -46,11 +46,12 @@
 mp_tiles:
         BINARY  "build/common/tiles_640x200_3bpp.bin"
 
-; The 14 tool icons: four cells each, then their attributes
+; The 14 tool icons of the Amstrad CPC game: four cells each, a cell 8 rows of two bytes (the pens' low and high bits), see
+; tools/extract_cpc_icons.py
         SECTION rodata_user
         PUBLIC  _mp_icons
 _mp_icons:
-        BINARY  "assets/icons_spec.bin"
+        BINARY  "assets/cpc_icons.bin"
 
         SECTION code_user
 
@@ -105,6 +106,7 @@ _plat_put_tile:
         ld      de,mp_tiles
         add     hl,de
         ex      de,hl                   ; de = its planes
+mp_pl_go:
         pop     bc
         bit     0,c
         jr      nz,mp_bake_inv
@@ -154,6 +156,28 @@ mp_bake_draw:
         xor     a
         out     (PLANE_OFF),a
         jp      mp_poll
+
+; void mp_planar(uint8_t col, uint8_t row, const uint8_t *planes, uint8_t inverse) __smallc
+; A cell from 24 bytes: a plane (blue, red, green) of eight rows after another, as plat_put_tile draws the map's pictures
+; (the complement if `inverse`).  Not cached: the icons are not in the map.
+        PUBLIC  _mp_planar
+_mp_planar:
+        ld      hl,2
+        add     hl,sp
+        ld      c,(hl)                  ; inverse (0 or 1)
+        inc     hl
+        inc     hl
+        ld      e,(hl)
+        inc     hl
+        ld      d,(hl)                  ; de = the planes
+        inc     hl
+        ld      a,(hl)                  ; row
+        inc     hl
+        inc     hl
+        ld      b,(hl)                  ; col
+        push    af
+        push    bc
+        jp      mp_pl_go
 
 ; A picture straight to the planes: de = its 24 bytes, mp_scr = the cell.  Each byte is doubled by the table (bc = DBL + byte;
 ; +256 for the low nibble) and stored; hl' is the screen and de' the step to the next row.  Keeps the other register set.
@@ -333,7 +357,7 @@ mp_cell_nc:
         jr      z,mp_solid
         call    mp_double               ; the picture doubled across, into mp_pix
 mp_draw_pix:
-        ld      a,__CLIB_PC8800_V2_ENABLED
+        ld      a,(mp_v2)
         or      a
         jr      z,mp_planes
         ; with the ALU: the picture's pixels set to the ink, then the others cleared to the paper
@@ -361,7 +385,7 @@ mp_alu_end:
 
 ; A cell of one colour: one ALU store; without it mp_planes (each plane is all ones or zeros)
 mp_solid:
-        ld      a,__CLIB_PC8800_V2_ENABLED
+        ld      a,(mp_v2)
         or      a
         jr      z,mp_planes
         call    mp_alu_on
@@ -697,7 +721,7 @@ _plat_put_overlay:
         pop     bc
         pop     af
         call    mp_scraddr
-        ld      a,__CLIB_PC8800_V2_ENABLED
+        ld      a,(mp_v2)
         or      a
         jr      z,mp_ov_planes
         call    mp_alu_on               ; white: set the pixels in every plane with one store
@@ -885,7 +909,9 @@ _plat_init:
         jr      nz,mp_up_done
         inc     a
         ld      (mp_up),a
-        ld      a,__CLIB_PC8800_V2_ENABLED
+        call    _pc88_v2mode            ; the DIP switch: V2 mode has the ALU
+        ld      a,l
+        ld      (mp_v2),a
         or      a
         jr      z,mp_ram
         ld      a,$98                   ; the machine's start state: analog RGB, main RAM at $F000, digital palette
@@ -920,7 +946,7 @@ mp_pal_lp:
         PUBLIC  _plat_text_clear
 _plat_text_clear:
 _plat_clear:
-        ld      a,__CLIB_PC8800_V2_ENABLED
+        ld      a,(mp_v2)
         or      a
         jr      z,mp_clear_planes
         call    mp_alu_on
@@ -1067,36 +1093,11 @@ _plat_put_minirow:
         ld      a,$AA                   ; the checker a tile of the base map (colour bit 3) is drawn in
         ld      (mm_pat),a
         pop     de
-        push    de
         ld      hl,mm_buf
-        ld      c,1
-        call    mm_pack
-        pop     de
-        push    de
-        ld      hl,mm_buf + 48
-        ld      c,2
-        call    mm_pack
-        pop     de
-        push    de
-        ld      hl,mm_buf + 96
-        ld      c,4
-        call    mm_pack
+        call    mm_pack3
         ld      a,$55                   ; the middle line has the other half of it
         ld      (mm_pat),a
-        pop     de
-        push    de
-        ld      hl,mm_buf + 144
-        ld      c,1
-        call    mm_pack
-        pop     de
-        push    de
-        ld      hl,mm_buf + 192
-        ld      c,2
-        call    mm_pack
-        pop     de
-        ld      hl,mm_buf + 240
-        ld      c,4
-        call    mm_pack
+        call    mm_pack3
         ld      hl,mm_buf
         ld      (mm_src),hl
         xor     a
@@ -1134,6 +1135,19 @@ mm_plane:
         cp      3
         jr      nz,mm_plane
         jp      mp_poll
+
+; The three planes' 48 bytes each, from hl on, from the colours at de (kept)
+mm_pack3:
+        ld      c,1
+mm_p3:
+        push    de
+        call    mm_pack
+        pop     de
+        sla     c
+        ld      a,c
+        cp      8
+        jr      nz,mm_p3
+        ret
 
 ; 48 bytes at hl from the 96 colours at de: for the plane of mask c, a byte is a nibble of ones for a tile that has the plane in its
 ; colour, then one for the next tile.  de goes on 96.
@@ -1174,6 +1188,7 @@ mm_dim:
         ret
         ENDIF
 
+        IFDEF   HAVE_SCROLL             ; (not in the shipping build: the Makefile does not define it, ui/game.c redraws the map instead)
 ; void plat_scroll(uint8_t row, uint8_t rows, int8_t dx, int8_t dy) __smallc
 ; The view's origin moved by (dx, dy) cells: cell (x, y) is now at (x - dx, y - dy).  The map is one linear block of pixels,
 ; so this is one block move; what wraps round lands in the exposed cells, which the game draws.  With the ALU the move is
@@ -1250,7 +1265,7 @@ _plat_scroll:
         ld      l,$80
 mp_sc_len:
         ld      (mp_slen),hl
-        ld      a,__CLIB_PC8800_V2_ENABLED
+        ld      a,(mp_v2)
         or      a
         jr      z,mp_sc_planes
         ld      a,(mp_mode)
@@ -1447,6 +1462,8 @@ mp_inv:
         jr      nz,mp_inv
         ret
 
+        ENDIF
+
 ; void plat_exit(void)
         PUBLIC  _plat_exit
 _plat_exit:
@@ -1463,6 +1480,7 @@ mp_cache: defs  40 * MAP_ROWS * 2
 
 ; The placer's variables: in the code section so that they stay in the low RAM
         SECTION code_user
+        IFDEF   HAVE_SCROLL
 mp_srow: defb   0                       ; plat_scroll's arguments and work
 mp_srows: defb  0
 mp_sdx:  defb   0
@@ -1474,6 +1492,8 @@ mp_slen: defw   0
 mp_scol: defb   0
 mp_scnt: defb   0
 mp_sy:   defb   0
+        ENDIF
+mp_v2:   defb   0                       ; 1: the V2 mode, with the ALU (plat_init)
 mp_up:   defb   0                       ; plat_init has been called
 mp_mode: defb   $98                     ; port $32 with the ALU off (the V2 machines)
 mp_attr: defb   0                       ; the cell's attribute

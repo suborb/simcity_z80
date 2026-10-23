@@ -19,7 +19,6 @@
 #define HAVE_SPRITES
 #define HAVE_SPRITE_OVERLAY     /* the sprites go over the baked tiles, which have colours */
 #define HAVE_ICONS              /* the tools as 16x16 pictures */
-#define HAVE_SCROLL             /* the map scrolls by moving its pixels (the ALU copies all three planes at once) */
 #define HAVE_TEXT_COLOUR        /* the budget and evaluation screens coloured, with bars (plat_text_attr, plat_bar) */
 #define MODAL_NARROW            /* ... in their 32 column arrangement, */
 #define MODAL_X 4               /* ... centred in the 40 columns */
