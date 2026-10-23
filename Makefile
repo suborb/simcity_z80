@@ -38,6 +38,7 @@ CONSOLE = platform/console/plat_console.c platform/console/plat_font.asm
 AQPLUS_PLATFORM = target/aqplus/plat_aqplus.c target/aqplus/plat_aqplus.asm
 ZX_PLATFORM = target/zx/plat_zx.asm
 MULTI8_PLATFORM = target/multi8/plat_multi8.c target/multi8/plat_multi8.asm
+PC88_PLATFORM = target/pc88/plat_pc88.c target/pc88/plat_pc88.asm
 Z88_PLATFORM = target/z88/plat_z88.c target/z88/plat_z88.asm
 
 
@@ -50,6 +51,7 @@ NC200  = build/nc200/simcity.img
 Z88ROM = build/z88rom/simcity.epr
 ZX     = build/zx/simcity.tap
 MULTI8 = build/multi8/simcity.cas
+PC88   = build/pc88/simcity.d88
 TEST   = build/test/simcity.bin
 TESTP  = build/testpanel/simcity.bin
 TESTM  = build/testmodal/simcity.bin
@@ -60,14 +62,15 @@ TESTH  = build/testhires/simcity.bin
 TESTK  = build/testnative/simcity.bin
 TESTA  = build/testart/simcity.bin
 
-.PHONY: all aqplus z88rom zx multi8 test testpanel testmodal testnarrow testsprites testoverlay testhires testnative testart check golden uitest tiletest z88test engine deadcode clean
+.PHONY: all aqplus z88rom zx multi8 pc88 test testpanel testmodal testnarrow testsprites testoverlay testhires testnative testart check golden uitest tiletest z88test engine deadcode clean
 
-all: aqplus z88rom zx multi8
+all: aqplus z88rom zx multi8 pc88
 
 aqplus: $(AQPLUS)
 z88rom: $(Z88ROM)
 zx:     $(ZX)
 multi8: $(MULTI8)
+pc88:   $(PC88)
 test:   $(TEST)
 testpanel: $(TESTP)
 testmodal: $(TESTM)
@@ -127,6 +130,22 @@ $(MULTI8): $(DEPS) build/multi8/mp_tiles.bin build/multi8/mp_mini.bin
 	@# the placer's variables must be in the low RAM: the planes are paged over $8000-$BFFF while it draws
 	@v=`sed -n 's/^mp_flags *= \$$\([0-9A-Fa-f]*\).*/\1/p' $(@D)/simcity.map`; \
 	    [ -n "$$v" ] && [ $$(( 0x$$v )) -lt 32768 ] || { echo "the placer's variables are not below $$8000 (mp_flags at $$v)"; rm -f $@; exit 1; }
+
+# The NEC PC-8801 in its all-RAM mode (a bootable disk): code and data from $0000, the stack under the uninitialised data,
+# which starts at PC88_BSS and runs over $C000, where the screen is paged in.  It shares the Multi 8's pictures.
+PC88_BSS = 0xAC00
+PC88_CLIB ?=                    # -clib=v1: no ALU, for the original PC-8801 (plane by plane)
+PC88_IMAGE_LIMIT = 0xA600       # (the doubling table is at $A600-$A7FF, and the stack gets the rest, down from the uninitialised data)
+
+$(PC88): $(DEPS) build/multi8/mp_tiles.bin build/multi8/mp_mini.bin
+	@mkdir -p $(@D)
+	$(ZCC) +pc88 -subtype=disk $(PC88_CLIB) -create-app $(COMMON) -pragma-include:target/pc88/zpragma.inc \
+	    -Itarget/pc88 -DTARGET_PC88 -Ca-DTARGET_PC88 -Ca-D__crt_org_bss=$(PC88_BSS) -Ca-DHAVE_MINIMAP_ART $(GAME) $(ENTROPY) $(MENU) $(NOSOUND) $(FIELDS) $(MMNATIVE) $(PC88_PLATFORM) -o $(@D)/simcity.bin
+	@size=`wc -c < $(@D)/simcity.bin`; echo "pc88 image: $$size bytes (limit $$(( $(PC88_IMAGE_LIMIT) )))"; \
+	    [ $$size -le $$(( $(PC88_IMAGE_LIMIT) )) ] || { echo "the image runs into the stack"; rm -f $@; exit 1; }
+	@# the placer's variables must be in the low RAM: the screen is paged over $$C000-$$FFFF while it draws
+	@v=`sed -n 's/^mm_src *= \$$\([0-9A-Fa-f]*\).*/\1/p' $(@D)/simcity.map`; \
+	    [ -n "$$v" ] && [ $$(( 0x$$v )) -lt 49152 ] || { echo "the placer's variables are not below $$C000 (mm_src at $$v)"; rm -f $@; exit 1; }
 
 # Headless: a scripted keyboard and a screen in RAM instead of the console, run under z88dk-ticks.
 $(TEST): $(DEPS)

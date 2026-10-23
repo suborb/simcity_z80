@@ -29,6 +29,9 @@ echo
 echo "== Multi 8 placer: three planes, paging and colours"
 python3 test/multi8/run.py
 echo
+echo "== PC-8801 placer: plane paging and the ALU, V1 and V2"
+python3 test/pc88/run.py
+echo
 echo "== z88dk's Multi 8 tape routines (tape_save, tape_load_to)"
 python3 test/multi8/tape.py
 echo
