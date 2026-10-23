@@ -883,24 +883,7 @@ static uint16_t afford_mask(void)
 }
 #endif
 
-#ifdef HAVE_ICONS_2X7
-/* The icons in two rows of seven (rows 1 to 4, 21 columns), with the demand bars and the speed in the 11 columns beside them, the
-   tool and its cost on row 5 and the advisor on row 6.  Nothing here may print a whole row 1 to 4 (a field table does): that is
-   the icons' place, and they are only drawn when the tool changes.  The mini map's 144 lines start under row 5, so in a mini map row 6 is not
-   drawn and row 5 has the map's name. */
-static const struct field top_status27[] = {
-    { 0,  0, F_STR,  0, &st_month },
-    { 0,  8, F_U16,  0, &V_year },
-    { 0,  9, F_TEXT, 0, "$" },
-    { 0, 10, F_L24,  0, V_money },
-    { 0, 19, F_TEXT, 0, "POP" },
-    { 0, 23, F_L24,  0, V_display_population },
-    { 5,  0, F_STR,  0, &st_tool },
-};
-static const struct field top_alert27[] = {
-    { 6,  0, F_STR,  0, &st_alert },
-};
-
+/* (for both layouts of the top panel) */
 #ifdef HAVE_MINIMAP_SQUARE
 #ifndef MM_SIDE_COL
 #define MM_SIDE_COL 24                      /* the sidebar's first column: after the 24 cells of the picture (a wider display can centre them: plat_config.h) */
@@ -970,6 +953,24 @@ static void draw_map_sidebar(void)
 }
 #endif
 
+#ifdef HAVE_ICONS_2X7
+/* The icons in two rows of seven (rows 1 to 4, 21 columns), with the demand bars and the speed in the 11 columns beside them, the
+   tool and its cost on row 5 and the advisor on row 6.  Nothing here may print a whole row 1 to 4 (a field table does): that is
+   the icons' place, and they are only drawn when the tool changes.  The mini map's 144 lines start under row 5, so in a mini map row 6 is not
+   drawn and row 5 has the map's name. */
+static const struct field top_status27[] = {
+    { 0,  0, F_STR,  0, &st_month },
+    { 0,  8, F_U16,  0, &V_year },
+    { 0,  9, F_TEXT, 0, "$" },
+    { 0, 10, F_L24,  0, V_money },
+    { 0, 19, F_TEXT, 0, "POP" },
+    { 0, 23, F_L24,  0, V_display_population },
+    { 5,  0, F_STR,  0, &st_tool },
+};
+static const struct field top_alert27[] = {
+    { 6,  0, F_STR,  0, &st_alert },
+};
+
 static void draw_status(void)
 {
     char buf[9];
@@ -1030,6 +1031,12 @@ static void draw_status(void)
     char buf[41];
 #endif
 
+#ifdef HAVE_MINIMAP_SQUARE
+    if (map_view) {
+        draw_map_sidebar();                 /* a square mini map has a sidebar in place of the panel */
+        return;
+    }
+#endif
     st_month = text_months[V_month];
     st_tool = text_tools[tool];
     st_speed = st_speeds[V_simulation_speed & 3];
@@ -1703,6 +1710,10 @@ static void play_city(void)
         st.alert = V_alertmessage;
         st.map_view = map_view;
         st.page = (panel_h >= 7) ? 0 : (uint8_t)((frame >> 6) % 3);
+#ifdef HAVE_MINIMAP_SQUARE
+        if (map_view)
+            st.page = 0;                    /* (the sidebar has no pages: do not redraw it and its key every 64 frames) */
+#endif
         if (memcmp(&st, &last_st, sizeof(st))) {
             last_st = st;
             draw_status();
