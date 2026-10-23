@@ -5,7 +5,10 @@
 #include "cityfile.h"
 #include "prompt.h"
 #ifdef HAVE_FILES
-#define NAME_MAX 24
+#ifndef FILE_NAME_MAX                       /* the longest file name the platform can keep (plat_config.h) */
+#define FILE_NAME_MAX 24
+#endif
+#define NAME_MAX FILE_NAME_MAX
 
 static uint8_t header[CITY_HEADER];
 

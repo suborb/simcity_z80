@@ -113,7 +113,10 @@ extern void     plat_flush(void);               /* end of frame: show what was d
      HAVE_POPUP_MENU   use the shared console box + message selector (ui/menu.c): ESC opens it over the city, centred in the
                        map; the file dialogues (ui/prompt.c) are boxes too.  Do not set this on a platform with native
                        HAVE_MENUS
-     HAVE_FILES        files, for saving and loading a city (plat_file_save()/plat_file_load())
+     HAVE_NARROW_TITLE the level menu has a line to a choice, for a display under 40 columns
+     HAVE_DEMAND_BARS  the demand indicators as coloured bar charts (plat_demand())
+     HAVE_FILES        files, for saving and loading a city (plat_file_save()/plat_file_load()); FILE_NAME_MAX
+                       (default 24) is the longest name the player may enter
      HAVE_APPNAME      the machine can show what the city is called (plat_set_name(); the Z88's Index)
      HAVE_SOUND        a beeper behind the engine's sound hooks (the Makefile links the platform's sound code, or
                        platform/common/nosound.asm if there is none); `sound_enabled` is the player's on/off
@@ -163,6 +166,20 @@ extern void     plat_icons(uint8_t selected);
               byte, where its engine art (assets/map_art_aq.bin, tools/make_aq_assets.py) comes converted
      inverse  1 for the blinking cursor: the picture with its pixels inverted */
 extern void     plat_put_tile(uint8_t col, uint8_t row, const uint8_t *art, uint8_t attr, uint8_t inverse);
+#endif
+
+#ifdef HAVE_DEMAND_BARS
+/* plat_demand() draws a demand indicator as a bar chart in cells (a colour display): the letter `name` in the cell at (col, row), then
+   seven cells to its right: the middle one is the zero mark, and `level` (-3..3: the demand over 32, as the text bars show it) cells
+   beyond it are filled, to the right (green: more is wanted) if it is positive and to the left (red: too much) if it is negative.
+   Without HAVE_DEMAND_BARS the game prints the text bars of demand_bars[] in ui/game.c. */
+extern void     plat_demand(uint8_t col, uint8_t row, char name, int8_t level);
+#endif
+
+#ifdef HAVE_CLEAR_MAP
+/* plat_clear_map() clears what is below the status panel (as much of the screen as a native mini map's 144 pixel rows need)
+   and the platform's idea of what is in the map's cells, but not the panel: opening a mini map does not redraw it. */
+extern void     plat_clear_map(void);
 #endif
 
 #ifdef HAVE_SCROLL

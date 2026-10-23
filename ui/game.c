@@ -555,12 +555,20 @@ static uint8_t draw_minimap(uint8_t full)
 /* Show mini map v (1..MM_VIEWS), or 0 for the city again. */
 static void set_map_view(uint8_t v)
 {
+#ifdef HAVE_ICONS_2X7
+    if (v && view_h + 1 < MM_NATIVE_ROWS * 3 / 8)       /* (the 7 row panel's last row is not used in a mini map) */
+#else
     if (v && view_h < MM_NATIVE_ROWS * 3 / 8)
+#endif
         return;                             /* nowhere to draw it: 144 pixel rows, 18 cells */
     if (v == map_view)
         return;
     if (!map_view && v)
+#ifdef HAVE_CLEAR_MAP
+        plat_clear_map();                   /* entering the mini map replaces the city (the panel stays as it is) */
+#else
         plat_clear();                       /* entering the mini map replaces the city layout */
+#endif
     map_view = v;
     if (v) {
         mm_full_row = 0;
@@ -691,6 +699,14 @@ static const char demand_bars[7][8] = {
     "###|   ", " ##|   ", "  #|   ", "   |   ", "   |#  ", "   |## ", "   |###"
 };
 
+#ifdef HAVE_DEMAND_BARS
+static int8_t demand_level(int16_t v)                  /* v / 32, rounded towards 0, within -3..3 */
+{
+    int16_t n = v < 0 ? -(-v >> 5) : v >> 5;
+
+    return (int8_t)(n > 3 ? 3 : n < -3 ? -3 : n);
+}
+#else
 static void demand_bar(char *b, char name, int16_t v)
 {
     int16_t n = v < 0 ? -(-v >> 5) : v >> 5;            /* v / 32, rounded towards 0 */
@@ -698,6 +714,7 @@ static void demand_bar(char *b, char name, int16_t v)
     b[0] = name;
     memcpy(b + 1, demand_bars[n > 3 ? 6 : n < -3 ? 0 : n + 3], 7);
 }
+#endif
 
 static const char *const help_page[3] = {
     "O P Q A MOVE  SPACE BUILD",
@@ -751,10 +768,33 @@ static const struct field status_map_low[] = {              /* with icons: just 
 };
 
 #ifdef HAVE_ICONS_TOP
-/* The Spectrum's arrangement across the whole 40 columns: the date, funds and population on row 0, the tool icons in
+/* The Spectrum's arrangement across the whole 40 columns (or 32: see below): the date, funds and population on row 0, the tool icons in
    rows 1 and 2, then the tool and speed, the three demand bars, and the advisor (or the mini map's name). */
+#ifdef HAVE_ICONS_2X7
+#define TOP_PANEL_ROWS  7                   /* (the mini map's 144 lines start under row 5: see draw_status) */
+#else
 #define TOP_PANEL_ROWS  6
+#endif
 
+#if MODAL_COLS < 40
+/* On a 32 column display: no word FUNDS, the population nearer, the demand bars 11 apart, the map's keys shorter. */
+#define TOP_DEMAND_C    11
+#define TOP_DEMAND_I    22
+static const struct field top_status[] = {
+    { 0,  0, F_STR,  0, &st_month },
+    { 0,  8, F_U16,  0, &V_year },
+    { 0,  9, F_TEXT, 0, "$" },
+    { 0, 10, F_L24,  0, V_money },
+    { 0, 19, F_TEXT, 0, "POP" },
+    { 0, 23, F_L24,  0, V_display_population },
+    { 3,  0, F_STR,  0, &st_tool },
+    { 3, 24, F_STR,  0, &st_speed },
+};
+#define TOP_MAP_KEYS_COL 20
+#define TOP_MAP_KEYS     "M NEXT X OFF"
+#else
+#define TOP_DEMAND_C    13
+#define TOP_DEMAND_I    26
 static const struct field top_status[] = {
     { 0,  0, F_STR,  0, &st_month },
     { 0,  8, F_U16,  0, &V_year },
@@ -765,15 +805,81 @@ static const struct field top_status[] = {
     { 3,  0, F_STR,  0, &st_tool },
     { 3, 24, F_STR,  0, &st_speed },
 };
+#define TOP_MAP_KEYS_COL 22
+#define TOP_MAP_KEYS     "M NEXT  X BACK"
+#endif
 static const struct field top_alert[] = {
     { 5,  0, F_STR,  0, &st_alert },
 };
 static const struct field top_map[] = {
     { 5,  0, F_TEXT, 0, "MAP:" },
     { 5,  5, F_STR,  0, &st_line[1] },
-    { 5, 22, F_TEXT, 0, "M NEXT  X BACK" },
+    { 5, TOP_MAP_KEYS_COL, F_TEXT, 0, TOP_MAP_KEYS },
 };
 
+#ifdef HAVE_ICONS_2X7
+/* The icons in two rows of seven (rows 1 to 4, 21 columns), with the demand bars and the speed in the 11 columns beside them, the
+   tool and its cost on row 5 and the advisor on row 6.  Nothing here may print a whole row 1 to 4 (a field table does): that is
+   the icons' place, and they are only drawn when the tool changes.  The mini map's 144 lines start under row 5, so in a mini map row 6 is not
+   drawn and row 5 has the map's name. */
+static const struct field top_status27[] = {
+    { 0,  0, F_STR,  0, &st_month },
+    { 0,  8, F_U16,  0, &V_year },
+    { 0,  9, F_TEXT, 0, "$" },
+    { 0, 10, F_L24,  0, V_money },
+    { 0, 19, F_TEXT, 0, "POP" },
+    { 0, 23, F_L24,  0, V_display_population },
+    { 5,  0, F_STR,  0, &st_tool },
+};
+static const struct field top_alert27[] = {
+    { 6,  0, F_STR,  0, &st_alert },
+};
+
+static void draw_status(void)
+{
+    char buf[9];
+
+    st_month = text_months[V_month];
+    st_tool = text_tools[tool];
+    st_speed = st_speeds[V_simulation_speed & 3];
+    st_alert = V_alertmessage < sizeof(text_alerts) / sizeof(text_alerts[0]) ? text_alerts[V_alertmessage] : "";
+    buf[8] = 0;
+    {                                       /* the speed, padded: a field would print the whole row, icons and all */
+        uint8_t i = 0;
+        const char *t = st_speed;
+
+        while (*t && i < 8)
+            buf[i++] = *t++;
+        while (i < 8)
+            buf[i++] = ' ';
+        plat_text_puts(22, 4, buf);
+    }
+#ifdef HAVE_DEMAND_BARS
+    plat_demand(22, 1, 'R', demand_level(V_RValve));
+    plat_demand(22, 2, 'C', demand_level(V_CValve));
+    plat_demand(22, 3, 'I', demand_level(V_IValve));
+#else
+    demand_bar(buf, 'R', V_RValve);
+    plat_text_puts(22, 1, buf);
+    demand_bar(buf, 'C', V_CValve);
+    plat_text_puts(22, 2, buf);
+    demand_bar(buf, 'I', V_IValve);
+    plat_text_puts(22, 3, buf);
+#endif
+#ifdef HAVE_MINIMAP
+    if (map_view) {
+        fmt_fields(top_status27, sizeof(top_status27) / sizeof(struct field) - 1);
+        st_line[1] = minimap_names[map_view];
+        fmt_fields(top_map, sizeof(top_map) / sizeof(struct field));
+    } else
+#endif
+    {
+        fmt_fields(top_status27, sizeof(top_status27) / sizeof(struct field));
+        fmt_fields(top_alert27, 1);
+    }
+    plat_icons(tool);
+}
+#else
 static void draw_status(void)
 {
     char buf[41];
@@ -785,8 +891,8 @@ static void draw_status(void)
     fmt_fields(top_status, sizeof(top_status) / sizeof(struct field));
     fmt_blank(buf);
     demand_bar(buf, 'R', V_RValve);
-    demand_bar(buf + 13, 'C', V_CValve);
-    demand_bar(buf + 26, 'I', V_IValve);
+    demand_bar(buf + TOP_DEMAND_C, 'C', V_CValve);
+    demand_bar(buf + TOP_DEMAND_I, 'I', V_IValve);
     plat_text_puts(0, 4, buf);
 #ifdef HAVE_MINIMAP
     if (map_view) {
@@ -797,6 +903,7 @@ static void draw_status(void)
         fmt_fields(top_alert, 1);
     plat_icons(tool);
 }
+#endif
 #else
 /* The status panel: five lines, so it fits the top third of even a 16 row screen. */
 static void draw_status(void)
@@ -1264,7 +1371,14 @@ static void title_screen(void)
 
     plat_text_clear();
     plat_text_puts(0, 0, "S I M C I T Y");
+#ifdef HAVE_NARROW_TITLE                           /* a 32 column display: one choice to a line */
+    plat_text_puts(0, 2, "CHOOSE A LEVEL:");
+    plat_text_puts(2, 4, "1 EASY");
+    plat_text_puts(2, 6, "2 MEDIUM");
+    plat_text_puts(2, 8, "3 HARD");
+#else
     plat_text_puts(0, 2, "CHOOSE A LEVEL: 1 EASY 2 MEDIUM 3 HARD");
+#endif
     plat_flush();
     do {
         seed++;
