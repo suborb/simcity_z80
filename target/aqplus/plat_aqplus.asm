@@ -146,6 +146,20 @@ _plat_aq_printc:
         ld      b,(hl)                  ; col
         ; a = ch, b = col, c = row
 aq_char:
+        cp      32
+        jr      nc,aq_ch_font
+        ld      l,a                     ; a line piece of the boxes' frames: codes 1 to 6
+        ld      h,0
+        add     hl,hl
+        add     hl,hl
+        add     hl,hl
+        ld      de,aq_box - 8
+        add     hl,de
+        ex      de,hl
+        ld      a,c                     ; row
+        ld      c,TEXT_COLOUR
+        jp      aq_cell
+aq_ch_font:
         ld      l,a
         ld      h,0
         add     hl,hl
@@ -232,6 +246,15 @@ _plat_exit:
         ret
 
 ; The inverted copy of a picture that aq_invert makes: in the code section, so that it is not under the video RAM (bank 2 in the all-RAM build).
+; The line pieces of the boxes' frames, pipes two pixels thick with rounded corners: 1 top left, 2 top right, 3 bottom left, 4 bottom right,
+; 5 across, 6 down (the codes of BOX_TOP, BOX_BOTTOM and BOX_SIDE in plat_config.h, below the space; in the code section like aq_scratch)
+aq_box:
+        defb    $00,$00,$00,$0F,$1F,$18,$18,$18
+        defb    $00,$00,$00,$F0,$F8,$18,$18,$18
+        defb    $18,$18,$18,$1F,$0F,$00,$00,$00
+        defb    $18,$18,$18,$F8,$F0,$00,$00,$00
+        defb    $00,$00,$00,$FF,$FF,$00,$00,$00
+        defb    $18,$18,$18,$18,$18,$18,$18,$18
 aq_scratch:
         defs    8
         IFDEF   AQ_VIDEO_BANK2

@@ -141,13 +141,14 @@ def main():
     # and single characters through plat_aq_printc; each is (col, row, string or character)
     texts = [(0, 0, 'SIMCITY'), (0, 24, 'JAN 1902  FUNDS $20000  POP 12345'), (30, 5, 'RUNS OFF THE RIGHT EDGE'),
              (39, 7, 'XY'), (40, 8, 'NOTHING'), (12, 9, ''), (3, 10, ' '), (38, 11, '!?'),
-             (10, 12, 'abcdefghijklmnopqrstuvwxyz{|}~'), (0, 13, '0123456789')]
-    chars = [(5, 14, 'A'), (39, 24, '~'), (0, 0, ' '), (20, 20, '@')]
+             (10, 12, 'abcdefghijklmnopqrstuvwxyz{|}~'), (0, 13, '0123456789'),
+             (2, 15, '\x01\x05\x05\x02'), (2, 16, '\x06  \x06'), (2, 17, '\x03\x05\x05\x04')]     # a frame: the line pieces are codes 1 to 6
+    chars = [(5, 14, 'A'), (39, 24, '~'), (0, 0, ' '), (20, 20, '@'), (9, 19, '\x04'), (10, 19, '\x06')]
     strings = ''
     tspec = ''
     n = 0
     for col, row, t in texts:
-        strings += f's{n}:      defm "{t}"\n        defb 0\n'
+        strings += f's{n}:      defb {"".join(str(ord(c)) + "," for c in t)}0\n'
         tspec += f'        defb {col},{row}\n        defw s{n}\n        defb 0\n'
         n += 1
     for col, row, ch in chars:
@@ -161,7 +162,13 @@ def main():
     for a in art:
         src += '        defb ' + ','.join(str(b) for b in a) + '\n'
 
-    # the model: what the video RAM holds afterwards
+    # the model: what the video RAM holds afterwards (the line pieces of the frames, which are not in the font)
+    BOX = [[0x00, 0x00, 0x00, 0x0F, 0x1F, 0x18, 0x18, 0x18], [0x00, 0x00, 0x00, 0xF0, 0xF8, 0x18, 0x18, 0x18],
+           [0x18, 0x18, 0x18, 0x1F, 0x0F, 0x00, 0x00, 0x00], [0x18, 0x18, 0x18, 0xF8, 0xF0, 0x00, 0x00, 0x00],
+           [0x00, 0x00, 0x00, 0xFF, 0xFF, 0x00, 0x00, 0x00], [0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18]]
+
+    def glyph(ch, r):
+        return BOX[ord(ch) - 1][r] if ord(ch) < 32 else font[(ord(ch) - 32) * 8 + r]
     bank = bytearray(0x4000)
     for col, row, a, colour, inv, tile in spec:
         for r in range(8):
@@ -172,12 +179,12 @@ def main():
             if col >= COLS:
                 break
             for r in range(8):
-                bank[row * 320 + r * 40 + col] = font[(ord(ch) - 32) * 8 + r]
+                bank[row * 320 + r * 40 + col] = glyph(ch, r)
             bank[0x2000 + row * 40 + col] = TEXT_COLOUR
             col += 1
     for col, row, ch in chars:
         for r in range(8):
-            bank[row * 320 + r * 40 + col] = font[(ord(ch) - 32) * 8 + r]
+            bank[row * 320 + r * 40 + col] = glyph(ch, r)
         bank[0x2000 + row * 40 + col] = TEXT_COLOUR
 
     with tempfile.TemporaryDirectory() as tmp:
@@ -199,9 +206,14 @@ def main():
         img = bytearray(65536)
         img[0x8000:0x8000 + len(code)] = code
         open(os.path.join(tmp, 'img.bin'), 'wb').write(img)
+        # first up to the clear (everything the cells and the text drew), then on through it and the one cell after it
+        subprocess.run([TICKS, '-pc', '8000', '-end', f'{syms["textdone"]:x}', '-counter', '400000000',
+                        '-output', 'mem0.out', 'img.bin'], cwd=tmp, capture_output=True)
+        mem0 = open(os.path.join(tmp, 'mem0.out'), 'rb').read()
         subprocess.run([TICKS, '-pc', '8000', '-end', f'{syms["textdone"] + 4:x}', '-counter', '400000000',
                         '-output', 'mem.out', 'img.bin'], cwd=tmp, capture_output=True)
         mem = open(os.path.join(tmp, 'mem.out'), 'rb').read()
+    before = bytes(bank)
 
     # plat_clear: the bitmap (8000 bytes) is 0 and the colour RAM (1000 bytes) white on black; the rest of the page
     # is left alone (so what was drawn there, beyond the cells, stays), then the one cell drawn after it
@@ -214,6 +226,10 @@ def main():
     bank[0x2000 + 1 * 40 + 2] = 0x25
 
     ok = True
+    bad0 = [i for i in range(0x4000) if mem0[0xC000 + i] != before[i]]
+    print(('PASS' if not bad0 else 'FAIL') + f'  the cells and the text (and the frame pieces) as drawn, before the clear: bitmap and colour RAM equal the model'
+          + (f' ({len(bad0)} bytes differ, first at ${0xC000 + bad0[0]:04X})' if bad0 else ''))
+    ok &= not bad0
     bad = [i for i in range(0x4000) if mem[0xC000 + i] != bank[i]]
     print(('PASS' if not bad else 'FAIL') + f'  {len(spec)} cells (corners, edges, random; inverse and plain) and text through plat_puts and plat_aq_printc, then plat_clear and one more cell: '
           f'bitmap and colour RAM equal the model' + (f' ({len(bad)} bytes differ, first at ${0xC000 + bad[0]:04X})' if bad else ''))
