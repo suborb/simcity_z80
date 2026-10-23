@@ -15,6 +15,9 @@
 #define MINIMAP_CHUNK_ROWS 4
 #define HAVE_SPRITES
 #define HAVE_ICONS              /* the tools as 16x16 pictures */
+#define HAVE_TEXT_COLOUR        /* the budget and evaluation screens coloured, with bars (plat_text_attr, plat_bar) */
+#define MODAL_NARROW            /* ... in their 32 column arrangement, */
+#define MODAL_X 4               /* ... centred in the 40 columns */
 #define HAVE_ICONS_AFFORD       /* the icons of what there is no money for are dimmed (plat_afford) */
 #define HAVE_POWER_ASK          /* a power station asks coal or nuclear when there is the money for both */
 #define BOX_TOP    "\1\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\2"

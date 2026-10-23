@@ -22,24 +22,14 @@ _aq_icons:
         PUBLIC  _aq_blit8
         PUBLIC  _plat_put_tile
         defc    PORT_BANK2 = $F2
-        IFDEF   AQ_VIDEO_BANK2          ; the all-RAM build (aqxboot): the video is paged over bank 2 ($8000); the stack and the buffers are in bank 3
-        defc    VID_PORT = $F2
-        defc    VID_BASE = $80          ; the high byte of the bitmap's address, and of the colour RAM's
-        defc    VID_COLOUR = $A0
-        MACRO   VID_PAGE_OUT
-        ld      a,(aq_page2)            ; the RAM that was in bank 2 (plat_init read it)
-        out     (PORT_BANK2),a
-        ENDM
-        ELSE                            ; the video is paged over bank 3 ($C000) where the buffers are
-        defc    VID_PORT = $F3
-        defc    VID_BASE = $C0
+        defc    VID_PORT = $F3          ; the video RAM is paged over bank 3 ($C000), where the buffers are
+        defc    VID_BASE = $C0          ; the high byte of the bitmap's address, and of the colour RAM's
         defc    VID_COLOUR = $E0
         MACRO   VID_PAGE_OUT
         in      a,(PORT_BANK2)
         inc     a
         out     (PORT_BANK3),a
         ENDM
-        ENDIF
         defc    PORT_BANK3 = $F3
 
 _plat_put_tile:
@@ -211,10 +201,6 @@ aq_puts_next:
         EXTERN  set_default_palette
         PUBLIC  _plat_init
 _plat_init:
-        IFDEF   AQ_VIDEO_BANK2
-        in      a,(PORT_BANK2)          ; the RAM page the video is paged over, to put back after every cell
-        ld      (aq_page2),a
-        ENDIF
         call    set_default_palette
         ld      a,VCTRL_BITMAP
         out     (PORT_VCTRL),a
@@ -238,6 +224,48 @@ _plat_clear:
         VID_PAGE_OUT
         ret
 
+; void aq_colours(uint8_t col, uint8_t row, uint8_t n, uint8_t colour) __smallc
+; The colour bytes of n cells from (col, row) to `colour` (ink << 4 | paper), and nothing else: the pictures stay as they are, so a
+; screen of text is coloured by this alone.  The cells are on one row (the colour RAM is 40 bytes a row).
+        PUBLIC  _aq_colours
+_aq_colours:
+        ld      hl,2
+        add     hl,sp
+        ld      c,(hl)                  ; colour
+        inc     hl
+        inc     hl
+        ld      b,(hl)                  ; n
+        inc     hl
+        inc     hl
+        ld      e,(hl)                  ; row
+        inc     hl
+        inc     hl
+        ld      a,(hl)                  ; col
+        ld      d,0
+        ld      h,d
+        ld      l,e
+        add     hl,hl
+        add     hl,hl
+        add     hl,de                   ; row * 5
+        add     hl,hl
+        add     hl,hl
+        add     hl,hl                   ; row * 40
+        ld      e,a
+        add     hl,de                   ; + col
+        ld      de,VID_COLOUR * 256
+        add     hl,de
+        ld      a,b
+        or      a
+        ret     z
+        ld      a,20                    ; the video RAM
+        out     (VID_PORT),a
+aq_col_fill:
+        ld      (hl),c
+        inc      hl
+        djnz    aq_col_fill
+        VID_PAGE_OUT
+        ret
+
 ; void plat_exit(void): back to the text screen
         PUBLIC  _plat_exit
 _plat_exit:
@@ -245,7 +273,7 @@ _plat_exit:
         out     (PORT_VCTRL),a
         ret
 
-; The inverted copy of a picture that aq_invert makes: in the code section, so that it is not under the video RAM (bank 2 in the all-RAM build).
+; The inverted copy of a picture that aq_invert makes: in the code section, so that it is not under the video RAM.
 ; The line pieces of the boxes' frames, pipes two pixels thick with rounded corners: 1 top left, 2 top right, 3 bottom left, 4 bottom right,
 ; 5 across, 6 down (the codes of BOX_TOP, BOX_BOTTOM and BOX_SIDE in plat_config.h, below the space; in the code section like aq_scratch)
 aq_box:
@@ -257,7 +285,4 @@ aq_box:
         defb    $18,$18,$18,$18,$18,$18,$18,$18
 aq_scratch:
         defs    8
-        IFDEF   AQ_VIDEO_BANK2
-aq_page2:
-        defb    0                       ; (in the code section, not under the video RAM)
-        ENDIF
+

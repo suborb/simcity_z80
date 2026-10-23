@@ -22,6 +22,36 @@ extern const uint8_t aq_icons[];
 
 /* plat_init, plat_exit, plat_clear, plat_put and plat_puts are in the assembler too */
 
+#ifdef HAVE_TEXT_COLOUR
+extern void aq_colours(uint8_t col, uint8_t row, uint8_t n, uint8_t colour) __smallc;
+
+/* The palette entry of each of the game's colours (Spectrum order: black, blue, red, magenta, green, cyan, yellow, white), the bright ones
+   (tools/make_aq_assets.py) */
+static const uint8_t aq_pal[8] = { 0, 4, 1, 5, 2, 6, 3, 7 };
+
+/* Colours text already drawn: only the colour bytes change, as a glyph's pixels are the ink */
+void plat_text_attr(uint8_t col, uint8_t row, uint8_t n, uint8_t attr)
+{
+    aq_colours(col, row, n, (uint8_t)(aq_pal[attr & 7] << 4 | aq_pal[(attr >> 3) & 7]));
+}
+
+/* A bar of n cells, the first `fill` pixels (8 to a cell) in the ink of attr, the rest the track: dark grey.  The cell's own two colours do it
+   (ink on a dark grey paper), the picture being the filled pixels of its middle six lines. */
+void plat_bar(uint8_t col, uint8_t row, uint8_t cells, uint8_t fill, uint8_t attr)
+{
+    uint8_t i, k, bits, a[8], colour = (uint8_t)(aq_pal[attr & 7] << 4 | 15);
+    int16_t px;
+
+    for (i = 0; i < cells; ++i) {
+        px = (int16_t)fill - 8 * i;
+        bits = px >= 8 ? 0xFF : px <= 0 ? 0 : (uint8_t)(0xFF << (8 - px));
+        for (k = 0; k < 8; ++k)
+            a[k] = (k && k < 7) ? bits : 0;
+        aq_blit8((uint8_t)(col + i), row, a, colour, 0);
+    }
+}
+#endif
+
 void plat_text_clear(void) { plat_clear(); }
 void plat_text_puts(uint8_t col, uint8_t row, const char *s) { plat_puts(col, row, s); }
 

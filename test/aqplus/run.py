@@ -26,7 +26,7 @@ ROWS, COLS = 25, 40
 HARNESS = '''        SECTION code_user
         org     $8000
         PUBLIC  _font_8x8_bbc_system, set_default_palette
-        EXTERN  _aq_blit8, _plat_put_tile, _plat_aq_printc, _plat_puts, _plat_clear
+        EXTERN  _aq_blit8, _plat_put_tile, _plat_aq_printc, _plat_puts, _plat_clear, _aq_colours
 start:  ld      sp,$7000
         ld      ix,cases
 next:   ld      a,(ix+0)
@@ -73,16 +73,31 @@ nexttext:
         ld      h,(ix+3)
         push    hl                      ; the string, or the character
         ld      a,(ix+4)
+        cp      2
+        jr      z,colourrun
         or      a
         jr      nz,onechar
         call    _plat_puts
         jr      textcalled
+colourrun:                              ; aq_colours(col, row, n, colour): the word is n | colour << 8
+        pop     hl
+        ld      a,h
+        ld      h,0
+        push    hl                      ; n
+        ld      l,a
+        push    hl                      ; colour
+        call    _aq_colours
+        ld      hl,8
+        add     hl,sp
+        ld      sp,hl
+        jr      textadvance
 onechar:
         call    _plat_aq_printc
 textcalled:
         ld      hl,6
         add     hl,sp
         ld      sp,hl
+textadvance:
         ld      de,5
         add     ix,de
         jr      nexttext
@@ -143,6 +158,7 @@ def main():
              (39, 7, 'XY'), (40, 8, 'NOTHING'), (12, 9, ''), (3, 10, ' '), (38, 11, '!?'),
              (10, 12, 'abcdefghijklmnopqrstuvwxyz{|}~'), (0, 13, '0123456789'),
              (2, 15, '\x01\x05\x05\x02'), (2, 16, '\x06  \x06'), (2, 17, '\x03\x05\x05\x04')]     # a frame: the line pieces are codes 1 to 6
+    runs = [(4, 0, 12, 0x31), (0, 24, 40, 0x6A), (30, 5, 10, 0x2F), (39, 7, 1, 0x15), (10, 12, 0, 0x77), (2, 15, 4, 0x4E), (7, 3, 33, 0xB1)]   # (col, row, n, colour)
     chars = [(5, 14, 'A'), (39, 24, '~'), (0, 0, ' '), (20, 20, '@'), (9, 19, '\x04'), (10, 19, '\x06')]
     strings = ''
     tspec = ''
@@ -153,6 +169,8 @@ def main():
         n += 1
     for col, row, ch in chars:
         tspec += f'        defb {col},{row}\n        defw {ord(ch)}\n        defb 1\n'
+    for col, row, n_cells, colour in runs:                     # the colour of cells already drawn (aq_colours, kind 2)
+        tspec += f'        defb {col},{row}\n        defw {n_cells | colour << 8}\n        defb 2\n'
     tspec += '        defb 255\n' + strings
 
     src = HARNESS.replace('        TEXTS\n', tspec)
@@ -186,6 +204,9 @@ def main():
         for r in range(8):
             bank[row * 320 + r * 40 + col] = glyph(ch, r)
         bank[0x2000 + row * 40 + col] = TEXT_COLOUR
+    for col, row, n_cells, colour in runs:                     # only the colour bytes change
+        for c in range(col, col + n_cells):
+            bank[0x2000 + row * 40 + c] = colour
 
     with tempfile.TemporaryDirectory() as tmp:
         open(os.path.join(tmp, 'h.asm'), 'w').write(src)
