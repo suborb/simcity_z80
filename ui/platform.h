@@ -18,6 +18,15 @@
 #endif
 /* The two screens have a layout for 40 or more columns (the default) and one for the 32 of many Z80 machines
    (a platform with a 32 column display sets MODAL_COLS to 32, and MODAL_ROWS to 24). */
+/* The budget and evaluation screens have a 32 column arrangement (a row to each item, with room for bars), which a display of 32 columns uses.
+   A platform with more can use it too by defining MODAL_NARROW, and MODAL_X to say the column the screens start at (4 to
+   centre them in 40). */
+#ifndef MODAL_NARROW
+#if defined(MODAL_COLS) && MODAL_COLS < 40
+#define MODAL_NARROW
+#endif
+#endif
+
 #ifndef MODAL_COLS
 #define MODAL_COLS 40
 #endif
@@ -113,9 +122,10 @@ extern void     plat_flush(void);               /* end of frame: show what was d
      HAVE_POPUP_MENU   use the shared console box + message selector (ui/menu.c): ESC opens it over the city, centred in the
                        map; the file dialogues (ui/prompt.c) are boxes too.  Do not set this on a platform with native
                        HAVE_MENUS
-     HAVE_NARROW_TITLE the level menu has a line to a choice, for a display under 40 columns
      HAVE_TEXT_COLOUR  the budget and evaluation screens in colour, with bar charts (plat_text_attr(), plat_bar())
      HAVE_DEMAND_BARS  the demand indicators as coloured bar charts (plat_demand())
+     HAVE_ICONS_AFFORD the icons of the tools that cost more than the money dimmed (plat_afford())
+     HAVE_POWER_ASK    placing a power station asks coal or nuclear when there is the money for both (needs HAVE_POPUP_MENU)
      HAVE_FILES        files, for saving and loading a city (plat_file_save()/plat_file_load()); FILE_NAME_MAX
                        (default 24) is the longest name the player may enter
      HAVE_APPNAME      the machine can show what the city is called (plat_set_name(); the Z88's Index)
@@ -157,6 +167,13 @@ extern void     plat_text_puts(uint8_t col, uint8_t row, const char *s);
 #ifdef HAVE_ICONS
 /* plat_icons() draws the 14 tool icons in rows 3 and 4 of the text area (28 columns), tool `selected` highlighted. */
 extern void     plat_icons(uint8_t selected);
+#endif
+
+#ifdef HAVE_ICONS_AFFORD
+/* plat_afford() says which tools there is the money for (bit i of mask is set for tool i), before the game calls plat_icons(): the
+   platform draws the icons of the others dimmed: greyed out, or (the ZX icon set's way) thinned to a checkerboard: each byte of the
+   1 bit picture AND %01010101 on the even rows and %10101010 on the odd ones. */
+extern void     plat_afford(uint16_t mask);
 #endif
 
 #ifdef HAVE_TILES

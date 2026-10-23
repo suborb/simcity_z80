@@ -45,8 +45,31 @@ void fmt_blank(char *b)
 }
 
 /* Called by the table drawing (fmtfields.asm) with a finished row. */
+#ifdef MODAL_X
+uint8_t fmt_col0;
+#define FMT_COL0 fmt_col0
+#else
+#define FMT_COL0 0
+#endif
+
 void fmt_flush(const char *row) __z88dk_fastcall
 {
-    plat_text_puts(0, fmt_row, row);
+    plat_text_puts(FMT_COL0, fmt_row, row);
 }
+
+#ifdef HAVE_TEXT_COLOUR
+void fmt_fields_each(const struct field *f, uint8_t n, void (*done)(uint8_t row))
+{
+    uint8_t i = 0, j, row;
+
+    while (i < n) {
+        row = f[i].row;
+        for (j = i; j < n && f[j].row == row; ++j)
+            ;
+        fmt_fields(f + i, (uint8_t)(j - i));
+        done(row);
+        i = j;
+    }
+}
+#endif
 #endif

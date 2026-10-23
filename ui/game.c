@@ -45,6 +45,7 @@
 #include "game.h"
 
 #define NUM_TOOLS   14
+#define TOOL_POWER_STATION 11
 
 /* Frames between simulation ticks, indexed by V_simulation_speed. */
 /* Rows of the simulation run per UI frame.  A slice is about 20ms on a 3.5MHz Z80, and
@@ -137,7 +138,9 @@ static const struct menu_item main_menu[] = {
     { "MINI MAP", MENU_MAP_NEXT },
 #endif
     { "GAME OPTIONS", MENU_GAME_OPTIONS },
+#ifndef HAVE_POWER_ASK                      /* (with it, the power station asks, and the one option left is in the game's) */
     { "BUILDING OPTIONS", MENU_BUILD_OPTIONS },
+#endif
     { "DISASTERS", MENU_DISASTERS },
     { "NEW CITY", MENU_NEW_CITY },
 #ifndef TARGET_AQPLUS
@@ -150,17 +153,22 @@ static struct menu_item game_options[] = {
     { "PAUSE: RUNNING", MENU_PAUSE | MENU_TOGGLE },
     { "SPEED: NORMAL", MENU_SPEED_NEXT | MENU_TOGGLE },
     { "AUTO BUDGET: ON", MENU_AUTOBUDGET_TOGGLE | MENU_TOGGLE },
+#ifdef HAVE_POWER_ASK
+    { "AUTO BULLDOZE: ON", MENU_BULLDOZE_TOGGLE | MENU_TOGGLE },
+#endif
 #ifdef HAVE_SOUND
     { "SOUND: ON", MENU_SOUND_TOGGLE | MENU_TOGGLE },
 #endif
     { "BACK", 0 }
 };
 
+#ifndef HAVE_POWER_ASK
 static struct menu_item build_options[] = {
     { "POWER: COAL", MENU_POWER_TOGGLE | MENU_TOGGLE },
     { "AUTO BULLDOZE: ON", MENU_BULLDOZE_TOGGLE | MENU_TOGGLE },
     { "BACK", 0 }
 };
+#endif
 
 static struct menu_item disaster_menu[] = {
     { "START FIRE", MENU_DISASTER },
@@ -186,11 +194,18 @@ static void update_option_labels(void)
     game_options[0].text = V_simulation_speed == 3 ? "PAUSE: PAUSED" : "PAUSE: RUNNING";
     game_options[1].text = speed[V_simulation_speed];
     game_options[2].text = V_auto_budget ? "AUTO BUDGET: ON" : "AUTO BUDGET: OFF";
+#ifdef HAVE_POWER_ASK
+    game_options[3].text = V_auto_bulldoze ? "AUTO BULLDOZE: ON" : "AUTO BULLDOZE: OFF";
+#ifdef HAVE_SOUND
+    game_options[4].text = sound_enabled ? "SOUND: ON" : "SOUND: OFF";
+#endif
+#else
 #ifdef HAVE_SOUND
     game_options[3].text = sound_enabled ? "SOUND: ON" : "SOUND: OFF";
 #endif
     build_options[0].text = power_nuclear ? "POWER: NUCLEAR" : "POWER: COAL";
     build_options[1].text = V_auto_bulldoze ? "AUTO BULLDOZE: ON" : "AUTO BULLDOZE: OFF";
+#endif
     disaster_menu[6].text = V_disaster_reset ? "RANDOM DISASTERS: OFF" : "RANDOM DISASTERS: ON";
 }
 
@@ -205,9 +220,11 @@ static uint8_t popup_menu(void)
         else if (choice == MENU_GAME_OPTIONS) {
             update_option_labels();
             choice = menu_choose("GAME", game_options, MENU_COUNT(game_options));
+#ifndef HAVE_POWER_ASK
         } else if (choice == MENU_BUILD_OPTIONS) {
             update_option_labels();
             choice = menu_choose("BUILDING", build_options, MENU_COUNT(build_options));
+#endif
         } else if (choice == MENU_DISASTERS) {
             update_option_labels();
             choice = menu_choose("DISASTERS", disaster_menu, MENU_COUNT(disaster_menu));
@@ -538,6 +555,17 @@ static void draw_minirow(uint8_t sy)
         plat_put_minirow(sy, colours, base, map_view);
     }
 #else
+#ifdef HAVE_MINIMAP_FLAT_BASE
+    if (map_view == MM_POLLUTION || map_view == MM_POLICE || map_view == MM_FIRE || map_view == MM_TRAFFIC || map_view == MM_CRIME) {
+        static uint8_t base[MM_NATIVE_COLS];
+        uint8_t i;
+
+        minimap_row(MM_CITY, sy, base);         /* a density: the land shows through, as a half lit checker (colour bit 3), where it is none */
+        for (i = 0; i < MM_NATIVE_COLS; ++i)
+            if (!colours[i] && base[i])
+                colours[i] = (uint8_t)(base[i] | 8);
+    }
+#endif
     plat_put_minirow(sy, colours);
 #endif
 #endif
@@ -839,6 +867,22 @@ static const struct field top_map[] = {
     { 5, TOP_MAP_KEYS_COL, F_TEXT, 0, TOP_MAP_KEYS },
 };
 
+#ifdef HAVE_ICONS_AFFORD
+/* What each tool costs (the power station: the coal one), to grey out the icons of the tools there is no money for. */
+static const uint16_t tool_costs[NUM_TOOLS] = { 1, 10, 5, 20, 10, 100, 100, 100, 500, 500, 3000, 3000, 5000, 10000 };
+
+static uint16_t afford_mask(void)
+{
+    uint16_t mask = 0, lo = (uint16_t)V_money[0] | ((uint16_t)V_money[1] << 8);
+    uint8_t i;
+
+    for (i = 0; i < NUM_TOOLS; ++i)
+        if (V_money[2] || lo >= tool_costs[i])
+            mask |= (uint16_t)(1 << i);
+    return mask;
+}
+#endif
+
 #ifdef HAVE_ICONS_2X7
 /* The icons in two rows of seven (rows 1 to 4, 21 columns), with the demand bars and the speed in the 11 columns beside them, the
    tool and its cost on row 5 and the advisor on row 6.  Nothing here may print a whole row 1 to 4 (a field table does): that is
@@ -971,23 +1015,34 @@ static void draw_status(void)
         fmt_fields(top_status27, sizeof(top_status27) / sizeof(struct field));
         fmt_fields(top_alert27, 1);
     }
+#ifdef HAVE_ICONS_AFFORD
+    plat_afford(afford_mask());
+#endif
     plat_icons(tool);
 }
 #else
 static void draw_status(void)
 {
+#ifndef HAVE_DEMAND_BARS
     char buf[41];
+#endif
 
     st_month = text_months[V_month];
     st_tool = text_tools[tool];
     st_speed = st_speeds[V_simulation_speed & 3];
     st_alert = V_alertmessage < sizeof(text_alerts) / sizeof(text_alerts[0]) ? text_alerts[V_alertmessage] : "";
     fmt_fields(top_status, sizeof(top_status) / sizeof(struct field));
+#ifdef HAVE_DEMAND_BARS
+    plat_demand(0, 4, 'R', demand_level(V_RValve, 26));
+    plat_demand(TOP_DEMAND_C, 4, 'C', demand_level(V_CValve, 30));
+    plat_demand(TOP_DEMAND_I, 4, 'I', demand_level(V_IValve, 30));
+#else
     fmt_blank(buf);
     demand_bar(buf, 'R', V_RValve);
     demand_bar(buf + TOP_DEMAND_C, 'C', V_CValve);
     demand_bar(buf + TOP_DEMAND_I, 'I', V_IValve);
     plat_text_puts(0, 4, buf);
+#endif
 #ifdef HAVE_MINIMAP
     if (map_view) {
         st_line[1] = minimap_names[map_view];
@@ -995,6 +1050,9 @@ static void draw_status(void)
     } else
 #endif
         fmt_fields(top_alert, 1);
+#ifdef HAVE_ICONS_AFFORD
+    plat_afford(afford_mask());
+#endif
     plat_icons(tool);
 }
 #endif
@@ -1158,6 +1216,24 @@ static void apply_tool(void)
         return;
     V_selected_tool = tool;
     V_power_type_chosen = power_nuclear ? 1 : 2;
+#ifdef HAVE_POWER_ASK
+    if (tool == TOOL_POWER_STATION) {       /* coal costs 3000 and nuclear 5000: if there is the money for both, the player says which */
+        static const struct menu_item kinds[2] = { { "COAL $3000", 2 }, { "NUCLEAR $5000", 1 } };
+        uint16_t lo = (uint16_t)V_money[0] | ((uint16_t)V_money[1] << 8);
+
+        if (!V_money[2] && lo < 3000)
+            return;                         /* (the engine would not build it) */
+        if (V_money[2] || lo >= 5000) {
+            uint8_t kind = menu_choose("POWER STATION", kinds, 2);
+
+            redraw |= REDRAW_MAP;           /* the box was over the map */
+            if (kind != 1 && kind != 2)
+                return;
+            V_power_type_chosen = kind;
+        } else
+            V_power_type_chosen = 2;        /* only coal is affordable */
+    }
+#endif
     V_pointer_charxy[0] = (uint8_t)(cur_x - origin_x);
     V_pointer_charxy[1] = (uint8_t)(cur_y - origin_y + 8);
     V_view_topleft[0] = origin_x;
@@ -1465,14 +1541,10 @@ static void title_screen(void)
 
     plat_text_clear();
     plat_text_puts(0, 0, "S I M C I T Y");
-#ifdef HAVE_NARROW_TITLE                           /* a 32 column display: one choice to a line */
-    plat_text_puts(0, 2, "CHOOSE A LEVEL:");
+    plat_text_puts(0, 2, "CHOOSE A LEVEL:");                 /* one choice to a line */
     plat_text_puts(2, 4, "1 EASY");
     plat_text_puts(2, 6, "2 MEDIUM");
     plat_text_puts(2, 8, "3 HARD");
-#else
-    plat_text_puts(0, 2, "CHOOSE A LEVEL: 1 EASY 2 MEDIUM 3 HARD");
-#endif
     plat_flush();
     do {
         seed++;

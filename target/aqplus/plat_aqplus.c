@@ -54,16 +54,32 @@ void plat_put_minimap(uint8_t col, uint8_t row, const uint8_t *art,
 /* The tool icons: 16x16 pictures, four cells each. */
 #define NUM_ICONS 14
 
+/* the tools there is the money for, bit i for tool i (plat_afford): the icons of the others are thinned to a checkerboard
+   (each byte of the picture AND %01010101 on the even rows and %10101010 on the odd ones) */
+static uint16_t afford = 0xFFFF;
+
+void plat_afford(uint16_t mask)
+{
+    afford = mask;
+}
+
 void plat_icons(uint8_t selected)
 {
-    uint8_t i, r, c, cell;
+    uint8_t i, r, c, cell, k;
+    const uint8_t *art;
+    uint8_t thin[8];
 
     for (i = 0; i < NUM_ICONS; ++i)
         for (r = 0; r < 2; ++r)
             for (c = 0; c < 2; ++c) {
                 cell = (uint8_t)(i * 4 + r * 2 + c);
-                aq_blit8((uint8_t)(i * 2 + c), (uint8_t)(1 + r), aq_icons + cell * 8,
-                         aq_icons[NUM_ICONS * 32 + cell], i == selected);
+                art = aq_icons + cell * 8;
+                if (!((afford >> i) & 1)) {
+                    for (k = 0; k < 8; ++k)
+                        thin[k] = art[k] & ((k & 1) ? 0xAA : 0x55);
+                    art = thin;
+                }
+                aq_blit8((uint8_t)(i * 2 + c), (uint8_t)(1 + r), art, aq_icons[NUM_ICONS * 32 + cell], i == selected);
             }
 }
 

@@ -91,7 +91,7 @@ static struct evaluation ev;
 static uint8_t migration[3];
 static const char *class_name, *level_name;
 
-#if MODAL_COLS < 40
+#ifdef MODAL_NARROW
 /* The 32 column arrangement: the same sections, with the problems one to a row. */
 static const struct field head[] = {
     { 0, 11, F_TEXT, 0,   "EVALUATION" },
@@ -251,34 +251,66 @@ static const struct field foot[] = {
 
 #define COUNT(a) (sizeof(a) / sizeof(struct field))
 
-#if defined(HAVE_TEXT_COLOUR) && MODAL_COLS < 40
+#if defined(HAVE_TEXT_COLOUR) && defined(MODAL_NARROW)
 /* The 32 column evaluation in colour: a title band, the question and the headings in cyan, yellow labels, bars for the approval
    (green, red) and for each problem (green when it is small, yellow, red when it is large), and the key in cyan. */
-static void decorate(void)
+#ifdef MODAL_X
+#define MX(c) ((uint8_t)((c) + MODAL_X))
+#else
+#define MX(c) (c)
+#endif
+static void colour_row(uint8_t row)
 {
-    uint8_t i, v, c;
+    uint8_t v, c;
 
-    plat_text_attr(0, 0, 32, PLAT_ATTR(COL_WHITE, COL_BLUE));
-    plat_text_attr(1, 2, 30, PLAT_ATTR(COL_CYAN, COL_BLACK));
-    plat_text_attr(1, 16, 10, PLAT_ATTR(COL_YELLOW, COL_BLACK));       /* the labels only: the figures are white */
-    plat_text_attr(1, 17, 9, PLAT_ATTR(COL_YELLOW, COL_BLACK));
-    plat_text_attr(1, 18, 15, PLAT_ATTR(COL_YELLOW, COL_BLACK));
-    plat_text_attr(1, 20, 8, PLAT_ATTR(COL_YELLOW, COL_BLACK));
-    plat_text_attr(1, 21, 10, PLAT_ATTR(COL_YELLOW, COL_BLACK));
-    plat_text_attr(1, 22, 10, PLAT_ATTR(COL_YELLOW, COL_BLACK));
-    plat_text_attr(24, 23, 8, PLAT_ATTR(COL_CYAN, COL_BLACK));
-    if (!ev.has_people)
+    switch (row) {
+    case 0:
+        plat_text_attr(MX(0), 0, 32, PLAT_ATTR(COL_WHITE, COL_BLUE));
         return;
-    plat_text_attr(18, 3, 3, PLAT_ATTR(COL_GREEN, COL_BLACK));
-    plat_text_attr(18, 4, 2, PLAT_ATTR(COL_RED, COL_BLACK));
-    plat_bar(22, 3, 10, (uint8_t)((uint16_t)ev.yes * 4 / 5), PLAT_ATTR(COL_GREEN, COL_BLACK));
-    plat_bar(22, 4, 10, (uint8_t)((uint16_t)ev.no * 4 / 5), PLAT_ATTR(COL_RED, COL_BLACK));
-    plat_text_attr(1, 6, 27, PLAT_ATTR(COL_CYAN, COL_BLACK));
-    for (i = 0; i < 7; ++i) {
-        v = ev.problem[i];
+    case 2:
+        plat_text_attr(MX(1), 2, 30, PLAT_ATTR(COL_CYAN, COL_BLACK));
+        return;
+    case 3:
+        if (ev.has_people) {
+            plat_text_attr(MX(18), 3, 3, PLAT_ATTR(COL_GREEN, COL_BLACK));
+            plat_bar(MX(22), 3, 10, (uint8_t)((uint16_t)ev.yes * 4 / 5), PLAT_ATTR(COL_GREEN, COL_BLACK));
+        }
+        return;
+    case 4:
+        if (ev.has_people) {
+            plat_text_attr(MX(18), 4, 2, PLAT_ATTR(COL_RED, COL_BLACK));
+            plat_bar(MX(22), 4, 10, (uint8_t)((uint16_t)ev.no * 4 / 5), PLAT_ATTR(COL_RED, COL_BLACK));
+        }
+        return;
+    case 6:
+        if (ev.has_people)
+            plat_text_attr(MX(1), 6, 27, PLAT_ATTR(COL_CYAN, COL_BLACK));
+        return;
+    case 16:                                                    /* the labels only: the figures are white */
+        plat_text_attr(MX(1), 16, 10, PLAT_ATTR(COL_YELLOW, COL_BLACK));
+        return;
+    case 17:
+        plat_text_attr(MX(1), 17, 9, PLAT_ATTR(COL_YELLOW, COL_BLACK));
+        return;
+    case 18:
+        plat_text_attr(MX(1), 18, 15, PLAT_ATTR(COL_YELLOW, COL_BLACK));
+        return;
+    case 20:
+        plat_text_attr(MX(1), 20, 8, PLAT_ATTR(COL_YELLOW, COL_BLACK));
+        return;
+    case 21:
+    case 22:
+        plat_text_attr(MX(1), row, 10, PLAT_ATTR(COL_YELLOW, COL_BLACK));
+        return;
+    case 23:
+        plat_text_attr(MX(24), 23, 8, PLAT_ATTR(COL_CYAN, COL_BLACK));
+        return;
+    }
+    if (row >= 8 && row <= 14 && ev.has_people) {               /* a problem: its label and its bar (green when small, red when large) */
+        v = ev.problem[row - 8];
         c = v < 25 ? COL_GREEN : v < 50 ? COL_YELLOW : COL_RED;
-        plat_text_attr(1, (uint8_t)(8 + i), 12, PLAT_ATTR(COL_YELLOW, COL_BLACK));
-        plat_bar(24, (uint8_t)(8 + i), 8, (uint8_t)((uint16_t)v * 16 / 25), PLAT_ATTR(c, COL_BLACK));
+        plat_text_attr(MX(1), row, 12, PLAT_ATTR(COL_YELLOW, COL_BLACK));
+        plat_bar(MX(24), row, 8, (uint8_t)((uint16_t)v * 16 / 25), PLAT_ATTR(c, COL_BLACK));
     }
 }
 #endif
@@ -295,14 +327,26 @@ static void draw(void)
     }
     class_name = text_city_class[ev.city_class];
     level_name = text_levels[V_difficulty > 2 ? 2 : V_difficulty];
+#ifdef MODAL_X
+    fmt_col0 = MODAL_X;                             /* (the screen is centred) */
+#endif
+#if defined(HAVE_TEXT_COLOUR) && defined(MODAL_NARROW)
+    fmt_fields_each(head, COUNT(head), colour_row);
+    if (ev.has_people)
+        fmt_fields_each(body, COUNT(body), colour_row);
+    else
+        fmt_fields_each(nobody, COUNT(nobody), colour_row);
+    fmt_fields_each(foot, COUNT(foot), colour_row);
+#else
     fmt_fields(head, COUNT(head));
     if (ev.has_people)
         fmt_fields(body, COUNT(body));
     else
         fmt_fields(nobody, COUNT(nobody));
     fmt_fields(foot, COUNT(foot));
-#if defined(HAVE_TEXT_COLOUR) && MODAL_COLS < 40
-    decorate();
+#endif
+#ifdef MODAL_X
+    fmt_col0 = 0;
 #endif
     plat_flush();
 }

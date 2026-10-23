@@ -13,6 +13,9 @@ extern uint8_t fmt_dec(char *b, uint32_t v);
 extern uint8_t fmt_dec3(char *b, uint8_t *t);
 
 #ifdef HAVE_FIELDS
+#ifdef MODAL_X
+extern uint8_t  fmt_col0;                                   /* the column the rows of a table are written from (0, except for a screen that sets it) */
+#endif
 extern uint8_t  fmt_str(char *b, uint8_t n, const char *s); /* s at b[n..]; returns the column after it */
 extern void     fmt_blank(char *b);                         /* FMT_WIDTH (40, or a narrower display's) spaces and a NUL */
 
@@ -36,6 +39,12 @@ struct field {
 extern uint8_t fmt_count, fmt_row;
 extern void fmt_run(const struct field *f) __z88dk_fastcall;
 #define fmt_fields(f, n)    do { fmt_count = (n); fmt_run(f); } while (0)
+
+#ifdef HAVE_TEXT_COLOUR
+/* The same a row at a time, calling done(row) after each: the screens that colour their text do it row by row, so that only one row at
+   a time is ever drawn plain (a whole screen printed and then coloured shows its colours gone for the time that takes). */
+extern void fmt_fields_each(const struct field *f, uint8_t n, void (*done)(uint8_t row));
+#endif
 #endif
 
 #endif

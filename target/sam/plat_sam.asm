@@ -459,17 +459,42 @@ _plat_icons:
         add     hl,sp
         ld      a,(hl)
         ld      (mp_isel),a
-        ld      a,(mp_ilast)            ; what is on the screen: only the two icons that change are drawn
+        ld      a,(mp_ilast)            ; what is on the screen: only the icons that change are drawn
         cp      $FF
         jr      z,pi_all
         ld      hl,mp_isel
         cp      (hl)
-        ret     z                       ; the same tool
-        ld      (mp_ii),a               ; the one that was selected,
-        call    pi_one
-        ld      a,(mp_isel)             ; and the one that is
+        jr      nz,pi_some
+        ld      hl,(mp_adiff)
+        ld      a,h
+        or      l
+        ret     z                       ; the same tool, and no price has come within reach or gone out of it
+pi_some:
+        ld      hl,(mp_adiff)           ; the one that was selected, the one that is, and those whose affordability changed
+        ld      (mp_adw),hl
+        xor     a
         ld      (mp_ii),a
+pi_chk:
+        ld      hl,(mp_adw)             ; (bit i of the changes: the word moves right as i goes up)
+        srl     h
+        rr      l
+        ld      (mp_adw),hl
+        jr      c,pi_draw
+        ld      a,(mp_ii)
+        ld      hl,mp_isel
+        cp      (hl)
+        jr      z,pi_draw
+        ld      hl,mp_ilast
+        cp      (hl)
+        jr      nz,pi_skip
+pi_draw:
         call    pi_one
+pi_skip:
+        ld      hl,mp_ii
+        inc     (hl)
+        ld      a,(hl)
+        cp      14
+        jr      nz,pi_chk
         jr      pi_done
 pi_all:
         xor     a                       ; a new screen: all of them
@@ -484,7 +509,89 @@ pi_each:
 pi_done:
         ld      a,(mp_isel)
         ld      (mp_ilast),a
+        ld      hl,0
+        ld      (mp_adiff),hl
         ret
+
+; void plat_afford(uint16_t mask) __smallc
+; Bit i of the mask is set if there is the money for tool i: the icons of the others are drawn greyed out (by the plat_icons that
+; follows).  What differs from before is noted in mp_adiff, so that plat_icons draws only those.
+        PUBLIC  _plat_afford
+_plat_afford:
+        ld      hl,2
+        add     hl,sp
+        ld      e,(hl)
+        inc     hl
+        ld      d,(hl)
+        ld      hl,(mp_amask)
+        ld      a,l
+        xor     e
+        ld      l,a
+        ld      a,h
+        xor     d
+        ld      h,a                     ; what changed
+        ld      bc,(mp_adiff)
+        ld      a,c
+        or      l
+        ld      c,a
+        ld      a,b
+        or      h
+        ld      b,a
+        ld      (mp_adiff),bc
+        ld      (mp_amask),de
+        ret
+
+; carry if there is the money for icon mp_ii
+pi_afford:
+        ld      a,(mp_ii)
+        inc     a
+        ld      b,a
+        ld      hl,(mp_amask)
+pi_af:
+        srl     h
+        rr      l
+        djnz    pi_af
+        ret
+
+; The picture in mp_ibuf greyed out: the dark colours black and the light ones light grey, on a dark grey button
+pi_dim:
+        ld      hl,mp_ibuf + 12
+        ld      b,ICON_BYTES
+pd_lp:
+        ld      a,(hl)
+        ld      c,a
+        rrca
+        rrca
+        rrca
+        rrca
+        and     15
+        call    pd_map
+        rlca
+        rlca
+        rlca
+        rlca
+        ld      (mp_dtmp),a
+        ld      a,c
+        and     15
+        call    pd_map
+        ld      c,a
+        ld      a,(mp_dtmp)
+        or      c
+        ld      (hl),a
+        inc     hl
+        djnz    pd_lp
+        ret
+pd_map:
+        push    hl
+        ld      hl,mp_dim16
+        ld      e,a
+        ld      d,0
+        add     hl,de
+        ld      a,(hl)
+        pop     hl
+        ret
+mp_dim16:
+        defb    0,0,0,0,0,0,0,8,0,7,7,7,7,7,7,7
 
 ; Draw icon mp_ii (the selected one, mp_isel, in its frame)
 pi_one:
@@ -510,6 +617,8 @@ pi_got:
         ldir
         ld      a,(mp_dpage)
         out     (HMPR),a
+        call    pi_afford
+        call    nc,pi_dim               ; (no money for it: greyed out)
         ld      a,(mp_ii)
         ld      hl,mp_isel
         cp      (hl)
@@ -1458,6 +1567,10 @@ mp_pix:   defs  32                      ; the picture on its way to the screen
 mp_ibuf:  defs  16 * 12                 ; a tool icon's button on its way to the screen
 mp_isel:  defb  0                       ; plat_icons: the selected tool, and the icon being drawn
 mp_ii:    defb  0
+mp_amask: defw  $3FFF                  ; plat_afford: the tools there is money for, what changed since the icons were drawn,
+mp_adiff: defw  0                       ; and plat_icons' own counters
+mp_adw:   defw  0
+mp_dtmp:  defb  0
 mp_drc:   defw  0                       ; plat_demand: the row and the column, the level, the cell
 mp_dlev:  defb  0
 mp_dk:    defb  0
