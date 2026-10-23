@@ -22,7 +22,12 @@
 #ifdef HAVE_MINIMAP_NATIVE
 /* Native pixel mini maps (HAVE_MINIMAP_NATIVE, the Multi 8): the whole city, every tile column and every other tile row,
    96 x 48 tiles drawn a row at a time by plat_put_minirow().  No dithering and no paging.  Row sy is tile row 2 * sy. */
+#ifdef HAVE_MINIMAP_SQUARE
+#define MM_NATIVE_ROWS 96                   /* HAVE_MINIMAP_SQUARE: every tile row, so the picture is square (row ty is tile row ty) */
+extern uint8_t mm_odd;                      /* (the builder's: the odd row of a pair) */
+#else
 #define MM_NATIVE_ROWS 48
+#endif
 #define MM_NATIVE_COLS 96
 
 extern const char *const minimap_names[MM_VIEWS + 1];

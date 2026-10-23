@@ -525,9 +525,21 @@ static void draw_minirow(uint8_t sy)
     plat_put_minirow(sy);
 #else
     static uint8_t colours[MM_NATIVE_COLS];
+#ifdef HAVE_MINIMAP_SQUARE
+    static uint8_t base[MM_NATIVE_COLS];
+#endif
 
     minimap_row(map_view, sy, colours);
+#ifdef HAVE_MINIMAP_SQUARE
+    if (map_view == MM_CITY || map_view == MM_POWER || map_view == MM_TRANSPORT)
+        plat_put_minirow(sy, colours, 0, map_view);
+    else {                                  /* a density: the land shows through where it is none */
+        minimap_row(MM_CITY, sy, base);
+        plat_put_minirow(sy, colours, base, map_view);
+    }
+#else
     plat_put_minirow(sy, colours);
+#endif
 #endif
 }
 
@@ -555,16 +567,20 @@ static uint8_t draw_minimap(uint8_t full)
 /* Show mini map v (1..MM_VIEWS), or 0 for the city again. */
 static void set_map_view(uint8_t v)
 {
-#ifdef HAVE_ICONS_2X7
+#ifdef HAVE_MINIMAP_SQUARE
+    if (v && (cols < 32 || rows < 24))
+        return;                             /* nowhere to draw it: 192x192 pixels and a sidebar */
+#elif defined(HAVE_ICONS_2X7)
     if (v && view_h + 1 < MM_NATIVE_ROWS * 3 / 8)       /* (the 7 row panel's last row is not used in a mini map) */
+        return;
 #else
     if (v && view_h < MM_NATIVE_ROWS * 3 / 8)
-#endif
         return;                             /* nowhere to draw it: 144 pixel rows, 18 cells */
+#endif
     if (v == map_view)
         return;
     if (!map_view && v)
-#ifdef HAVE_CLEAR_MAP
+#if defined(HAVE_CLEAR_MAP) && !defined(HAVE_MINIMAP_SQUARE)
         plat_clear_map();                   /* entering the mini map replaces the city (the panel stays as it is) */
 #else
         plat_clear();                       /* entering the mini map replaces the city layout */
@@ -575,6 +591,9 @@ static void set_map_view(uint8_t v)
         map_full = 1;
     } else {
         last_cx = 255;                      /* a full pass over the city */
+#ifdef HAVE_MINIMAP_SQUARE
+        redraw |= REDRAW_ALL;               /* the square picture covered the panel too: the whole screen again */
+#endif
     }
 }
 #else
@@ -838,10 +857,82 @@ static const struct field top_alert27[] = {
     { 6,  0, F_STR,  0, &st_alert },
 };
 
+#ifdef HAVE_MINIMAP_SQUARE
+/* The sidebar of a square mini map (eight columns at the right of the screen): the date, the money, the population, the view,
+   its key (the platform's), the demand, the speed and the keys.  Only plat_text_puts() and plat_demand(): a field table would print
+   whole rows, picture and all. */
+static const char *const sidebar_names[MM_VIEWS + 1] = {
+    "", "CITY", "POLLUTE", "POLICE", "FIRE", "TRAFFIC", "POWER", "TRANSPRT", "CRIME"
+};
+
+static void side_puts(uint8_t row, const char *s)       /* the text padded to the eight columns */
+{
+    char b[9];
+    uint8_t i = 0;
+
+    while (*s && i < 8)
+        b[i++] = *s++;
+    while (i < 8)
+        b[i++] = ' ';
+    b[8] = 0;
+    plat_text_puts(24, row, b);
+}
+
+static void side_number(uint8_t row, char lead, const uint8_t *v)
+{
+    char b[9];
+    uint8_t t[7], n = 0;
+
+    t[0] = v[0];
+    t[1] = v[1];
+    t[2] = v[2];
+    if (lead)
+        b[n++] = lead;
+    n += fmt_dec3(b + n, t);
+    while (n < 8)
+        b[n++] = ' ';
+    b[8] = 0;
+    plat_text_puts(24, row, b);
+}
+
+static void draw_map_sidebar(void)
+{
+    char b[9];
+    uint8_t n;
+
+    b[0] = text_months[V_month][0];
+    b[1] = text_months[V_month][1];
+    b[2] = text_months[V_month][2];
+    b[3] = ' ';
+    n = (uint8_t)(4 + fmt_dec(b + 4, V_year));
+    while (n < 8)
+        b[n++] = ' ';
+    b[8] = 0;
+    plat_text_puts(24, 0, b);
+    side_number(1, '$', V_money);
+    side_puts(2, "POP");
+    side_number(3, 0, V_display_population);
+    side_puts(5, sidebar_names[map_view]);
+    plat_minimap_key(map_view);
+    plat_demand(24, 17, 'R', demand_level(V_RValve, 26));
+    plat_demand(24, 18, 'C', demand_level(V_CValve, 30));
+    plat_demand(24, 19, 'I', demand_level(V_IValve, 30));
+    side_puts(21, st_speeds[V_simulation_speed & 3]);
+    side_puts(22, "M NEXT");
+    side_puts(23, "X BACK");
+}
+#endif
+
 static void draw_status(void)
 {
     char buf[9];
 
+#ifdef HAVE_MINIMAP_SQUARE
+    if (map_view) {
+        draw_map_sidebar();
+        return;
+    }
+#endif
     st_month = text_months[V_month];
     st_tool = text_tools[tool];
     st_speed = st_speeds[V_simulation_speed & 3];

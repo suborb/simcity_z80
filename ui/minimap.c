@@ -61,6 +61,20 @@ void minimap_row(uint8_t v, uint8_t sy)
     minimap_tiles(sy);
 }
 #else
+#ifdef HAVE_MINIMAP_SQUARE
+void minimap_row(uint8_t v, uint8_t ty, uint8_t *out)   /* tile row ty: the builder does the pair, mm_odd says which of the two */
+{
+    uint8_t tx;
+
+    if (v != MM_CRIME) {
+        mm_odd = ty & 1;
+        minimap_fast(v, (uint8_t)(ty >> 1), out);
+        return;
+    }
+    for (tx = 0; tx < MAP_W; ++tx)
+        out[tx] = crime(tx, ty) >> 1;
+}
+#else
 void minimap_row(uint8_t v, uint8_t sy, uint8_t *out)
 {
     uint8_t tx;
@@ -72,6 +86,7 @@ void minimap_row(uint8_t v, uint8_t sy, uint8_t *out)
     for (tx = 0; tx < MAP_W; ++tx)
         out[tx] = crime(tx, (uint8_t)(sy << 1)) >> 1;
 }
+#endif
 #endif
 #else
 static const uint8_t bayer2[4] = { 0, 2, 3, 1 };

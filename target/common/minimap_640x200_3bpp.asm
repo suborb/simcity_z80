@@ -37,6 +37,11 @@
         defc    OFF_POWER = 5760
 
         IN_BSS
+        IFDEF   HAVE_MINIMAP_SQUARE
+        PUBLIC  _mm_odd
+_mm_odd:
+mm_odd: defb    0                       ; set for the odd tile row of the pair sy covers
+        ENDIF
 mm_sy:  defb    0
 mm_out: defw    0
         IFDEF   HAVE_MINIMAP_ART
@@ -105,7 +110,7 @@ mm_done:
 mm_ret: pop     ix
         ret
 
-; hl = levelmap + 192 sy, the start of tile row 2 * sy
+; hl = levelmap + 192 sy, the start of tile row 2 * sy (HAVE_MINIMAP_SQUARE: the next row if mm_odd is set: a picture of every tile row)
 mm_levelrow:
         ld      a,(mm_sy)
         ld      l,a
@@ -122,6 +127,13 @@ mm_levelrow:
         add     hl,de
         ld      de,_levelmap
         add     hl,de
+        IFDEF   HAVE_MINIMAP_SQUARE
+        ld      a,(mm_odd)
+        or      a
+        ret     z
+        ld      de,96
+        add     hl,de
+        ENDIF
         ret
 
 ; City colours for the row, at ix.  A large zone's row starts with a marker cell (bit 7 set, bit 6 clear) followed by a cell
@@ -258,6 +270,14 @@ mm_power:
         add     hl,hl                   ; 24 sy: 12 bytes a row of tiles, two rows a map row
         ld      de,_minimaps + OFF_POWER
         add     hl,de
+        IFDEF   HAVE_MINIMAP_SQUARE
+        ld      a,(mm_odd)
+        or      a
+        jr      z,mm_p0
+        ld      de,12
+        add     hl,de
+mm_p0:
+        ENDIF
         ld      b,12
 mm_p1:  ld      c,(hl)
         inc     hl

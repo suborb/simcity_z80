@@ -1124,90 +1124,193 @@ mp_clear_cache:
         ldir
         ret
 
-; void plat_put_minirow(uint8_t sy, const uint8_t *colours) __smallc
-; Row sy (0..47) of the mini map: 96 colours (0..7, bit 0 blue, 1 red, 2 green), one a tile, each 2 pixels wide (a byte) and 3 lines
-; tall, centred in the 144 lines under the status panel (lines MM_LINE0 + 3 sy to + 2).
+; void plat_put_minirow(uint8_t ty, const uint8_t *colours, const uint8_t *base, uint8_t view) __smallc
+; Tile row ty (0..95) of the mini map: 96 colours (0..7, what the builder makes), each a tile of 2x2 pixels (a byte of one colour on
+; two lines), the picture 192x192 at the left of the screen.  What a colour is depends on the view: mm_tabs has the ST palette entry
+; of each of the eight for each view; it goes to the aligned page (64 up) as a byte of both nibbles.  For a density (the views in
+; mm_densities) a tile with no level shows its colour from base, the city's row, through mm_dim (the aligned page, 72 up).
         PUBLIC  _plat_put_minirow
-        defc    MM_LINE0 = 48
-        defc    MM_BYTE = 16            ; (128 - 96) / 2: centred
+        defc    mm_densities = $9E      ; views 2, 3, 4, 5 and 8, a bit each (view - 1)
 _plat_put_minirow:
         ld      hl,2
         add     hl,sp
-        ld      e,(hl)
+        ld      a,(hl)                  ; the view, 1 to 8
         inc     hl
-        ld      d,(hl)                  ; de = the colours
         inc     hl
-        ld      c,(hl)                  ; sy
-        ex      de,hl                   ; hl = colours
-        ld      de,mm_buf
-        ld      b,96
-mm_conv:
+        ld      e,(hl)                  ; base
+        inc     hl
+        ld      d,(hl)
+        inc     hl
+        ld      (mm_bptr),de
+        ld      c,(hl)                  ; colours
+        inc     hl
+        ld      b,(hl)
+        inc     hl
+        ld      e,(hl)                  ; ty
+        ld      d,a
+        ld      a,e
+        ld      (mm_ty),a
+        ld      a,d
+        dec     a
+        and     7
+        ld      e,a
+        ld      a,mm_densities
+        inc     e
+mm_dn:
+        dec     e
+        jr      z,mm_dd
+        rrca
+        jr      mm_dn
+mm_dd:
+        and     1
+        ld      (mm_dens),a             ; (bit view - 1 of mm_densities)
+        ld      a,d
+        dec     a
+        and     7
+        add     a,a
+        add     a,a
+        add     a,a
+        ld      e,a
+        ld      d,0
+        ld      hl,mm_tabs
+        add     hl,de                   ; this view's eight palette entries
+        ld      a,(mp_tabhi)
+        ld      d,a
+        ld      e,64
+        push    bc
+        ld      b,8
+mm_t:
         ld      a,(hl)
         inc     hl
-        and     7
-        push    hl
+        ld      c,a
+        rlca
+        rlca
+        rlca
+        rlca
+        or      c
+        ld      (de),a                  ; (the aligned page, 64 up: a byte of both nibbles for each colour)
+        inc     e
+        djnz    mm_t
+        ld      hl,mm_dim               ; and the base's, 72 up
+        ld      b,8
+mm_u:
+        ld      a,(hl)
+        inc     hl
+        ld      c,a
+        rlca
+        rlca
+        rlca
+        rlca
+        or      c
+        ld      (de),a
+        inc     e
+        djnz    mm_u
+        pop     bc                      ; the colours
+        ld      de,mm_buf
+        ld      a,96
+        ld      (mm_cnt),a
+mm_tile:
+        ld      hl,(mm_bptr)
+        ld      a,(hl)                  ; this tile of the base
+        inc     hl
+        ld      (mm_bptr),hl
         ld      l,a
-        ld      h,0
-        push    de
-        ld      de,mp_attrs
-        add     hl,de
-        pop     de
-        ld      a,(hl)                  ; the palette entry of the colour
-        pop     hl
+        ld      a,(bc)
+        inc     bc
+        and     7
+        jr      nz,mm_lvl
+        ld      a,(mm_dens)
+        or      a
+        ld      a,0
+        jr      z,mm_lvl                ; not a density: colour 0 is the view's own
+        ld      a,l                     ; a density with none here: the base, dimmed
+        and     7
+        or      72
+        jr      mm_look
+mm_lvl:
+        or      64
+mm_look:
+        ld      l,a
+        ld      a,(mp_tabhi)
+        ld      h,a
+        ld      a,(hl)
         ld      (de),a
         inc     de
-        djnz    mm_conv
-        ; the nibbles doubled: entry * 17
-        ld      hl,mm_buf
-        ld      b,96
-mm_dup:
-        ld      a,(hl)
+        ld      hl,mm_cnt
+        dec     (hl)
+        jr      nz,mm_tile
+        ld      a,SCRPAGE               ; the row to two lines: tile row ty is lines 2 ty and 2 ty + 1, at $8000 + 256 ty
+        out     (HMPR),a
+        ld      a,(mm_ty)
+        add     a,$80
         ld      d,a
-        add     a,a
-        add     a,a
-        add     a,a
-        add     a,a
-        or      d
+        ld      e,0
+        ld      hl,mm_buf
+        ld      bc,96
+        ldir
+        ld      e,$80
+        ld      hl,mm_buf
+        ld      bc,96
+        ldir
+        jp      mp_back
+
+; void plat_swatch(uint8_t col, uint8_t row, uint8_t cells, uint8_t index) __smallc
+; `cells` solid cells of ST palette entry `index`, from the cell (col, row): the key to a mini map's colours.
+        PUBLIC  _plat_swatch
+_plat_swatch:
+        ld      hl,2
+        add     hl,sp
+        ld      a,(hl)                  ; index
+        inc     hl
+        inc     hl
+        ld      b,(hl)                  ; cells
+        inc     hl
+        inc     hl
+        ld      d,(hl)                  ; row
+        inc     hl
+        inc     hl
+        ld      e,(hl)                  ; col
+        ld      (mp_tc),de
+        ld      c,a
+        rlca
+        rlca
+        rlca
+        rlca
+        or      c                       ; both pixels of a byte
+        ld      hl,mp_bp
         ld      (hl),a
         inc     hl
-        djnz    mm_dup
-        ld      a,c
-        ld      l,a
-        add     a,a
-        add     a,l
-        add     a,MM_LINE0              ; the row's first line
-        srl     a                       ; its address: line * 128 + $8000
-        ld      e,0
-        rr      e                       ; (bit 7 of the low byte is the line's low bit)
-        or      $80
-        ld      d,a
-        ld      a,e
-        or      MM_BYTE
-        ld      e,a
-        ld      a,SCRPAGE
-        out     (HMPR),a
-        ld      c,3
-mm_line:
-        ld      hl,mm_buf
-        ld      b,0
-        push    de
-        ld      b,96
-mm_copy:
-        ld      a,(hl)
-        ld      (de),a
+        ld      (hl),a
         inc     hl
-        inc     de
-        djnz    mm_copy
-        pop     de
-        ld      a,e
-        add     a,128
-        ld      e,a
-        jr      nc,mm_nc
-        inc     d
-mm_nc:
-        dec     c
-        jr      nz,mm_line
-        jp      mp_back
+        ld      (hl),a
+        inc     hl
+        ld      (hl),a
+        ld      a,b
+        ld      (mp_dk),a
+sw_cell:
+        call    mp_bar_cell
+        ld      hl,mp_dk
+        dec     (hl)
+        jr      nz,sw_cell
+        ret
+
+; The ST palette entry of each of the eight colours the builder makes, a view to a line (views 1 to 8: the city, pollution, police
+; cover, fire cover, traffic, power, transport, crime).  The city: 0 dirt, 1 water, 2 fire and the services, 3 industry, 4 trees,
+; 5 housing, 6 commerce, 7 roads and the other networks; a density: its level from 0, dark grey, up through blues, greens and yellow to
+; red, magenta and white (the first is none: the city shows); power: dirt, water, red where there is something without power, yellow where there is; transport: roads white.
+mm_tabs:
+        defb    6,1,12,14,2,10,9,15
+        defb    8,3,11,10,14,12,13,15
+        defb    8,3,11,10,14,12,13,15
+        defb    8,3,11,10,14,12,13,15
+        defb    8,3,11,10,14,12,13,15
+        defb    6,1,12,6,6,6,14,6
+        defb    0,1,0,0,0,0,0,15
+        defb    8,3,11,10,14,12,13,15
+
+; The city under a density, dimmed: dirt dark grey, water blue, trees dark green, everything built light grey
+mm_dim:
+        defb    8,1,7,7,2,7,7,7
 
 ; void plat_exit(void)
         PUBLIC  _plat_exit
@@ -1349,7 +1452,7 @@ mp_ov16:
         defb    $FF,$FF
 
 ; The placer's variables: in the code section so that they stay in the low RAM
-mp_space: defs  256 + 64                ; room for 64 bytes of tables on a 256 byte boundary
+mp_space: defs  256 + 96                ; room for 80 bytes of tables on a 256 byte boundary: the text's and the overlay's, and the mini map's two
 mp_tabhi: defb  0                       ; the boundary's high byte
 mp_pix:   defs  32                      ; the picture on its way to the screen
 mp_ibuf:  defs  16 * 12                 ; a tool icon's button on its way to the screen
@@ -1364,6 +1467,10 @@ mp_bn:    defw  0
 mp_bp:    defs  4                       ; plat_bar: a line of the cell
 mp_ilast: defb  $FF                    ; the tool whose icon is framed on the screen, or $FF if the icons are not drawn
 mm_buf:   defs  96                      ; the mini map's row on its way to the screen
+mm_ty:    defb  0
+mm_cnt:   defb  0
+mm_dens:  defb  0
+mm_bptr:  defw  0
 mp_gl:    defs  8
 mp_pr:    defs  4                       ; the four pairs of pixels of the current attribute
 mp_pal:   defs  24                      ; the palette, then the palette entries of the attribute's colours

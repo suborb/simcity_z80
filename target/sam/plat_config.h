@@ -18,7 +18,8 @@
 #define MODAL_ROWS 24
 #define FMT_WIDTH 32            /* a row of a table screen: the display's width (and -Ca-DFMT_WIDTH=32: the Makefile) */
 #define HAVE_MINIMAP
-#define HAVE_MINIMAP_NATIVE    /* the whole city, every other row, in colour (plat_put_minirow) */
+#define HAVE_MINIMAP_NATIVE    /* the whole city in colour (plat_put_minirow) */
+#define HAVE_MINIMAP_SQUARE    /* ... every tile row, 2x2 pixels a tile, 192x192 with a sidebar (the Makefile defines it for the assembler too) */
 #define HAVE_NARROW_TITLE      /* the level menu a line to a choice (ui/game.c) */
 #define HAVE_CLEAR_MAP          /* a mini map clears the screen below the panel only (plat_clear_map) */
 #define HAVE_DEMAND_BARS        /* the R, C and I demand as coloured bar charts (plat_demand) */

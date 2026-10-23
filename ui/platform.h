@@ -230,6 +230,18 @@ extern void     plat_put_bitmap(uint8_t col, uint8_t row, const uint8_t *art);
    (blue, red, green: bits 0, 1 and 2 of a colour) of three lines of 48 bytes, 4 pixels a tile.  Row sy is lines 3 sy to
    3 sy + 2 of a map 144 lines high, which the Multi 8 centres under the status panel. */
 extern void     plat_put_minirow(uint8_t sy);
+#elif defined(HAVE_MINIMAP_SQUARE)
+/* HAVE_MINIMAP_SQUARE (with HAVE_MINIMAP_NATIVE, a colour display of at least 192x192 pixels): the mini map is the whole city, every tile
+   row, a tile 2x2 pixels, so a square 192x192 at the left of the screen, and the rest of the screen is a sidebar the game fills
+   in (the date, the money, the view's name, the demand, the keys).
+     plat_put_minirow(ty, colours, base, view)   draws tile row ty (0..95) from 96 colours (0..7, as the builder makes them) of view
+                                           `view`: what a colour is depends on the view, so the platform has its own palette for each.
+                                           For a density (pollution, cover, traffic, crime) base has the city's colours of the row, to
+                                           show where the density is none (0 otherwise)
+     plat_minimap_key(view)                draws the key to the colours of the view in the sidebar's rows 5 to 15 (columns 24 up)
+   Opening one clears the whole screen, and the status panel is not drawn while it is open. */
+extern void plat_put_minirow(uint8_t ty, const uint8_t *colours, const uint8_t *base, uint8_t view);
+extern void plat_minimap_key(uint8_t view);
 #elif defined(HAVE_MINIMAP_NATIVE)
 /* plat_put_minirow() draws row sy (0..47) of the mini map from 96 colours, one a tile column, each a block of pixels (the
    Multi 8: 4x3 hardware pixels, so the map is 384x144).  Bit 0 of a colour is the blue plane, 1 the red, 2 the green.
