@@ -220,7 +220,8 @@ def attr_colours(palette):
     out = bytearray()
     for c in range(8):
         want = ((c >> 1) & 1, (c >> 2) & 1, c & 1)
-        out.append(min(range(16), key=lambda i: (sum((a - b * 7) ** 2 for a, b in zip(
+        low = 0 if c == 0 else 1                # the channels that are off are a little on: the bright entries (light red, light
+        out.append(min(range(16), key=lambda i: (sum((a - (7 if b else low)) ** 2 for a, b in zip(   # green...) are the ones wanted
             ((palette[i] >> 8) & 7, (palette[i] >> 4) & 7, palette[i] & 7), want)), i)))
     return bytes(out)
 

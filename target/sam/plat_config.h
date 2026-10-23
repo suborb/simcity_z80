@@ -18,6 +18,7 @@
 #define HAVE_NARROW_TITLE      /* the level menu a line to a choice (ui/game.c) */
 #define HAVE_CLEAR_MAP          /* a mini map clears the screen below the panel only (plat_clear_map) */
 #define HAVE_DEMAND_BARS        /* the R, C and I demand as coloured bar charts (plat_demand) */
+#define HAVE_TEXT_COLOUR        /* the budget and evaluation screens coloured, with bars (plat_text_attr, plat_bar) */
 #define HAVE_SPRITES
 #define HAVE_SPRITE_OVERLAY     /* the sprites go over the baked tiles, which have colours */
 #define HAVE_ICONS              /* the tools as 16x16 pictures */

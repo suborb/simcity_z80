@@ -130,7 +130,11 @@ static const struct field foot[] = {
     { 17,  1, F_TEXT, 0,   "MIGRATION" },
     { 17, 20, F_S24,  0,   migration },
     { 18,  1, F_TEXT, 0,   "ASSESSED VALUE $" },
+#ifdef HAVE_TEXT_COLOUR
+    { 18, 17, F_K24,  0,   V_previous_city_score },
+#else
     { 18, 18, F_K24,  0,   V_previous_city_score },
+#endif
     { 20,  1, F_TEXT, 0,   "CATEGORY" },
     { 20, 11, F_STR,  0,   &class_name },
     { 21,  1, F_TEXT, 0,   "GAME LEVEL" },
@@ -235,6 +239,38 @@ static const struct field foot[] = {
 
 #define COUNT(a) (sizeof(a) / sizeof(struct field))
 
+#if defined(HAVE_TEXT_COLOUR) && MODAL_COLS < 40
+/* The 32 column evaluation in colour: a title band, the question and the headings in cyan, yellow labels, bars for the approval
+   (green, red) and for each problem (green when it is small, yellow, red when it is large), and the key in cyan. */
+static void decorate(void)
+{
+    uint8_t i, v, c;
+
+    plat_text_attr(0, 0, 32, PLAT_ATTR(COL_WHITE, COL_BLUE));
+    plat_text_attr(1, 2, 30, PLAT_ATTR(COL_CYAN, COL_BLACK));
+    plat_text_attr(1, 16, 16, PLAT_ATTR(COL_YELLOW, COL_BLACK));
+    plat_text_attr(1, 17, 9, PLAT_ATTR(COL_YELLOW, COL_BLACK));
+    plat_text_attr(1, 18, 16, PLAT_ATTR(COL_YELLOW, COL_BLACK));
+    plat_text_attr(1, 20, 8, PLAT_ATTR(COL_YELLOW, COL_BLACK));
+    plat_text_attr(1, 21, 10, PLAT_ATTR(COL_YELLOW, COL_BLACK));
+    plat_text_attr(1, 22, 10, PLAT_ATTR(COL_YELLOW, COL_BLACK));
+    plat_text_attr(24, 23, 8, PLAT_ATTR(COL_CYAN, COL_BLACK));
+    if (!ev.has_people)
+        return;
+    plat_text_attr(18, 3, 3, PLAT_ATTR(COL_GREEN, COL_BLACK));
+    plat_text_attr(18, 4, 2, PLAT_ATTR(COL_RED, COL_BLACK));
+    plat_bar(22, 3, 10, (uint8_t)((uint16_t)ev.yes * 4 / 5), PLAT_ATTR(COL_GREEN, COL_BLACK));
+    plat_bar(22, 4, 10, (uint8_t)((uint16_t)ev.no * 4 / 5), PLAT_ATTR(COL_RED, COL_BLACK));
+    plat_text_attr(1, 6, 27, PLAT_ATTR(COL_CYAN, COL_BLACK));
+    for (i = 0; i < 7; ++i) {
+        v = ev.problem[i];
+        c = v < 25 ? COL_GREEN : v < 50 ? COL_YELLOW : COL_RED;
+        plat_text_attr(1, (uint8_t)(8 + i), 12, PLAT_ATTR(COL_YELLOW, COL_BLACK));
+        plat_bar(24, (uint8_t)(8 + i), 8, (uint8_t)((uint16_t)v * 16 / 25), PLAT_ATTR(c, COL_BLACK));
+    }
+}
+#endif
+
 static void draw(void)
 {
     uint8_t i, borrow = 0;
@@ -253,6 +289,9 @@ static void draw(void)
     else
         fmt_fields(nobody, COUNT(nobody));
     fmt_fields(foot, COUNT(foot));
+#if defined(HAVE_TEXT_COLOUR) && MODAL_COLS < 40
+    decorate();
+#endif
     plat_flush();
 }
 

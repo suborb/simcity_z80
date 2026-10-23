@@ -695,6 +695,221 @@ dm_line:
         jp      nz,dm_cell
         ret
 
+; Read a cell back from the screen: hl = its address; the 32 bytes go to mp_pix.
+mp_fetch:
+        ld      a,SCRPAGE
+        out     (HMPR),a
+        ld      de,mp_pix
+        REPT    8
+        ldi
+        ldi
+        ldi
+        ldi
+        ld      a,l
+        add     a,124
+        ld      l,a
+        jr      nc,ASMPC + 3
+        inc     h
+        ENDR
+        jp      mp_back
+
+; void plat_text_attr(uint8_t col, uint8_t row, uint8_t n, uint8_t attr) __smallc
+; Recolours n cells of text already drawn (white on black): the pixels that are set take the ink of the attribute (the Spectrum's
+; format: ink in bits 0-2, paper in bits 3-5) and the others the paper.
+        PUBLIC  _plat_text_attr
+_plat_text_attr:
+        ld      hl,2
+        add     hl,sp
+        ld      a,(hl)                  ; attr
+        inc     hl
+        inc     hl
+        ld      c,(hl)                  ; n
+        inc     hl
+        inc     hl
+        ld      d,(hl)                  ; row
+        inc     hl
+        inc     hl
+        ld      e,(hl)                  ; col
+        ld      (mp_tn),bc
+        ld      (mp_tc),de
+        call    mp_mktab                ; the four byte values of the pixel pairs
+ta_cell:
+        ld      hl,(mp_tc)              ; e = col, d = row
+        ld      a,(mp_tc)
+        ld      b,a
+        ld      a,(mp_tc + 1)
+        call    mp_scraddr
+        push    hl
+        call    mp_fetch
+        ld      hl,mp_pix
+        ld      b,32
+ta_byte:
+        ld      a,(hl)
+        or      a
+        jr      z,ta_0
+        cp      $0F
+        jr      z,ta_1
+        cp      $F0
+        jr      z,ta_2
+        cp      $FF
+        jr      nz,ta_next              ; (not text: left as it is)
+        ld      a,(mp_pr + 3)
+        jr      ta_set
+ta_0:
+        ld      a,(mp_pr)
+        jr      ta_set
+ta_1:
+        ld      a,(mp_pr + 1)
+        jr      ta_set
+ta_2:
+        ld      a,(mp_pr + 2)
+ta_set:
+        ld      (hl),a
+ta_next:
+        inc     hl
+        djnz    ta_byte
+        pop     de
+        ld      hl,mp_pix
+        call    mp_blit
+        ld      hl,mp_tc
+        inc     (hl)
+        ld      hl,mp_tn
+        dec     (hl)
+        jr      nz,ta_cell
+        ret
+
+; void plat_bar(uint8_t col, uint8_t row, uint8_t cells, uint8_t fill, uint8_t attr) __smallc
+; A horizontal bar chart `cells` cells wide: the first `fill` pixels (0 to 8 * cells) in the ink of the attribute, the rest in its
+; paper; each cell is six lines tall with black above and below.
+        PUBLIC  _plat_bar
+_plat_bar:
+        ld      hl,2
+        add     hl,sp
+        ld      a,(hl)                  ; attr
+        inc     hl
+        inc     hl
+        ld      c,(hl)                  ; fill
+        inc     hl
+        inc     hl
+        ld      b,(hl)                  ; cells
+        inc     hl
+        inc     hl
+        ld      d,(hl)                  ; row
+        inc     hl
+        inc     hl
+        ld      e,(hl)                  ; col
+        ld      (mp_bn),bc              ; (the fill, then the cells: c, then b)
+        ld      (mp_tc),de
+        call    mp_mktab
+        ld      hl,mp_pr                ; a black paper is the dark grey of the demand bars: the track the bar is on
+        ld      b,4
+br_trk:
+        ld      a,(hl)
+        ld      c,a
+        and     $F0
+        jr      nz,br_t1
+        ld      a,c
+        or      $80
+        ld      c,a
+br_t1:
+        ld      a,c
+        and     $0F
+        jr      nz,br_t2
+        ld      a,c
+        or      $08
+        ld      c,a
+br_t2:
+        ld      (hl),c
+        inc     hl
+        djnz    br_trk
+br_cell:
+        ld      a,(mp_bn)               ; pixels still to fill: this cell's share, 0 to 8
+        ld      c,8
+        cp      8
+        jr      nc,br_full
+        ld      c,a
+        xor     a
+        jr      br_part
+br_full:
+        sub     8
+br_part:
+        ld      (mp_bn),a
+        ; c = the pixels of ink in this cell: the pattern of one line, four bytes
+        ld      hl,mp_bp
+        ld      b,0
+br_byte:
+        ld      a,b
+        cp      c
+        ld      e,0
+        jr      nc,br_l
+        ld      e,2
+br_l:
+        ld      a,b
+        inc     a
+        cp      c
+        jr      nc,br_r
+        inc     e
+br_r:
+        push    hl
+        ld      hl,mp_pr
+        ld      d,0
+        add     hl,de
+        ld      a,(hl)
+        pop     hl
+        ld      (hl),a
+        inc     hl
+        inc     b
+        inc     b
+        ld      a,b
+        cp      8
+        jr      nz,br_byte
+        ld      hl,mp_pix               ; black, six lines of the pattern, black
+        xor     a
+        ld      (hl),a
+        inc     hl
+        ld      (hl),a
+        inc     hl
+        ld      (hl),a
+        inc     hl
+        ld      (hl),a
+        inc     hl
+        ex      de,hl
+        ld      b,6
+br_line:
+        ld      hl,mp_bp
+        ld      c,4
+br_copy:
+        ld      a,(hl)
+        ld      (de),a
+        inc     hl
+        inc     de
+        dec     c
+        jr      nz,br_copy
+        djnz    br_line
+        xor     a
+        ld      (de),a
+        inc     de
+        ld      (de),a
+        inc     de
+        ld      (de),a
+        inc     de
+        ld      (de),a
+        ld      a,(mp_tc)
+        ld      b,a
+        ld      a,(mp_tc + 1)
+        call    mp_scraddr
+        ex      de,hl
+        ld      hl,mp_pix
+        call    mp_blit
+        ld      hl,mp_tc
+        inc     (hl)
+        ld      hl,mp_bn + 1
+        dec     (hl)
+        jp      nz,br_cell
+        ld      a,$FF
+        ld      (mp_cattr),a            ; (mp_pr is not what the text's table is made from now)
+        ret
+
 ; void mp_tile1(uint8_t col, uint8_t row, const uint8_t *art, uint8_t attr, uint8_t inverse) __smallc
 ; 8 bytes of 1 bit art in the colours of an attribute (the icons); inverse swaps them.
         PUBLIC  _mp_tile1
@@ -1126,6 +1341,10 @@ mp_ii:    defb  0
 mp_drc:   defw  0                       ; plat_demand: the row and the column, the level, the cell
 mp_dlev:  defb  0
 mp_dk:    defb  0
+mp_tn:    defw  0                       ; plat_text_attr: the count; plat_bar: the fill (low byte), the cells (high)
+mp_tc:    defw  0                       ; the column and the row of the cell
+mp_bn:    defw  0
+mp_bp:    defs  4                       ; plat_bar: a line of the cell
 mp_ilast: defb  $FF                    ; the tool whose icon is framed on the screen, or $FF if the icons are not drawn
 mm_buf:   defs  96                      ; the mini map's row on its way to the screen
 mp_gl:    defs  8

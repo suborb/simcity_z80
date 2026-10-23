@@ -30,8 +30,14 @@ static const struct field fields[] = {
     {  0,  1, F_TEXT, 0,   "FISCAL BUDGET" },
     {  2,  1, F_TEXT, 0,   "TAX RATE" },
     {  2, 12, F_U8,   '%', &SMC_tax_rate },
+#ifdef HAVE_TEXT_COLOUR
+    {  4,  1, F_TEXT, 0,   "TAX COLLECTED" },
+    {  4, 16, F_TEXT, 0,   "$" },                       /* the $ signs in one column, and the figures after them */
+    {  4, 17, F_L24,  0,   V_tax_collected },
+#else
     {  4,  1, F_TEXT, 0,   "TAX COLLECTED $" },
     {  4, 16, F_L24,  0,   V_tax_collected },
+#endif
     {  6, 11, F_TEXT, 0,   "REQSTD ALLCTD FUND" },
     {  8,  1, F_TEXT, 0,   "TRANSPORT" },
     {  8, 17, F_U16,  0,   &V_Transport_Funding_Requested },
@@ -47,10 +53,19 @@ static const struct field fields[] = {
     { 12, 28, F_U8,   '%', &SMC_fire_percent },
     { 15,  1, F_TEXT, 0,   "CASH FLOW" },
     { 15, 22, F_S24,  0,   V_cashflow },
+#ifdef HAVE_TEXT_COLOUR
+    { 17,  1, F_TEXT, 0,   "PREVIOUS FUNDS" },
+    { 17, 16, F_TEXT, 0,   "$" },
+    { 17, 17, F_L24,  0,   V_previous_money },
+    { 19,  1, F_TEXT, 0,   "CURRENT FUNDS" },
+    { 19, 16, F_TEXT, 0,   "$" },
+    { 19, 17, F_L24,  0,   V_money_after_budget },
+#else
     { 17,  1, F_TEXT, 0,   "PREVIOUS FUNDS $" },
     { 17, 17, F_L24,  0,   V_previous_money },
     { 19,  1, F_TEXT, 0,   "CURRENT FUNDS $" },
     { 19, 16, F_L24,  0,   V_money_after_budget },
+#endif
     { 23,  0, F_TEXT, 0,   "Q A SELECT  O P CHANGE  ENTER OK" },
 };
 #elif MODAL_ROWS >= 24
@@ -120,6 +135,44 @@ static const struct field fields[] = {
 };
 #endif
 
+#if defined(HAVE_TEXT_COLOUR) && MODAL_COLS < 40
+/* The 32 column budget in colour: a title band, yellow labels (the selected item's white on blue), a bar for the tax rate and for each
+   service's funding level (green when it is well funded, yellow, red when it is not), the cash flow green or red, and the keys in
+   cyan.  The bars are on the rows between the items, which the table leaves empty. */
+static void decorate(void)
+{
+    static const uint8_t item_len[4] = { 8, 9, 6, 4 };
+    const uint8_t *pct[3];
+    uint8_t i, v, c;
+
+    pct[0] = &SMC_transport_percent;
+    pct[1] = &SMC_police_percent;
+    pct[2] = &SMC_fire_percent;
+    plat_text_attr(0, 0, 32, PLAT_ATTR(COL_WHITE, COL_BLUE));
+    plat_text_attr(11, 6, 18, PLAT_ATTR(COL_CYAN, COL_BLACK));
+    plat_text_attr(1, 4, 15, PLAT_ATTR(COL_YELLOW, COL_BLACK));
+    plat_text_attr(1, 15, 9, PLAT_ATTR(COL_YELLOW, COL_BLACK));
+    plat_text_attr(1, 17, 15, PLAT_ATTR(COL_YELLOW, COL_BLACK));
+    plat_text_attr(1, 19, 15, PLAT_ATTR(COL_YELLOW, COL_BLACK));
+    plat_text_attr(14, 15, 9, PLAT_ATTR((V_cashflow[2] & 0x80) ? COL_RED : COL_GREEN, COL_BLACK));
+    plat_text_attr(0, 23, 32, PLAT_ATTR(COL_CYAN, COL_BLACK));
+    for (i = 0; i < 4; ++i) {
+        static const uint8_t item_row[4] = { 2, 8, 10, 12 };
+
+        plat_text_attr(0, item_row[i], (uint8_t)(item_len[i] + 1),
+                       i == sel ? PLAT_ATTR(COL_WHITE, COL_BLUE) : PLAT_ATTR(COL_YELLOW, COL_BLACK));
+    }
+    v = SMC_tax_rate;                                       /* 0 to 20 %: 12 pixels each */
+    c = v <= 7 ? COL_GREEN : v <= 12 ? COL_YELLOW : COL_RED;
+    plat_bar(1, 3, 30, (uint8_t)(v * 12), PLAT_ATTR(c, COL_BLACK));
+    for (i = 0; i < 3; ++i) {                               /* 0 to 100 %: 2.4 pixels each */
+        v = *pct[i];
+        c = v >= 70 ? COL_GREEN : v >= 40 ? COL_YELLOW : COL_RED;
+        plat_bar(1, (uint8_t)(9 + i * 2), 30, (uint8_t)((uint16_t)v * 12 / 5), PLAT_ATTR(c, COL_BLACK));
+    }
+}
+#endif
+
 static void draw(void)
 {
 #if MODAL_COLS < 40 || MODAL_ROWS >= 24
@@ -130,6 +183,9 @@ static void draw(void)
 
     fmt_fields(fields, sizeof(fields) / sizeof(struct field));
     plat_text_puts(0, item_row[sel], ">");              /* the selected item */
+#if defined(HAVE_TEXT_COLOUR) && MODAL_COLS < 40
+    decorate();
+#endif
     plat_flush();
 }
 

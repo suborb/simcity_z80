@@ -19,6 +19,10 @@ emu.register_frame_done(function()
     if n==k.f then field(k):set_value(1) end
     if n==k.f+k.len then field(k):set_value(0) end
   end
+  if os.getenv('SAMPOKE') and n == tonumber(os.getenv('SAMPOKEAT') or '1400') then   -- SAMPOKE="addr=hexbytes addr=hexbytes": game variables set directly (the data window is page 3)
+    local mem=cpu.spaces['program']; local io=cpu.spaces['io']; io:write_u8(0xfb,3)
+    for a,b in os.getenv('SAMPOKE'):gmatch('(%x+)=(%x+)') do local v=tonumber(a,16); for i=1,#b,2 do mem:write_u8(v+(i-1)//2,tonumber(b:sub(i,i+1),16)) end end
+  end
   if snaps[n] then manager.machine.video:snapshot() end
   if n==last and os.getenv("SAMPEEK") then local mem=cpu.spaces["program"]; local io=cpu.spaces["io"]; io:write_u8(0xfb,3); for a in os.getenv("SAMPEEK"):gmatch("%x+") do local v=tonumber(a,16); print(string.format("peek %04x = %02x %02x %02x %02x",v,mem:read_u8(v),mem:read_u8(v+1),mem:read_u8(v+2),mem:read_u8(v+3))) end end
   if n==last then print(string.format("pc=%04x sp=%04x",cpu.state["PC"].value,cpu.state["SP"].value)); manager.machine:exit() end

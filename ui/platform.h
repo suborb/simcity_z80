@@ -114,6 +114,7 @@ extern void     plat_flush(void);               /* end of frame: show what was d
                        map; the file dialogues (ui/prompt.c) are boxes too.  Do not set this on a platform with native
                        HAVE_MENUS
      HAVE_NARROW_TITLE the level menu has a line to a choice, for a display under 40 columns
+     HAVE_TEXT_COLOUR  the budget and evaluation screens in colour, with bar charts (plat_text_attr(), plat_bar())
      HAVE_DEMAND_BARS  the demand indicators as coloured bar charts (plat_demand())
      HAVE_FILES        files, for saving and loading a city (plat_file_save()/plat_file_load()); FILE_NAME_MAX
                        (default 24) is the longest name the player may enter
@@ -166,6 +167,27 @@ extern void     plat_icons(uint8_t selected);
               byte, where its engine art (assets/map_art_aq.bin, tools/make_aq_assets.py) comes converted
      inverse  1 for the blinking cursor: the picture with its pixels inverted */
 extern void     plat_put_tile(uint8_t col, uint8_t row, const uint8_t *art, uint8_t attr, uint8_t inverse);
+#endif
+
+#ifdef HAVE_TEXT_COLOUR
+/* The screens of tables (the budget, the evaluation) are drawn as text and then coloured.  An attribute is the Spectrum's: the ink
+   in bits 0-2, the paper in bits 3-5, a colour being 1 blue, 2 red and 4 green added up (so 0 black, 3 magenta, 5 cyan, 6 yellow,
+   7 white); PLAT_ATTR(ink, paper) makes one.
+     plat_text_attr(col, row, n, attr)       recolours n cells of the text already drawn: its pixels take the ink and the
+                                             background the paper
+     plat_bar(col, row, cells, fill, attr)   a horizontal bar chart `cells` wide (up to 31): the first `fill` pixels (0 to
+                                             8 * cells, up to 255) in the ink, the rest in the paper */
+#define COL_BLACK   0
+#define COL_BLUE    1
+#define COL_RED     2
+#define COL_MAGENTA 3
+#define COL_GREEN   4
+#define COL_CYAN    5
+#define COL_YELLOW  6
+#define COL_WHITE   7
+#define PLAT_ATTR(ink, paper) ((uint8_t)((ink) | ((paper) << 3)))
+extern void     plat_text_attr(uint8_t col, uint8_t row, uint8_t n, uint8_t attr);
+extern void     plat_bar(uint8_t col, uint8_t row, uint8_t cells, uint8_t fill, uint8_t attr);
 #endif
 
 #ifdef HAVE_DEMAND_BARS
