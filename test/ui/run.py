@@ -707,10 +707,10 @@ def main():
     mem = run(pbin, psyms, [LEVEL_MEDIUM, PAUSE, CMD_BUDGET, 0, 0])
     text = panes(mem)[1]
     check('budget: the screen shows the headings and the departments',
-          all(any(w in r for r in text) for w in ('FISCAL BUDGET', 'TAX RATE', 'TRANSPORT', 'POLICE', 'FIRE', 'CASH FLOW', 'ENTER OK')),
+          all(any(w in r for r in text) for w in ('FISCAL BUDGET', 'TAX RATE', 'TRANSPORT', 'POLICE', 'FIRE', 'CASH FLOW')),
           '\n'.join(text))
     check('budget: the funds row shows the label and both figures, not overlapping (the test city pays 350 in tax: FUNDS 10000>10350)',
-          re.search(r'CASH FLOW\s+350\s+FUNDS\s+10000>\s+10350', text[6]) is not None, repr(text[6]))
+          re.search(r'CASH FLOW\s+350\s+FUNDS\s+10000>\s+10350', text[7]) is not None, repr(text[7]))
     check('budget: the figures of the three departments line up under their headings',
           text[2].index('REQSTD') + 5 == text[3].index('0 ') and all(len(r.rstrip()) <= 40 for r in text), '\n'.join(text))
     check('budget: it starts with the tax rate of 7%', any('TAX RATE  7%' in r for r in text), '\n'.join(text))

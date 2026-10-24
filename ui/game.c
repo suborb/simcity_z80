@@ -742,9 +742,11 @@ static void set_map_view(uint8_t v)
 #endif
 
 /* "R   |## " : a letter, three cells for shortfall, a bar, three cells for demand: the seven bars for -3..3 */
+#ifndef HAVE_DEMAND_BARS
 static const char demand_bars[7][8] = {
     "###|   ", " ##|   ", "  #|   ", "   |   ", "   |#  ", "   |## ", "   |###"
 };
+#endif
 
 #ifdef HAVE_DEMAND_BARS
 /* The demand as a number of zones: the engine's valve is 8 to a zone of imbalance, less an offset it keeps (26 for R, 30 for C and I) so
@@ -817,6 +819,22 @@ static const struct field status_map_low[] = {              /* with icons: just 
     { 5,  5, F_STR,  0, &st_line[1] },
 };
 
+#ifdef HAVE_ICONS_AFFORD
+/* What each tool costs (the power station: the coal one), to grey out the icons of the tools there is no money for. */
+static const uint16_t tool_costs[NUM_TOOLS] = { 1, 10, 5, 20, 10, 100, 100, 100, 500, 500, 3000, 3000, 5000, 10000 };
+
+static uint16_t afford_mask(void)
+{
+    uint16_t mask = 0, lo = (uint16_t)V_money[0] | ((uint16_t)V_money[1] << 8);
+    uint8_t i;
+
+    for (i = 0; i < NUM_TOOLS; ++i)
+        if (V_money[2] || lo >= tool_costs[i])
+            mask |= (uint16_t)(1 << i);
+    return mask;
+}
+#endif
+
 #ifdef HAVE_ICONS_TOP
 /* The Spectrum's arrangement across the whole 40 columns (or 32: see below): the date, funds and population on row 0, the tool icons in
    rows 1 and 2, then the tool and speed, the three demand bars, and the advisor (or the mini map's name). */
@@ -867,21 +885,6 @@ static const struct field top_map[] = {
     { 5, TOP_MAP_KEYS_COL, F_TEXT, 0, TOP_MAP_KEYS },
 };
 
-#ifdef HAVE_ICONS_AFFORD
-/* What each tool costs (the power station: the coal one), to grey out the icons of the tools there is no money for. */
-static const uint16_t tool_costs[NUM_TOOLS] = { 1, 10, 5, 20, 10, 100, 100, 100, 500, 500, 3000, 3000, 5000, 10000 };
-
-static uint16_t afford_mask(void)
-{
-    uint16_t mask = 0, lo = (uint16_t)V_money[0] | ((uint16_t)V_money[1] << 8);
-    uint8_t i;
-
-    for (i = 0; i < NUM_TOOLS; ++i)
-        if (V_money[2] || lo >= tool_costs[i])
-            mask |= (uint16_t)(1 << i);
-    return mask;
-}
-#endif
 
 /* (for both layouts of the top panel) */
 #ifdef HAVE_MINIMAP_SQUARE
@@ -1072,7 +1075,11 @@ static void draw_status(void)
 {
     char buf[41];
 #ifdef HAVE_ICONS
+#ifdef HAVE_TEXT_TITLE
+    uint8_t icons = panel_h >= 7;                           /* (the title bar took a row of the window's eight) */
+#else
     uint8_t icons = panel_h >= 8;                           /* the tools as pictures in rows 3 and 4 */
+#endif
 #endif
 
     if (!panel_w)
@@ -1083,11 +1090,17 @@ static void draw_status(void)
     st_alert = V_alertmessage < sizeof(text_alerts) / sizeof(text_alerts[0]) ? text_alerts[V_alertmessage] : "";
     fmt_fields(status_top, sizeof(status_top) / sizeof(struct field));
     if (panel_h > 1) {
+#ifdef HAVE_DEMAND_BARS
+        plat_demand(0, 1, 'R', demand_level(V_RValve, 26));
+        plat_demand(11, 1, 'C', demand_level(V_CValve, 30));
+        plat_demand(22, 1, 'I', demand_level(V_IValve, 30));
+#else
         fmt_blank(buf);
         demand_bar(buf, 'R', V_RValve);
         demand_bar(buf + 10, 'C', V_CValve);
         demand_bar(buf + 20, 'I', V_IValve);
         plat_text_puts(0, 1, buf);
+#endif
     }
     fmt_fields(status_tool, sizeof(status_tool) / sizeof(struct field));
 #ifdef HAVE_ICONS
@@ -1097,7 +1110,12 @@ static void draw_status(void)
         if (map_view) {
             st_line[1] = minimap_names[map_view];
             fmt_fields(status_map_low, sizeof(status_map_low) / sizeof(struct field));
+            plat_text_bold(0, 5, "MAP:");                /* (the line is in bold where the platform can: it says the screen is not the city) */
+            plat_text_bold(5, 5, st_line[1]);
         }
+#endif
+#ifdef HAVE_ICONS_AFFORD
+        plat_afford(afford_mask());
 #endif
         plat_icons(tool);
         return;
@@ -1333,7 +1351,7 @@ static void handle_key(uint8_t k)
     case KEY_FAR_RIGHT: move_cursor(8, 0);  break;
     case KEY_FAR_UP:    move_cursor(0, -8); break;
     case KEY_FAR_DOWN:  move_cursor(0, 8);  break;
-#ifndef HAVE_MENUS                                  /* the letters, for keyboards without cursor keys */
+#if !defined(HAVE_MENUS) || defined(HAVE_KEYS_QAOP)    /* the letters, for keyboards without cursor keys (or for a tester's sanity) */
     case 'o': move_cursor(-1, 0); break;
     case 'p': move_cursor(1, 0);  break;
     case 'q': move_cursor(0, -1); break;
@@ -1562,11 +1580,16 @@ static void title_screen(void)
     uint8_t k;
 
     plat_text_clear();
+#ifdef HAVE_TEXT_WINDOW                             /* (the window has a title of its own) */
+#define LEVEL_ROW 0
+#else
+#define LEVEL_ROW 2
     plat_text_puts(0, 0, "S I M C I T Y");
-    plat_text_puts(0, 2, "CHOOSE A LEVEL:");                 /* one choice to a line */
-    plat_text_puts(2, 4, "1 EASY");
-    plat_text_puts(2, 6, "2 MEDIUM");
-    plat_text_puts(2, 8, "3 HARD");
+#endif
+    plat_text_puts(0, LEVEL_ROW, "CHOOSE A LEVEL:");           /* one choice to a line */
+    plat_text_puts(2, LEVEL_ROW + 2, "1 EASY");
+    plat_text_puts(2, LEVEL_ROW + 4, "2 MEDIUM");
+    plat_text_puts(2, LEVEL_ROW + 6, "3 HARD");
     plat_flush();
     do {
         seed++;
@@ -1594,7 +1617,11 @@ static void title_screen(void)
 #endif
     V_InitialSeed = (uint16_t)(seed ^ first ^ (plat_clock() - first) ^ plat_entropy()) | 1; /* ...and the name took to type */
     plat_text_clear();
+#ifdef HAVE_TEXT_TITLE
+    plat_text_puts(0, 1, "GENERATING LANDSCAPE...");        /* (a line down from the title bar) */
+#else
     plat_text_puts(0, 0, "GENERATING LANDSCAPE...");
+#endif
     plat_flush();
 }
 

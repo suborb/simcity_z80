@@ -9,12 +9,14 @@
 #include "engine.h"
 #include "platform.h"
 
-#define Z88_TEXT_COLS 51
-#define Z88_TEXT_ROWS 8
+#define Z88_TEXT_X    2                    /* everything is moved across 2 from the bars, to sit in the middle of the 45 cells */
+#define Z88_TEXT_COLS 43                   /* inside the frame (the frame is 47 wide and 8 high, 2 across from the left: centred on the 51 columns) */
+#define Z88_TEXT_ROWS 7
 #define Z88_MAP_COLS  32
 #define Z88_MAP_ROWS  8
 #define ICON_FIRST_CHAR 64
 #define NUM_ICONS 14
+#define DEMAND_FIRST  120                  /* the characters left after the icons' 56: the demand bars' 7 */
 
 extern void z88_sop(const char *s) __z88dk_fastcall;
 extern const uint8_t z88_icons[];
@@ -23,12 +25,11 @@ extern void plat_set_udgs(const void *p) __z88dk_fastcall;
 
 static uint16_t clock_count;
 static uint16_t z88_mode;
-static uint8_t icons_ok;
+uint8_t icons_ok;                       /* (the demand indicator, in plat_z88.asm, looks at it) */
 static const uint8_t *font_now;
 static const uint8_t *udg_now;
 static uint8_t cursor_art[8];
 static char z88_text[5 + Z88_TEXT_COLS + 1];
-static char icon_text[5 + NUM_ICONS * 12 + 1];
 static uint8_t cmd_queue[8];
 static uint8_t cmd_head, cmd_tail;
 
@@ -48,7 +49,19 @@ static void set_udgs(const uint8_t *p)
     }
 }
 
-static void define_icons(void)
+/* The demand indicator's cells, 6 pixels wide: the zero mark, a bar of 1 to 5 pixels from the cell's left edge.  A full cell is a
+   space in reverse video, and a bar growing to the left is the bar of the other 6 - n pixels in reverse video. */
+static const uint8_t demand_art[7][8] = {
+    { 0x0C, 0, 0x0C, 0, 0x0C, 0, 0x0C, 0 },            /* the zero mark: dotted, so that it is not taken for the end of a bar */
+    { 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20 },
+    { 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30 },
+    { 0x38, 0x38, 0x38, 0x38, 0x38, 0x38, 0x38, 0x38 },
+    { 0x3C, 0x3C, 0x3C, 0x3C, 0x3C, 0x3C, 0x3C, 0x3C },
+    { 0x3E, 0x3E, 0x3E, 0x3E, 0x3E, 0x3E, 0x3E, 0x3E },
+    { 0, 0, 0, 0, 0x3F, 0, 0, 0 },                      /* the track, in a cell with no bar */
+};
+
+void define_icons(void)
 {
     char d[13];
     uint8_t c, r;
@@ -61,36 +74,13 @@ static void define_icons(void)
             d[4 + r] = (char)(z88_icons[c * 8 + r] | 0x80);
         z88_sop(d);
     }
-    icons_ok = 1;
-}
-
-void plat_icons(uint8_t selected)
-{
-    uint8_t i, r, n;
-    char c;
-
-    if (!icons_ok)
-        define_icons();
-    for (r = 0; r < 2; ++r) {
-        icon_text[0] = 1; icon_text[1] = '3'; icon_text[2] = '@';
-        icon_text[3] = 32;
-        icon_text[4] = (char)(32 + 3 + r);
-        n = 5;
-        for (i = 0; i < NUM_ICONS; ++i) {
-            if (i == selected) {
-                icon_text[n++] = 1; icon_text[n++] = 'R';
-            }
-            for (c = 0; c < 2; ++c) {
-                icon_text[n++] = 1; icon_text[n++] = '2'; icon_text[n++] = '?';
-                icon_text[n++] = (char)(ICON_FIRST_CHAR + i * 4 + r * 2 + c);
-            }
-            if (i == selected) {
-                icon_text[n++] = 1; icon_text[n++] = 'R';
-            }
-        }
-        icon_text[n] = 0;
-        z88_sop(icon_text);
+    for (c = 0; c < 7; ++c) {                           /* the demand bars' cells */
+        d[3] = (char)(DEMAND_FIRST + c);
+        for (r = 0; r < 8; ++r)
+            d[4 + r] = (char)(demand_art[c][r] | 0x80);
+        z88_sop(d);
     }
+    icons_ok = 1;
 }
 
 void plat_init(void)
@@ -123,19 +113,37 @@ void plat_puts(uint8_t col, uint8_t row, const char *s) { plat_text_puts(col, ro
 
 uint8_t plat_text_cols(void) { return Z88_TEXT_COLS; }
 uint8_t plat_text_rows(void) { return Z88_TEXT_ROWS; }
-void plat_text_clear(void) { z88_sop("\x01" "2C1"); }
+/* The text window is one OZ window (1): 47 x 8 at column 2, centred on the 51 columns, with OZ's bars (type 131).  Its first row is the title,
+   reverse, centred, in OZ's tiny font (which the text below it keeps); the text is in the rows below, one cell in from the bars (plat_text_puts() and plat_icons() add the
+   offset), 45 x 7.  Clearing it is defining it again (with bit 7 of the type, it is cleared) and drawing the title. */
+void plat_text_clear(void)
+{
+    z88_sop("\x01" "7#1" "\x22" "\x20" "\x4f" "\x28" "\x83" "\x01" "2C1" "\x01" "3+TR"          /* window 1 at 2,0, 47 x 8, with the banner: reverse, tiny */
+            "\x01" "3@" "\x34" "\x20" "SIMCITY"                                                          /* centred (7 of the 47 characters: column 20) */
+            "\x01" "3@  " "\x01" "2A" "\x4f" "\x01" "2-R" "\x01" "2-C");                                /* the bar across the whole row; reverse off, tiny stays on for the text */
+}
 
 void plat_text_puts(uint8_t col, uint8_t row, const char *s)
 {
     uint8_t n = 5;
 
     z88_text[0] = 1; z88_text[1] = '3'; z88_text[2] = '@';
-    z88_text[3] = (char)(32 + col);
-    z88_text[4] = (char)(32 + row);
-    while (*s && n < sizeof(z88_text) - 1)
-        z88_text[n++] = *s++;
+    z88_text[3] = (char)(32 + 1 + Z88_TEXT_X + col);    /* inside the bars, below the title */
+    z88_text[4] = (char)(32 + 1 + row);
+    while (*s && n < sizeof(z88_text) - 1) {
+        z88_text[n] = *s;
+        ++n;
+        ++s;
+    }
     z88_text[n] = 0;
     z88_sop(z88_text);
+}
+
+void plat_text_bold(uint8_t col, uint8_t row, const char *s)
+{
+    z88_sop("\x01" "2+B");
+    plat_text_puts(col, row, s);
+    z88_sop("\x01" "2-B");
 }
 
 void plat_put_tile(uint8_t col, uint8_t row, const uint8_t *art, uint8_t attr, uint8_t inverse)
@@ -251,7 +259,7 @@ uint8_t plat_key(void)
             if (c == 10)
                 return KEY_ENTER;
             if (c >= 'A' && c <= 'Z')
-                return (uint8_t)(c + 'a' - 'A');
+                return c == 'Q' || c == 'A' || c == 'O' || c == 'P' ? c : (uint8_t)(c + 'a' - 'A');      /* (shifted QAOP: 8 cells) */
             if (c < ' ' && c != KEY_ENTER && c != KEY_ESC)
                 return 0;
             return c;

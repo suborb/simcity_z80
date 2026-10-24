@@ -20,9 +20,19 @@
 #define MAX_TAX 20
 #define ROWS    MODAL_ROWS
 /* The compact design is an eight-row grid.  On an intermediate-height screen spread it over the available rows. */
+#if MODAL_ROWS == 7
+#define BUDGET_ROW(n)  ((n) > 6 ? 6 : (n))     /* seven rows: the blank row before the last goes */
+#else
 #define BUDGET_ROW(n)  (((n) * (MODAL_ROWS - 1) + 3) / 7)
+#endif
 
 static uint8_t sel;                     /* 0 tax rate, 1 transport, 2 police, 3 fire */
+
+#ifdef HAVE_MENUS
+#define CASH_ROW 7                      /* the keys are in the menus: the cash flow takes the last row (of 7 rows, row 6: see BUDGET_ROW) */
+#else
+#define CASH_ROW 6
+#endif
 
 #ifdef MODAL_NARROW
 /* The 32 column arrangement: the same groups, with the numbers packed under their headings. */
@@ -104,7 +114,7 @@ static const struct field fields[] = {
 };
 #else
 static const struct field fields[] = {
-    { BUDGET_ROW(0),  1, F_TEXT, 0,   "FISCAL BUDGET   TAX COLLECTED $" },
+        { BUDGET_ROW(0),  1, F_TEXT, 0,   "FISCAL BUDGET   TAX COLLECTED $" },
     { BUDGET_ROW(0), 32, F_L24,  0,   V_tax_collected },
     { BUDGET_ROW(1),  1, F_TEXT, 0,   "TAX RATE" },
     { BUDGET_ROW(1), 12, F_U8,   '%', &SMC_tax_rate },
@@ -121,15 +131,13 @@ static const struct field fields[] = {
     { BUDGET_ROW(5), 18, F_U16,  0,   &V_Budget_Fire_Funding_Requested },
     { BUDGET_ROW(5), 27, F_U16,  0,   &V_Fire_Funding_Allocated },
     { BUDGET_ROW(5), 34, F_U8,   '%', &SMC_fire_percent },
-    { BUDGET_ROW(6),  1, F_TEXT, 0,   "CASH FLOW" },                   /* room for 7 digit funds: the row is 40 wide */
-    { BUDGET_ROW(6), 18, F_S24,  0,   V_cashflow },
-    { BUDGET_ROW(6), 20, F_TEXT, 0,   "FUNDS" },
-    { BUDGET_ROW(6), 32, F_U24,  0,   V_previous_money },
-    { BUDGET_ROW(6), 32, F_TEXT, 0,   ">" },
-    { BUDGET_ROW(6), 40, F_U24,  0,   V_money_after_budget },
-#ifdef HAVE_MENUS
-    { BUDGET_ROW(7),  1, F_TEXT, 0,   "CURSORS SELECT AND CHANGE  ENTER OK" },
-#else
+    { BUDGET_ROW(CASH_ROW),  1, F_TEXT, 0,   "CASH FLOW" },                   /* room for 7 digit funds: the row is 40 wide */
+    { BUDGET_ROW(CASH_ROW), 18, F_S24,  0,   V_cashflow },
+    { BUDGET_ROW(CASH_ROW), 20, F_TEXT, 0,   "FUNDS" },
+    { BUDGET_ROW(CASH_ROW), 32, F_U24,  0,   V_previous_money },
+    { BUDGET_ROW(CASH_ROW), 32, F_TEXT, 0,   ">" },
+    { BUDGET_ROW(CASH_ROW), 40, F_U24,  0,   V_money_after_budget },
+#ifndef HAVE_MENUS
     { BUDGET_ROW(7),  1, F_TEXT, 0,   "Q A SELECT  O P CHANGE  ENTER OK" },
 #endif
 };
@@ -209,7 +217,7 @@ static void draw(void)
     fmt_fields_each(fields, sizeof(fields) / sizeof(struct field), colour_row);
 #else
     fmt_fields(fields, sizeof(fields) / sizeof(struct field));
-    plat_text_puts(0, item_row[sel], ">");              /* the selected item */
+    plat_text_puts(MX(0), item_row[sel], ">");              /* the selected item */
 #endif
 #ifdef MODAL_X
     fmt_col0 = 0;

@@ -204,6 +204,50 @@ static const struct field foot[] = {
     { 21, 17, F_U16,  0,   &ev.score },
     { 23, 31, F_TEXT, 0,   "ENTER OK" },
 };
+#elif defined(HAVE_TEXT_TITLE)
+/* In seven rows: the approval, the problems (four rows), then the population and migration, and the value of the city with its
+   category.  The figures end in the same columns (the percentages 16 and 39, the numbers 16 and 39 as well), the second column of
+   labels starts at 20.  (The game level is left out.) */
+static const struct field head[] = {
+    { 0,  0, F_TEXT, 0,   "MAYOR APPROVAL" },
+    { 0, 17, F_TEXT, 0,   "YES" },
+    { 0, 25, F_U8,   '%', &ev.yes },
+    { 0, 28, F_TEXT, 0,   "NO" },
+    { 0, 35, F_U8,   '%', &ev.no },
+};
+
+static const struct field body[] = {
+    { 1,  0, F_TEXT, 0,   "TRAFFIC" },
+    { 1, 15, F_U8,   '%', ev.problem },
+    { 1, 20, F_TEXT, 0,   "POLLUTION" },
+    { 1, 38, F_U8,   '%', ev.problem + 1 },
+    { 2,  0, F_TEXT, 0,   "CRIME" },
+    { 2, 15, F_U8,   '%', ev.problem + 2 },
+    { 2, 20, F_TEXT, 0,   "FIRE" },
+    { 2, 38, F_U8,   '%', ev.problem + 3 },
+    { 3,  0, F_TEXT, 0,   "TAXES" },
+    { 3, 15, F_U8,   '%', ev.problem + 4 },
+    { 3, 20, F_TEXT, 0,   "HOUSE PRICES" },
+    { 3, 38, F_U8,   '%', ev.problem + 5 },
+    { 4,  0, F_TEXT, 0,   "UNEMPLOYMENT" },
+    { 4, 15, F_U8,   '%', ev.problem + 6 },
+    { 4, 20, F_TEXT, 0,   "CITY SCORE" },
+    { 4, 39, F_U16,  0,   &ev.score },
+};
+
+static const struct field nobody[] = {
+    { 1,  0, F_TEXT, 0,   "NOBODY LIVES HERE YET" },
+};
+
+static const struct field foot[] = {
+    { 5,  0, F_TEXT, 0,   "POPULATION" },
+    { 5, 16, F_U24,  0,   V_display_population },
+    { 5, 20, F_TEXT, 0,   "MIGRATION" },
+    { 5, 39, F_S24,  0,   migration },
+    { 6,  0, F_TEXT, 0,   "ASSESSED VALUE $" },
+    { 6, 16, F_K24,  0,   V_previous_city_score },
+    { 6, 28, F_STR,  0,   &class_name },
+};
 #else
 static const struct field head[] = {
     { EVAL_ROW(0),  0, F_TEXT, 0,   "MAYOR APPROVAL" },
@@ -350,6 +394,7 @@ static void draw(void)
 #endif
     plat_flush();
 }
+
 
 uint8_t evaluation_screen(void)
 {

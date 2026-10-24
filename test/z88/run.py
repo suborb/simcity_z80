@@ -57,9 +57,10 @@ check('every item has a shortcut of capital letters', all(k and re.fullmatch('[A
 check('no two shortcuts are the same', len(seqs) == len(set(seqs)))
 clash = [(a, b) for a in seqs if a for b in seqs if b and a != b and b.startswith(a)]
 check('no shortcut is the start of another', not clash, str(clash[:3]))
-check('each shortcut starts with its menu initial',
-      all(k and k[0] == topics[t][0] for (t, _), k in shortcuts.items()),
-      str([(topics[t], k) for (t, _), k in shortcuts.items() if not k or k[0] != topics[t][0]]))
+SINGLE = {'B', 'E', 'S', 'L'}                      # Budget, Evaluation, Save, Load: the one letter shortcuts
+check('each shortcut starts with its menu\'s letter (Game, Tempo for Speed, Options, Views, Disasters), except the four single letters',
+      all(k and (k in SINGLE or k[0] == {'Speed': 'T'}.get(topics[t], topics[t][0])) for (t, _), k in shortcuts.items()),
+      str([(topics[t], k) for (t, _), k in shortcuts.items() if not k or not (k in SINGLE or k[0] == {'Speed': 'T'}.get(topics[t], topics[t][0]))]))
 check('no shortcut starts with M, I or J (the ENTER, TAB and LF keys are <>M, <>I and <>J, which OZ would take for them)',
       not [k for k in seqs if k and k[0] in 'MIJ'], str([k for k in seqs if k and k[0] in 'MIJ']))
 check('at most 7 menus of 24 items', len(topics) <= 7 and all(sum(1 for (t, _) in items if t == k) <= 24 for k in topics))

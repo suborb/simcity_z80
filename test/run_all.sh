@@ -56,6 +56,10 @@ python3 test/fmt/run.py
 echo
 echo "== Z88 menus agree with the commands the game understands"
 python3 test/z88/run.py
+echo "== the Z88's demand indicator, every level"
+python3 test/z88/demand.py
+echo "== the Z88's tool icons: reverse for the tool, grey for what costs too much"
+python3 test/z88/icons.py
 echo
 echo "== UI: game core under scripted keys"
 python3 test/ui/run.py | grep -E "^(PASS|FAIL)|passed|FAILED"

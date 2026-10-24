@@ -47,12 +47,17 @@ uint8_t prompt_ask(const char *t, const char *l, char *name, uint8_t max, uint8_
 #else
 /* The screen: a title, a label and the text typed so far (and a cursor), a message and what to press. */
 static const char *title, *label, *shown, *message, *help;
+#ifdef HAVE_TEXT_TITLE
+#define PR(n) ((n) > 6 ? 6 : (n))       /* seven rows */
+#else
+#define PR(n) (n)
+#endif
 static const struct field screen[] = {
     { 0,  0, F_STR,  0, &title },
     { 2,  0, F_STR,  0, &label },
     { 2, 11, F_STR,  0, &shown },
     { 4,  0, F_STR,  0, &message },
-    { 7,  0, F_STR,  0, &help },
+    { PR(7),  0, F_STR,  0, &help },
 };
 
 static void show(void)

@@ -328,6 +328,8 @@ def main():
     end = mem[VARS + 8] | mem[VARS + 9] << 8
     text = bytes(mem[OUT:end])
     print(f'  os_out received {len(text)} characters')
+    check('the text window got its text whole (the level choice, the status panel), not a character repeated',
+          b'CHOOSE A LEVEL:' in text and b'EASY' in text and b'FUNDS $10000' in text, text[:300].decode('latin-1'))
     if '--text' in sys.argv:
         print('  ' + ''.join(chr(c) if 32 <= c < 127 else f'<{c}>' for c in text))
     bad_irqs, bad_sp = mem[VARS + 12], mem[VARS + 14] | mem[VARS + 15] << 8

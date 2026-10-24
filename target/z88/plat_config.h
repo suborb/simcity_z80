@@ -6,13 +6,16 @@
 #define HAVE_BITMAP
 #define HAVE_BUDGET
 #define HAVE_EVALUATION
-#define MODAL_ROWS 8           /* the OZ text window */
+#define HAVE_TEXT_TITLE        /* the OZ window has a frame with a title bar, which takes a row of its 8 */
+#define MODAL_ROWS 7           /* the rows inside it */
 #define HAVE_MINIMAP
 #define HAVE_MINIMAP_CURSOR
 #define HAVE_SPRITES
 #define HAVE_TEXT_WINDOW
 #define HAVE_MENUS
+#define HAVE_KEYS_QAOP         /* Q A O P (and shifted, 8 cells) move the cursor as well as the cursor keys */
 #define HAVE_ICONS
+#define HAVE_DEMAND_BARS       /* the demand indicators as bars of user defined characters (plat_demand()) */
 #define HAVE_FILES
 #define HAVE_APPNAME
 #define HAVE_SOUND

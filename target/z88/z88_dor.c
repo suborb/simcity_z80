@@ -10,10 +10,11 @@
    CMD_* of ui/platform.h (the codes below are those values: keep them in step; test/z88
    checks).
 
-   Shortcuts: the user presses the [] (square) key and then types the letters of the item's KEY.  The letters are up to the application: here the first is the menu's initial
-   (Game, Speed, Options, Views, Disasters) and the rest name the item, with no sequence the start of
-   another (test/z88 checks that too).  Keep M, I and J off the front of them: the ENTER key is Ctrl-M
-   (<>M), TAB is <>I and <>J is LF, and OZ takes those for a shortcut that starts with the letter. */
+   Shortcuts: the user presses <> and then types the letters of the item's KEY.  The letters are up to the application: the
+   four most used (Budget, Evaluation, Save, Load) are one letter; the rest start with the menu's letter (Game, Tempo for the
+   speed, Options, Views, Disasters) and then name the item, with no sequence the start of another (test/z88 checks that
+   too).  Keep M, I and J off the front of them: the ENTER key is Ctrl-M (<>M), TAB is <>I and <>J is LF, and OZ takes
+   those for a shortcut that starts with the letter. */
 #include <dor.h>
 
 #define APP_NAME "SimCity"
@@ -44,16 +45,16 @@
 #define TOPIC1_2KEY          "GP"
 #define TOPIC1_2CODE         0x91
 #define TOPIC1_3             "Budget"
-#define TOPIC1_3KEY          "GB"
+#define TOPIC1_3KEY          "B"
 #define TOPIC1_3CODE         0xA4
 #define TOPIC1_4             "Evaluation"
-#define TOPIC1_4KEY          "GE"
+#define TOPIC1_4KEY          "E"
 #define TOPIC1_4CODE         0xA5
 #define TOPIC1_5             "Save"
-#define TOPIC1_5KEY          "GS"
+#define TOPIC1_5KEY          "S"
 #define TOPIC1_5CODE         0xA6
 #define TOPIC1_6             "Load"
-#define TOPIC1_6KEY          "GL"
+#define TOPIC1_6KEY          "L"
 #define TOPIC1_6CODE         0xA7
 #define TOPIC1_7             "Quit"
 #define TOPIC1_7KEY          "GQ"
@@ -62,13 +63,13 @@
 /* ---- Speed ---- */
 #define TOPIC2               "Speed"
 #define TOPIC2_1             "Fast"
-#define TOPIC2_1KEY          "SF"
+#define TOPIC2_1KEY          "TF"
 #define TOPIC2_1CODE         0x92
 #define TOPIC2_2             "Normal"
-#define TOPIC2_2KEY          "SN"
+#define TOPIC2_2KEY          "TN"
 #define TOPIC2_2CODE         0x93
 #define TOPIC2_3             "Slow"
-#define TOPIC2_3KEY          "SL"
+#define TOPIC2_3KEY          "TL"
 #define TOPIC2_3CODE         0x94
 
 /* ---- Options ---- */
@@ -104,14 +105,13 @@
 #define TOPIC3_10KEY         "OSF"
 #define TOPIC3_10CODE        0xAB
 
-/* ---- Views: the mini maps, CMD_MAP + the view (ui/minimap.h), then back to the city.  Not "Maps": its
-   shortcuts would start with M, and the ENTER key is Ctrl-M (<>M), which OZ then takes for them ---- */
+/* ---- Views: the mini maps, CMD_MAP + the view (ui/minimap.h), then back to the city.  Not "Maps": its shortcuts would start with M, and the ENTER key is Ctrl-M (<>M), which OZ then takes for them ---- */
 #define TOPIC4               "Views"
 #define TOPIC4_1             "City"
 #define TOPIC4_1KEY          "VC"
 #define TOPIC4_1CODE         0x87
 #define TOPIC4_2             "Pollution"
-#define TOPIC4_2KEY          "VU"
+#define TOPIC4_2KEY          "VP"
 #define TOPIC4_2CODE         0x88
 #define TOPIC4_3             "Police coverage"
 #define TOPIC4_3KEY          "VO"
