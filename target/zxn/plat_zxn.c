@@ -1,7 +1,8 @@
 /* ZX Spectrum Next platform: Layer 2, 256x192 pixels of 8 bits (the palette entry of each), used as 32 x 24 cells of 8x8.  The drawing
    primitives (a cell from the picture atlas, a glyph, a line of pixels) are in plat_zxn.asm; this has what is made from them: text,
-   the tool icons, the demand and bar charts, the mini map's rows, and the keyboard.  The palette is the Atari ST's 16 colours (entry 0
-   black and 15 white), as on the SAM Coupe, which this follows (target/sam/plat_sam.asm); tools/st_tiles_3bpp.py --zxn makes the art. */
+   the tool icons, the demand and bar charts, the mini map's rows, and the keyboard.  The palette is in three parts: the Atari ST's 16 colours (entry 0
+   black and 15 white), which the text, charts, mini maps and tool icons use, then the map art's 64 (the Amiga SimCity 1 Meg's by default), those inverted
+   (the cursor), and the Amiga's 16 for the tool icons; this follows the SAM Coupe (target/sam/plat_sam.asm); tools/st_tiles_3bpp.py --zxn makes the art. */
 #include <stdint.h>
 #include <string.h>
 #include <fcntl.h>
@@ -16,6 +17,7 @@ extern void zxn_rd(uint8_t y, uint8_t x, uint8_t *dst, uint16_t len);
 extern void zxn_fill(uint8_t y, uint8_t x, uint16_t len, uint8_t colour);
 extern void zxn_palette(const uint8_t *entries, uint8_t first, uint8_t count);
 extern void zxn_show(void);
+extern void zxn_bank_read(uint8_t *dst, uint8_t page, uint16_t off, uint16_t len);
 extern void zxn_dma(uint8_t srcpage, uint16_t srcoff, uint8_t dstpage, uint16_t dstoff, uint16_t len, uint8_t dec);
 extern void snd_init(void);
 extern void snd_wait(void);
@@ -25,17 +27,22 @@ extern void zxn_out(uint16_t port, uint8_t value);
 
 extern const uint8_t font_8x8_bbc_system[];     /* 96 glyphs, from space */
 extern const uint8_t view_tile_art[];           /* picture n is at 8 * n from it */
-extern const uint8_t zxn_head[];               /* 16 palette entries (2 bytes each), 8 attribute colours, then the tool icons */
+extern const uint8_t zxn_head[];               /* 208 palette entries (2 bytes each: the ST's 16 for the interface, the map art's 64, the same inverted, the Amiga's 64 for the tool icons), 8 attribute colours, then the 64 colours a dimmed icon's are */
 
 #define COLS        32
-#define MAP_ROW     7                           /* the map's cell rows: the only ones with a cache entry */
-#define MAP_ROWS    17
+#define MAP_ROW     (ICON_ROWS + 3)             /* the map's cell rows: the only ones with a cache entry (after the panel: ui/game.c) */
+#define MAP_ROWS    (24 - MAP_ROW)
 #define BLACK       0
 #define WHITE       15
 #define TEXT_ATTR   7                           /* white on black */
-#define ATTRS       (zxn_head + 32)
-#define ICONS       (zxn_head + 40)
-#define ICON_BYTES  (14 * 12)
+#define PALETTE_ENTRIES 208
+#define ATTRS       (zxn_head + 2 * PALETTE_ENTRIES)
+#define DIM         (ATTRS + 8)                 /* what each of the icons' 64 colours is, dimmed: an absolute palette entry */
+#define ICON_PAGE   44                          /* the icons: 14 of 22x20 bytes, a palette index (0 to 63) a pixel, in the 8 KB page 44 (bank 22, zxn_data.asm) */
+#define ICON_W      22                          /* the tool icons: the Amiga's, 22x20 pixels of 6 bits */
+#define ICON_H      20
+#define ICON_BYTES  (ICON_W * ICON_H)
+#define ICON_PALETTE 144                        /* (palette entries 144 to 207) */
 
 static uint16_t cache[COLS * MAP_ROWS];         /* what each map cell shows: its art address xor the inverse flag, or $FFFF */
 static uint16_t clock_count;
@@ -240,7 +247,9 @@ void plat_init(void)
     zxn_reg(0xC4, 1);                            /* the frame interrupt of the ULA */
     snd_init();
                                                 /* (the sound's frame interrupt: interrupts are on from here) */
-    zxn_palette(zxn_head, 0, 16);
+    zxn_palette(zxn_head, 0, 100);                /* (the call takes up to 127 entries) */
+    zxn_palette(zxn_head + 200, 100, 100);
+    zxn_palette(zxn_head + 400, 200, PALETTE_ENTRIES - 200);
     zxn_show();
     zxn_out(0xFE, 0);                              /* a black border */
 }
@@ -358,13 +367,11 @@ void plat_bar(uint8_t col, uint8_t row, uint8_t cells, uint8_t fill, uint8_t att
 }
 
 /* ---- the tool icons ------------------------------------------------------------------------------------------------------------ */
-/* The 14 tools as the ST game's buttons, 24x14 pixels, in two rows of seven: icon i is at cell column 3 * (i mod 7) and row 1 + 2 * (i div 7),
-   in a 24x16 area (a blank line above and below); the selected one has a yellow frame (colour 14). */
+/* The 14 tools as the Amiga game's buttons, 22x20 pixels, in two rows of seven: icon i is at pixel (23 * (i mod 7), 8 + 20 * (i div 7)), under the
+   status line and left of the demand bars; the selected one has a yellow frame (colour 14 of the interface's). */
 static uint8_t icon_sel;
 static uint16_t afford_mask = 0x3FFF;           /* the tools there is money for, and what changed since the icons were drawn */
 static uint16_t afford_diff;
-
-static const uint8_t dim16[16] = { 0, 0, 0, 0, 0, 0, 0, 8, 0, 7, 7, 7, 7, 7, 7, 7 };    /* the picture greyed out */
 
 void plat_afford(uint16_t mask)
 {
@@ -374,33 +381,25 @@ void plat_afford(uint16_t mask)
 
 static void icon_one(uint8_t i)
 {
-    uint8_t buf[24 * 16], *d = buf + 24, x, y, c;
-    const uint8_t *s = ICONS + (uint16_t)i * ICON_BYTES;
+    uint8_t buf[ICON_BYTES], x, y, c;
+    uint16_t n;
     uint8_t dim = !((afford_mask >> i) & 1);
 
-    memset(buf, BLACK, sizeof(buf));
-    for (y = 0; y < 14; ++y)
-        for (x = 0; x < 12; ++x) {
-            c = *s++;
-            *d++ = dim ? dim16[c >> 4] : (uint8_t)(c >> 4);
-            *d++ = dim ? dim16[c & 15] : (uint8_t)(c & 15);
-        }
-    if (i == icon_sel) {                        /* the frame, yellow */
-        memset(buf, 14, 24);
-        memset(buf + 15 * 24, 14, 24);
-        for (y = 1; y < 15; ++y)
-            buf[y * 24] = buf[y * 24 + 23] = 14;
+    zxn_bank_read(buf, ICON_PAGE + (uint8_t)(((uint16_t)i * ICON_BYTES) >> 13), (uint16_t)((uint16_t)i * ICON_BYTES) & 0x1FFF, ICON_BYTES);
+    for (n = 0; n < ICON_BYTES; ++n) {          /* (what is not affordable is in greys) */
+        c = buf[n];
+        buf[n] = dim ? DIM[c] : (uint8_t)(ICON_PALETTE + c);
     }
-    x = (uint8_t)(3 * (i % 7) * 8);
-    y = (uint8_t)((1 + 2 * (i / 7)) * 8);
-    for (c = 0; c < 16; ++c)
-        zxn_wr((uint8_t)(y + c), x, buf + c * 24, 24);
-    x = (uint8_t)(3 * (i % 7));
-    y = (uint8_t)(1 + 2 * (i / 7));
-    for (c = 0; c < 3; ++c) {                   /* (the cells are not the cache's: rows 1 to 4) */
-        forget((uint8_t)(x + c), y);
-        forget((uint8_t)(x + c), (uint8_t)(y + 1));
+    if (i == icon_sel) {                        /* the frame, yellow, over the button's edge */
+        memset(buf, 14, ICON_W);
+        memset(buf + (ICON_H - 1) * ICON_W, 14, ICON_W);
+        for (y = 1; y < ICON_H - 1; ++y)
+            buf[y * ICON_W] = buf[y * ICON_W + ICON_W - 1] = 14;
     }
+    x = (uint8_t)(23 * (i % 7));
+    y = (uint8_t)(8 + 20 * (i / 7));
+    for (c = 0; c < ICON_H; ++c)
+        zxn_wr((uint8_t)(y + c), x, buf + c * ICON_W, ICON_W);
 }
 
 void plat_icons(uint8_t selected)

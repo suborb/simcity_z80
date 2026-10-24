@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Make the map pictures of the 3 bit (8 colour) targets from the Atari ST game's art.
+"""Make the map pictures of the 3 bit (8 colour) targets from Micropolis-numbered game art.
 
   tools/st_tiles_3bpp.py assets/st_tiles.bin --planes FILE [--numbering ours|cpc]
   tools/st_tiles_3bpp.py assets/st_tiles.bin --mini FILE [--numbering ours|cpc]
@@ -11,10 +11,10 @@ and the same game): --planes the pictures baked into 8 colours, 24 bytes each (t
 eight rows), --mini the quarter size pictures for the mini maps, 5 bytes each.  The table is the one tools/extract_st_tiles.py
 makes (the game's palette, then 32 byte pictures in the Micropolis numbering).
 
-The ST art has the Micropolis numbering and ours does not, so each of our pictures is taken from a Micropolis tile.  That mapping
+The ST and Amiga art have the Micropolis numbering and ours does not, so each of our pictures is taken from a Micropolis tile.  That mapping
 (TILE, st_piece, st_picture_ours, st_picture_cpc) is the useful part and is not specific to the ST: it gives the Micropolis tile
 number for each of our pictures, so any set of Micropolis-numbered tiles can be converted by loading its pictures (pixels(), to8()
-and planes() below are the ST's palette and format).  It was worked out by comparing the shapes of our tiles (the CPC art, which
+and planes() below are the ST and Amiga planar format).  It was worked out by comparing the shapes of our tiles (the CPC art, which
 draws the engine's own tiles) with the ST's:
 
   the engine's 94 map tiles   TILE below.  Roads, rails and wires come in the same eleven shapes in both games, in different
@@ -28,11 +28,19 @@ draws the engine's own tiles) with the ST's:
   --numbering ours  the engine's own 345 pictures (94 tiles and 251 pieces); the default
               cpc   the CPC's 471, as the engine with FINE_ZONE_LEVELS (see PORTING.md)
 
-The ST game's 16 colours become the machine's 8 by COLOUR (a table: a colour, or a pair that is dithered, one pixel in
+The game's 16 colours become the machine's 8 by COLOUR (a table: a colour, or a pair that is dithered, one pixel in
 two), which is the one place to change the look.  The art belongs to the game (see PORTING.md).
 
-  --zxn DIR    the pictures for the ZX Spectrum Next's Layer 2 (256x192, a byte a pixel, the palette entry of each): head.bin (the 16
-                palette entries as the Next's two bytes each, the 8 attribute colours' entries, the tool icons: --icons, as for --sam),
+  --layout row|plane
+                how a 32 byte picture is stored: `row`, the ST's (eight rows, each of the four bitplane bytes of the row) or `plane`, the Amiga's
+                (the eight bytes of bitplane 0, then those of plane 1, 2 and 3: assets/amiga_tiles.bin is SimCity 512K's SimData2 as it is
+                on the disk).  Inferred from the palette when omitted: a 4-bit palette is the Amiga's.
+  --palette-bits N
+                the bits in each source palette component: 3 for the ST ($0RGB, the default) or 4 for the Amiga.  It is inferred from
+                the palette when omitted, and may be stated explicitly for a 4-bit palette whose entries happen all to be 0..7.
+  --zxn DIR    the pictures for the ZX Spectrum Next's Layer 2 (256x192, a byte a pixel, the palette entry of each): head.bin (the 208
+                palette entries as the Next's two bytes each: the ST's 16 for the interface, the art's 64, the art's inverted, the Amiga's 64 for the
+                tool icons; the 8 attribute colours' entries; the 64 greys of a dimmed icon's colours) and icons.bin (the 14 Amiga tool icons, --amiga-icons, 22x20 a byte a pixel),
                 atlas0.bin and atlas1.bin (the pictures, 64 bytes each: 256 of them in the first 16 KB bank, the rest in the second)
   --sam FILE    the pictures for the SAM Coupe's mode 4 (256x192, 16 colours, 4 bits a pixel, the left pixel in the high nibble):
                 the palette (16 bytes, the nearest of the SAM's 128 colours to each of the game's), the palette entry nearest each of the
@@ -209,33 +217,74 @@ def sam_level(c):
             ((c >> 4) & 1) * 4 + (c & 1) * 2 + bright)
 
 
-def sam_palette(palette):
-    """The nearest SAM palette byte (0..127) to each of the game's colours ($0RGB, 3 bits a channel)."""
+def palette_levels(palette, bits):
+    """The source palette as 3-bit RGB tuples, for the SAM and Next palettes."""
+    top = (1 << bits) - 1
+    return [tuple((((w >> shift) & top) * 7 + top // 2) // top for shift in (8, 4, 0)) for w in palette]
+
+
+def sam_palette(palette, bits):
+    """The nearest SAM palette byte (0..127) to each source colour."""
     out = bytearray()
-    for w in palette:
-        want = ((w >> 8) & 7, (w >> 4) & 7, w & 7)
+    for want in palette_levels(palette, bits):
         out.append(min(range(128), key=lambda c: (sum((a - b) ** 2 for a, b in zip(sam_level(c), want)), c)))
     return bytes(out)
 
 
-def attr_colours(palette):
+def attr_colours(palette, bits):
     """The palette entry nearest each of the eight colours of a Spectrum attribute (bit 0 blue, 1 red, 2 green)."""
     out = bytearray()
+    colours = palette_levels(palette, bits)
     for c in range(8):
         want = ((c >> 1) & 1, (c >> 2) & 1, c & 1)
         low = 0 if c == 0 else 1                # the channels that are off are a little on: the bright entries (light red, light
         out.append(min(range(16), key=lambda i: (sum((a - (7 if b else low)) ** 2 for a, b in zip(   # green...) are the ones wanted
-            ((palette[i] >> 8) & 7, (palette[i] >> 4) & 7, palette[i] & 7), want)), i)))
+            colours[i], want)), i)))
     return bytes(out)
 
 
-def zxn_palette(palette):
-    """The Next's 9 bit colours (RRRGGGBB, then the low bit of blue) of the game's colours ($0RGB, 3 bits a channel)."""
+def pixels6(pic):
+    """The 8x8 colour indexes (0..63) of a 48 byte picture of the Amiga 1 Meg game: six bitplanes, the eight bytes of each one after another."""
+    return [[sum((((pic[p * 8 + r] >> (7 - x)) & 1) << p) for p in range(6)) for x in range(8)] for r in range(8)]
+
+
+AMIGA_1MEG = 64 + 960 * 48          # the size of assets/amiga_1meg_tiles.bin (tools/extract_amiga_1meg_tiles.py)
+
+
+def zxn_palette(levels):
+    """The Next's 9-bit palette (RRRGGGBB, then the low bit of blue) of colours given as 3-bit (r, g, b) levels."""
     out = bytearray()
-    for w in palette:
-        r, g, b = (w >> 8) & 7, (w >> 4) & 7, w & 7
+    for r, g, b in levels:
         out += bytes(((r << 5) | (g << 2) | (b >> 1), b & 1))
     return bytes(out)
+
+
+# The Next's Layer 2 palette: entries 0 to 15 are the Atari ST's colours, which the game's text, charts and mini maps use (whatever art the
+# map has); 16 to 79 the art's own colours, which the map's pictures use; 80 to 143 the same colours inverted (the cursor); 144 to 159 the
+# Amiga's colours for the tool icons.
+ZXN_TILE_COLOURS = 64        # room for the 1 Meg art's 64 (32 and their halves); a 16 colour set uses the first 16
+ZXN_TILE_BASE = 16
+ZXN_INVERSE_BASE = ZXN_TILE_BASE + ZXN_TILE_COLOURS
+ZXN_ICON_BASE = ZXN_INVERSE_BASE + ZXN_TILE_COLOURS     # the Amiga's colours (the icons' own file's: 16 or 64), for the tool icons (whatever the map's art is)
+
+# The Amiga's 14 tool icons (tools/extract_amiga_icons.py or extract_amiga_1meg_icons.py: 22x20, a palette index a byte, in the engine's order).
+ICON_W, ICON_H = 22, 20
+
+
+def zxn_icon_palette(icons_path):
+    """The palette of an icon file: the 3-bit levels of its 64 colours (the sibling file `..._tiles.bin` has the palette: the 512K's 16 words or the 1 Meg's 32 with
+    their halves), and the grey each colour becomes when the icon is dimmed (an absolute Layer 2 palette index: the ST's dark grey, 8, or light grey, 7)."""
+    path = os.path.join(os.path.dirname(icons_path), os.path.basename(icons_path).replace('icons', 'tiles'))
+    raw = open(path, 'rb').read(64)
+    if os.path.getsize(path) == AMIGA_1MEG:
+        words = list(struct.unpack('>32H', raw))
+        words += [((w >> 9 & 7) << 8) | ((w >> 5 & 7) << 4) | (w >> 1 & 7) for w in words]
+    else:
+        words = list(struct.unpack('>16H', raw[:32]))
+    levels = palette_levels(words, 4)
+    levels += [(0, 0, 0)] * (64 - len(levels))
+    dim = bytes(8 if (30 * r + 59 * g + 11 * b) // 100 <= 2 else 7 for r, g, b in levels)
+    return levels, dim
 
 
 def sam_picture(px):
@@ -255,12 +304,13 @@ def load(path):
 SPEC = [(0, 0, 0), (0, 0, 205), (205, 0, 0), (205, 0, 205), (0, 205, 0), (0, 205, 205), (205, 205, 0), (255, 255, 255)]
 
 
-def sheet(path, table, palette, pictures, original, scale=5):
+def sheet(path, table, palette, bits, pictures, original, scale=5):
     from PIL import Image
     cols = 32
     rows = (len(pictures) + cols - 1) // cols
     im = Image.new('RGB', (cols * 9 * scale, rows * 9 * scale), (30, 30, 40))
-    rgb = [(((w >> 8) & 7) * 255 // 7, ((w >> 4) & 7) * 255 // 7, (w & 7) * 255 // 7) for w in palette]
+    top = (1 << bits) - 1
+    rgb = [(((w >> 8) & top) * 255 // top, ((w >> 4) & top) * 255 // top, (w & top) * 255 // top) for w in palette]
     for k, n in enumerate(pictures):
         px = pixels(table[n * PIC:n * PIC + PIC])
         px8 = to8(px)
@@ -281,14 +331,32 @@ def main():
     ap.add_argument('--sheet')
     ap.add_argument('--sam')
     ap.add_argument('--zxn')
+    ap.add_argument('--amiga-icons', help='with --zxn: the tool icons (tools/extract_amiga_icons.py), with their palette, the first 32 bytes of amiga_tiles.bin beside them')
     ap.add_argument('--icons', help='with --sam: the tool icons (tools/extract_st_icons.py), put after the palette')
     ap.add_argument('--original', action='store_true')
+    ap.add_argument('--palette-bits', choices=(3, 4), type=int,
+                    help='bits per $0RGB component (default: infer 3 or 4 from the palette)')
+    ap.add_argument('--layout', choices=('row', 'plane'), help='how a picture is stored: the ST\'s rows of plane bytes, or the Amiga\'s planes (default: by the palette)')
     ap.add_argument('--colours', choices=sorted(PRESETS), default='meadow')
     ap.add_argument('--numbering', choices=('ours', 'cpc'), default='ours')
     a = ap.parse_args()
     global COLOUR
     COLOUR = PRESETS[a.colours]
-    palette, table = load(a.table)
+    depth6 = os.path.getsize(a.table) == AMIGA_1MEG
+    if depth6:                                  # the Amiga 1 Meg game's art: 32 colours and their halves, 6 bitplanes: only the Next's atlas is made from it
+        if not a.zxn or a.planes or a.mini or a.sam or a.sheet:
+            sys.exit(f'{a.table}: the 1 Meg art has 64 colours: it makes only --zxn')
+        raw = open(a.table, 'rb').read()
+        words = struct.unpack('>32H', raw[:64])
+        palette = list(words) + [((w >> 9 & 7) << 8) | ((w >> 5 & 7) << 4) | (w >> 1 & 7) for w in words]   # (the halves, in 4 bits: a bit less)
+        table = raw[64:]
+        PICSIZE = 48
+    else:
+        palette, table = load(a.table)
+        PICSIZE = PIC
+    bits = a.palette_bits or (4 if any(((w >> shift) & 15) > 7 for w in palette for shift in (8, 4, 0)) else 3)
+    if not depth6 and (a.layout or ('plane' if bits == 4 else 'row')) == 'plane':      # the Amiga's: make each picture the ST's rows of plane bytes
+        table = b''.join(bytes(table[n + p * 8 + r] for r in range(8) for p in range(4)) for n in range(0, len(table) - PIC + 1, PIC))
     if a.numbering == 'ours':
         pictures = [st_picture_ours(i) for i in range(OURS)]
     else:
@@ -302,20 +370,31 @@ def main():
         print(f'{len(baked)} pictures, {len(baked) * 5} bytes of mini map pictures -> {a.mini}')
     if a.sam:
         icons = open(a.icons, 'rb').read() if a.icons else b''
-        data = sam_palette(palette) + attr_colours(palette) + icons + b''.join(sam_picture(pixels(table[n * PIC:n * PIC + PIC])) for n in pictures)
+        data = sam_palette(palette, bits) + attr_colours(palette, bits) + icons + b''.join(sam_picture(pixels(table[n * PIC:n * PIC + PIC])) for n in pictures)
         open(a.sam, 'wb').write(data)
         print(f'{len(pictures)} pictures, {len(icons)} bytes of icons, a 16 byte palette, 8 attribute colours and {len(pictures) * 32} bytes of mode 4 pictures -> {a.sam}')
     if a.zxn:
-        import os
         os.makedirs(a.zxn, exist_ok=True)
-        icons = open(a.icons, 'rb').read() if a.icons else b''
-        pics = b''.join(bytes(v for row in pixels(table[n * PIC:n * PIC + PIC]) for v in row) for n in pictures)
-        open(os.path.join(a.zxn, 'head.bin'), 'wb').write(zxn_palette(palette) + attr_colours(palette) + icons)
+        if not a.amiga_icons:
+            sys.exit('--zxn needs --amiga-icons')
+        icons = open(a.amiga_icons, 'rb').read()
+        if len(icons) != 14 * ICON_W * ICON_H:
+            sys.exit(f'{a.amiga_icons}: {len(icons)} bytes, not the 14 icons of {ICON_W}x{ICON_H}')
+        icon_levels, dim = zxn_icon_palette(a.amiga_icons)
+        from extract_st_tiles import PALETTE as ST_PALETTE
+        ui = list(struct.unpack('>16H', ST_PALETTE))
+        art = palette_levels(palette, bits)
+        art += [(0, 0, 0)] * (ZXN_TILE_COLOURS - len(art))
+        pixel = pixels6 if depth6 else pixels
+        pics = b''.join(bytes(ZXN_TILE_BASE + v for row in pixel(table[n * PICSIZE:n * PICSIZE + PICSIZE]) for v in row) for n in pictures)
+        levels = palette_levels(ui, 3) + art + [(7 - r, 7 - g, 7 - b) for r, g, b in art] + icon_levels
+        open(os.path.join(a.zxn, 'head.bin'), 'wb').write(zxn_palette(levels) + attr_colours(ui, 3) + dim)
+        open(os.path.join(a.zxn, 'icons.bin'), 'wb').write(icons)
         open(os.path.join(a.zxn, 'atlas0.bin'), 'wb').write(pics[:16384])
         open(os.path.join(a.zxn, 'atlas1.bin'), 'wb').write(pics[16384:].ljust(8192, b'\0'))
-        print(f'{len(pictures)} pictures of 64 bytes ({len(pics)} bytes), the palette and {len(icons)} bytes of icons -> {a.zxn}/')
+        print(f'{len(pictures)} pictures of 64 bytes ({len(pics)} bytes), the palette, and the 14 icons -> {a.zxn}/')
     if a.sheet:
-        sheet(a.sheet, table, palette, pictures, a.original)
+        sheet(a.sheet, table, palette, bits, pictures, a.original)
 
 
 if __name__ == '__main__':

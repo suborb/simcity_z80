@@ -839,7 +839,10 @@ static uint16_t afford_mask(void)
 /* The Spectrum's arrangement across the whole 40 columns (or 32: see below): the date, funds and population on row 0, the tool icons in
    rows 1 and 2, then the tool and speed, the three demand bars, and the advisor (or the mini map's name). */
 #ifdef HAVE_ICONS_2X7
-#define TOP_PANEL_ROWS  7                   /* (the mini map's 144 lines start under row 5: see draw_status) */
+#ifndef ICON_ROWS
+#define ICON_ROWS       4                   /* the cell rows the two rows of icons take (rows 1 to ICON_ROWS): 4 for 24x16 pixel icons, 5 for 22x20 */
+#endif
+#define TOP_PANEL_ROWS  (ICON_ROWS + 3)     /* (the mini map's 144 lines start under row 5: see draw_status) */
 #else
 #define TOP_PANEL_ROWS  6
 #endif
@@ -957,8 +960,8 @@ static void draw_map_sidebar(void)
 #endif
 
 #ifdef HAVE_ICONS_2X7
-/* The icons in two rows of seven (rows 1 to 4, 21 columns), with the demand bars and the speed in the 11 columns beside them, the
-   tool and its cost on row 5 and the advisor on row 6.  Nothing here may print a whole row 1 to 4 (a field table does): that is
+/* The icons in two rows of seven (rows 1 to ICON_ROWS, 21 columns), with the demand bars and the speed in the 11 columns beside them, the
+   tool and its cost on the row after the icons and the advisor on the next.  Nothing here may print a whole row 1 to 4 (a field table does): that is
    the icons' place, and they are only drawn when the tool changes.  The mini map's 144 lines start under row 5, so in a mini map row 6 is not
    drawn and row 5 has the map's name. */
 static const struct field top_status27[] = {
@@ -968,10 +971,10 @@ static const struct field top_status27[] = {
     { 0, 10, F_L24,  0, V_money },
     { 0, 19, F_TEXT, 0, "POP" },
     { 0, 23, F_L24,  0, V_display_population },
-    { 5,  0, F_STR,  0, &st_tool },
+    { ICON_ROWS + 1,  0, F_STR,  0, &st_tool },
 };
 static const struct field top_alert27[] = {
-    { 6,  0, F_STR,  0, &st_alert },
+    { ICON_ROWS + 2,  0, F_STR,  0, &st_alert },
 };
 
 static void draw_status(void)

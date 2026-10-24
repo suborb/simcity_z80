@@ -1,5 +1,5 @@
 /* ZX Spectrum Next capabilities for the shared game UI: Layer 2, 256x192 pixels of 8 bits, used as 32 columns of 8x8 cells
-   (target/zxn/plat_zxn.c, plat_zxn.asm), the same layout as the SAM Coupe's, with the Atari ST's art in its 16 colours. */
+   (target/zxn/plat_zxn.c, plat_zxn.asm), the same layout as the SAM Coupe's, with the Amiga SimCity 1 Meg's map art in its 64 colours (and the Atari ST's interface colours). */
 #ifndef PLAT_CONFIG_H
 #define PLAT_CONFIG_H
 
@@ -31,6 +31,7 @@
 #define HAVE_ICONS_AFFORD       /* the icons of what there is no money for are greyed out (plat_afford) */
 #define HAVE_POWER_ASK          /* a power station asks coal or nuclear when there is the money for both */
 #define HAVE_ICONS_2X7          /* ... with the icons in two rows of seven (ui/game.c) */
+#define ICON_ROWS 5             /* ... the Amiga's 22x20 pixel icons: two rows of them are five cell rows, and the map starts a row lower */
 #ifndef ZXN_NO_SCROLL
 #define HAVE_SCROLL             /* a scroll moves the map's pixels by the DMA (plat_scroll) and draws only the cells that come into view */
 #endif

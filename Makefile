@@ -125,14 +125,15 @@ $(ZX): $(DEPS)
 	$(ZCC) +zx $(ZX_FLAGS) $(GAME) $(ENTROPY) $(NOSOUND) $(FIELDS) $(ZX_PLATFORM) -o $(@D)/simcity
 
 # The map's pictures baked for 640x200 screens of 3 bits a pixel (the Multi 8 and the PC-8801), and at a quarter of the size for
-# the mini maps (4 columns by 3 lines, 5 bytes each: HAVE_MINIMAP_ART).  They are made from the art of one of two games:
+# the mini maps (4 columns by 3 lines, 5 bytes each: HAVE_MINIMAP_ART).  They are made from the art of one of three games:
 #   make TILESET=cpc    the Amstrad CPC game's (assets/cpc_tiles.bin, tools/extract_cpc_tiles.py); the default
 #   make TILESET=st     the Atari ST game's (assets/st_tiles.bin, tools/st_tiles_3bpp.py), in the colours ST_COLOURS says
+#   make TILESET=amiga  SimCity 512K's (assets/amiga_tiles.bin, tools/st_tiles_3bpp.py), with its 4-bit RGB palette
 # Changing TILESET (or ST_COLOURS) makes the pictures again, and so rebuilds the programs that have them.
 TILESET ?= cpc
 ST_COLOURS ?= meadow
-TILES_TOOL = $(if $(filter st,$(TILESET)),tools/st_tiles_3bpp.py,tools/extract_cpc_tiles.py)
-TILES_ARGS = $(if $(filter st,$(TILESET)),--colours $(ST_COLOURS),)
+TILES_TOOL = $(if $(filter cpc,$(TILESET)),tools/extract_cpc_tiles.py,tools/st_tiles_3bpp.py)
+TILES_ARGS = $(if $(filter st,$(TILESET)),--colours $(ST_COLOURS)) $(if $(filter amiga,$(TILESET)),--palette-bits 4)
 TILES_STAMP = build/common/.tiles-$(TILESET)$(if $(filter st,$(TILESET)),-$(ST_COLOURS),)
 
 $(TILES_STAMP):
@@ -201,8 +202,8 @@ $(SAM): $(DEPS) build/sam/tiles.bin
 
 # The ZX Spectrum Next: Layer 2 (256x192, a byte a pixel), the Atari ST's art in its 16 colours, as the SAM Coupe.  The program is linked at
 # $0000 (z88dk's zxn crt with CRT_ORG_CODE 0: target/zxn/zpragma.inc) and the stack and the uninitialised data are at
-# ZXN_BSS ($A400); appmake makes the NEX file, with the program in a bank of its own and a loader that maps it (z88dk's zx-util.c).
-ZXN_BSS = 0xAC00
+# ZXN_BSS ($B000); appmake makes the NEX file, with the program in a bank of its own and a loader that maps it (z88dk's zx-util.c).
+ZXN_BSS = 0xB000
 ZXN_FLAGS =                    # (-DZXN_NO_SCROLL: no scrolling by the DMA; -DZXN_PACE=2: 25 frames a second)
 ZXN_ENTROPY = $(ENTROPY)       # (target/zxn/entropy_test.asm: the build test/zxn/run.py runs, which makes the same city each time)
 ZXN_ASM = target/zxn/plat_zxn.asm target/zxn/plat_sound.asm target/zxn/zxn_boot.asm target/zxn/zxn_data.asm
@@ -217,9 +218,14 @@ $(ZXN): $(DEPS) build/zxn/head.bin
 	@size=`wc -c < $(@D)/simcity.bin`; echo "zxn image: $$size bytes (the stack and the data start at $$(( $(ZXN_BSS) )))"; \
 	    [ $$size -le $$(( $(ZXN_BSS) )) ] || { echo "the image runs into the stack and the data"; rm -f $@; exit 1; }
 
-build/zxn/head.bin: assets/st_tiles.bin assets/st_icons.bin tools/st_tiles_3bpp.py
+# The map's art: the Amiga SimCity 1 Meg's (assets/amiga_1meg_tiles.bin, tools/extract_amiga_1meg_tiles.py: 64 colours); ZXN_TILES=assets/amiga_tiles.bin makes it
+# the 512K version's, assets/st_tiles.bin the Atari ST's.  The interface (text, charts, mini maps) is in the ST's colours either way.
+# The tool icons: the 1 Meg Amiga's (assets/amiga_1meg_icons.bin, tools/extract_amiga_1meg_icons.py); ZXN_ICONS=assets/amiga_icons.bin makes them the 512K's.
+ZXN_TILES ?= assets/amiga_1meg_tiles.bin
+ZXN_ICONS ?= assets/amiga_1meg_icons.bin
+build/zxn/head.bin: $(ZXN_TILES) $(ZXN_ICONS) tools/st_tiles_3bpp.py
 	@mkdir -p $(@D)
-	python3 tools/st_tiles_3bpp.py assets/st_tiles.bin --icons assets/st_icons.bin --zxn $(@D)
+	python3 tools/st_tiles_3bpp.py $(ZXN_TILES) --amiga-icons $(ZXN_ICONS) --zxn $(@D)
 
 build/sam/tiles.bin: assets/st_tiles.bin assets/st_icons.bin tools/st_tiles_3bpp.py
 	@mkdir -p $(@D)

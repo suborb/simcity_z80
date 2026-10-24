@@ -11,3 +11,7 @@ _zxn_head:
 
         SECTION BANK_21
         BINARY  "build/zxn/atlas1.bin"
+
+; The tool icons, 14 of 22x20, a byte a pixel (a palette index): in a bank of their own, 8 KB page 44 (ICON_PAGE in plat_zxn.c)
+        SECTION BANK_22
+        BINARY  "build/zxn/icons.bin"

@@ -5,8 +5,9 @@ and run it from the browser (or with the nexload command); in an emulator
 such as CSpect, ZEsarUX or JNext, load it as a NEX file.  It needs a Next
 with at least 512 KB of RAM and the NextZXOS (for saving and loading).
 
-The game is drawn on Layer 2 (256 x 192, 256 colours, of which it uses the
-Atari ST game's 16) and plays the ST game's sound effects on the AY chip,
+The game is drawn on Layer 2 (256 x 192, 256 colours, of which it uses 64 for the
+map (the Amiga SimCity 1 Meg's art), 16 for the screens (the Atari ST
+game's colours) and 64 for the tool icons (the Amiga's, too)) and plays the ST game's sound effects on the AY chip,
 from the frame interrupt.  It runs the Z80 at 7 MHz, 50 frames a second,
 and moves the map's pixels with the DMA when the view scrolls.  Cities are saved to
 and loaded from the SD card (esxDOS files, in the current folder).

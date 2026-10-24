@@ -59,7 +59,8 @@ zxn_cell_addr:
         ret
 
 ; void zxn_tile(uint8_t col, uint8_t row, uint16_t pic, uint8_t inverse) __smallc
-; Picture number `pic` of the atlas at the cell: inverse draws the colour indexes xor 15 (the cursor).
+; Picture number `pic` of the atlas at the cell: inverse draws the colour indexes 64 up (the same colours inverted in the palette: the cursor).
+; The art's pixels are the palette entries 16 to 79 (tools/st_tiles_3bpp.py --zxn); the interface's colours are entries 0 to 15.
         PUBLIC  _zxn_tile
 _zxn_tile:
         ld      hl,2
@@ -122,7 +123,7 @@ nt_line:
         ld      c,8
 nt_px:
         ld      a,(hl)
-        xor     15
+        add     a,64
         ld      (de),a
         inc     hl
         inc     de
@@ -478,3 +479,35 @@ nd_dec: defb    0
 nd_len: defw    0
 nd_src: defw    0
 nd_dst: defw    0
+
+; void zxn_bank_read(uint8_t *dst, uint8_t page, uint16_t off, uint16_t len) __smallc
+; len bytes from offset off (below 8192) of the 8 KB page `page`, which is mapped into slot 6 for the time, to dst (below $C000): the tool icons are in
+; a bank of their own (zxn_data.asm).
+        PUBLIC  _zxn_bank_read
+_zxn_bank_read:
+        ld      hl,2
+        add     hl,sp
+        ld      c,(hl)                  ; len
+        inc     hl
+        ld      b,(hl)
+        inc     hl
+        ld      e,(hl)                  ; off
+        inc     hl
+        ld      d,(hl)
+        set     6,d
+        set     7,d                     ; + $C000: the window of slot 6
+        inc     hl
+        ld      a,(hl)                  ; page
+        inc     hl
+        inc     hl
+        push    de
+        ld      e,(hl)                  ; dst
+        inc     hl
+        ld      d,(hl)
+        nextreg REG_ATLAS,a
+        pop     hl                      ; hl = the source in the window
+        ld      a,b
+        or      c
+        jp      z,zxn_done
+        ldir
+        jp      zxn_done

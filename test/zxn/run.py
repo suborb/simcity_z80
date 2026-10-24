@@ -95,7 +95,10 @@ def main():
     city = run([S], 700)
     check('the panel, the icons and the map', lit(city, (0, 0, 256, 48)) > 1500 and distinct(city, (0, 56, 256, 192)) >= 4,
           f'{lit(city, (0, 0, 256, 48))} {distinct(city, (0, 56, 256, 192))}')
-    check('the tool icons are in colour', distinct(city, (0, 8, 168, 40)) >= 8, str(distinct(city, (0, 8, 168, 40))))
+    # the Amiga's buttons: two rows of seven 22x20 pictures in colour on grey bevels, and a yellow frame round the tool in use (the road)
+    icons = colours(city, (0, 8, 161, 48))
+    check('the tool icons are drawn: many colours and the yellow frame of the tool in use', len(icons) >= 12 and sum(n for n, c in icons if c[0] > 150 and c[2] < 150) > 60,
+          str(sorted(icons, reverse=True)[:6]))
 
     # the cursor moves a cell with caps shift and 5 to 8 (JNext's arrows), then roads
     built = run([S] + LAND + [(820, 'right'), (860, 'right'), (900, 'space'), (940, 'right'), (980, 'space')], 1200)
