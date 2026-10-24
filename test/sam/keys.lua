@@ -24,6 +24,14 @@ emu.register_frame_done(function()
     for a,b in os.getenv('SAMPOKE'):gmatch('(%x+)=(%x+)') do local v=tonumber(a,16); for i=1,#b,2 do mem:write_u8(v+(i-1)//2,tonumber(b:sub(i,i+1),16)) end end
   end
   if snaps[n] then manager.machine.video:snapshot() end
+  if os.getenv("SAMDUMP") and n == tonumber(os.getenv("SAMDUMPAT") or "0") then   -- SAMDUMP="addr:len:file": the data window (page 3) written to a file
+    local mem=cpu.spaces["program"]; local io=cpu.spaces["io"]; io:write_u8(0xfb,3)
+    for a,l,fn in os.getenv("SAMDUMP"):gmatch("(%x+):(%d+):([^,]+)") do
+      local out=_G.io.open(fn,"wb"); local v=tonumber(a,16)
+      for i=0,tonumber(l)-1 do out:write(string.char(mem:read_u8(v+i))) end
+      out:close()
+    end
+  end
   if n==last and os.getenv("SAMPEEK") then local mem=cpu.spaces["program"]; local io=cpu.spaces["io"]; io:write_u8(0xfb,3); for a in os.getenv("SAMPEEK"):gmatch("%x+") do local v=tonumber(a,16); print(string.format("peek %04x = %02x %02x %02x %02x",v,mem:read_u8(v),mem:read_u8(v+1),mem:read_u8(v+2),mem:read_u8(v+3))) end end
   if n==last then print(string.format("pc=%04x sp=%04x",cpu.state["PC"].value,cpu.state["SP"].value)); manager.machine:exit() end
 end)

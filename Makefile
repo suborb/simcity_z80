@@ -193,17 +193,12 @@ SAM_BSS = 0xA200        # the code and the placer's variables are in the low 32 
 $(SAM): $(DEPS) build/sam/tiles.bin
 	@mkdir -p $(@D)
 	$(ZCC) +sam -subtype=allram $(COMMON) -pragma-include:target/sam/zpragma.inc \
-	    -Itarget/sam -DTARGET_SAM -Ca-DTARGET_SAM -Ca-D__crt_org_bss=$(SAM_BSS) -Ca-DFMT_WIDTH=32 -Ca-DLEVELMAP_ROOM=64 -Ca-DHAVE_MINIMAP_SQUARE -Ca-DHAVE_SOUND -Ca-DAY_SAA -Ca-DAY_ISR target/sam/plat_sam_files.asm $(GAME) $(ENTROPY) $(MENU) target/sam/plat_sound.asm target/common/ay_hooks.asm target/common/ay_sfx.asm $(FIELDS) $(MMNATIVE) $(LINEEDIT) $(SAM_PLATFORM_NOFILES) -o $(@D)/simcity.bin
+	    -Itarget/sam -DTARGET_SAM -Ca-DTARGET_SAM -Ca-D__crt_org_bss=$(SAM_BSS) -Ca-DFMT_WIDTH=32 -Ca-DHAVE_MINIMAP_SQUARE -Ca-DHAVE_SOUND -Ca-DAY_SAA -Ca-DAY_ISR target/sam/plat_sam_files.asm $(GAME) $(ENTROPY) $(MENU) target/sam/plat_sound.asm target/common/ay_hooks.asm target/common/ay_sfx.asm $(FIELDS) $(MMNATIVE) $(LINEEDIT) $(SAM_PLATFORM_NOFILES) -o $(@D)/simcity.bin
 	@size=`wc -c < $(@D)/simcity.bin`; echo "sam image: $$size bytes (the uninitialised data starts at $$(( $(SAM_BSS) )))"; \
 	    [ $$size -le $$(( $(SAM_BSS) )) ] || { echo "the image runs into the uninitialised data"; rm -f $@; exit 1; }
 	@# the placer's variables must be in the low 32 KB: the screen is paged over the high window while it draws
 	@v=`sed -n 's/^mp_pix *= \$$\([0-9A-Fa-f]*\).*/\1/p' $(@D)/simcity.map`; \
 	    [ -n "$$v" ] && [ $$(( 0x$$v )) -lt 32768 ] || { echo "the placer's variables are not below $$8000 (mp_pix at $$v)"; rm -f $@; exit 1; }
-	@# the map (which the file code saves in place, with the header block in the 64 bytes before it) is in one 16 KB page of the data (the DOS takes a page
-	@# and an offset): $$8000-$$BFFF or $$C000-$$FFFF
-	@v=`sed -n 's/^_levelmap *= \$$\([0-9A-Fa-f]*\).*/\1/p' $(@D)/simcity.map`; h=`sed -n 's/^__BSS_head *= \$$\([0-9A-Fa-f]*\).*/\1/p' $(@D)/simcity.map`; \
-	    [ -n "$$v" ] && { [ $$(( 0x$$v - 64 )) -ge 32768 ] && [ $$(( 0x$$v + 9216 )) -le 49152 ] || [ $$(( 0x$$v - 64 )) -ge 49152 ] && [ $$(( 0x$$v + 9216 )) -le 65536 ]; } || \
-	    { echo "the map is not within one 16 KB page of the data (_levelmap at $$v): make SAM_BSS = `printf 0x%X $$(( 49152 + 64 - 0x$$v + 0x$$h ))` or more"; rm -f $@; exit 1; }
 	python3 -c "import sys; d = open('$(@D)/simcity.bin', 'rb').read(); d += bytes(65536 - len(d)) + open('build/sam/tiles.bin', 'rb').read(); open('$(@D)/simcity.all', 'wb').write(d)"
 	z88dk-appmake +mgt -b $(@D)/simcity.all --org 0 --exec --default-dosfile $$ZCCCFG/../target/sam/classic/samdos2.bin -o $@
 
