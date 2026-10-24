@@ -30,10 +30,13 @@ emu.register_frame_done(function()
     cpu.state["PC"].value = hooks[n]
     log:write(string.format("%d hook %04x from pc=%04x\n", n, hooks[n], pc))
   end
-  if n > 700 and n < 760 and os.getenv("SAMVARS") then
+  if n > (tonumber(os.getenv("SAMFROM") or "700")) and n < (tonumber(os.getenv("SAMTO") or "760")) and os.getenv("SAMVARS") then
     local t = {}
     for a in os.getenv("SAMVARS"):gmatch("%x+") do t[#t + 1] = string.format("%02x", mem:read_u8(tonumber(a, 16))) end
-    log:write(string.format("%d status=%02x vars %s\n", n, io_space:read_u8(0xf9), table.concat(t, " ")))
+    log:write(string.format("%d pc=%04x sp=%04x lmpr=%02x hmpr=%02x vars %s\n", n, cpu.state["PC"].value, cpu.state["SP"].value, io_space:read_u8(0xfa), io_space:read_u8(0xfb), table.concat(t, " ")))
+    local sp = cpu.state["SP"].value; local b = {}
+    for i = 0, 17 do b[#b + 1] = string.format("%02x", mem:read_u8(sp + i)) end
+    log:write("   stack " .. table.concat(b, " ") .. "\n")
   end
   if n == last then log:close(); manager.machine:exit() end
 end)

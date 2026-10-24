@@ -187,13 +187,14 @@ $(PC88): $(DEPS) build/common/tiles_640x200_3bpp.bin
 # uninitialised data in the next 32 KB (which the startup code pages in over $8000-$FFFF), and the baked pictures in the 32 KB after that,
 # where the placer pages them in a picture at a time (the screen is paged over the data window to draw).  The disk image is that
 # one file, padded to a block boundary, so the loader's pages follow each other.
+SAM_TEST =              # (-DSOUND_TEST -Ca-DSOUND_TEST: the build of test/sam/sound_check.py, which calls the sound hooks itself)
 SAM_BSS = 0xA200        # the code and the placer's variables are in the low 32 KB; the rest of the image may run on into the high window, and the
                         # uninitialised data starts after it, where the map (in the data) begins in the upper 16 KB page: see the check below
 
 $(SAM): $(DEPS) build/sam/tiles.bin
 	@mkdir -p $(@D)
 	$(ZCC) +sam -subtype=allram $(COMMON) -pragma-include:target/sam/zpragma.inc \
-	    -Itarget/sam -DTARGET_SAM -Ca-DTARGET_SAM -Ca-D__crt_org_bss=$(SAM_BSS) -Ca-DFMT_WIDTH=32 -Ca-DHAVE_MINIMAP_SQUARE -Ca-DHAVE_SOUND -Ca-DAY_SAA -Ca-DAY_ISR target/sam/plat_sam_files.asm $(GAME) $(ENTROPY) $(MENU) target/sam/plat_sound.asm target/common/ay_hooks.asm target/common/ay_sfx.asm $(FIELDS) $(MMNATIVE) $(LINEEDIT) $(SAM_PLATFORM_NOFILES) -o $(@D)/simcity.bin
+	    -Itarget/sam -DTARGET_SAM -Ca-DTARGET_SAM -Ca-D__crt_org_bss=$(SAM_BSS) -Ca-DFMT_WIDTH=32 -Ca-DHAVE_MINIMAP_SQUARE -Ca-DHAVE_SOUND -Ca-DAY_SAA -Ca-DAY_ISR $(SAM_TEST) target/sam/plat_sam_files.asm $(GAME) $(ENTROPY) $(MENU) target/sam/plat_sound.asm target/common/ay_hooks.asm target/common/ay_sfx.asm $(FIELDS) $(MMNATIVE) $(LINEEDIT) $(SAM_PLATFORM_NOFILES) -o $(@D)/simcity.bin
 	@size=`wc -c < $(@D)/simcity.bin`; echo "sam image: $$size bytes (the uninitialised data starts at $$(( $(SAM_BSS) )))"; \
 	    [ $$size -le $$(( $(SAM_BSS) )) ] || { echo "the image runs into the uninitialised data"; rm -f $@; exit 1; }
 	@# the placer's variables must be in the low 32 KB: the screen is paged over the high window while it draws
