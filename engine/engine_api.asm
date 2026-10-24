@@ -111,7 +111,7 @@ V_pointer_charxy:       defw    0
 V_view_topleft:         defw    0
 
 ; Variables that stand in for operands the Spectrum program patches in its own code (a
-; PORTABLE build has no self-modifying code; see SMC_PATCHES in tools/split_engine.py).
+; PORTABLE build has no self-modifying code; the operands are ordinary variables in the engine files).
 V_stroke_step_mask:     defb    7               ; AND mask for the landscape stroke step (7 or 3)
 V_ellipse_dx:           defw    0               ; running dx of the landscape ellipse
 V_ellipse_dy:           defw    0               ; running dy

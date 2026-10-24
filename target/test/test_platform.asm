@@ -166,6 +166,7 @@ ui_budget_confirm:      ret
 ui_choose_power_plant:  ret
 draw_map:               ret
 play_place_sound:       ret
+play_built_sound:       ret
 wait_if_demolish_pending:       xor     a       ; Z = carry on
                         ret
 play_crash_sound:       ret

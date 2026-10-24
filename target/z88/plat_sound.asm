@@ -9,7 +9,7 @@
         MODULE  plat_sound
         INCLUDE "sections.asm"
 
-        PUBLIC  soundfx1, soundfx2, play_place_sound, play_crash_sound, play_rising_tone, play_falling_tone
+        PUBLIC  soundfx1, soundfx2, play_place_sound, play_built_sound, play_crash_sound, play_rising_tone, play_falling_tone
         PUBLIC  _sound_enabled
 
         defc    COM         = $B0           ; the COM register
@@ -104,6 +104,10 @@ sfx2_low:
         pop     bc
         pop     de
         pop     hl
+        ret
+
+; Nothing is made of a tool that places something (the Spectrum has no sound for it either).
+play_built_sound:
         ret
 
 ; Spectrum: soundfx2 when the keys that move the cursor are not held; here always.

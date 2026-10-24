@@ -2,10 +2,11 @@
 ; with sound links its own file instead, e.g. target/z88/plat_sound.asm for the Z88.)
         MODULE  nosound
 
-        PUBLIC  play_place_sound, play_crash_sound, play_rising_tone, play_falling_tone, soundfx1
+        PUBLIC  play_place_sound, play_built_sound, play_crash_sound, play_rising_tone, play_falling_tone, soundfx1
 
         SECTION code_user
 play_place_sound:
+play_built_sound:
 play_crash_sound:
 play_rising_tone:
 play_falling_tone:

@@ -42,7 +42,7 @@ is not available.
 | `platform/common/` | Settings and hooks the engine needs, for C programs. |
 | `target/test/` | Headless assembly platform used by the golden-master tests. |
 | `target/test_ui/` | Headless C platform used by the UI tests. |
-| `tools/` | `split_engine.py` (extract the engine), `extract_text.py` (generate `ui/text.h` and `ui/text.c`), `find_dead.py`, `make_map_art.py`, `make_z88_icons.py` (the tool icons as Z88 characters). |
+| `tools/` | `extract_text.py` (generate `ui/text.h` and `ui/text.c`), `find_dead.py`, `make_map_art.py`, `make_z88_icons.py` (the tool icons as Z88 characters). |
 | `Makefile` | Builds every platform (`make zx`, `make aqplus`, ...) and runs the tests (`make check`). |
 | `test/` | `run_all.sh` runs everything. |
 | `PORTING.md` | Strategy, status and plan. |

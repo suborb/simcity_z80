@@ -55,6 +55,9 @@ get_cost_for_zone:
         ld      (V_money+2),a
         pop     bc
         pop     hl
+        IFDEF PORTABLE
+        call    play_built_sound
+        ENDIF
         or      a
         ret     
 

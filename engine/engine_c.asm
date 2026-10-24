@@ -32,7 +32,7 @@
         EXTERN  V_simulation_speed, V_auto_budget, V_disaster_reset
         EXTERN  V_auto_bulldoze, V_power_type_chosen, textcol
         EXTERN  ui_budget_confirm, ui_choose_power_plant, draw_map
-        EXTERN  play_place_sound, wait_if_demolish_pending
+        EXTERN  play_place_sound, play_built_sound, wait_if_demolish_pending
         EXTERN  play_crash_sound, play_rising_tone, play_falling_tone, soundfx1
         EXTERN  print_budget_amounts, cls_map, cls_print_topbox, render_status_bar
         EXTERN  text_generating_landscape

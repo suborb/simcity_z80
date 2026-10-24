@@ -1,5 +1,5 @@
-; Sound effects for a machine with an AY-3-8910 (or a YM2149, or the PC-8801's SSG): the Atari ST game's own effects, packed small by
-; tools/extract_st_sounds.py (assets/st_sounds.bin) and played a tick at a time, 50 ticks a second.
+; A player for sound effects on an AY-3-8910 (or a YM2149, or the PC-8801's SSG): the Atari ST game's own effects, packed small by
+; tools/extract_st_sounds.py into assets/st_sounds.bin, played a tick at a time, 50 ticks a second.
 ;
 ; An effect is one voice, on channel C: a tone and/or noise, the tone period swept in steps and the volume following a curve.  Packed:
 ;     mixer, the length of the volume stream, the first tone period (a word),
@@ -15,8 +15,8 @@
 ;     ay_busy                             Z if no effect is sounding (A = 0)
 ;
 ; The chip's address and data ports, and how many of 256 frames to skip to make 50 Hz of a faster display (a 60 Hz one: 43; the default
-; is none), are set at assembly time (-Ca-DAY_ADDR_PORT=n ...); the defaults are the Aquarius+'s.  The variables are in the code section: a
-; platform whose video RAM is paged over some of its RAM needs them where it is not.
+; is none), are set at assembly time (-Ca-DAY_ADDR_PORT=n ...); the defaults are the Aquarius+'s.  The variables are in the code section, so
+; they sit outside any RAM that video is paged over.
         MODULE  ay_sfx
 
         PUBLIC  _ay_play, _ay_tick, _ay_stop, ay_start, ay_busy, ay_tick, ay_stop

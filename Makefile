@@ -5,7 +5,6 @@
 #   make check                          every automated test (test/run_all.sh)
 #   make golden | uitest | tiletest | z88test   one group of tests
 #   make ZCC='zcc' ...                 build with another compiler (or set ZCC in the environment: the tests use it too)
-#   make engine                         regenerate engine/ and target/zx-original from disassembly/sim_game.asm
 #   make deadcode                       list engine code nothing reaches
 #   make clean
 #
@@ -69,7 +68,7 @@ TESTK  = build/testnative/simcity.bin
 TESTA  = build/testart/simcity.bin
 TESTSC = build/testscroll/simcity.bin
 
-.PHONY: all aqplus aqplus_allram z88rom zx multi8 pc88 sam test testpanel testmodal testnarrow testsprites testoverlay testhires testnative testart testscroll check golden uitest tiletest z88test engine deadcode clean
+.PHONY: all aqplus aqplus_allram z88rom zx multi8 pc88 sam test testpanel testmodal testnarrow testsprites testoverlay testhires testnative testart testscroll check golden uitest tiletest z88test deadcode clean
 
 all: aqplus z88rom zx multi8 pc88 sam
 
@@ -278,9 +277,6 @@ tiletest:
 
 z88test:
 	python3 test/z88/run.py
-
-engine:
-	python3 tools/split_engine.py
 
 deadcode: $(TEST)
 	python3 tools/find_dead.py

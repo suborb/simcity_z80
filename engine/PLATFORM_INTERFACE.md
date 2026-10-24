@@ -1,7 +1,7 @@
 # Engine / platform interface
 
 The engine in this directory is a copy of the simulation half of the Spectrum
-program (see `tools/split_engine.py` and `PORTING.md`).  Build it with
+program (see `PORTING.md`; `disassembly/sim_game.asm` is the original it was taken from).  Build it with
 `PORTABLE` defined, include `engine/engine.asm` in the platform's program, and
 supply what is listed here.  `target/test/test_platform.asm` is the smallest
 complete example: every item below is either a fixed value or a `ret`.
@@ -68,6 +68,8 @@ between slices, as on the Spectrum.
 | Label | Called when | Contract |
 |---|---|---|
 | `ui_budget_confirm` | Annual budget with `V_auto_budget = 0` | Modal. Show the budget (the engine's `calculate_tax`, `run_budget` compute it), let the player adjust, and return with the final funds in `V_money_after_budget`. |
+| `play_place_sound` | A tool is refused (the place is taken, or it is not dirt) | May do nothing. |
+| `play_built_sound` | Money was spent by a tool: something was placed (`PORTABLE` builds only) | Keeps every register and flag. May do nothing. |
 | `play_crash_sound` | Aircrash | May do nothing. |
 | `play_rising_tone` | Fire starts | May do nothing. |
 | `play_falling_tone` | Flood starts | May do nothing. |
@@ -91,7 +93,7 @@ the z88dk section it belongs in:
 A platform with a ROM puts `code_user` and `rodata_user` there and gives the rest RAM; the
 crt copies `data_user` from ROM and clears `bss_user`.  The engine has no self-modifying
 code in this build: the nine operands the Spectrum program patches are ordinary variables
-(`SMC_PATCHES` in `tools/split_engine.py`).  `test/golden` runs the engine from an image laid out
+(the `V_` variables in `engine/engine_api.asm`).  `test/golden` runs the engine from an image laid out
 this way and fails if anything below `__data_user_head` changes, and
 `tools/find_dead.py --smc` fails if any instruction stores into a label that is code.
 
