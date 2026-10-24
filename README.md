@@ -56,7 +56,7 @@ is not available.
 
 Needs [z88dk](https://z88dk.org).
 
-    make aqplus     # Aquarius+   -> build/aqplus/simcity.aqx
+    make aqplus     # Aquarius+   -> build/aqplus/simcity.aqx (the loader) and simcity.bin (the game; keep them together)
     make z88rom     # Z88 ROM application, 32 KB card image -> build/z88rom/simcity.epr
     make zx         # ZX Spectrum -> build/zx/simcity.tap (incomplete)
     make multi8     # Multi 8     -> build/multi8/simcity.cas

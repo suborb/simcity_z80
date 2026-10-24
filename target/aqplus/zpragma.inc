@@ -1,17 +1,11 @@
-// z88dk pragmas for the Aquarius+ AQX build (make aqplus).
-// The AQX loader loads the whole executable below $C000, so keep the CRT lean.
-#pragma output CRT_ENABLE_STDIO = 0
-#pragma output CLIB_EXIT_STACK_SIZE = 0
-// The game draws text and pictures itself (target/aqplus/plat_aqplus.asm) and sets the video mode and clears
-// the screen itself, so none of z88dk's console is wanted: nothing prints through fputc_cons.
-#pragma redirect fputc_cons = l_ret
-#pragma redirect fputc_cons_generic = l_ret
-#pragma output CRT_DISABLELOADER = 1
-#pragma output CRT_COMPRESS_AQX = 1
-
-
-#pragma output REGISTER_SP = 0x3d00
-#pragma output CRT_ORG_CODE = 0x3d00
-
+// Application policy for the two-stage Aquarius+ AQX build.
+// The generic allram subtype deliberately leaves BSS trimming to callers.
 #pragma output CRT_TRIM_BSS = 1
-#pragma output CRT_AQPLUS_BANK3_RAM = 1
+// Stage 1 uses bank 3 for its stack, so it cannot run the generic bank-file
+// loader, which pages that same window while it is active.
+#pragma output CRT_DISABLELOADER = 1
+// The video RAM is paged over bank 3 while a cell is drawn (plat_aqplus.asm), so the stacks are in the low RAM: the program starts at
+// $1000 (the bootstrap loads it from CRT_ORG_CODE), the program's stack is $0C00-$0FFF under it, and the simulation's $0B00-$0BFF
+// (the Makefile gives SIM_STACK_TOP).
+#pragma output CRT_ORG_CODE = 0x1000
+#pragma output REGISTER_SP = 0x1000
