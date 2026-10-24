@@ -15,7 +15,7 @@
 ;     ay_busy                             Z if no effect is sounding (A = 0)
 ;
 ; The chip's address and data ports, and how many of 256 frames to skip to make 50 Hz of a faster display (a 60 Hz one: 43; the default
-; is none; AY_ISR if ay_tick is called by an interrupt of the platform's; AY_SCALE for a chip clocked at 3.579545 MHz, not the ST's 2 MHz), are set at assembly time (-Ca-DAY_ADDR_PORT=n ...); the defaults are the Aquarius+'s.  The variables are in the code section, so
+; is none; AY_ISR if ay_tick is called by an interrupt of the platform's; AY_SCALE for a chip clocked at 3.579545 MHz, not the ST's 2 MHz, or with AY_DOWN for one at 1.7734475 MHz; AY_PORT16 if the ports are decoded from all 16 bits), are set at assembly time (-Ca-DAY_ADDR_PORT=n ...); the defaults are the Aquarius+'s.  The variables are in the code section, so
 ; they sit outside any RAM that video is paged over.
         MODULE  ay_sfx
 
@@ -245,6 +245,33 @@ ay_nset:
         jp      ay_write
 
         IFDEF   AY_SCALE
+        IFDEF   AY_DOWN
+; hl := hl * 0.8828 (1 - 1/8 + 1/128): the periods are the ST's, whose chip runs at 2 MHz, for a chip at 1.7734475 MHz (a factor of
+; 0.8867: the ZX Spectrum 128's and the Next's).  Uses bc, de.
+ay_scale:
+        ld      d,h
+        ld      e,l
+        ld      b,h
+        ld      c,l
+        srl     b
+        rr      c
+        srl     b
+        rr      c
+        srl     b
+        rr      c
+        or      a
+        sbc     hl,bc
+        ld      b,d
+        ld      c,e
+        ld      a,7
+ay_scale_lp:
+        srl     b
+        rr      c
+        dec     a
+        jr      nz,ay_scale_lp
+        add     hl,bc
+        ret
+        ELSE
 ; hl := hl * 1.78125 (1 + 1/2 + 1/4 + 1/32), at most 4095: the periods are the ST's, whose chip runs at 2 MHz, for a chip at 3.579545 MHz
 ; (a factor of 1.7898).  Uses bc, de.
 ay_scale:
@@ -273,9 +300,23 @@ ay_scale_lp:
         ld      hl,4095
         ret
         ENDIF
+        ENDIF
 
         IFNDEF  AY_SAA
 ; Register C of the chip := A.  Keeps hl, de, b.
+        IFDEF   AY_PORT16
+ay_write:                               ; (the ports are decoded from all 16 bits: the ZX Spectrum 128's and the Next's $FFFD and $BFFD)
+        push    bc
+        push    af
+        ld      a,c
+        ld      bc,AY_ADDR_PORT
+        out     (c),a
+        pop     af
+        ld      bc,AY_DATA_PORT
+        out     (c),a
+        pop     bc
+        ret
+        ELSE
 ay_write:
         push    af
         ld      a,c
@@ -283,6 +324,7 @@ ay_write:
         pop     af
         out     (AY_DATA_PORT),a
         ret
+        ENDIF
         ELSE
 
 ; The SAM Coupe's SAA 1099 instead of an AY (assemble with -DAY_SAA).  The player above still says what it wants as AY registers; this

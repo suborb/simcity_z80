@@ -31,6 +31,9 @@ draws the engine's own tiles) with the ST's:
 The ST game's 16 colours become the machine's 8 by COLOUR (a table: a colour, or a pair that is dithered, one pixel in
 two), which is the one place to change the look.  The art belongs to the game (see PORTING.md).
 
+  --zxn DIR    the pictures for the ZX Spectrum Next's Layer 2 (256x192, a byte a pixel, the palette entry of each): head.bin (the 16
+                palette entries as the Next's two bytes each, the 8 attribute colours' entries, the tool icons: --icons, as for --sam),
+                atlas0.bin and atlas1.bin (the pictures, 64 bytes each: 256 of them in the first 16 KB bank, the rest in the second)
   --sam FILE    the pictures for the SAM Coupe's mode 4 (256x192, 16 colours, 4 bits a pixel, the left pixel in the high nibble):
                 the palette (16 bytes, the nearest of the SAM's 128 colours to each of the game's), the palette entry nearest each of the
                 eight attribute colours (8 bytes: bit 0 blue, 1 red, 2 green), the icons (--icons) if there are any, and then 32 bytes a picture
@@ -226,6 +229,15 @@ def attr_colours(palette):
     return bytes(out)
 
 
+def zxn_palette(palette):
+    """The Next's 9 bit colours (RRRGGGBB, then the low bit of blue) of the game's colours ($0RGB, 3 bits a channel)."""
+    out = bytearray()
+    for w in palette:
+        r, g, b = (w >> 8) & 7, (w >> 4) & 7, w & 7
+        out += bytes(((r << 5) | (g << 2) | (b >> 1), b & 1))
+    return bytes(out)
+
+
 def sam_picture(px):
     """A picture in mode 4: eight rows of four bytes, two pixels to a byte, the left one in the high nibble."""
     return bytes((row[x] << 4) | row[x + 1] for row in px for x in range(0, 8, 2))
@@ -268,6 +280,7 @@ def main():
     ap.add_argument('--mini')
     ap.add_argument('--sheet')
     ap.add_argument('--sam')
+    ap.add_argument('--zxn')
     ap.add_argument('--icons', help='with --sam: the tool icons (tools/extract_st_icons.py), put after the palette')
     ap.add_argument('--original', action='store_true')
     ap.add_argument('--colours', choices=sorted(PRESETS), default='meadow')
@@ -292,6 +305,15 @@ def main():
         data = sam_palette(palette) + attr_colours(palette) + icons + b''.join(sam_picture(pixels(table[n * PIC:n * PIC + PIC])) for n in pictures)
         open(a.sam, 'wb').write(data)
         print(f'{len(pictures)} pictures, {len(icons)} bytes of icons, a 16 byte palette, 8 attribute colours and {len(pictures) * 32} bytes of mode 4 pictures -> {a.sam}')
+    if a.zxn:
+        import os
+        os.makedirs(a.zxn, exist_ok=True)
+        icons = open(a.icons, 'rb').read() if a.icons else b''
+        pics = b''.join(bytes(v for row in pixels(table[n * PIC:n * PIC + PIC]) for v in row) for n in pictures)
+        open(os.path.join(a.zxn, 'head.bin'), 'wb').write(zxn_palette(palette) + attr_colours(palette) + icons)
+        open(os.path.join(a.zxn, 'atlas0.bin'), 'wb').write(pics[:16384])
+        open(os.path.join(a.zxn, 'atlas1.bin'), 'wb').write(pics[16384:].ljust(8192, b'\0'))
+        print(f'{len(pictures)} pictures of 64 bytes ({len(pics)} bytes), the palette and {len(icons)} bytes of icons -> {a.zxn}/')
     if a.sheet:
         sheet(a.sheet, table, palette, pictures, a.original)
 

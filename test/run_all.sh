@@ -81,4 +81,10 @@ if [ -n "$SAM_MAME" ]; then
 else
     echo "== SAM Coupe file round trip skipped (set SAM_MAME to the MAME directory)"
 fi
+if [ -n "$JNEXT" ]; then
+    echo "== ZX Spectrum Next: the game under JNext (JNEXT is the jnext executable; make zxn first)"
+    python3 test/zxn/run.py || status=1
+else
+    echo "== ZX Spectrum Next tests skipped (set JNEXT to the jnext executable)"
+fi
 exit $status

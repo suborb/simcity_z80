@@ -41,7 +41,7 @@ AQPLUS_PLATFORM = target/aqplus/plat_aqplus.c target/aqplus/plat_aqplus.asm
 ZX_PLATFORM = target/zx/plat_zx.asm
 MULTI8_PLATFORM = target/multi8/plat_multi8.c target/multi8/plat_multi8.asm target/common/plat_charts.c target/common/plat_icons.c
 PC88_PLATFORM = target/pc88/plat_pc88.c target/pc88/plat_pc88.asm target/pc88/plat_pc88_files.asm target/common/plat_charts.c target/common/plat_icons.c
-SAM_PLATFORM_NOFILES = target/sam/plat_sam.c target/sam/plat_sam.asm
+SAM_PLATFORM_NOFILES = target/sam/plat_sam.c target/sam/plat_sam.asm target/common/minimap_key.c
 Z88_PLATFORM = target/z88/plat_z88.c target/z88/plat_z88.asm
 
 
@@ -56,6 +56,7 @@ ZX     = build/zx/simcity.tap
 MULTI8 = build/multi8/simcity.cas
 PC88   = build/pc88/simcity.d88
 SAM    = build/sam/simcity.mgt
+ZXN   = build/zxn/simcity.nex
 TEST   = build/test/simcity.bin
 TESTP  = build/testpanel/simcity.bin
 TESTM  = build/testmodal/simcity.bin
@@ -67,12 +68,12 @@ TESTK  = build/testnative/simcity.bin
 TESTA  = build/testart/simcity.bin
 TESTSC = build/testscroll/simcity.bin
 
-.PHONY: all dist aqplus z88rom zx multi8 pc88 sam test testpanel testmodal testnarrow testsprites testoverlay testhires testnative testart testscroll check golden uitest tiletest z88test deadcode clean
+.PHONY: all dist aqplus z88rom zx multi8 pc88 sam zxn test testpanel testmodal testnarrow testsprites testoverlay testhires testnative testart testscroll check golden uitest tiletest z88test deadcode clean
 
-all: aqplus z88rom zx multi8 pc88 sam
+all: aqplus z88rom zx multi8 pc88 sam zxn
 
 # The zip files for distribution, one for each machine (build/dist/; tools/make_dist.py)
-dist: aqplus z88rom multi8 pc88 sam
+dist: aqplus z88rom multi8 pc88 sam zxn
 	python3 tools/make_dist.py
 
 aqplus: $(AQPLUS)
@@ -81,6 +82,7 @@ zx:     $(ZX)
 multi8: $(MULTI8)
 pc88:   $(PC88)
 sam:    $(SAM)
+zxn:   $(ZXN)
 test:   $(TEST)
 testpanel: $(TESTP)
 testmodal: $(TESTM)
@@ -154,7 +156,7 @@ $(MULTI8): $(DEPS) build/common/tiles_640x200_3bpp.bin
 	@mkdir -p $(@D)
 	$(ZCC) +multi8 -subtype=64k -create-app $(COMMON) -pragma-include:target/multi8/zpragma.inc \
 	    -Itarget/multi8 -DTARGET_MULTI8 -Ca-DTARGET_MULTI8 -Ca-DHAVE_SOUND -Ca-DAY_ADDR_PORT=24 -Ca-DAY_DATA_PORT=25 -Ca-DAY_SCALE $(GAME) $(ENTROPY) $(MENU) target/multi8/plat_sound.asm target/common/ay_hooks.asm target/common/ay_sfx.asm $(FIELDS) $(MMNATIVE) $(LINEEDIT) $(MULTI8_PLATFORM) -o $(@D)/simcity
-	@size=`wc -c < $(@D)/simcity`; end=`sed -n 's/^__BSS_END_tail *= \$$\([0-9A-Fa-f]*\).*/\1/p' $(@D)/simcity.map`; \
+	@size=`wc -c < $(@D)/simcity.bin`; end=`sed -n 's/^__BSS_END_tail *= \$$\([0-9A-Fa-f]*\).*/\1/p' $(@D)/simcity.map`; \
 	    echo "multi8 image: $$size bytes (the uninitialised data ends at $$(printf '%X' $$(( 0x$$end ))), the table is at $$(printf '%X' $$(( $(MULTI8_TABLE) ))))"; \
 	    [ $$(( 0x$$end )) -le $$(( $(MULTI8_TABLE) )) ] || { echo "the uninitialised data runs into the doubling table"; rm -f $@; exit 1; }
 	@# the placer's variables must be in the low RAM: the planes are paged over $8000-$BFFF while it draws
@@ -196,6 +198,28 @@ $(SAM): $(DEPS) build/sam/tiles.bin
 	    [ -n "$$v" ] && [ $$(( 0x$$v )) -lt 32768 ] || { echo "the placer's variables are not below $$8000 (mp_pix at $$v)"; rm -f $@; exit 1; }
 	python3 -c "import sys; d = open('$(@D)/simcity.bin', 'rb').read(); d += bytes(65536 - len(d)) + open('build/sam/tiles.bin', 'rb').read(); open('$(@D)/simcity.all', 'wb').write(d)"
 	z88dk-appmake +mgt -b $(@D)/simcity.all --org 0 --exec --default-dosfile $$ZCCCFG/../target/sam/classic/samdos2.bin -o $@
+
+# The ZX Spectrum Next: Layer 2 (256x192, a byte a pixel), the Atari ST's art in its 16 colours, as the SAM Coupe.  The program is linked at
+# $0000 (z88dk's zxn crt with CRT_ORG_CODE 0: target/zxn/zpragma.inc) and the stack and the uninitialised data are at
+# ZXN_BSS ($A400); appmake makes the NEX file, with the program in a bank of its own and a loader that maps it (z88dk's zx-util.c).
+ZXN_BSS = 0xAC00
+ZXN_FLAGS =                    # (-DZXN_NO_SCROLL: no scrolling by the DMA; -DZXN_PACE=2: 25 frames a second)
+ZXN_ENTROPY = $(ENTROPY)       # (target/zxn/entropy_test.asm: the build test/zxn/run.py runs, which makes the same city each time)
+ZXN_ASM = target/zxn/plat_zxn.asm target/zxn/plat_sound.asm target/zxn/zxn_boot.asm target/zxn/zxn_data.asm
+ZXN_PLATFORM = target/zxn/plat_zxn.c target/common/minimap_key.c
+
+$(ZXN): $(DEPS) build/zxn/head.bin
+	@mkdir -p $(@D)
+	$(ZCC) +zxn -clib=classic -lesxdos -subtype=nex -pragma-include:target/zxn/zpragma.inc -pragma-define:CRT_ORG_BSS=$(ZXN_BSS) \
+	    -Itarget/zxn -DTARGET_ZXN $(ZXN_FLAGS) -Ca-DTARGET_ZXN -Ca-DFMT_WIDTH=32 -Ca-DHAVE_MINIMAP_SQUARE -Ca-DHAVE_SOUND -Ca-DAY_ISR -Ca-DAY_PORT16 -Ca-DAY_SCALE -Ca-DAY_DOWN -Ca-DAY_ADDR_PORT=65533 -Ca-DAY_DATA_PORT=49149 $(COMMON) \
+	    $(GAME) $(ZXN_ENTROPY) $(MENU) target/common/ay_hooks.asm target/common/ay_sfx.asm $(FIELDS) $(MMNATIVE) $(LINEEDIT) $(ZXN_ASM) $(ZXN_PLATFORM) -create-app -o $(@D)/simcity.bin
+	@# the program is below the stack and the data
+	@size=`wc -c < $(@D)/simcity.bin`; echo "zxn image: $$size bytes (the stack and the data start at $$(( $(ZXN_BSS) )))"; \
+	    [ $$size -le $$(( $(ZXN_BSS) )) ] || { echo "the image runs into the stack and the data"; rm -f $@; exit 1; }
+
+build/zxn/head.bin: assets/st_tiles.bin assets/st_icons.bin tools/st_tiles_3bpp.py
+	@mkdir -p $(@D)
+	python3 tools/st_tiles_3bpp.py assets/st_tiles.bin --icons assets/st_icons.bin --zxn $(@D)
 
 build/sam/tiles.bin: assets/st_tiles.bin assets/st_icons.bin tools/st_tiles_3bpp.py
 	@mkdir -p $(@D)

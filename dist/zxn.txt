@@ -1,0 +1,29 @@
+Running it
+----------
+simcity.nex is a program for the ZX Spectrum Next.  Copy it to the SD card
+and run it from the browser (or with the nexload command); in an emulator
+such as CSpect, ZEsarUX or JNext, load it as a NEX file.  It needs a Next
+with at least 512 KB of RAM and the NextZXOS (for saving and loading).
+
+The game is drawn on Layer 2 (256 x 192, 256 colours, of which it uses the
+Atari ST game's 16) and plays the ST game's sound effects on the AY chip,
+from the frame interrupt.  It runs the Z80 at 7 MHz, 50 frames a second,
+and moves the map's pixels with the DMA when the view scrolls.  Cities are saved to
+and loaded from the SD card (esxDOS files, in the current folder).
+
+Keys
+----
+  Cursor keys     move the cursor one square (Next cursor keys are Caps
+                  Shift with 5 6 7 8); with Symbol Shift too: eight
+  O P Q A         left, right, up, down (with Caps Shift: eight)
+  Space, Enter    build with the tool
+  , .             the previous and next tool (Symbol Shift with N and M)
+  0 - 9           choose a tool by its number
+  H               pause or run
+  + -             faster, slower (Symbol Shift with K and J)
+  M               the next mini map (X goes back to the city)
+  B               the budget            V   the evaluation
+  S               save the city         L   load a city
+  X               the game menu: new city, options, disasters, sound
+  Break, Edit     (Caps Shift with Space, or with 1) leave a screen
+  Delete          (Caps Shift with 0) rubs out a letter of a file name
