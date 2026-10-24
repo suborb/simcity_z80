@@ -6209,7 +6209,7 @@ initialise_simulation_variables:
 ;     value<24 -> 0;  24-199 -> -24;  200+ -> -34
 ;   Average traffic density stored in V_TrafficAverage
 ;
-; BUDGET (DoBudget - runs in November, month==11):
+; BUDGET (DoBudget - runs in December, month==11):
 ;   Copies current population/fund figures to budget panel variables
 ;   If auto_budget off: sets V_wait_for_budget_confirm=1 and busy-loops
 ;   until UI thread clears the flag (user confirms budget in menu)
@@ -7987,7 +7987,7 @@ L8e52:
 
 V_display_population:        defb    0,0,0        ; VAR $8E8A / 36490 - current cumulative population (copy for budget display)
 V_prev_year_population:        defb    0,0,0        ; VAR $8E8D / 36493 - previous year's population (for budget comparison)
-V_population:   defb    0,0,0        ; VAR $8E90 / 36496 - running population snapshot (updated each November)
+V_population:   defb    0,0,0        ; VAR $8E90 / 36496 - running population snapshot (updated each December)
 
 
 
@@ -8008,7 +8008,7 @@ V_population:   defb    0,0,0        ; VAR $8E90 / 36496 - running population sn
         ld      (V_display_population+2),a
         ld      a,(V_month)
         cp      11
-        ret     nz                              ;Only do full budget in November
+        ret     nz                              ;Only do full budget in December
         ld      hl,(V_population)
         ld      a,(V_population+2)
         ld      c,a

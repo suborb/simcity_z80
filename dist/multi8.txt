@@ -1,0 +1,33 @@
+Running it
+----------
+simcity.cas is a cassette image for the Mitsubishi Multi 8: load it from
+the tape drive (in an emulator, play the image).  The game runs in the
+machine's 64 KB RAM mode.  Saving a city writes it to tape, and loading
+one reads it back; press Esc to cancel a tape operation.
+
+The game draws in the 640 x 200 colour mode, with the planes paged in
+over $8000, and uses the PSG for sound effects.
+
+To load from BASIC enter:
+
+MON
+R
+GC000
+
+Keys
+----
+  Cursor keys     move the cursor one square (shifted: eight)
+  O P Q A         left, right, up, down (shifted capitals: eight)
+  Space, Enter    build with the tool
+  , .             the previous and next tool
+  0 - 9           choose a tool by its number
+  H               pause or run
+  + -             faster, slower
+  M               the next mini map (X goes back to the city)
+  B               the budget            V   the evaluation
+  S               save the city         L   load a city
+  X               the game menu: new city, options, disasters, sound
+
+If the letters stop working, the keyboard is in its GRAPH or KANA mode:
+switch it back (in an emulator, the host's Alt, Kana and Caps Lock keys
+change these).

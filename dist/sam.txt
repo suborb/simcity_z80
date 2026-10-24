@@ -1,0 +1,22 @@
+Running it
+----------
+simcity.mgt is a disk image for the SAM Coupe.  Put it in drive 1 and
+boot it (F9).  In SimCoupe, insert the image as Disk 1.
+
+The game uses screen mode 4 (256 x 192, 16 colours) and the SAA 1099 for
+sound effects, played from the frame interrupt.  Cities are saved to and
+loaded from the disk (SAMDOS files); file names can be ten characters.
+
+Keys
+----
+  Cursor keys     move the cursor one square (with shift: eight)
+  O P Q A         left, right, up, down (shifted capitals: eight)
+  Space, Enter    build with the tool
+  , .             the previous and next tool
+  0 - 9           choose a tool by its number
+  H               pause or run
+  + -             faster, slower
+  M               the next mini map (X goes back to the city)
+  B               the budget            V   the evaluation
+  S               save the city         L   load a city
+  X               the game menu: new city, options, disasters, sound

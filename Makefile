@@ -67,9 +67,13 @@ TESTK  = build/testnative/simcity.bin
 TESTA  = build/testart/simcity.bin
 TESTSC = build/testscroll/simcity.bin
 
-.PHONY: all aqplus z88rom zx multi8 pc88 sam test testpanel testmodal testnarrow testsprites testoverlay testhires testnative testart testscroll check golden uitest tiletest z88test deadcode clean
+.PHONY: all dist aqplus z88rom zx multi8 pc88 sam test testpanel testmodal testnarrow testsprites testoverlay testhires testnative testart testscroll check golden uitest tiletest z88test deadcode clean
 
 all: aqplus z88rom zx multi8 pc88 sam
+
+# The zip files for distribution, one for each machine (build/dist/; tools/make_dist.py)
+dist: aqplus z88rom multi8 pc88 sam
+	python3 tools/make_dist.py
 
 aqplus: $(AQPLUS)
 z88rom: $(Z88ROM)

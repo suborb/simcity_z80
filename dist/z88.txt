@@ -1,0 +1,48 @@
+Running it
+----------
+The game comes as the same Z88 application in three forms:
+
+  simcity.epr     a card image (32 KB), for a slot: in the OZvm emulator,
+                  insert the file as a card in a slot
+  simcity.app     the installer's files: the .app file with the two banks,
+  simcity.ap0     .ap0 and .ap1 (keep the three together, with the same
+  simcity.ap1     name), to be installed from the Z88's RAM
+  simcity.a5p     the same as one compressed file, for the OZ 5 installer
+
+Once it is in the machine, SimCity appears in the Index.  Cities are
+saved as files in the Z88's filing system: the game asks for a file name.
+
+The game draws the map on the right of the screen and its text, icons
+and the R, C and I bars in a window on the left.  It uses the OZ menus.
+
+Keys
+----
+  Cursor keys     move the cursor one square (with shift: eight)
+  O P Q A         left, right, up, down (shifted capitals: eight)
+  Space, Enter    build with the tool
+  Tab, Shift-Tab  the next, the previous tool (or , and . )
+  0 - 9           choose a tool by its number
+  + -             faster, slower
+  M               the next mini map; Esc goes back to the city
+
+The OZ menus (press the diamond, <>, then the letters):
+
+  <> B            the budget
+  <> E            the evaluation
+  <> S            save the city
+  <> L            load a city
+  <> G N          a new city           <> G P   pause
+  <> G Q          quit
+  <> T F, N, L    speed: fast, normal, slow
+  <> V ...        views: V C the city, V P pollution, V O police,
+                  V F fire, V T traffic, V W power, V R transport,
+                  V I crime, V X back to the city
+  <> D ...        disasters: D F fire, D L flood, D E earthquake,
+                  D A air crash, D T tornado, D M meltdown
+  <> O ...        options: coal or nuclear power (O C, O N), disasters
+                  (O D N, O D F), auto-bulldoze (O B N, O B F),
+                  auto-budget (O A N, O A F), sound (O S N, O S F)
+
+The menus also list all of these.  The tools that cost more than the
+money you have are shown greyed out.  The budget and evaluation screens
+close with Enter, Space or Esc.

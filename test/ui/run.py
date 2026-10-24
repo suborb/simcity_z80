@@ -656,7 +656,7 @@ def main():
     check('auto-budget: and off again', mem[psyms['_V_auto_budget']] == 0)
     mem = run(pbin, psyms, [LEVEL_MEDIUM, ord('+'), CMD_AUTOBUDGET_ON] + [0] * 1500)
     text = panes(mem)[1]
-    check('auto-budget: in November the engine runs the budget without stopping for the screen',
+    check('auto-budget: in December the engine runs the budget without stopping for the screen',
           not any('FISCAL' in r for r in text) and any('FUNDS' in r for r in text), '\n'.join(text))
 
     # --- 6c. the sound option ---
@@ -736,10 +736,10 @@ def main():
     check('budget: enter accepts it and the game goes on (status panel back, new rate kept)',
           any('FUNDS' in r for r in text) and not any('FISCAL' in r for r in text) and byte_p(mem, '_SMC_tax_rate') == 8, '\n'.join(text))
     check('budget: the game asks the player for the annual budget', byte_p(mem, '_V_auto_budget') == 0)
-    # the engine's own request, in November: fast, until the year's tick; then the player changes the tax rate and accepts
+    # the engine's own request, in December: fast, until the year's tick; then the player changes the tax rate and accepts
     mem = run(pbin, psyms, [LEVEL_MEDIUM, ord('+')] + [0] * 1500 + [KEY_RIGHT, KEY_RIGHT, 0, 0])
     text = panes(mem)[1]
-    check('budget: in November the game stops for the budget screen', any('FISCAL BUDGET' in r for r in text), '\n'.join(text))
+    check('budget: in December the game stops for the budget screen', any('FISCAL BUDGET' in r for r in text), '\n'.join(text))
     check('budget: the player can change the tax rate in it', byte_p(mem, '_SMC_tax_rate') == 9)
 
     # --- 8. the evaluation screen: the mayor's approval ---

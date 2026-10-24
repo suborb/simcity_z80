@@ -1,0 +1,22 @@
+Running it
+----------
+simcity.d88 is a disk image for the NEC PC-8801 (V1 or V2: the game finds
+out which at start-up).  Put it in drive 1 and reset the machine; it
+boots straight into the game.
+
+The game uses the 640 x 200 colour screen.  Cities are saved to and
+loaded from the disk.
+
+Keys
+----
+  Cursor keys     move the cursor one square (shifted: eight)
+  O P Q A         left, right, up, down (shifted capitals: eight)
+  Space, Enter    build with the tool
+  , .             the previous and next tool
+  0 - 9           choose a tool by its number
+  H               pause or run
+  + -             faster, slower
+  M               the next mini map (X goes back to the city)
+  B               the budget            V   the evaluation
+  S               save the city         L   load a city
+  X               the game menu: new city, options, disasters

@@ -1,0 +1,31 @@
+Running it
+----------
+Copy simcity.aqx and simcity.bin to the same place on the Aquarius+'s SD
+card (or the folder of the emulator's file system) and run simcity.aqx.
+The .aqx is the loader: it needs simcity.bin beside it.
+
+From BASIC enter the command: RUN simcity.aqx and the game will start.
+
+The game uses the 40 x 25 bitmap screen, the AY-3-8910 for sound effects
+and the ESP file system for saving cities.
+
+Keys
+----
+  Cursor keys     move the cursor one square (shifted: eight)
+  O P Q A         left, right, up, down (shifted capitals: eight)
+  Space, Enter    build with the tool
+  , .             the previous and next tool
+  0 - 9           choose a tool by its number
+  H               pause or run
+  + -             faster, slower
+  M               the next mini map (X goes back to the city)
+  B               the budget            V   the evaluation
+  S               save the city         L   load a city
+  X               the game menu: new city, options, disasters, sound
+
+In the menu the cursor up and down (or Q and A) move, Space or Enter
+chooses, X closes it.  Options that show a value (SPEED: NORMAL) change
+as you choose them.  Placing a power plant asks for coal or nuclear when
+there is the money for both.
+
+Saving and loading ask for a file name: type it and press Enter.
