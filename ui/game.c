@@ -1381,7 +1381,9 @@ static void handle_key(uint8_t k)
         if (map_view) set_map_view(0); else quit = 1;
         break;
 #endif
+#ifndef HAVE_MENUS
     case 'b':
+#endif
 #ifdef HAVE_POPUP_MENU
     case MENU_BUDGET:
 #endif
@@ -1389,7 +1391,9 @@ static void handle_key(uint8_t k)
     case CMD_BUDGET:
 #endif
         game_budget(); break;
+#ifndef HAVE_MENUS
     case 'v':
+#endif
 #ifdef HAVE_POPUP_MENU
     case MENU_EVALUATION:
 #endif
@@ -1397,7 +1401,9 @@ static void handle_key(uint8_t k)
     case CMD_EVALUATION:
 #endif
         game_evaluation(); break;
+#ifndef HAVE_MENUS
     case 's':
+#endif
 #ifdef HAVE_POPUP_MENU
     case MENU_SAVE:
 #endif
@@ -1405,7 +1411,9 @@ static void handle_key(uint8_t k)
     case CMD_SAVE:
 #endif
         game_save(); break;
+#ifndef HAVE_MENUS
     case 'l':
+#endif
 #ifdef HAVE_POPUP_MENU
     case MENU_LOAD:
 #endif
@@ -1425,7 +1433,9 @@ static void handle_key(uint8_t k)
     case CMD_NEW_CITY:
 #endif
         restart = quit = 1; break;
+#ifndef HAVE_MENUS
     case 'h':
+#endif
 #ifdef HAVE_POPUP_MENU
     case MENU_PAUSE:
 #endif
@@ -1449,11 +1459,13 @@ static void handle_key(uint8_t k)
     case CMD_SPEED_NORMAL:     V_simulation_speed = 1; break;
     case CMD_SPEED_SLOW:       V_simulation_speed = 2; break;
 #endif
+#ifndef HAVE_MENUS
     case 'e':
 #ifdef HAVE_POPUP_MENU
     case MENU_POWER_TOGGLE:
 #endif
         power_nuclear = !power_nuclear; break;
+#endif
 #ifndef TARGET_AQPLUS
     case CMD_POWER_COAL:       power_nuclear = 0; break;
     case CMD_POWER_NUCLEAR:    power_nuclear = 1; break;

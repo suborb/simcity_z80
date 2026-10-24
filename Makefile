@@ -111,7 +111,7 @@ $(AQPLUS_ALLRAM): $(DEPS)
 
 
 Z88ROM_FLAGS = -subtype=app --generic-console -create-app -pragma-include:target/z88/zpragma_rom.inc \
-               -Itarget/z88 -DTARGET_Z88 -Ca-DZ88_DI_SIM \
+               -Itarget/z88 -DTARGET_Z88 -Ca-DZ88_DI_SIM -Ca-DRODATA_IN_RAM \
                -Cp-DAPP_VERSION=$(VERSION)
 
 $(Z88ROM): $(DEPS)

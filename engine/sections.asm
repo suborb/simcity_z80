@@ -17,9 +17,15 @@
         MACRO   IN_CODE
         SECTION code_user
         ENDM
+        IFDEF   RODATA_IN_RAM           ; the Z88 ROM: the tables go in the initial data, which the startup unpacks
+        MACRO   IN_RODATA
+        SECTION data_user
+        ENDM
+        ELSE
         MACRO   IN_RODATA
         SECTION rodata_user
         ENDM
+        ENDIF
         MACRO   IN_DATA
         SECTION data_user
         ENDM

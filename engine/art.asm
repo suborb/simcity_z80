@@ -20,7 +20,11 @@
         defc    ART_TILE_ATTRS = 2760
         defc    ART_ZONE_ATTRS = 2854
 
+        IFDEF   RODATA_IN_RAM           ; (the Z88's console reads the art with the map bank paged over $4000-$7FFF: it stays in ROM)
+        SECTION rodata_user
+        ELSE
         IN_RODATA
+        ENDIF
 view_udgs:
         IFDEF   TARGET_AQPLUS
         BINARY  "assets/map_art_aq.bin"

@@ -302,6 +302,7 @@ def main():
         print(''.join(tail))
     mem = open(dump, 'rb').read()
 
+    data_image = open(os.path.join(BUILD, 'simcity_DATA.bin'), 'rb').read()      # (the initial data as the linker made it; the image holds it packed in the ROM build with CRT_MODEL 3)
     ok = True
 
     def check(name, good, detail=''):
@@ -321,8 +322,9 @@ def main():
     check('the game reached its main loop (frame counter running)', frame > 0, f'frame {frame}')
     deepest = next((i for i in range(STACK_FLOOR, SP_START) if mem[i] != 0xA5), SP_START)
     print(f'  stack: the deepest byte written is {deepest:#06x}, {SP_START - deepest} bytes below the start')
+    table = syms['D_shoreline_lookup']                  # (a table nothing writes: the unpacked initial data must equal the linker's image)
     check('the initial data was copied from ROM to RAM',
-          bytes(mem[syms['V_stroke_dims']:syms['V_stroke_dims'] + 2]) == bytes(epr[syms['__ROMABLE_END_tail'] - 0x8000 + (syms['V_stroke_dims'] - syms['__DATA_head']):][:2]))
+          bytes(mem[table:table + 64]) == data_image[table - syms['__DATA_head']:][:64])
     end = mem[VARS + 8] | mem[VARS + 9] << 8
     text = bytes(mem[OUT:end])
     print(f'  os_out received {len(text)} characters')

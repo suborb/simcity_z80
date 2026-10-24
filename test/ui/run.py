@@ -189,7 +189,7 @@ def check(name, ok, detail=''):
 def main():
     binary, syms = build()
     LEVEL_MEDIUM = ord('2')     # 10000 starting funds
-    PAUSE = ord('h')
+    PAUSE = 0x91          # CMD_PAUSE
 
     # --- 1. the title screen and a do-nothing game ------------------------------
     mem = run(binary, syms, [LEVEL_MEDIUM, PAUSE])

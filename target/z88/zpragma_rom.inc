@@ -6,3 +6,4 @@
 #pragma output CRT_ENABLE_STDIO = 0
 #pragma output CLIB_EXIT_STACK_SIZE = 0
 #pragma redirect fputc_cons_generic = fputc_cons_generic_minimal
+#pragma output CRT_MODEL = 3
