@@ -16,7 +16,7 @@ ZCC ?= zcc -compiler=80cc -fframe-pointer
 
 # -DPORTABLE selects the engine's portable build; the include paths are for the assembler
 # (engine, repository root for assets/) and the C compiler (ui).
-COMMON = -Ca-DPORTABLE -Ca-Iengine -Ca-I. -Iui -Cc-standard-escape-chars -m
+COMMON = -Cp-DAPP_VERSION=$(VERSION) -Ca-DPORTABLE -Ca-Iengine -Ca-I. -Iui -Cc-standard-escape-chars -m
 
 # The game core.  The optional features (the budget and evaluation screens, saving and loading, the mini maps,
 # the sprites) are always compiled; each is switched on or off by the platform's plat_config.h, which defines

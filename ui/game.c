@@ -1574,6 +1574,9 @@ static void choose_layout(void)
 #endif
 }
 
+#define VERSION_STRING(x) #x
+#define VERSION_TEXT(x) VERSION_STRING(x)               /* (the Makefile passes it as a bare number) */
+
 static void title_screen(void)
 {
     uint16_t seed = 0, first;
@@ -1585,6 +1588,9 @@ static void title_screen(void)
 #else
 #define LEVEL_ROW 2
     plat_text_puts(0, 0, "S I M C I T Y");
+#ifdef APP_VERSION
+    plat_text_puts(16, 0, "v" VERSION_TEXT(APP_VERSION));
+#endif
 #endif
     plat_text_puts(0, LEVEL_ROW, "CHOOSE A LEVEL:");           /* one choice to a line */
     plat_text_puts(2, LEVEL_ROW + 2, "1 EASY");
