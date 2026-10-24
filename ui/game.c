@@ -1075,8 +1075,8 @@ static void draw_status(void)
 {
     char buf[41];
 #ifdef HAVE_ICONS
-#ifdef HAVE_TEXT_TITLE
-    uint8_t icons = panel_h >= 7;                           /* (the title bar took a row of the window's eight) */
+#ifdef HAVE_TEXT_BANNER
+    uint8_t icons = panel_h >= 7;                           /* (the banner took a row of the window's eight) */
 #else
     uint8_t icons = panel_h >= 8;                           /* the tools as pictures in rows 3 and 4 */
 #endif
@@ -1617,8 +1617,8 @@ static void title_screen(void)
 #endif
     V_InitialSeed = (uint16_t)(seed ^ first ^ (plat_clock() - first) ^ plat_entropy()) | 1; /* ...and the name took to type */
     plat_text_clear();
-#ifdef HAVE_TEXT_TITLE
-    plat_text_puts(0, 1, "GENERATING LANDSCAPE...");        /* (a line down from the title bar) */
+#ifdef HAVE_TEXT_BANNER
+    plat_text_puts(0, 1, "GENERATING LANDSCAPE...");        /* (a line down from the banner) */
 #else
     plat_text_puts(0, 0, "GENERATING LANDSCAPE...");
 #endif

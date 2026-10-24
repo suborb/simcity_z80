@@ -6,7 +6,7 @@
 #define HAVE_BITMAP
 #define HAVE_BUDGET
 #define HAVE_EVALUATION
-#define HAVE_TEXT_TITLE        /* the OZ window has a frame with a title bar, which takes a row of its 8 */
+#define HAVE_TEXT_BANNER       /* the OZ window is framed, with a banner, which takes a row of its 8 */
 #define MODAL_ROWS 7           /* the rows inside it */
 #define HAVE_MINIMAP
 #define HAVE_MINIMAP_CURSOR

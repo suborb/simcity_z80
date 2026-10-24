@@ -204,7 +204,7 @@ static const struct field foot[] = {
     { 21, 17, F_U16,  0,   &ev.score },
     { 23, 31, F_TEXT, 0,   "ENTER OK" },
 };
-#elif defined(HAVE_TEXT_TITLE)
+#elif defined(HAVE_TEXT_BANNER)
 /* In seven rows: the approval, the problems (four rows), then the population and migration, and the value of the city with its
    category.  The figures end in the same columns (the percentages 16 and 39, the numbers 16 and 39 as well), the second column of
    labels starts at 20.  (The game level is left out.) */
@@ -370,7 +370,9 @@ static void draw(void)
         borrow = d < 0;
     }
     class_name = text_city_class[ev.city_class];
+#ifndef HAVE_TEXT_BANNER
     level_name = text_levels[V_difficulty > 2 ? 2 : V_difficulty];
+#endif
 #ifdef MODAL_X
     fmt_col0 = MODAL_X;                             /* (the screen is centred) */
 #endif

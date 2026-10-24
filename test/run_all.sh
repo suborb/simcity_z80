@@ -69,6 +69,8 @@ status=0
 for t in aqplus z88rom zx multi8; do
     if make -s $t >/dev/null 2>&1; then echo "built $t"; else echo "FAIL  build $t"; status=1; fi
 done
+echo "== the Z88 card image boots under z88dk-ticks, with OZ stubbed"
+python3 test/z88/boot.py || status=1
 if [ -n "$SAM_MAME" ]; then
     echo "== SAM Coupe: save a city as a SAMDOS file and load it back (MAME in \$SAM_MAME; make sam first)"
     test/sam/roundtrip.sh || status=1

@@ -9,8 +9,8 @@
 #include "engine.h"
 #include "platform.h"
 
-#define Z88_TEXT_X    2                    /* everything is moved across 2 from the bars, to sit in the middle of the 45 cells */
-#define Z88_TEXT_COLS 43                   /* inside the frame (the frame is 47 wide and 8 high, 2 across from the left: centred on the 51 columns) */
+#define Z88_TEXT_X    2                    /* the text starts 2 cells in from the bars (so a 40 column screen is in the middle of the window) */
+#define Z88_TEXT_COLS 43                   /* the window is 47 wide: less the bars and the 2 */
 #define Z88_TEXT_ROWS 7
 #define Z88_MAP_COLS  32
 #define Z88_MAP_ROWS  8
@@ -113,9 +113,10 @@ void plat_puts(uint8_t col, uint8_t row, const char *s) { plat_text_puts(col, ro
 
 uint8_t plat_text_cols(void) { return Z88_TEXT_COLS; }
 uint8_t plat_text_rows(void) { return Z88_TEXT_ROWS; }
-/* The text window is one OZ window (1): 47 x 8 at column 2, centred on the 51 columns, with OZ's bars (type 131).  Its first row is the title,
-   reverse, centred, in OZ's tiny font (which the text below it keeps); the text is in the rows below, one cell in from the bars (plat_text_puts() and plat_icons() add the
-   offset), 45 x 7.  Clearing it is defining it again (with bit 7 of the type, it is cleared) and drawing the title. */
+/* The text window is one OZ window (1): 47 x 8 at column 2, centred on the 51 columns, with OZ's bars (type 131).  Its first row is the
+   banner, SIMCITY, reverse and centred; the text is in the 7 rows below, inside the bars, and in OZ's tiny font (plat_text_puts(),
+   plat_icons() and plat_demand() add the offset).  Clearing the window is defining it again (with bit 7 of the type it is cleared) and
+   drawing the banner.  (A banner that changed with the screen did not take in OZvm: each screen puts its heading in its first row.) */
 void plat_text_clear(void)
 {
     z88_sop("\x01" "7#1" "\x22" "\x20" "\x4f" "\x28" "\x83" "\x01" "2C1" "\x01" "3+TR"          /* window 1 at 2,0, 47 x 8, with the banner: reverse, tiny */

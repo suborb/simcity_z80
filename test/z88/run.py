@@ -4,7 +4,7 @@
 
   * every command except CMD_REDRAW (which OZ sends itself) has exactly one menu item, and
     every menu item sends a command that exists;
-  * the shortcut keys (typed after the [] key) are letter sequences, each different, none the
+  * the shortcut keys (typed after the <> key) are letter sequences, each different, none the
     start of another, and each begins with its menu's initial, which is not M, I or J (ENTER, TAB
     and LF are <>M, <>I and <>J);
   * the menus stay within OZ's limits (7 topics, 24 items each, command codes 0x81..0xB0).

@@ -6,4 +6,5 @@
 #pragma output CRT_ENABLE_STDIO = 0
 #pragma output CLIB_EXIT_STACK_SIZE = 0
 #pragma redirect fputc_cons_generic = fputc_cons_generic_minimal
+// the initial data (with the engine's tables: RODATA_IN_RAM in the Makefile) is stored packed and unpacked at start-up: about 1.3 KB saved
 #pragma output CRT_MODEL = 3

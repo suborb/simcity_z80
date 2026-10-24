@@ -13,11 +13,11 @@
 #if (defined(HAVE_BUDGET) || defined(HAVE_EVALUATION)) && !defined(MODAL_ROWS)
 #error "a platform with modal screens must define MODAL_ROWS"
 #endif
-#if defined(MODAL_ROWS) && MODAL_ROWS < 8 && !defined(HAVE_TEXT_TITLE)
+#if defined(MODAL_ROWS) && MODAL_ROWS < 8 && !defined(HAVE_TEXT_BANNER)
 #error "MODAL_ROWS must be at least 8"
 #endif
-#if defined(HAVE_TEXT_TITLE) && !defined(HAVE_TEXT_WINDOW)
-#error "a title bar is the text window's"
+#if defined(HAVE_TEXT_BANNER) && !defined(HAVE_TEXT_WINDOW)
+#error "a banner is the text window's"
 #endif
 /* The two screens have a layout for 40 or more columns (the default) and one for the 32 of many Z80 machines
    (a platform with a 32 column display sets MODAL_COLS to 32, and MODAL_ROWS to 24). */
@@ -108,7 +108,8 @@ extern void     plat_flush(void);               /* end of frame: show what was d
      HAVE_TEXT_WINDOW  a text window of its own beside the map (the Z88's OZ window): the map then gets the
                        whole console and everything textual is drawn with plat_text_puts() in the window's
                        coordinates.  Without it the text shares the screen, the top third.
-     HAVE_TEXT_TITLE   with HAVE_TEXT_WINDOW: the window has a title bar (plat_text_title()), which takes a row: the screens have one row less
+     HAVE_TEXT_BANNER  with HAVE_TEXT_WINDOW: the window is framed and its first row is a banner of the platform's own, so the
+                       text area is a row shorter (MODAL_ROWS 7): the screens and the status panel are laid out in 7 rows
      HAVE_TILES        it can draw the game's own 8x8 pictures (plat_put_tile())
      HAVE_BITMAP       it can draw pictures of the game's own making (plat_put_bitmap()); needed by HAVE_MINIMAP (unless
                        it draws the mini maps itself: HAVE_MINIMAP_NATIVE)
@@ -167,9 +168,10 @@ extern uint8_t  plat_text_rows(void);
 #endif
 extern void     plat_text_clear(void);
 extern void     plat_text_puts(uint8_t col, uint8_t row, const char *s);
-#ifdef HAVE_TEXT_TITLE
-/* HAVE_TEXT_TITLE: the text window is framed, with a banner of its own (the Z88's OZ window): its rows (plat_text_rows(), and
-   MODAL_ROWS: 7) are the ones inside, below the banner. */
+#ifdef HAVE_TEXT_BANNER
+/* HAVE_TEXT_BANNER: the text window is framed, with a banner of its own (the Z88's OZ window): its rows (plat_text_rows(), and
+   MODAL_ROWS: 7) are the ones inside, below the banner.  plat_text_bold() writes in bold, which the status panel does for the name of the
+   mini map in view. */
 extern void     plat_text_bold(uint8_t col, uint8_t row, const char *s);       /* write it in bold */
 #else
 #define plat_text_bold(c, r, s)
