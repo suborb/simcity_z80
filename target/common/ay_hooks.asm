@@ -95,19 +95,20 @@ fx1_wait:
 ; Wait for the start of a frame (the sync bit's change to 0) and tick (with AY_ISR an interrupt ticks, and this only waits: for as long as
 ; a frame is expected to take, in case the interrupts are off)
 ay_edge:
-        IFDEF   AY_ISR
-        ld      bc,0
+        ld      bc,0                    ; (a bound, in case the frame clock does not run)
 ay_edge_wait:
+        push    bc
         call    ay_sync
-        ret     z
+        pop     bc
+        jr      z,ay_edge_tick
         dec     bc
         ld      a,b
         or      c
         jr      nz,ay_edge_wait
+ay_edge_tick:
+        IFDEF   AY_ISR
         ret
         ELSE
-        call    ay_sync
-        jr      nz,ay_edge
         jp      ay_tick
         ENDIF
 
@@ -117,7 +118,8 @@ ay_poll:
         IFDEF   AY_ISR
         ret
         ELSE
-        call    ay_sync
+        call    ay_sync                 ; (a tick for each frame it says has gone by)
         ret     nz
-        jp      ay_tick
+        call    ay_tick
+        jr      ay_poll
         ENDIF

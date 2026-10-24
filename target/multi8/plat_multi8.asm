@@ -62,6 +62,9 @@ _mp_icons:
 ; _view_tile_art + 8 * n), and the picture is drawn from mp_tiles, where it is baked in the Multi 8's colours: 24 bytes,
 ; a plane (blue, red, green) of eight pixel rows after another (tools/extract_cpc_tiles.py).  The attribute is not
 ; used.  `inverse` draws the complement, which is the cursor.
+        IFDEF   HAVE_SOUND
+        EXTERN  snd_init, ay_poll
+        ENDIF
         PUBLIC  _plat_put_tile
 _plat_put_tile:
         ld      hl,2
@@ -142,6 +145,9 @@ mp_bake_draw:
         call    mp_one
         ld      a,MEM_IDLE
         out     (PORT_MEM),a
+        IFDEF   HAVE_SOUND
+        call    ay_poll                 ; (the sound's ticks go on while the screen is drawn)
+        ENDIF
         jp      mp_keyscan
 
 ; The cell's 16 bytes from de into the plane a (bit 0 blue, 1 red, 2 green); de goes on
@@ -752,6 +758,9 @@ mp_dbl_lo:
 _plat_init:
         di
         call    mp_dbl_init
+        IFDEF   HAVE_SOUND
+        call    snd_init                ; (the sound's frame clock)
+        ENDIF
         ld      a,(__port29_copy)
         and     $3F                     ; bit 7 clear: colour; bit 6 set: 80 columns
         or      $40

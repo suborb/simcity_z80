@@ -9,6 +9,7 @@ frame skip that makes 50 Hz of a 60 Hz display (AY_SKIP) and with the Multi 8's 
   usage: test/ay_sfx/run.py
 """
 import os
+import random
 import re
 import subprocess
 import sys
@@ -101,7 +102,15 @@ def run_trace(effects_ticks, defines, addr_port, data_port):
         return effects
 
 
-def expected(blob, effect, calls, skip, acc=0):
+def scaled(p, limit):
+    """A period for the ST's 2 MHz chip as one for a chip at 3.579545 MHz: times 1.78125 (1 + 1/2 + 1/4 + 1/32), at most `limit`."""
+    q = min(limit, p + (p >> 1) + (p >> 2) + (p >> 5))
+    if limit == 4095 and 100 <= p <= 2200:      # (a tone: within a percent of the true ratio of the clocks, where it can be)
+        assert abs(q / p / (3579545 / 2000000) - 1) < 0.01, (p, q)
+    return q
+
+
+def expected(blob, effect, calls, skip, acc=0, scale=False):
     """The writes the player should make for the effect's first `calls` calls of ay_tick."""
     at = blob[1 + 2 * effect] | blob[2 + 2 * effect] << 8
     mixer, ticks = st.unpack_effect(blob, at)
@@ -119,7 +128,10 @@ def expected(blob, effect, calls, skip, acc=0):
                 continue
         if n < len(ticks):
             period, vol = ticks[n]
-            out.append([(4, period & 255), (5, period >> 8), (6, period & 31), (10, vol)])
+            if scale:
+                out.append([(4, scaled(period, 4095) & 255), (5, scaled(period, 4095) >> 8), (6, scaled(period & 31, 31)), (10, vol)])
+            else:
+                out.append([(4, period & 255), (5, period >> 8), (6, period & 31), (10, vol)])
             n += 1
         else:
             out.append([(10, 0)])                   # the end: silence
@@ -161,6 +173,116 @@ def expected_saa(blob, effect, calls):
     return start, out
 
 
+CLOCK_HARNESS = '''        SECTION code_user
+        org     $2000
+        EXTERN  ay_sync, ay_clock_reset
+        PUBLIC  ay_clock
+start:  ld      sp,$7000
+        ld      hl,table
+        ld      (tp),hl
+        call    ay_clock_reset          ; (reads the first value of the table)
+        ld      bc,CALLS
+loop:   push    bc
+        call    ay_sync
+        ld      a,0
+        jr      nz,out
+        inc     a
+out:    out     ($FE),a                 ; 1: a frame, 0: none
+        pop     bc
+        dec     bc
+        ld      a,b
+        or      c
+        jr      nz,loop
+fin:    halt
+; the counter: the next word of the table each time it is read
+ay_clock:
+        ld      hl,(tp)
+        ld      e,(hl)
+        inc     hl
+        ld      d,(hl)
+        inc     hl
+        ld      (tp),hl
+        ex      de,hl
+        ret
+tp:     defw    0
+table:
+TABLE
+'''
+
+
+def clock_model(values, calls, maxcatch=8):
+    """What ay_sync should say on each call, given the counter's successive readings: Z (1) once for each pulse the counter has counted down
+    since the last reading, at most maxcatch of them, then none until the next reading."""
+    it = iter(values)
+    last, pending, out = next(it), 0, []
+    for _ in range(calls):
+        if pending:
+            pending -= 1
+            out.append(1)
+            continue
+        now = next(it)
+        elapsed = (last - now) & 0xFFFF
+        last = now
+        if elapsed == 0:
+            out.append(0)
+        else:
+            pending = min(elapsed, maxcatch) - 1
+            out.append(1)
+    return out
+
+
+def check_multi8_clock():
+    """target/multi8/plat_sound.asm's ay_sync (with a stub for the timer read) against clock_model, on a counter that stands still, steps by one,
+    jumps by more than it will catch up and wraps through 0."""
+    rng = random.Random(8)
+    value, values = 0x3000, [0x3000]
+    for step in [0, 0, 1, 1, 2, 3, 20, 0, 1] + [rng.choice((0, 0, 1, 1, 1, 2, 3, 7, 8, 9, 40)) for _ in range(120)] + [0x3000 - 3] + [1, 1, 1, 1]:
+        value = (value - step) & 0xFFFF if step < 0x3000 else step
+        values.append(value)
+    # make it pass through zero: start the second half near the bottom
+    values += [(0x0006 - k * 2) & 0xFFFF for k in range(12)]
+    calls = 400
+    values += [0x0100] * (calls + 10)
+    with tempfile.TemporaryDirectory() as tmp:
+        table = ''.join(f'        defw ${v:04X}\n' for v in values)
+        src = CLOCK_HARNESS.replace('TABLE\n', table).replace('CALLS', str(calls))
+        open(os.path.join(tmp, 'h.asm'), 'w').write(src)
+        out = subprocess.run([Z80ASM, '-b', '-m', '-I' + ROOT, '-DCLOCK_STUB', '-oh.bin', 'h.asm', os.path.join(ROOT, 'target/multi8/plat_sound.asm')],
+                             cwd=tmp, capture_output=True, text=True)
+        if out.returncode or out.stderr.strip():
+            print(out.stdout + out.stderr)
+            return False
+        syms = {}
+        for line in open(os.path.join(tmp, 'h.map')):
+            m = re.match(r'(\S+)\s+= \$([0-9A-F]+) ;', line)
+            if m:
+                syms[m.group(1)] = int(m.group(2), 16)
+        code = open(os.path.join(tmp, 'h_code_user.bin'), 'rb').read()
+        img = bytearray(65536)
+        img[0x2000:0x2000 + len(code)] = code
+        open(os.path.join(tmp, 'img.bin'), 'wb').write(img)
+        with open(os.path.join(tmp, 'trace.txt'), 'w') as tf:
+            subprocess.run([TICKS, '-pc', '2000', '-end', f'{syms["fin"]:x}', '-counter', '400000000', '-trace', 'img.bin'],
+                           cwd=tmp, stdout=tf, stderr=subprocess.DEVNULL)
+        reg_re = re.compile(r'pc=(\w+), \[pc\]=\w+,\s+bc=(\w+),\s+de=(\w+),\s+hl=(\w+),\s+af=(\w+)')
+        ins_re = re.compile(r'^\s+out\s+\(\$([0-9a-fA-F]+)\),a\s+;\[(\w+)\]')
+        a, got = 0, []
+        for line in open(os.path.join(tmp, 'trace.txt'), errors='replace'):
+            if line.startswith('pc='):
+                g = reg_re.match(line)
+                a = int(g.group(5), 16) >> 8
+                continue
+            g = ins_re.match(line)
+            if g and int(g.group(1), 16) == 0xFE:
+                got.append(a)
+    want = clock_model(values, calls)
+    ok = got == want
+    frames = sum(want)
+    print(('PASS' if ok else 'FAIL') + f'  [Multi 8 frame clock] ay_sync over {calls} calls says "a frame" {frames} times, as the counter model does'
+          + ('' if ok else f' (first difference at call {next((i for i in range(min(len(got), len(want))) if got[i] != want[i]), None)}; got {len(got)}, wanted {len(want)})'))
+    return ok
+
+
 def main():
     blob = open(os.path.join(ROOT, 'assets', 'st_sounds.bin'), 'rb').read()
     count = blob[0]
@@ -170,7 +292,8 @@ def main():
         lengths.append(len(st.unpack_effect(blob, at)[1]))
     ok = True
     for name, defines, addr, data, skip in (('AQ+ ports', [], 0xF7, 0xF6, 0), ('60 Hz skip', ['-DAY_SKIP=43'], 0xF7, 0xF6, 43),
-                                            ('Multi 8 ports', ['-DAY_ADDR_PORT=24', '-DAY_DATA_PORT=25'], 24, 25, 0),
+                                            ('Aquarius+ as built: 3.58 MHz chip, 60 Hz', ['-DAY_SKIP=43', '-DAY_SCALE'], 0xF7, 0xF6, 43),
+                                            ('Multi 8 as built: its ports, 3.58 MHz chip', ['-DAY_ADDR_PORT=24', '-DAY_DATA_PORT=25', '-DAY_SCALE'], 24, 25, 0),
                                             ('SAM Coupe SAA 1099', ['-DAY_SAA'], 0x1FF, 0xFF, 0)):
         plan = [(k, min(255, int(lengths[k] * (1.25 if skip else 1)) + 4)) for k in range(count)]
         got = run_trace(plan, defines, addr, data)
@@ -183,7 +306,7 @@ def main():
             if 'SAA' in name:
                 want_start, want = expected_saa(blob, e, calls)
             else:
-                want_start, want, acc = expected(blob, e, calls, skip, acc)
+                want_start, want, acc = expected(blob, e, calls, skip, acc, scale='-DAY_SCALE' in defines)
             g = got[k]
             if g['start'] != want_start or len(g['ticks']) != calls or g['ticks'] != want:
                 first = next((i for i in range(min(len(want), len(g['ticks']))) if want[i] != g['ticks'][i]), None)
@@ -191,6 +314,7 @@ def main():
         print(('PASS' if not bad else 'FAIL') + f'  [{name}] {count} effects, every tick of every effect writes what the packed data says'
               + (f' (bad: {bad[:2]})' if bad else ''))
         ok &= not bad
+    ok &= check_multi8_clock()
     return 0 if ok else 1
 
 

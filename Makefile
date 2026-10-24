@@ -104,7 +104,7 @@ $(AQPLUS): $(DEPS)
 $(AQPLUS_ALLRAM): $(DEPS)
 	@mkdir -p $(@D)
 	$(ZCC) +aquarius -clib=aqplus -subtype=allram -create-app $(COMMON) -pragma-include:target/aqplus/zpragma_allram.inc \
-	    -Itarget/aqplus -DTARGET_AQPLUS -DAQPLUS_ALLRAM -Ca-DTARGET_AQPLUS -Ca-DSIM_STACK_TOP=0x0c00 -Ca-DHAVE_MINIMAP_SQUARE -Ca-DHAVE_SOUND -Ca-DAY_SKIP=43 $(GAME) $(ENTROPY) $(MENU) target/aqplus/plat_sound.asm target/common/ay_hooks.asm target/common/ay_sfx.asm $(FIELDS) $(MMNATIVE) $(AQPLUS_PLATFORM) -o $(@D)/simcity.bin
+	    -Itarget/aqplus -DTARGET_AQPLUS -DAQPLUS_ALLRAM -Ca-DTARGET_AQPLUS -Ca-DSIM_STACK_TOP=0x0c00 -Ca-DHAVE_MINIMAP_SQUARE -Ca-DHAVE_SOUND -Ca-DAY_SKIP=43 -Ca-DAY_SCALE $(GAME) $(ENTROPY) $(MENU) target/aqplus/plat_sound.asm target/common/ay_hooks.asm target/common/ay_sfx.asm $(FIELDS) $(MMNATIVE) $(AQPLUS_PLATFORM) -o $(@D)/simcity.bin
 	@for s in _aq_blit8 aq_cell _plat_put _plat_clear _plat_init aq_scratch aq_box _font_8x8_bbc_system _view_tile_art _aq_icons; do \
 	    v=`sed -n "s/^$$s *= \$$\([0-9A-Fa-f]*\).*/\1/p" $(@D)/simcity.map | head -1`; \
 	    [ -z "$$v" ] || [ $$(( 0x$$v )) -lt 49152 ] || { echo "$$s is not below $$C000 (at $$v)"; rm -f $@; exit 1; }; done
@@ -159,7 +159,7 @@ MULTI8_TABLE = 0xF800
 $(MULTI8): $(DEPS) build/common/tiles_640x200_3bpp.bin
 	@mkdir -p $(@D)
 	$(ZCC) +multi8 -subtype=64k -create-app $(COMMON) -pragma-include:target/multi8/zpragma.inc \
-	    -Itarget/multi8 -DTARGET_MULTI8 -Ca-DTARGET_MULTI8 $(GAME) $(ENTROPY) $(MENU) $(NOSOUND) $(FIELDS) $(MMNATIVE) $(LINEEDIT) $(MULTI8_PLATFORM) -o $(@D)/simcity
+	    -Itarget/multi8 -DTARGET_MULTI8 -Ca-DTARGET_MULTI8 -Ca-DHAVE_SOUND -Ca-DAY_ADDR_PORT=24 -Ca-DAY_DATA_PORT=25 -Ca-DAY_SCALE $(GAME) $(ENTROPY) $(MENU) target/multi8/plat_sound.asm target/common/ay_hooks.asm target/common/ay_sfx.asm $(FIELDS) $(MMNATIVE) $(LINEEDIT) $(MULTI8_PLATFORM) -o $(@D)/simcity
 	@size=`wc -c < $(@D)/simcity`; end=`sed -n 's/^__BSS_END_tail *= \$$\([0-9A-Fa-f]*\).*/\1/p' $(@D)/simcity.map`; \
 	    echo "multi8 image: $$size bytes (the uninitialised data ends at $$(printf '%X' $$(( 0x$$end ))), the table is at $$(printf '%X' $$(( $(MULTI8_TABLE) ))))"; \
 	    [ $$(( 0x$$end )) -le $$(( $(MULTI8_TABLE) )) ] || { echo "the uninitialised data runs into the doubling table"; rm -f $@; exit 1; }

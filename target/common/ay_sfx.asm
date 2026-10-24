@@ -15,7 +15,7 @@
 ;     ay_busy                             Z if no effect is sounding (A = 0)
 ;
 ; The chip's address and data ports, and how many of 256 frames to skip to make 50 Hz of a faster display (a 60 Hz one: 43; the default
-; is none; AY_ISR if ay_tick is called by an interrupt of the platform's), are set at assembly time (-Ca-DAY_ADDR_PORT=n ...); the defaults are the Aquarius+'s.  The variables are in the code section, so
+; is none; AY_ISR if ay_tick is called by an interrupt of the platform's; AY_SCALE for a chip clocked at 3.579545 MHz, not the ST's 2 MHz), are set at assembly time (-Ca-DAY_ADDR_PORT=n ...); the defaults are the Aquarius+'s.  The variables are in the code section, so
 ; they sit outside any RAM that video is paged over.
         MODULE  ay_sfx
 
@@ -210,19 +210,69 @@ ay_have:
         dec     (hl)
 ay_out:
         ld      hl,(ay_period)          ; channel C's tone, its noise (the same low byte) and its volume
+        IFDEF   AY_SCALE
+        call    ay_scale
+        ENDIF
         ld      c,4
         ld      a,l
         call    ay_write
         ld      c,5
         ld      a,h
         call    ay_write
-        ld      c,6
+        IFDEF   AY_SCALE
         ld      a,(ay_period)
         and     31
+        ld      l,a
+        ld      h,0
+        call    ay_scale
+        ld      a,h
+        or      a
+        ld      a,l
+        jr      nz,ay_nmax
+        cp      32
+        jr      c,ay_nset
+ay_nmax:
+        ld      a,31
+ay_nset:
+        ELSE
+        ld      a,(ay_period)
+        and     31
+        ENDIF
+        ld      c,6                     ; (the scaling uses bc)
         call    ay_write
         ld      c,10
         ld      a,(ay_vol)
-        ; falls into ay_write
+        jp      ay_write
+
+        IFDEF   AY_SCALE
+; hl := hl * 1.78125 (1 + 1/2 + 1/4 + 1/32), at most 4095: the periods are the ST's, whose chip runs at 2 MHz, for a chip at 3.579545 MHz
+; (a factor of 1.7898).  Uses bc, de.
+ay_scale:
+        ld      d,h
+        ld      e,l
+        ld      b,h
+        ld      c,l
+        srl     b
+        rr      c
+        add     hl,bc
+        srl     b
+        rr      c
+        add     hl,bc
+        ld      b,d
+        ld      c,e
+        ld      a,5
+ay_scale_lp:
+        srl     b
+        rr      c
+        dec     a
+        jr      nz,ay_scale_lp
+        add     hl,bc
+        ld      a,h
+        cp      16
+        ret     c
+        ld      hl,4095
+        ret
+        ENDIF
 
         IFNDEF  AY_SAA
 ; Register C of the chip := A.  Keeps hl, de, b.
