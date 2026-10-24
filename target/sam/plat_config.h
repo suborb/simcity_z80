@@ -10,6 +10,7 @@
 #define BOX_TOP    "\1\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\2"
 #define BOX_BOTTOM "\3\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\4"
 #define BOX_SIDE   "\6                            \6"
+#define HAVE_SOUND              /* the Atari ST game's effects on the SAA 1099 (target/common/ay_sfx.asm, target/sam/plat_sound.asm) */
 #define HAVE_FILES          /* saving and loading a city as a SAMDOS file */
 #define FILE_NAME_MAX 10    /* SAMDOS names are 10 characters */
 #define HAVE_BUDGET

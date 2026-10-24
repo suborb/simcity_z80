@@ -70,17 +70,26 @@ def run_trace(effects_ticks, defines, addr_port, data_port):
                            cwd=tmp, stdout=tf, stderr=subprocess.DEVNULL)
         reg_re = re.compile(r'pc=(\w+), \[pc\]=\w+,\s+bc=(\w+),\s+de=(\w+),\s+hl=(\w+),\s+af=(\w+)')
         ins_re = re.compile(r'^\s+out\s+\(\$([0-9a-fA-F]+)\),a\s+;\[(\w+)\]')
-        a = 0
+        outc_re = re.compile(r'^\s+out\s+\(c\),([ad])\s+;\[(\w+)\]')
+        a = d = bc = 0
         effects, reg = [], 0
         for line in open(os.path.join(tmp, 'trace.txt'), errors='replace'):
             if line.startswith('pc='):
                 g = reg_re.match(line)
                 a = int(g.group(5), 16) >> 8
+                d = int(g.group(3), 16) >> 8
+                bc = int(g.group(2), 16)
                 continue
             g = ins_re.match(line)
-            if not g:
-                continue
-            port = int(g.group(1), 16)
+            if g:
+                port = int(g.group(1), 16)
+            else:
+                g = outc_re.match(line)
+                if not g:
+                    continue
+                port = bc                            # (the SAA's ports are 16 bit: out (c),r with b = 1 for the address)
+                if g.group(1) == 'd':
+                    a = d
             if port == 0xFD:
                 effects.append({'effect': a, 'start': [], 'ticks': []})
             elif port == 0xFE:
@@ -118,6 +127,40 @@ def expected(blob, effect, calls, skip, acc=0):
     return start, out, acc
 
 
+SAA_AMP = [0x00, 0x00, 0x00, 0x00, 0x00, 0x11, 0x11, 0x11, 0x11, 0x22, 0x33, 0x44, 0x55, 0x88, 0xBB, 0xFF]
+
+
+def saa_tick(period, vol):
+    """What the SAM's player writes for a tick of period and volume (the AY's): channel 0's tone, octave, noise rate and amplitude.
+    Written from the chip, not the player: the SAA's tone is 15625 * 2^octave / (511 - N) Hz and the AY's 125000 / P, so the octave takes
+    P * 2^octave into 2048..4095 and 511 - N is that divided by 8."""
+    p = period & 4095 or 1
+    octave, x = 0, p
+    while x < 2048 and octave < 7:
+        x, octave = x * 2, octave + 1
+    n = 511 - (x >> 3) if x >= 2048 else 255          # (too high for the SAA: its highest tone)
+    assert 0 <= n <= 255
+    if x >= 2048:
+        assert abs(15625 * 2 ** octave / (511 - n) / (125000 / p) - 1) < 0.005, (period, octave, n)        # the pitch is the AY's, to half a percent
+    rate = 0 if period & 31 < 6 else 1 if period & 31 < 12 else 2
+    return [(8, n), (0x10, octave), (0x16, rate), (0, SAA_AMP[vol])]
+
+
+def expected_saa(blob, effect, calls):
+    at = blob[1 + 2 * effect] | blob[2 + 2 * effect] << 8
+    mixer, ticks = st.unpack_effect(blob, at)
+    start = [(0x1C, 2), (0x1C, 1), (0x14, 0 if mixer & 4 else 1), (0x15, 1 if mixer & 36 == 4 else 0)]
+    out = []
+    for t in range(calls):
+        if t < len(ticks):
+            out.append(saa_tick(*ticks[t]))
+        elif t == len(ticks):
+            out.append(saa_tick(ticks[-1][0], 0))              # the end: silence (the period as it was)
+        else:
+            out.append([])
+    return start, out
+
+
 def main():
     blob = open(os.path.join(ROOT, 'assets', 'st_sounds.bin'), 'rb').read()
     count = blob[0]
@@ -127,7 +170,8 @@ def main():
         lengths.append(len(st.unpack_effect(blob, at)[1]))
     ok = True
     for name, defines, addr, data, skip in (('AQ+ ports', [], 0xF7, 0xF6, 0), ('60 Hz skip', ['-DAY_SKIP=43'], 0xF7, 0xF6, 43),
-                                            ('Multi 8 ports', ['-DAY_ADDR_PORT=24', '-DAY_DATA_PORT=25'], 24, 25, 0)):
+                                            ('Multi 8 ports', ['-DAY_ADDR_PORT=24', '-DAY_DATA_PORT=25'], 24, 25, 0),
+                                            ('SAM Coupe SAA 1099', ['-DAY_SAA'], 0x1FF, 0xFF, 0)):
         plan = [(k, min(255, int(lengths[k] * (1.25 if skip else 1)) + 4)) for k in range(count)]
         got = run_trace(plan, defines, addr, data)
         if got is None:
@@ -136,7 +180,10 @@ def main():
         bad = []
         acc = 0                                      # (the frame skip's accumulator carries on from one effect to the next)
         for k, (e, calls) in enumerate(plan):
-            want_start, want, acc = expected(blob, e, calls, skip, acc)
+            if 'SAA' in name:
+                want_start, want = expected_saa(blob, e, calls)
+            else:
+                want_start, want, acc = expected(blob, e, calls, skip, acc)
             g = got[k]
             if g['start'] != want_start or len(g['ticks']) != calls or g['ticks'] != want:
                 first = next((i for i in range(min(len(want), len(g['ticks']))) if want[i] != g['ticks'][i]), None)

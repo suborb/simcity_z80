@@ -68,6 +68,8 @@ done
 if [ -n "$SAM_MAME" ]; then
     echo "== SAM Coupe: save a city as a SAMDOS file and load it back (MAME in \$SAM_MAME; make sam first)"
     test/sam/roundtrip.sh || status=1
+    echo "== SAM Coupe: the sound hooks, recorded from MAME's SAA 1099"
+    python3 test/sam/sound_check.py || status=1
 else
     echo "== SAM Coupe file round trip skipped (set SAM_MAME to the MAME directory)"
 fi

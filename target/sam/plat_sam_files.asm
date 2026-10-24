@@ -219,7 +219,13 @@ fs_dos_ix:
         ld      ix,fs_uifa
 fs_dos:
         ld      (fs_stub + fs_hook - fs_stub_src),a
+        IFDEF   HAVE_SOUND
+        call    fs_stub
+        ei                              ; (the sound's frame interrupt: the stub leaves them off)
+        ret
+        ELSE
         jp      fs_stub
+        ENDIF
 
 ; The stub.  It is copied to fs_stub and must not depend on where it is: it gets to its variables by their addresses.
 fs_stub_src:

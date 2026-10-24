@@ -1,7 +1,8 @@
 // z88dk pragmas for the SAM Coupe all RAM build (make sam).
 #pragma output CRT_ENABLE_STDIO = 0
 #pragma output CLIB_EXIT_STACK_SIZE = 0
-// interrupts stay off: the screen is paged over the data while the placer draws
+// interrupts start on and plat_init turns them off while it sets up; the sound's frame interrupt (plat_sound.asm) turns them on again at its end
+// (z88dk's handler pages the data in over the high window for the length of one, so one may come while the placer has the screen in)
 #pragma output CRT_ENABLE_EIDI = 1
 // the stack is in the low 32 KB, with the code (the startup code reserves it)
 #pragma output CRT_STACK_SIZE = 768

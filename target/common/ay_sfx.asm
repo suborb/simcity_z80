@@ -15,7 +15,7 @@
 ;     ay_busy                             Z if no effect is sounding (A = 0)
 ;
 ; The chip's address and data ports, and how many of 256 frames to skip to make 50 Hz of a faster display (a 60 Hz one: 43; the default
-; is none), are set at assembly time (-Ca-DAY_ADDR_PORT=n ...); the defaults are the Aquarius+'s.  The variables are in the code section, so
+; is none; AY_ISR if ay_tick is called by an interrupt of the platform's), are set at assembly time (-Ca-DAY_ADDR_PORT=n ...); the defaults are the Aquarius+'s.  The variables are in the code section, so
 ; they sit outside any RAM that video is paged over.
         MODULE  ay_sfx
 
@@ -58,8 +58,12 @@ _ay_play:
         call    ay_start
         ret
 
-; Start the effect in A: A = n.  (Keeps nothing.)
+; Start the effect in A: A = n.  (Keeps nothing.)  With AY_ISR, interrupts (which call ay_tick) are off while it sets the effect up, and
+; on again at the end: so the game must call it with them on.
 ay_start:
+        IFDEF   AY_ISR
+        di
+        ENDIF
         ld      hl,_ay_sfx_data + 1
         add     a,a
         ld      e,a
@@ -100,7 +104,13 @@ ay_start:
         call    ay_write
         ld      c,7
         ld      a,b
+        IFDEF   AY_ISR
+        call    ay_write
+        ei
+        ret
+        ELSE
         jp      ay_write
+        ENDIF
 
 ; void ay_stop(void)
 _ay_stop:
@@ -214,6 +224,7 @@ ay_out:
         ld      a,(ay_vol)
         ; falls into ay_write
 
+        IFNDEF  AY_SAA
 ; Register C of the chip := A.  Keeps hl, de, b.
 ay_write:
         push    af
@@ -222,3 +233,147 @@ ay_write:
         pop     af
         out     (AY_DATA_PORT),a
         ret
+        ELSE
+
+; The SAM Coupe's SAA 1099 instead of an AY (assemble with -DAY_SAA).  The player above still says what it wants as AY registers; this
+; is the chip behind them.  Writes to the registers of channel C's tone, noise and mixer are kept; the write of its volume, the last of a
+; tick, sends the tick to the chip's channel 0:
+;     tone     the AY's period P (a square wave of 125000 / P Hz: the ST's 2 MHz clock) is an octave and a tone N of the SAA, whose
+;              frequency is 15625 * 2^octave / (511 - N) Hz: so 511 - N = P * 2^octave / 8, which is between 256 and 511 for the octave
+;              that puts P * 2^octave in 2048 to 4095, and N is the low byte of its complement
+;     noise    the SAA has three rates, 31.3, 15.6 and 7.8 kHz (the AY's 125000 / n Hz: n under 6, under 12, the rest), and a channel
+;              that has noise has it instead of its tone (the AY mixes the two): so noise alone is noise, and tone with noise is the tone
+;     volume   the AY's steps are logarithmic, the SAA's linear: a table
+; Keeps hl, de, b.
+SAA_ADDR_PORT   equ     $01FF
+SAA_DATA_PORT   equ     $00FF
+
+ay_write:
+        push    hl
+        push    de
+        push    bc
+        ld      e,a
+        ld      a,c
+        cp      10
+        jr      z,saa_tick
+        cp      8
+        jr      nc,saa_done             ; (8 and 9: the silent channels)
+        sub     4
+        jr      c,saa_done
+        ld      c,a
+        ld      b,0
+        ld      hl,saa_shadow
+        add     hl,bc
+        ld      (hl),e                  ; tone low, tone high, noise period, mixer
+        cp      3
+        jr      nz,saa_done
+        ld      d,2                     ; the mixer, at the start of an effect: reset the chip, switch it on, and say what channel 0 plays
+        ld      a,$1C
+        call    saa_put
+        ld      d,1
+        ld      a,$1C
+        call    saa_put
+        ld      a,e
+        and     4
+        ld      d,1                     ; tone, unless its AY bit (2) is set
+        jr      z,saa_tone_en
+        ld      d,0
+saa_tone_en:
+        ld      a,$14
+        call    saa_put
+        ld      a,e                     ; noise, if it is on and the tone is not
+        and     36                      ; (bits 5 and 2)
+        cp      4
+        ld      d,1
+        jr      z,saa_noise_en
+        ld      d,0
+saa_noise_en:
+        ld      a,$15
+        call    saa_put
+saa_done:
+        pop     bc
+        pop     de
+        pop     hl
+        ret
+
+; A tick: E = the volume
+saa_tick:
+        ld      hl,(saa_shadow)         ; the period
+        ld      a,h
+        and     15
+        ld      h,a
+        or      l
+        jr      nz,saa_period
+        inc     l                       ; (0 is 1 on the AY)
+saa_period:
+        ld      b,0                     ; the octave
+saa_oct:
+        ld      a,h
+        cp      8
+        jr      nc,saa_octave
+        ld      a,b
+        cp      7
+        jr      z,saa_high              ; (a pitch beyond the SAA's top: its highest tone)
+        add     hl,hl
+        inc     b
+        jr      saa_oct
+saa_high:
+        ld      hl,0
+saa_octave:                             ; N = low byte of the complement of (hl >> 3)
+        ld      a,l
+        rrca
+        rrca
+        rrca
+        and     31
+        ld      c,a
+        ld      a,h
+        add     a,a
+        add     a,a
+        add     a,a
+        add     a,a
+        add     a,a
+        or      c
+        cpl
+        ld      d,a
+        ld      h,b                     ; (the octave: saa_put uses bc)
+        ld      a,8
+        call    saa_put
+        ld      d,h                     ; octave: channel 0 is the low three bits of register $10
+        ld      a,$10
+        call    saa_put
+        ld      a,(saa_shadow + 2)      ; the noise rate
+        and     31
+        ld      d,0
+        cp      6
+        jr      c,saa_rate
+        inc     d
+        cp      12
+        jr      c,saa_rate
+        inc     d
+saa_rate:
+        ld      a,$16
+        call    saa_put
+        ld      a,e                     ; the volume, in both ears
+        and     15
+        ld      c,a
+        ld      b,0
+        ld      hl,saa_amp
+        add     hl,bc
+        ld      d,(hl)
+        xor     a
+        call    saa_put
+        jr      saa_done
+
+; SAA register A := D
+saa_put:
+        ld      bc,SAA_ADDR_PORT
+        out     (c),a
+        dec     b
+        out     (c),d
+        ret
+
+saa_shadow:     defs    4
+; the AY's volumes 0 to 15 (3 dB steps, 1 at the top) as the SAA's linear 0 to 15, in both ears
+saa_amp:        defb    $00,$00,$00,$00,$00,$11,$11,$11,$11,$22,$33,$44,$55,$88,$BB,$FF
+
+        ENDIF

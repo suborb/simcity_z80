@@ -16,6 +16,9 @@
         SECTION code_user
         EXTERN  _font_8x8_bbc_system
         EXTERN  _view_tile_art          ; picture n is at 8 * n from it
+        IFDEF   HAVE_SOUND
+        EXTERN  snd_init
+        ENDIF
 
         defc    HMPR = 251
         defc    VMPR = 252
@@ -1173,6 +1176,9 @@ mp_aligned:
         ldir
         ld      a,$FF
         ld      (mp_cattr),a            ; (no table made yet)
+        IFDEF   HAVE_SOUND
+        call    snd_init                ; (the sound's frame interrupt: interrupts are on from here on)
+        ENDIF
 
 ; The video mode, the palette and the border: what a ROM routine (the DOS) may have changed.  Uses a, b, c, hl.
         PUBLIC  mp_screen
