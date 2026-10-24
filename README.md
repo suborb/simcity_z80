@@ -42,7 +42,7 @@ is not available.
 | `target/sam/` | SAM Coupe: allram layout with paged data, SAA 1099 sound, MGT disk image with save/load. |
 | `target/common/` | Code shared between targets: the AY/SAA sound-effect player and hooks, line editor, mini map, icon and chart drawing. |
 | `target/zx/` | Spectrum-specific platform implementation: bitmap renderer, capabilities and CRT settings. |
-| `target/z88/` | Z88-specific implementation: OZ integration, icons, sound and ROM CRT settings. |
+| `target/z88/` | Z88-specific implementation: OZ integration (the menus and their `<>` shortcuts, a framed 7-row text window), tool icons (greyed out when unaffordable), demand bars, sound and ROM CRT settings. |
 | `platform/common/` | Settings and hooks the engine needs, for C programs. |
 | `target/test/` | Headless assembly platform used by the golden-master tests. |
 | `target/test_ui/` | Headless C platform used by the UI tests. |
