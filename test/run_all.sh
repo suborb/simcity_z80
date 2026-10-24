@@ -70,6 +70,8 @@ if [ -n "$SAM_MAME" ]; then
     test/sam/roundtrip.sh || status=1
     echo "== SAM Coupe: the sound hooks, recorded from MAME's SAA 1099"
     python3 test/sam/sound_check.py || status=1
+    echo "== SAM Coupe: shifted cursor keys move eight cells"
+    test/sam/shift_check.sh || status=1
 else
     echo "== SAM Coupe file round trip skipped (set SAM_MAME to the MAME directory)"
 fi

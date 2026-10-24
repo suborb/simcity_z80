@@ -1447,11 +1447,6 @@ _plat_key:
 
 ; The lowest key down is the key; one coming down is kept as the event.  Uses a, bc, de, hl.
 mp_keyscan:
-        ld      bc,$FEFE
-        in      a,(c)
-        cpl
-        and     1
-        ld      (mp_shift),a            ; shift (row 0, bit 0)
         ld      hl,mp_ktab
         ld      de,$FE00                ; d = the rows' select bits, e = the row
 mp_ks_row:
@@ -1506,20 +1501,37 @@ mp_ks_found:
         cp      (hl)
         ret     z                       ; the same key, still down
         ld      (hl),a
-        ld      b,a
-        ld      a,(mp_shift)
-        or      a
-        jr      z,mp_ks_ev
-        ld      a,b                     ; shift: the cursor keys go eight cells (28-31)
         sub     8
         cp      4
-        jr      nc,mp_ks_ev
-        ld      a,b
+        jr      c,mp_ks_cursor
+        ld      a,(hl)                  ; (hl = mp_held: the key)
+        cp      'a'
+        jr      c,mp_ks_plain
+        cp      'z' + 1
+        jr      nc,mp_ks_plain
+        call    mp_ks_shift             ; a letter: a capital if the shift is down (the game's Q, A, O and P go eight cells)
+        ld      a,(hl)
+        jr      nz,mp_ks_store
+        and     $DF
+        jr      mp_ks_store
+mp_ks_cursor:
+        call    mp_ks_shift             ; a cursor key: the shift makes it eight cells (28-31)
+        ld      a,(hl)
+        jr      nz,mp_ks_store
         add     a,20
-        ld      b,a
-mp_ks_ev:
-        ld      a,b
+        jr      mp_ks_store
+mp_ks_plain:
+        ld      a,(hl)
+mp_ks_store:
         ld      (mp_event),a
+        ret
+
+; Z if the shift is down (row 0, bit 0).  It is read once a key has been found, not before the scan: the keyboard may change in
+; between, and a shift that came with the key (a host's events arrive together) must not be missed.  Uses a, bc.
+mp_ks_shift:
+        ld      bc,$FEFE
+        in      a,(c)
+        and     1
         ret
 
 ; The keys, a row of eight each: row 0 SHIFT Z X C V F1 F2 F3, 1 A S D F G F4 F5 F6, 2 Q W E R T F7 F8 F9, 3 1 2 3 4 5 ESC TAB CAPS,
@@ -1598,7 +1610,6 @@ mp_cattr: defb  $FF                     ; the attribute mp_t16 is made for
 mp_dpage: defb  0                       ; HMPR while the game runs, and for its baked pictures
 mp_tpage: defb  0
 mp_up:    defb  0                       ; plat_init has been called
-mp_shift: defb  0
 mp_held:  defb  0                       ; the code of the key that is down, or 0
 mp_event: defb  0                       ; the key pressed since plat_key last looked, or 0
 

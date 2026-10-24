@@ -7,6 +7,11 @@ end
 local snaps={}
 for f in (os.getenv("SAMSNAPS") or ""):gmatch("%d+") do snaps[tonumber(f)]=true end
 local last=tonumber(os.getenv("SAMEND") or "1500")
+local memlog
+if os.getenv("SAMMEM") then
+  memlog={}
+  for f,a in os.getenv("SAMMEM"):gmatch("(%d+):(%x+)") do f=tonumber(f); memlog[f]=memlog[f] or {}; table.insert(memlog[f],a) end
+end
 local n=0
 local cpu=manager.machine.devices[":maincpu"]
 local function field(k) return manager.machine.ioport.ports[k.p].fields[k.name] end
@@ -24,6 +29,10 @@ emu.register_frame_done(function()
     for a,b in os.getenv('SAMPOKE'):gmatch('(%x+)=(%x+)') do local v=tonumber(a,16); for i=1,#b,2 do mem:write_u8(v+(i-1)//2,tonumber(b:sub(i,i+1),16)) end end
   end
   if snaps[n] then manager.machine.video:snapshot() end
+  if memlog and memlog[n] then   -- SAMMEM="frame:addr,frame:addr": one byte of the data window (page 3) printed at each frame, "peek-mem frame addr value" (go.sh keeps the lines that say peek)
+    local mem=cpu.spaces["program"]; local io=cpu.spaces["io"]; io:write_u8(0xfb,3)
+    for _,a in ipairs(memlog[n]) do print(string.format("peek-mem %d %s %d", n, a, mem:read_u8(tonumber(a,16)))) end
+  end
   if os.getenv("SAMDUMP") and n == tonumber(os.getenv("SAMDUMPAT") or "0") then   -- SAMDUMP="addr:len:file": the data window (page 3) written to a file
     local mem=cpu.spaces["program"]; local io=cpu.spaces["io"]; io:write_u8(0xfb,3)
     for a,l,fn in os.getenv("SAMDUMP"):gmatch("(%x+):(%d+):([^,]+)") do
