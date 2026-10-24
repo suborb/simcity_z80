@@ -23,7 +23,7 @@ Z80 based computer.
 ## Rebuild
 
 The rebuild utilises the original simulation engine and assets. Instead of being interrupt based, the
-simulation and UI cooperatively multitask which allows porting ot hardware where an interrupt source
+simulation and UI cooperatively multitask which allows porting to hardware where an interrupt source
 is not available.
 
 
@@ -36,15 +36,20 @@ is not available.
 | `ui/` | The shared game user interface, in C, written against the small platform API in `ui/platform.h`. |
 | `target/zx-original/` | The original Spectrum build, assembled from the engine and original UI code; byte-identical to the disassembly. |
 | `platform/console/` | NC200 z88dk console and keyboard front end. |
-| `target/aqplus/` | Aquarius+-specific platform implementation: bitmap renderer, capabilities and AQX CRT settings. |
+| `target/aqplus/` | Aquarius+-specific platform implementation: bitmap renderer, AY sound, capabilities and AQX CRT settings. |
+| `target/multi8/` | Mitsubishi Multi 8: planar bitmap renderer, PSG sound, tape (.cas) image. |
+| `target/pc88/` | NEC PC-8801: ALU/bank-switched renderer, D88 disk image. |
+| `target/sam/` | SAM Coupe: allram layout with paged data, SAA 1099 sound, MGT disk image with save/load. |
+| `target/common/` | Code shared between targets: the AY/SAA sound-effect player and hooks, line editor, mini map, icon and chart drawing. |
 | `target/zx/` | Spectrum-specific platform implementation: bitmap renderer, capabilities and CRT settings. |
 | `target/z88/` | Z88-specific implementation: OZ integration, icons, sound and ROM CRT settings. |
 | `platform/common/` | Settings and hooks the engine needs, for C programs. |
 | `target/test/` | Headless assembly platform used by the golden-master tests. |
 | `target/test_ui/` | Headless C platform used by the UI tests. |
-| `tools/` | `extract_text.py` (generate `ui/text.h` and `ui/text.c`), `find_dead.py`, `make_map_art.py`, `make_z88_icons.py` (the tool icons as Z88 characters). |
+| `assets/` | Binary art and sound data used by the targets (tiles, icons, `st_sounds.bin`). |
+| `tools/` | `extract_text.py` (generate `ui/text.h` and `ui/text.c`), `find_dead.py`, `make_map_art.py`, `make_z88_icons.py`, the `extract_*` and `make_*assets` scripts that build `assets/` from the Atari ST and CPC versions (the ST sound effects are packed by `extract_st_sounds.py` and played by `target/common/ay_sfx.asm`). |
 | `Makefile` | Builds every platform (`make zx`, `make aqplus`, ...) and runs the tests (`make check`). |
-| `test/` | `run_all.sh` runs everything. |
+| `test/` | `run_all.sh` runs everything (the SAM MAME tests only when `SAM_MAME` is set). |
 | `PORTING.md` | Strategy, status and plan. |
 
 ### Building and testing
@@ -53,7 +58,10 @@ Needs [z88dk](https://z88dk.org).
 
     make aqplus     # Aquarius+   -> build/aqplus/simcity.aqx
     make z88rom     # Z88 ROM application, 32 KB card image -> build/z88rom/simcity.epr
-    make zx         # ZX Spectrum -> build/zx/simcity.tap (incopmlete)
+    make zx         # ZX Spectrum -> build/zx/simcity.tap (incomplete)
+    make multi8     # Multi 8     -> build/multi8/simcity.cas
+    make pc88       # PC-8801     -> build/pc88/simcity.d88
+    make sam        # SAM Coupe   -> build/sam/simcity.mgt
     make check      # golden master, tile drawing, UI tests, all builds
 
 z88dk's tools (`zcc`, `z88dk-z80asm`, `z88dk-ticks`) must be on the `PATH`.
