@@ -27,6 +27,7 @@ extern void zxn_out(uint16_t port, uint8_t value);
 
 extern const uint8_t font_8x8_bbc_system[];     /* 96 glyphs, from space */
 extern const uint8_t view_tile_art[];           /* picture n is at 8 * n from it */
+extern uint8_t V_view_tick;                     /* the game's frame counter: the animations' clock */
 extern const uint8_t zxn_head[];               /* 208 palette entries (2 bytes each: the ST's 16 for the interface, the map art's 64, the same inverted, the Amiga's 64 for the tool icons), 8 attribute colours, then the 64 colours a dimmed icon's are */
 
 #define COLS        32
@@ -38,6 +39,9 @@ extern const uint8_t zxn_head[];               /* 208 palette entries (2 bytes e
 #define PALETTE_ENTRIES 208
 #define ATTRS       (zxn_head + 2 * PALETTE_ENTRIES)
 #define DIM         (ATTRS + 8)                 /* what each of the icons' 64 colours is, dimmed: an absolute palette entry */
+#define PICTURES    345                         /* the engine's pictures (the animations' frames come after them) */
+#define ANIM_MAP    (DIM + 64)                  /* a byte a picture: its animation (from 1), or 0 */
+#define ANIM_TAB    (ANIM_MAP + PICTURES)       /* an animation: the first frame's picture (a word) and the frames less one, 3 bytes (tools/st_tiles_3bpp.py ANIMATED) */
 #define ICON_PAGE   44                          /* the icons: 14 of 22x20 bytes, a palette index (0 to 63) a pixel, in the 8 KB page 44 (bank 22, zxn_data.asm) */
 #define ICON_W      22                          /* the tool icons: the Amiga's, 22x20 pixels of 6 bits */
 #define ICON_H      20
@@ -152,10 +156,24 @@ void plat_scroll(uint8_t row, uint8_t rows, int8_t dx, int8_t dy)
 #endif
 
 /* ---- pictures and text ------------------------------------------------------------------------------------------------------ */
+/* The picture to show for picture n: an animated one (the airport's radar, the park's fountain, the chimneys' smoke, the nuclear plant's swirl) shows one of its
+   frames, which are pictures after the engine's, changing every 16 ticks of the frame counter. */
+static uint16_t shown(uint16_t n)
+{
+    uint8_t k = ANIM_MAP[n];
+    const uint8_t *e;
+
+    if (!k)
+        return n;
+    e = ANIM_TAB + (uint16_t)(k - 1) * 3;
+    return (uint16_t)(e[0] | (e[1] << 8)) + ((V_view_tick >> 4) & e[2]);
+}
+
 void plat_put_tile(uint8_t col, uint8_t row, const uint8_t *art, uint8_t attr, uint8_t inverse)
 {
     uint16_t *e = entry(col, row);
-    uint16_t key = (uint16_t)art ^ inverse;
+    uint16_t n = shown((uint16_t)(art - view_tile_art) >> 3);
+    uint16_t key = (n << 1) | inverse;          /* what the cell shows: the picture and whether it is the cursor's */
 
     (void)attr;
     if (e) {
@@ -163,7 +181,7 @@ void plat_put_tile(uint8_t col, uint8_t row, const uint8_t *art, uint8_t attr, u
             return;
         *e = key;
     }
-    zxn_tile(col, row, (uint16_t)(art - view_tile_art) >> 3, inverse);
+    zxn_tile(col, row, n, inverse);
 }
 
 void plat_put_overlay(uint8_t col, uint8_t row, const uint8_t *art)

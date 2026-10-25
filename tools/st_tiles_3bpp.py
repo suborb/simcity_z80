@@ -127,6 +127,34 @@ def st_piece(p):
     return BLANK
 
 
+# The animated tiles.  Micropolis keeps the frames of an animation at the end of its table (832 to 959): four, or for the airport's radar eight,
+# pictures that differ from the tile they animate by a few pixels (the smoke over a chimney, the fountain's spray, the radar's sweep, the nuclear plant's
+# swirl).  base tile: (its first frame, the number of frames).  Found by comparing the pixels of the three tile sets (ST, Amiga 512K and 1 Meg:
+# the same numbers in all); the engine has no animation of its own (only the unpowered flash and the busy roads) so a platform shows the frame
+# itself.  The stadium's game (932 to 947) and the others in the table are not used.
+ANIMATED = {711: (832, 8),                      # the airport's radar
+            40: (840, 4),                       # the park's fountain
+            649: (892, 4), 650: (896, 4), 686: (908, 4), 689: (912, 4),         # the smoke of the industrial zones' chimneys
+            747: (916, 4), 748: (920, 4), 751: (924, 4), 752: (928, 4),         # the coal power plant's
+            820: (952, 4)}                      # the nuclear plant's swirl
+ANIM_SHIFT = 4                                  # a frame is 16 ticks of the game's frame counter (V_view_tick), which the platforms use
+
+
+def animation(pictures):
+    """For our pictures (their Micropolis tiles): the frame tiles to add after them, a byte a picture (0, or the number of its animation, from 1) and the animations
+    as (the number of the first frame's picture, the number of frames)."""
+    extra, entries, amap = [], [], bytearray(len(pictures))
+    for base, (first, n) in sorted(ANIMATED.items()):
+        users = [i for i, t in enumerate(pictures) if t == base]
+        if not users:
+            continue
+        entries.append((len(pictures) + len(extra), n))
+        extra += range(first, first + n)
+        for i in users:
+            amap[i] = len(entries)
+    return extra, bytes(amap), entries
+
+
 def st_picture_ours(i):
     """The Micropolis tile for our picture i (0..344)."""
     return TILE[i] if i < TILES else st_piece(i - PIECE0)
@@ -271,6 +299,18 @@ ZXN_ICON_BASE = ZXN_INVERSE_BASE + ZXN_TILE_COLOURS     # the Amiga's colours (t
 ICON_W, ICON_H = 22, 20
 
 
+def sam_anim(amap, entries):
+    """The assembler source of the animations' tables for plat_sam.asm: mp_animmap, a byte a picture (the number of its animation from 1, or 0), and mp_animtab, an animation
+    to three bytes: the number of the first frame's picture (a word) and the number of frames less one (4 or 8 frames: a mask)."""
+    lines = ['; made by tools/st_tiles_3bpp.py --sam-anim: the animated pictures (see ANIMATED there)', 'mp_animmap:']
+    for k in range(0, len(amap), 16):
+        lines.append('        defb    ' + ','.join(str(v) for v in amap[k:k + 16]))
+    lines.append('mp_animtab:')
+    for first, n in entries:
+        lines.append(f'        defw    {first}\n        defb    {n - 1}')
+    return '\n'.join(lines) + '\n'
+
+
 def zxn_icon_palette(icons_path):
     """The palette of an icon file: the 3-bit levels of its 64 colours (the sibling file `..._tiles.bin` has the palette: the 512K's 16 words or the 1 Meg's 32 with
     their halves), and the grey each colour becomes when the icon is dimmed (an absolute Layer 2 palette index: the ST's dark grey, 8, or light grey, 7)."""
@@ -331,6 +371,7 @@ def main():
     ap.add_argument('--sheet')
     ap.add_argument('--sam')
     ap.add_argument('--zxn')
+    ap.add_argument('--sam-anim', help='with --sam: the assembler source of the animations\' tables (plat_sam.asm includes it)')
     ap.add_argument('--amiga-icons', help='with --zxn: the tool icons (tools/extract_amiga_icons.py), with their palette, the first 32 bytes of amiga_tiles.bin beside them')
     ap.add_argument('--icons', help='with --sam: the tool icons (tools/extract_st_icons.py), put after the palette')
     ap.add_argument('--original', action='store_true')
@@ -362,6 +403,11 @@ def main():
     else:
         pictures = [st_picture_cpc(i) for i in range(CPC_COUNT)]
     baked = [planes(to8(pixels(table[n * PIC:n * PIC + PIC]))) for n in pictures]
+    if a.numbering == 'ours':                       # (the SAM and the Next also have the animations' frames, after the pictures)
+        extra, amap, entries = animation(pictures)
+        framed = pictures + extra
+    else:
+        extra, amap, entries, framed = [], b'', [], pictures
     if a.planes:
         open(a.planes, 'wb').write(b''.join(baked))
         print(f'{len(baked)} pictures, {len(baked) * 24} bytes of baked pictures -> {a.planes}')
@@ -370,9 +416,11 @@ def main():
         print(f'{len(baked)} pictures, {len(baked) * 5} bytes of mini map pictures -> {a.mini}')
     if a.sam:
         icons = open(a.icons, 'rb').read() if a.icons else b''
-        data = sam_palette(palette, bits) + attr_colours(palette, bits) + icons + b''.join(sam_picture(pixels(table[n * PIC:n * PIC + PIC])) for n in pictures)
+        data = sam_palette(palette, bits) + attr_colours(palette, bits) + icons + b''.join(sam_picture(pixels(table[n * PIC:n * PIC + PIC])) for n in framed)
         open(a.sam, 'wb').write(data)
-        print(f'{len(pictures)} pictures, {len(icons)} bytes of icons, a 16 byte palette, 8 attribute colours and {len(pictures) * 32} bytes of mode 4 pictures -> {a.sam}')
+        print(f'{len(framed)} pictures, {len(icons)} bytes of icons, a 16 byte palette, 8 attribute colours and {len(framed) * 32} bytes of mode 4 pictures -> {a.sam}')
+        if a.sam_anim:
+            open(a.sam_anim, 'w').write(sam_anim(amap, entries))
     if a.zxn:
         os.makedirs(a.zxn, exist_ok=True)
         if not a.amiga_icons:
@@ -386,13 +434,15 @@ def main():
         art = palette_levels(palette, bits)
         art += [(0, 0, 0)] * (ZXN_TILE_COLOURS - len(art))
         pixel = pixels6 if depth6 else pixels
-        pics = b''.join(bytes(ZXN_TILE_BASE + v for row in pixel(table[n * PICSIZE:n * PICSIZE + PICSIZE]) for v in row) for n in pictures)
+        pics = b''.join(bytes(ZXN_TILE_BASE + v for row in pixel(table[n * PICSIZE:n * PICSIZE + PICSIZE]) for v in row) for n in framed)
         levels = palette_levels(ui, 3) + art + [(7 - r, 7 - g, 7 - b) for r, g, b in art] + icon_levels
-        open(os.path.join(a.zxn, 'head.bin'), 'wb').write(zxn_palette(levels) + attr_colours(ui, 3) + dim)
+        open(os.path.join(a.zxn, 'head.bin'), 'wb').write(zxn_palette(levels) + attr_colours(ui, 3) + dim + amap + b''.join(struct.pack('<HB', first, n - 1) for first, n in entries))
         open(os.path.join(a.zxn, 'icons.bin'), 'wb').write(icons)
         open(os.path.join(a.zxn, 'atlas0.bin'), 'wb').write(pics[:16384])
-        open(os.path.join(a.zxn, 'atlas1.bin'), 'wb').write(pics[16384:].ljust(8192, b'\0'))
-        print(f'{len(pictures)} pictures of 64 bytes ({len(pics)} bytes), the palette, and the 14 icons -> {a.zxn}/')
+        if len(pics) > 32768:
+            sys.exit(f'{len(pics)} bytes of pictures: the two banks of the Next atlas hold 512')
+        open(os.path.join(a.zxn, 'atlas1.bin'), 'wb').write(pics[16384:].ljust(16384, b'\0'))
+        print(f'{len(framed)} pictures of 64 bytes ({len(pics)} bytes: {len(extra)} are the frames of {len(entries)} animations), the palette, and the 14 icons -> {a.zxn}/')
     if a.sheet:
         sheet(a.sheet, table, palette, bits, pictures, a.original)
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """The ZX Spectrum Next build under JNext (headless): the level screen, a city, the cursor and a road, the popup menu, a mini map, the
-budget and evaluation screens, scrolling by the DMA, a city saved and loaded back, and the sound.  Needs JNext, Pillow and make, Pillow, and JNext:
+budget and evaluation screens, scrolling by the DMA, the animated pictures, a city saved and loaded back, and the sound.  Needs JNext, Pillow and make, Pillow, and JNext:
 
     JNEXT=/Applications/jnext.app/Contents/MacOS/jnext python3 test/zxn/run.py
 
@@ -114,6 +114,14 @@ def main():
     diff = ImageChops.difference(scrolled, redrawn).convert('L').point(lambda v: 255 if v else 0)
     n = sum(1 for v in diff.tobytes() if v)
     check('the map scrolled by the DMA is the picture a full redraw makes', n <= 64 and differs(city, scrolled, (0, 56, 256, 192)), f'{n} pixels differ, in {diff.getbbox()}')
+
+    # animation: an airport (tool 13: twelve presses of '.' from the road) has a radar, and the park's fountain and the chimneys' smoke are others: the game
+    # shows each animated picture's frames in turn, one every 16 frames.  Eight screenshots 16 frames apart: some cell shows four or more different pictures
+    # (the plane that flies over the airport and the cursor change a cell to one or two)
+    airport = [S] + LAND + [(820 + 40 * i, '.') for i in range(12)] + [(1320, 'space'), (1400, 'caps+o')]
+    frames = [run(airport, 1800 + 16 * k) for k in range(8)]
+    most = max(len({f.crop((x * 8, y * 8, x * 8 + 8, y * 8 + 8)).tobytes() for f in frames}) for y in range(8, 24) for x in range(32))
+    check('the airport\'s radar animates: a map cell shows its frames in turn', most >= 4, f'at most {most} different pictures in a cell')
 
     # the popup menu: ESC (caps shift and 1: EDIT)
     menu = run([S, (700, 'caps+1')], 900)

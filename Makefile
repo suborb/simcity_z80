@@ -188,7 +188,7 @@ SAM_TEST =              # (-DSOUND_TEST -Ca-DSOUND_TEST: the build of test/sam/s
 SAM_BSS = 0xA200        # the code and the placer's variables are in the low 32 KB; the rest of the image may run on into the high window, and the
                         # uninitialised data starts after it, where the map (in the data) begins in the upper 16 KB page: see the check below
 
-$(SAM): $(DEPS) build/sam/tiles.bin
+$(SAM): $(DEPS) build/sam/tiles.bin build/sam/anim.inc
 	@mkdir -p $(@D)
 	$(ZCC) +sam -subtype=allram $(COMMON) -pragma-include:target/sam/zpragma.inc \
 	    -Itarget/sam -DTARGET_SAM -Ca-DTARGET_SAM -Ca-D__crt_org_bss=$(SAM_BSS) -Ca-DFMT_WIDTH=32 -Ca-DHAVE_MINIMAP_SQUARE -Ca-DHAVE_SOUND -Ca-DAY_SAA -Ca-DAY_ISR $(SAM_TEST) target/sam/plat_sam_files.asm $(GAME) $(ENTROPY) $(MENU) target/sam/plat_sound.asm target/common/ay_hooks.asm target/common/ay_sfx.asm $(FIELDS) $(MMNATIVE) $(LINEEDIT) $(SAM_PLATFORM_NOFILES) -o $(@D)/simcity.bin
@@ -227,9 +227,9 @@ build/zxn/head.bin: $(ZXN_TILES) $(ZXN_ICONS) tools/st_tiles_3bpp.py
 	@mkdir -p $(@D)
 	python3 tools/st_tiles_3bpp.py $(ZXN_TILES) --amiga-icons $(ZXN_ICONS) --zxn $(@D)
 
-build/sam/tiles.bin: assets/st_tiles.bin assets/st_icons.bin tools/st_tiles_3bpp.py
+build/sam/tiles.bin build/sam/anim.inc: assets/st_tiles.bin assets/st_icons.bin tools/st_tiles_3bpp.py
 	@mkdir -p $(@D)
-	python3 tools/st_tiles_3bpp.py assets/st_tiles.bin --icons assets/st_icons.bin --sam $@
+	python3 tools/st_tiles_3bpp.py assets/st_tiles.bin --icons assets/st_icons.bin --sam build/sam/tiles.bin --sam-anim build/sam/anim.inc
 
 # Headless: a scripted keyboard and a screen in RAM instead of the console, run under z88dk-ticks.
 $(TEST): $(DEPS)

@@ -16,6 +16,7 @@
         SECTION code_user
         EXTERN  _font_8x8_bbc_system
         EXTERN  _view_tile_art          ; picture n is at 8 * n from it
+        EXTERN  _V_view_tick            ; the game's frame counter (the animations' clock)
         IFDEF   HAVE_SOUND
         EXTERN  snd_init
         ENDIF
@@ -61,6 +62,7 @@ _plat_put_tile:
         inc     hl
         inc     hl
         ld      b,(hl)
+        call    mp_anim                 ; (an animated picture: the art of the frame it shows now)
         call    mp_cached
         ret     c
         ; a = row, b = col, c = inverse, de = art
@@ -98,6 +100,69 @@ mp_t_draw:
         ex      de,hl
         ld      hl,mp_pix
         jp      mp_blit
+
+; de = the art of a picture: if it is animated (mp_animmap, made by tools/st_tiles_3bpp.py --sam-anim: the number of its animation from 1, or 0), the art of
+; the frame it shows now: the animation's first frame (a word) and the number of frames less one (the mask of 3 or 7) are in mp_animtab, three bytes each,
+; and the frame is (the game's frame counter / 16) and the mask.  The pictures of the frames follow the engine's, and so does their art's address (which is
+; only the cache's key and a number: it is not read).  Keeps a, b, c.
+mp_anim:
+        push    af
+        push    bc
+        push    de                      ; the art as it was
+        ld      hl,_view_tile_art
+        ex      de,hl
+        or      a
+        sbc     hl,de                   ; art - the first = 8 * n
+        srl     h
+        rr      l
+        srl     h
+        rr      l
+        srl     h
+        rr      l                       ; n
+        ld      de,mp_animmap
+        add     hl,de
+        ld      a,(hl)
+        or      a
+        jr      z,ma_none
+        dec     a
+        ld      c,a
+        add     a,a
+        add     a,c                     ; 3 * (k - 1)
+        ld      l,a
+        ld      h,0
+        ld      de,mp_animtab
+        add     hl,de
+        ld      c,(hl)
+        inc     hl
+        ld      b,(hl)                  ; bc = the first frame's picture
+        inc     hl
+        ld      d,(hl)                  ; the mask
+        ld      a,(_V_view_tick)
+        rrca
+        rrca
+        rrca
+        rrca
+        and     d
+        ld      l,a
+        ld      h,0
+        add     hl,bc                   ; the picture to show
+        add     hl,hl
+        add     hl,hl
+        add     hl,hl
+        ld      de,_view_tile_art
+        add     hl,de
+        ex      de,hl
+        pop     hl                      ; (the art as it was is not wanted)
+        pop     bc
+        pop     af
+        ret
+ma_none:
+        pop     de
+        pop     bc
+        pop     af
+        ret
+
+        INCLUDE "build/sam/anim.inc"
 
 ; hl = the screen address of cell a = row, b = column.  Uses a.
 mp_scraddr:
