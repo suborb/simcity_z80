@@ -8,6 +8,7 @@
 #include <fcntl.h>
 #include "engine.h"
 #include "platform.h"
+#include "prompt.h"
 
 #define Z88_TEXT_X    2                    /* the text starts 2 cells in from the bars (so a 40 column screen is in the middle of the window) */
 #define Z88_TEXT_COLS 43                   /* the window is 47 wide: less the bars and the 2 */
@@ -19,6 +20,7 @@
 #define DEMAND_FIRST  120                  /* the characters left after the icons' 56: the demand bars' 7 */
 
 extern void z88_sop(const char *s) __z88dk_fastcall;
+extern char *z88_fgets_cons(char *s, size_t n);
 extern const uint8_t z88_icons[];
 extern void plat_set_font(const void *p) __z88dk_fastcall;
 extern void plat_set_udgs(const void *p) __z88dk_fastcall;
@@ -30,6 +32,7 @@ static const uint8_t *font_now;
 static const uint8_t *udg_now;
 static uint8_t cursor_art[8];
 static char z88_text[5 + Z88_TEXT_COLS + 1];
+char z88_banner[] = "\x01" "7#1" "\x22" "\x20" "\x4f" "\x28" "\x83" "\x01" "2C1" "\x01" "3+TR" "\x01" "3@" "\x34" "\x20" "SIMCITY      " "\x01" "3@  " "\x01" "2A" "\x4f" "\x01" "2-R" "\x01" "2-C";
 static uint8_t cmd_queue[8];
 static uint8_t cmd_head, cmd_tail;
 
@@ -114,14 +117,12 @@ void plat_puts(uint8_t col, uint8_t row, const char *s) { plat_text_puts(col, ro
 uint8_t plat_text_cols(void) { return Z88_TEXT_COLS; }
 uint8_t plat_text_rows(void) { return Z88_TEXT_ROWS; }
 /* The text window is one OZ window (1): 47 x 8 at column 2, centred on the 51 columns, with OZ's bars (type 131).  Its first row is the
-   banner, SIMCITY, reverse and centred; the text is in the 7 rows below, inside the bars, and in OZ's tiny font (plat_text_puts(),
+   city name, reverse and centred; the text is in the 7 rows below, inside the bars, and in OZ's tiny font (plat_text_puts(),
    plat_icons() and plat_demand() add the offset).  Clearing the window is defining it again (with bit 7 of the type it is cleared) and
-   drawing the banner.  (A banner that changed with the screen did not take in OZvm: each screen puts its heading in its first row.) */
+   drawing the banner. */
 void plat_text_clear(void)
 {
-    z88_sop("\x01" "7#1" "\x22" "\x20" "\x4f" "\x28" "\x83" "\x01" "2C1" "\x01" "3+TR"          /* window 1 at 2,0, 47 x 8, with the banner: reverse, tiny */
-            "\x01" "3@" "\x34" "\x20" "SIMCITY"                                                          /* centred (7 of the 47 characters: column 20) */
-            "\x01" "3@  " "\x01" "2A" "\x4f" "\x01" "2-R" "\x01" "2-C");                                /* the bar across the whole row; reverse off, tiny stays on for the text */
+    z88_sop(z88_banner);
 }
 
 void plat_text_puts(uint8_t col, uint8_t row, const char *s)
@@ -187,10 +188,12 @@ uint8_t plat_text_input(uint8_t col, uint8_t row, char *buf, uint8_t max, uint8_
     uint8_t n;
 
     (void)spaces;
+    for (n = 0; n < max && city_name[n]; ++n)
+        buf[n] = city_name[n];
+    buf[n] = 0;
     plat_text_puts(col, row, "");
     z88_sop("\x01" "2+C");
-    buf[0] = 0;
-    r = fgets_cons(buf, (size_t)max + 1);
+    r = z88_fgets_cons(buf, (size_t)max + 1);
     z88_sop("\x01" "2-C");
     for (n = 0; buf[n]; ++n)
         ;

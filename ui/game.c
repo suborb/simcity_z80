@@ -79,6 +79,17 @@ static uint8_t power_nuclear;           /* what the power plant tool builds */
 static uint8_t tick_reset;              /* a city was loaded: abandon the tick in progress */
 static uint8_t map_view;                /* 0: the city; else the mini map shown (MM_CITY..) */
 static uint8_t map_full;                /* the mini map needs drawing from scratch */
+
+/* A platform that chooses the power-station type in advance (rather than asking
+   as it is placed) should show the price of that choice. */
+static const char *tool_text(uint8_t n)
+{
+#ifndef HAVE_POWER_ASK
+    if (n == TOOL_POWER_STATION && !power_nuclear)
+        return "POWER STATION $3000";
+#endif
+    return text_tools[n];
+}
 /* Everything the status panel shows, to tell when it needs redrawing. */
 struct status {
     uint8_t money[3], pop[3];             /* 24 bit, as the engine keeps them */
@@ -988,7 +999,7 @@ static void draw_status(void)
     }
 #endif
     st_month = text_months[V_month];
-    st_tool = text_tools[tool];
+    st_tool = tool_text(tool);
     st_speed = st_speeds[V_simulation_speed & 3];
     st_alert = V_alertmessage < sizeof(text_alerts) / sizeof(text_alerts[0]) ? text_alerts[V_alertmessage] : "";
     buf[8] = 0;
@@ -1044,7 +1055,7 @@ static void draw_status(void)
     }
 #endif
     st_month = text_months[V_month];
-    st_tool = text_tools[tool];
+    st_tool = tool_text(tool);
     st_speed = st_speeds[V_simulation_speed & 3];
     st_alert = V_alertmessage < sizeof(text_alerts) / sizeof(text_alerts[0]) ? text_alerts[V_alertmessage] : "";
     fmt_fields(top_status, sizeof(top_status) / sizeof(struct field));
@@ -1088,7 +1099,7 @@ static void draw_status(void)
     if (!panel_w)
         return;
     st_month = text_months[V_month];
-    st_tool = text_tools[tool];
+    st_tool = tool_text(tool);
     st_speed = st_speeds[V_simulation_speed & 3];
     st_alert = V_alertmessage < sizeof(text_alerts) / sizeof(text_alerts[0]) ? text_alerts[V_alertmessage] : "";
     fmt_fields(status_top, sizeof(status_top) / sizeof(struct field));
@@ -1173,7 +1184,7 @@ static void draw_status(void)
     buf[28] = 0;
     line(1, buf, 0, 0);
 
-    n = append(buf, 0, text_tools[tool]);
+    n = append(buf, 0, tool_text(tool));
     n = append(buf, n, "  ");
     n = append(buf, n, V_simulation_speed == 3 ? "PAUSED" : V_simulation_speed == 0 ? "FAST" :
             V_simulation_speed == 1 ? "NORMAL" : "SLOW");
@@ -1485,11 +1496,19 @@ static void handle_key(uint8_t k)
 #ifdef HAVE_POPUP_MENU
     case MENU_POWER_TOGGLE:
 #endif
-        power_nuclear = !power_nuclear; break;
+        power_nuclear = !power_nuclear;
+        redraw |= REDRAW_TEXT;
+        break;
 #endif
 #ifndef TARGET_AQPLUS
-    case CMD_POWER_COAL:       power_nuclear = 0; break;
-    case CMD_POWER_NUCLEAR:    power_nuclear = 1; break;
+    case CMD_POWER_COAL:
+        power_nuclear = 0;
+        redraw |= REDRAW_TEXT;
+        break;
+    case CMD_POWER_NUCLEAR:
+        power_nuclear = 1;
+        redraw |= REDRAW_TEXT;
+        break;
 #endif
 #ifdef HAVE_POPUP_MENU
     case MENU_DISASTERS_TOGGLE: V_disaster_reset = !V_disaster_reset; break;

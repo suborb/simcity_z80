@@ -42,7 +42,7 @@ ZX_PLATFORM = target/zx/plat_zx.asm
 MULTI8_PLATFORM = target/multi8/plat_multi8.c target/multi8/plat_multi8.asm target/common/plat_charts.c target/common/plat_icons.c
 PC88_PLATFORM = target/pc88/plat_pc88.c target/pc88/plat_pc88.asm target/pc88/plat_pc88_files.asm target/common/plat_charts.c target/common/plat_icons.c
 SAM_PLATFORM_NOFILES = target/sam/plat_sam.c target/sam/plat_sam.asm target/common/minimap_key.c
-Z88_PLATFORM = target/z88/plat_z88.c target/z88/plat_z88.asm
+Z88_PLATFORM = target/z88/plat_z88.c target/z88/plat_z88.asm target/z88/fgets_cons.asm
 
 
 # Everything a build depends on.

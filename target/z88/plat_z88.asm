@@ -18,10 +18,28 @@ _z88_icons:
         BINARY  "assets/z88_icons.bin"
 
         SECTION code_clib
-; void plat_set_name(const char *name) __z88dk_fastcall: the city's name for OZ's Index (DC_Nam, which keeps IX)
+; void plat_set_name(const char *name) __z88dk_fastcall: use the city name
+; both in OZ's Index and in the fixed-width window banner.
         PUBLIC  _plat_set_name
+        EXTERN  _z88_banner
 _plat_set_name:
+        push    hl
         call_oz (dc_nam)
+        pop     hl
+        ld      de,_z88_banner + 23
+        ld      b,12
+z88_name_copy:
+        ld      a,(hl)
+        or      a
+        jr      z,z88_name_space
+        inc     hl
+        jr      z88_name_put
+z88_name_space:
+        ld      a,' '
+z88_name_put:
+        ld      (de),a
+        inc     de
+        djnz    z88_name_copy
         ret
 
 _z88_sop:
