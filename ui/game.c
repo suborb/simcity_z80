@@ -61,10 +61,17 @@ static const uint8_t tool_size[NUM_TOOLS] = { 1, 1, 1, 1, 1, 3, 3, 3, 3, 3, 4, 4
 extern const uint8_t D_tile_flags[];
 
 /* ---- state ------------------------------------------------------------- */
+#ifdef HAVE_MOUSE
+uint8_t cur_x, cur_y;                   /* exposed to the compact SAM edge-scroll routine */
+uint8_t origin_x, origin_y;
+uint8_t frame, map_view;
+#else
 static uint8_t cur_x, cur_y;            /* cursor, map coordinates */
 static uint8_t origin_x, origin_y;      /* map cell at the top left of the view */
-static uint8_t tool;
 static uint8_t frame;
+static uint8_t map_view;
+#endif
+static uint8_t tool;
 static uint8_t quit;
 static uint8_t restart;                 /* quit this city and start another */
 static uint8_t redraw;                  /* parts of the display a modal screen overwrote */
@@ -77,7 +84,6 @@ static uint8_t redraw;                  /* parts of the display a modal screen o
 #endif
 static uint8_t power_nuclear;           /* what the power plant tool builds */
 static uint8_t tick_reset;              /* a city was loaded: abandon the tick in progress */
-static uint8_t map_view;                /* 0: the city; else the mini map shown (MM_CITY..) */
 static uint8_t map_full;                /* the mini map needs drawing from scratch */
 
 /* A platform that chooses the power-station type in advance (rather than asking
@@ -100,8 +106,12 @@ struct status {
 
 /* Layout, decided from the screen size at start-up. */
 static uint8_t cols, rows;
+#ifdef HAVE_MOUSE
+uint8_t view_w, view_h, map_row;
+#else
 static uint8_t view_w, view_h;
 static uint8_t map_row;                 /* screen row of the top of the map */
+#endif
 static uint8_t panel_col, panel_row;    /* where the status text starts */
 static uint8_t panel_w, panel_h;
 
@@ -223,6 +233,10 @@ static void update_option_labels(void)
 static uint8_t popup_menu(void)
 {
     uint8_t choice = MENU_MAIN, page;
+
+#ifdef HAVE_MOUSE_POINTER
+    plat_mouse_pointer_erase();
+#endif
 
     while (choice) {
         page = choice;
@@ -362,8 +376,49 @@ static uint8_t glyph(uint8_t x, uint8_t y)
 /* ---- drawing -------------------------------------------------------------- */
 static uint8_t last_cx = 255, last_cy;  /* where the cursor was drawn, in view cells */
 static uint8_t last_size, last_phase;   /* its size (the tool's footprint) and blink phase then */
+#ifdef HAVE_MOUSE
+static uint8_t draw_cursor_enabled = 1;     /* the mouse can take the pointer off the map: then the cursor is not drawn */
+#define CURSOR_ENABLED draw_cursor_enabled &&
+#else
+#define CURSOR_ENABLED                      /* (a target without a mouse always has its cursor in view: no test for it) */
+#endif
 #ifdef DRAW_SPRITES
 static struct sprite sprites[MAX_SPRITES], last_sprites[MAX_SPRITES];   /* the train, plane and tornado, now and last frame */
+#endif
+#ifdef HAVE_MOUSE_POINTER
+extern void plat_mouse_pointer_erase(void);
+extern void plat_mouse_pointer_refresh(void);
+extern void plat_mouse_pointer_before_map_row(void);
+extern void plat_forget_tile(uint8_t col, uint8_t row);
+#endif
+#ifdef HAVE_MOUSE
+extern uint8_t plat_mouse_edge_scroll(void);
+#endif
+
+#ifdef HAVE_MOUSE
+/* The city already has a blinking tool footprint at cur_x/cur_y.  Feed that
+   cursor from the mouse while it is over the map instead of painting a second
+   mouse-shaped highlight on top of the map tiles. */
+static uint8_t plat_mouse_update_city_cursor(void)
+{
+    uint8_t sx, sy, mx, my;
+
+    plat_page_data();
+    if (!plat_mouse_present || map_view)
+        return 0;
+    sx = (uint8_t)((uint16_t)plat_mouse_x >> 3);
+    sy = (uint8_t)((uint16_t)plat_mouse_y >> 3);
+    if (sx >= view_w || sy < map_row || sy >= map_row + view_h)
+        return 0;
+    mx = (uint8_t)(origin_x + sx);
+    my = (uint8_t)(origin_y + sy - map_row);
+    if (mx < MAP_W && my < MAP_H) {
+        cur_x = mx;
+        cur_y = my;
+        return 1;
+    }
+    return 0;
+}
 #endif
 
 /* The cursor is the size of what the tool would place: a square of tool_size[tool] cells whose top
@@ -371,7 +426,9 @@ static struct sprite sprites[MAX_SPRITES], last_sprites[MAX_SPRITES];   /* the t
 static uint8_t in_cursor(uint8_t mx, uint8_t my)
 {
     uint8_t size = tool_size[tool];
-    return (uint8_t)(mx - cur_x) < size && (uint8_t)(my - cur_y) < size;
+    if ((uint8_t)(mx - cur_x) < size && (uint8_t)(my - cur_y) < size)
+        return 1;
+    return 0;
 }
 
 /* Draw one scheduled cell of the view.  The scheduler below only asks for a
@@ -381,7 +438,7 @@ static uint8_t in_cursor(uint8_t mx, uint8_t my)
 static void draw_cell(uint8_t cx, uint8_t cy)
 {
     uint8_t mx = (uint8_t)(origin_x + cx), my = (uint8_t)(origin_y + cy);
-    uint8_t cursor = ((frame & 4) && in_cursor(mx, my));
+    uint8_t cursor = (CURSOR_ENABLED (frame & 4) && in_cursor(mx, my));
 
 #ifdef HAVE_TILES
     view_x = mx;
@@ -428,8 +485,12 @@ static void draw_footprint(int16_t cx, int16_t cy, uint8_t size)   /* view cells
     int16_t x, y;
     for (y = cy; y < cy + size; ++y)
         for (x = cx; x < cx + size; ++x)
-            if (x >= 0 && y >= 0 && x < view_w && y < view_h)
+            if (x >= 0 && y >= 0 && x < view_w && y < view_h) {
+#ifdef HAVE_MOUSE_POINTER
+                plat_forget_tile((uint8_t)x, (uint8_t)(map_row + y));
+#endif
                 draw_cell((uint8_t)x, (uint8_t)y);
+            }
 }
 
 #ifdef HAVE_SCROLL
@@ -478,10 +539,34 @@ static void scroll_view(void)
 }
 #endif
 
+uint8_t draw_refresh_row;
 static void draw_view(uint8_t full, uint8_t dirty)
 {
-    static uint8_t refresh_row;
-    uint8_t cx, cy, rows_dirty, size = tool_size[tool], phase = (frame & 4) != 0;
+    uint8_t cx, cy, rows_dirty;
+    uint8_t size = tool_size[tool], phase = (frame & 4) != 0;
+#ifdef HAVE_MOUSE
+    uint8_t cursor_visible = 1;
+#else
+#define cursor_visible 1
+#endif
+
+#ifdef HAVE_MOUSE
+    if (plat_mouse_present) {
+        uint16_t px, py;
+        uint8_t sx, sy;
+
+        plat_page_data();
+        px = (uint16_t)plat_mouse_x;
+        py = (uint16_t)plat_mouse_y;
+        sx = (uint8_t)(px >> 3);
+        sy = (uint8_t)(py >> 3);
+        cursor_visible = !map_view && sx < view_w &&
+                         sy >= map_row && sy < map_row + view_h;
+    }
+#endif
+#ifdef HAVE_MOUSE
+    draw_cursor_enabled = cursor_visible;
+#endif
 
 #ifdef DRAW_SPRITES
     sprites_collect(sprites, frame);
@@ -496,23 +581,50 @@ static void draw_view(uint8_t full, uint8_t dirty)
                 draw_cell(cx, cy);
     } else {
         if (dirty) {                        /* the tool's footprint starts at the cursor */
+#ifdef HAVE_MOUSE_POINTER
+            if (plat_mouse_present && cursor_visible)
+                plat_mouse_pointer_erase();
+#endif
             cy = (uint8_t)(cur_y - origin_y);
             rows_dirty = tool_size[tool];
             for (; rows_dirty && cy < view_h; --rows_dirty, ++cy)
                 for (cx = 0; cx < view_w; ++cx)
                     draw_cell(cx, cy);
         }
-        if (++refresh_row >= view_h)
-            refresh_row = 0;
+        if (++draw_refresh_row >= view_h)
+            draw_refresh_row = 0;
+#ifdef HAVE_MOUSE_POINTER
+        plat_mouse_pointer_before_map_row();
+#endif
         for (cx = 0; cx < view_w; ++cx)
-            draw_cell(cx, refresh_row);
+            draw_cell(cx, draw_refresh_row);
         cx = (uint8_t)(cur_x - origin_x);
         cy = (uint8_t)(cur_y - origin_y);
-        if (cx != last_cx || cy != last_cy || size != last_size || phase != last_phase) {
-            if (last_cx < view_w && last_cy < view_h)
-                draw_footprint(last_cx, last_cy, last_size);
-            draw_footprint(cx, cy, size);
+#ifdef HAVE_MOUSE
+        if (cursor_visible) {
+#else
+        {                                   /* (without a mouse the cursor is always in view) */
+#endif
+            if (cx != last_cx || cy != last_cy || size != last_size || phase != last_phase) {
+#ifdef HAVE_MOUSE_POINTER
+                if (plat_mouse_present)
+                    plat_mouse_pointer_erase();
+#endif
+                if (last_cx < view_w && last_cy < view_h)
+                    draw_footprint(last_cx, last_cy, last_size);
+                draw_footprint(cx, cy, size);
+            }
+#ifdef HAVE_MOUSE
+        } else if (last_cx < view_w && last_cy < view_h) {
+#ifdef HAVE_MOUSE_POINTER
+            if (plat_mouse_present)
+                plat_mouse_pointer_erase();
+#endif
+            draw_footprint(last_cx, last_cy, last_size);
         }
+#else
+        }
+#endif
     }
 #ifdef DRAW_SPRITES
     if (full != 1)                          /* a sprite that moved, changed or went: its old cells and its new */
@@ -525,7 +637,11 @@ static void draw_view(uint8_t full, uint8_t dirty)
             }
     memcpy(last_sprites, sprites, sizeof(sprites));
 #endif
+#ifdef HAVE_MOUSE
+    last_cx = cursor_visible ? (uint8_t)(cur_x - origin_x) : 254;
+#else
     last_cx = (uint8_t)(cur_x - origin_x);
+#endif
     last_cy = (uint8_t)(cur_y - origin_y);
     last_size = size;
     last_phase = phase;
@@ -1243,6 +1359,22 @@ static void move_cursor(int8_t dx, int8_t dy)
     cur_x = (uint8_t)nx;
     cur_y = (uint8_t)ny;
     clamp_view();
+#ifdef HAVE_MOUSE
+    /* QAOP/cursor-key moves should carry the software mouse position with
+       the city cursor. Since the mouse is relative, future hardware deltas
+       then continue from this adjusted position. */
+    plat_page_data();
+    if (!map_view && plat_mouse_present) {
+        uint16_t px = (uint16_t)plat_mouse_x;
+        uint16_t py = (uint16_t)plat_mouse_y;
+        uint8_t sx = (uint8_t)(px >> 3);
+        uint8_t sy = (uint8_t)(py >> 3);
+        if (sx < view_w && sy >= map_row && sy < map_row + view_h) {
+            plat_mouse_x = (int16_t)(((uint16_t)(cur_x - origin_x) << 3) | (px & 7));
+            plat_mouse_y = (int16_t)(((uint16_t)(map_row + cur_y - origin_y) << 3) | (py & 7));
+        }
+    }
+#endif
 }
 
 static void apply_tool(void)
@@ -1265,6 +1397,9 @@ static void apply_tool(void)
         if (!V_money[2] && lo < 3000)
             return;                         /* (the engine would not build it) */
         if (V_money[2] || lo >= 5000) {
+#ifdef HAVE_MOUSE_POINTER
+            plat_mouse_pointer_erase();
+#endif
             uint8_t kind = menu_choose("POWER STATION", kinds, 2);
 
             redraw |= REDRAW_MAP;           /* the box was over the map */
@@ -1293,6 +1428,9 @@ static void set_tool(uint8_t t)
    this, the simulation parked); the player can also look at it, and change the rates, any time. */
 void game_budget(void)
 {
+#ifdef HAVE_MOUSE_POINTER
+    plat_mouse_pointer_erase();
+#endif
     if (budget_screen())
         quit = 1;
     else
@@ -1307,6 +1445,9 @@ void game_budget(void)
 /* The evaluation screen, modal. */
 static void game_evaluation(void)
 {
+#ifdef HAVE_MOUSE_POINTER
+    plat_mouse_pointer_erase();
+#endif
     if (evaluation_screen())
         quit = 1;
     else
@@ -1603,11 +1744,15 @@ static void title_screen(void)
     uint16_t seed = 0, first;
     uint8_t k;
 
-    plat_text_clear();
 #ifdef HAVE_TEXT_WINDOW                             /* (the window has a title of its own) */
 #define LEVEL_ROW 0
 #else
 #define LEVEL_ROW 2
+#endif
+title_again:
+    plat_page_data();
+    plat_text_clear();
+#ifndef HAVE_TEXT_WINDOW
     plat_text_puts(0, 0, "S I M C I T Y");
 #ifdef APP_VERSION
     plat_text_puts(16, 0, "v" VERSION_TEXT(APP_VERSION));
@@ -1620,6 +1765,7 @@ static void title_screen(void)
     plat_flush();
     do {
         seed++;
+        plat_page_data();
         k = plat_key();
         if (!k)
             plat_idle();
@@ -1686,14 +1832,50 @@ static void play_city(void)
     memset(&last_st, 0xFF, sizeof(last_st));          /* nothing drawn yet */
 
     while (!quit) {
+        plat_page_data();
         if (tick_reset) {                   /* a city was loaded */
             tick_reset = 0;
             ticking = 0;
             countdown = tick_frames[V_simulation_speed];
         }
+        plat_page_data();
         k = plat_key();
+#ifdef HAVE_MOUSE
+        /* Sample the keyboard first; some mouse interfaces also read from
+           the keyboard ports. */
+        plat_page_data();                /* the driver state may be in banked memory */
+        {
+            uint8_t mouse_event = plat_mouse_input();
+            /* Some mouse button interfaces can also appear in the keyboard
+               scan. Do not let a mouse press become a second Enter/Space
+               placement, especially when the pointer is outside the map. */
+            if (k && !((mouse_event & 4) && (k == KEY_ENTER || k == ' ')))
+                handle_key(k);
+            if (mouse_event & 1) {
+                uint8_t old_x = cur_x, old_y = cur_y;
+                uint8_t valid;
+                valid = plat_mouse_update_city_cursor();
+                if (valid && (mouse_event & 4) && !(mouse_event & 2) &&
+                    (cur_x != old_x || cur_y != old_y))
+                    apply_tool();
+            }
+            if (mouse_event & 2) {
+                if (!map_view) {
+                    uint8_t icon = plat_mouse_icon_hit();
+                    if (icon < NUM_TOOLS)
+                        set_tool(icon);
+                    else if (plat_mouse_update_city_cursor())
+                        apply_tool();
+                }
+            }
+            if (plat_mouse_update_city_cursor() &&
+                plat_mouse_edge_scroll() && (mouse_event & 4))
+                apply_tool();             /* continue a drag as the map moves under the edge */
+        }
+#else
         if (k)
             handle_key(k);
+#endif
         if (quit)                           /* no last frame: it would draw over a screen the quit left up */
             break;
 
@@ -1733,6 +1915,9 @@ static void play_city(void)
 
         /* a full pass over the map only when the view has moved */
         if (redraw) {                       /* OZ drew over us, or a screen did: start the affected area again */
+#ifdef HAVE_MOUSE_POINTER
+            plat_mouse_pointer_erase();   /* a full map redraw overwrites the saved pointer cells too */
+#endif
             if (redraw & REDRAW_ALL) {
                 plat_clear();
                 last_cx = 255;
@@ -1782,9 +1967,14 @@ static void play_city(void)
 #endif
         if (memcmp(&st, &last_st, sizeof(st))) {
             last_st = st;
+#ifdef HAVE_MOUSE_POINTER
+            plat_mouse_pointer_erase();            /* draw the fresh panel beneath a stationary pointer */
+#endif
+            plat_page_data();
             draw_status();
         }
 #ifdef HAVE_ICONS_TOP                  /* the panel is at the top: it is drawn first, so a new screen does not show the map before it */
+        plat_page_data();
         full = origin_x != last_ox || origin_y != last_oy || last_cx == 255;
 #ifdef HAVE_SCROLL
         full = scroll_or_full(full, last_ox, last_oy);
@@ -1797,6 +1987,12 @@ static void play_city(void)
             draw_view(full, map_dirty);
         }
 #endif
+        plat_page_data();
+#ifdef HAVE_MOUSE_POINTER
+#ifndef SAM_DISABLE_MOUSE_POINTER
+        plat_mouse_pointer_refresh();
+#endif
+#endif
         plat_flush();
         map_dirty = 0;
         ++frame;
@@ -1807,6 +2003,9 @@ static void play_city(void)
 void game_run(void)
 {
     plat_init();
+#ifdef HAVE_MOUSE
+    plat_mouse_init();
+#endif
     choose_layout();
     do {
         quit = restart = 0;

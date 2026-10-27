@@ -14,6 +14,11 @@
 ; arguments the way the game's C code passes them (smallc: first argument first, the caller cleans up).  Interrupts are off.
 
         SECTION code_user
+        INCLUDE "mapsize.inc"
+        PUBLIC  _plat_mouse_edge_scroll
+        EXTERN  _plat_mouse_x, _plat_mouse_y
+        EXTERN  _cur_x, _cur_y, _origin_x, _origin_y, _frame
+        EXTERN  _view_w, _view_h, _map_row
         EXTERN  _font_8x8_bbc_system
         EXTERN  _view_tile_art          ; picture n is at 8 * n from it
         EXTERN  _V_view_tick            ; the game's frame counter (the animations' clock)
@@ -33,6 +38,47 @@
         defc    MAP_ROW = 7             ; the map's cell rows: the only ones with a cache entry
         defc    MAP_ROWS = 17
         defc    COLS = 32
+
+; Keep the lookup tables, draw buffers and state in low, resident RAM. The
+; screen page replaces $8000-$FFFF while these are in use.
+        SECTION code_driver
+mp_space: defs  80                     ; 32 bytes each for pixel pairs and overlays, then 16 minimap shades
+mp_tablo: defb  0
+mp_tabhi: defb  0
+mp_pix:   defs  32                      ; the picture on its way to the screen
+mp_msk:   defs  32                      ; pixel nibbles to restore beneath the mouse pointer
+mp_mask_ptr: defw 0
+mp_ibuf:  defs  16 * 12                 ; a tool icon's button on its way to the screen
+mp_isel:  defb  0                       ; plat_icons: the selected tool, and the icon being drawn
+mp_ii:    defb  0
+mp_amask: defw  $3FFF
+mp_adiff: defw  0
+mp_adw:   defw  0
+mp_dtmp:  defb  0
+mp_drc:   defw  0
+mp_dlev:  defb  0
+mp_dk:    defb  0
+mp_tn:    defw  0
+mp_tc:    defw  0
+mp_bn:    defw  0
+mp_bp:    defs  4
+mp_ilast: defb  $FF
+mm_buf:   defs  96
+mm_ty:    defb  0
+mm_cnt:   defb  0
+mm_dens:  defb  0
+mm_bptr:  defw  0
+mp_gl:    defs  8
+mp_pr:    defs  4
+mp_pal:   defs  24
+mp_attrs: defs  8
+mp_cattr: defb  $FF
+mp_dpage: defb  0
+mp_tpage: defb  0
+mp_up:    defb  0
+mp_held:  defb  0
+mp_event: defb  0
+        SECTION code_user
 
 ; The 14 tool icons: four cells each, then their attributes
         SECTION rodata_user
@@ -271,6 +317,18 @@ mp_forget:
         ret
 
 ; Other drawing in a cell: the cache no longer applies.  a = row, b = column, c = attribute, de = 8 bytes of 1 bit art.
+; void plat_forget_tile(uint8_t col, uint8_t row) __smallc
+; Force the next tile draw at this screen cell to update the pixels too.
+        PUBLIC  _plat_forget_tile
+_plat_forget_tile:
+        ld      hl,2
+        add     hl,sp
+        ld      a,(hl)                  ; row (last smallc argument)
+        inc     hl
+        inc     hl                      ; each smallc byte argument occupies a word
+        ld      b,(hl)                  ; column
+        jp      mp_forget
+
 mp_cell:
         call    mp_forget
         push    af
@@ -296,7 +354,11 @@ mp_cv:
         rrca
         push    hl
         ld      l,a
+        ld      a,(mp_tablo)
+        add     a,l
+        ld      l,a
         ld      a,(mp_tabhi)
+        adc     a,0
         ld      h,a
         ld      a,(hl)
         ld      (de),a
@@ -309,6 +371,12 @@ mp_cv:
         and     $0F
         add     a,a
         ld      l,a
+        ld      a,(mp_tablo)
+        add     a,l
+        ld      l,a
+        ld      a,(mp_tabhi)
+        adc     a,0
+        ld      h,a
         ld      a,(hl)
         ld      (de),a
         inc     de
@@ -326,7 +394,7 @@ mp_cv:
         jp      mp_blit
 
 ; The table for attribute a (ink in bits 0-2, paper in 3-5; the palette entries of those colours are mp_attrs): 16 entries of two bytes,
-; the four pixels of each nibble, at the start of the aligned tables (the overlay's are at +32).  The last one is kept.
+; the four pixels of each nibble, at the start of the lookup buffer (the overlay's are at +32).  The last one is kept.
 mp_mktab:
         ld      hl,mp_cattr
         cp      (hl)
@@ -378,7 +446,8 @@ mp_mktab:
         ; entry n = (pairs[n >> 2], pairs[n & 3])
         ld      a,(mp_tabhi)
         ld      h,a
-        ld      l,0
+        ld      a,(mp_tablo)
+        ld      l,a
         ld      b,0                     ; n
 mp_mk:
         ld      a,b
@@ -412,6 +481,7 @@ mp_mk:
 
 ; void plat_put_overlay(uint8_t col, uint8_t row, const uint8_t *art) __smallc
 ; The pixels set in 8 bytes of art, white, over the cell: a sprite.
+        SECTION code_driver
         PUBLIC  _plat_put_overlay
 _plat_put_overlay:
         ld      hl,2
@@ -441,7 +511,11 @@ mp_ov_cv:
         or      32                      ; (the overlay's half of the table)
         push    hl
         ld      l,a
+        ld      a,(mp_tablo)
+        add     a,l
+        ld      l,a
         ld      a,(mp_tabhi)
+        adc     a,0
         ld      h,a
         ld      a,(hl)
         ld      (de),a
@@ -455,6 +529,12 @@ mp_ov_cv:
         add     a,a
         or      32
         ld      l,a
+        ld      a,(mp_tablo)
+        add     a,l
+        ld      l,a
+        ld      a,(mp_tabhi)
+        adc     a,0
+        ld      h,a
         ld      a,(hl)
         ld      (de),a
         inc     de
@@ -501,7 +581,211 @@ mp_ov_cv:
         ENDR
         jp      mp_back
 
+; Save and restore only cells the pointer actually touches.
+        SECTION code_compiler
+        EXTERN  _plat_mouse_pointer_cell_count
+        EXTERN  _plat_mouse_pointer_cells
+        EXTERN  _plat_mouse_pointer_background
+        EXTERN  _plat_mouse_pointer_mask
+        PUBLIC  _plat_mouse_pointer_save_screen
+        PUBLIC  _plat_mouse_pointer_restore_screen
+
+_plat_mouse_pointer_save_screen:
+        push    ix
+        push    iy
+        ld      ix,_plat_mouse_pointer_cells
+        ld      iy,_plat_mouse_pointer_background
+        ld      a,(_plat_mouse_pointer_cell_count)
+        ld      b,a
+        or      a
+        jr      z,ps_done
+ps_loop:
+        push    bc
+        ld      a,(ix+1)                ; screen row
+        ld      b,(ix+0)                ; screen column
+        call    mp_scraddr
+        call    mp_fetch
+        ld      hl,mp_pix
+        push    iy
+        pop     de
+        ld      bc,32
+        ldir
+        push    iy
+        pop     hl
+        ld      de,32
+        add     hl,de
+        push    hl
+        pop     iy
+        inc     ix
+        inc     ix
+        pop     bc
+        djnz    ps_loop
+ps_done:
+        pop     iy
+        pop     ix
+        ret
+
+_plat_mouse_pointer_restore_screen:
+        push    ix
+        push    iy
+        ld      ix,_plat_mouse_pointer_cells
+        ld      iy,_plat_mouse_pointer_background
+        ld      hl,_plat_mouse_pointer_mask
+        ld      (mp_mask_ptr),hl
+        ld      a,(_plat_mouse_pointer_cell_count)
+        ld      b,a
+        or      a
+        jp      z,pr_done
+pr_loop:
+        push    bc
+        push    ix
+        push    iy
+        push    iy
+        pop     hl
+        ld      de,mp_pix
+        ld      bc,32
+        ldir
+        ld      hl,(mp_mask_ptr)
+        ld      de,mp_msk
+        ld      bc,32
+        ldir
+        ld      (mp_mask_ptr),hl
+        ld      a,(ix+1)                ; screen row
+        ld      b,(ix+0)                ; screen column
+        call    mp_scraddr
+        ex      de,hl                   ; DE = screen destination
+        ld      hl,mp_pix               ; HL = saved cell pixels
+        ld      ix,mp_msk
+        call    mp_maskblit
+        pop     iy
+        push    iy
+        pop     hl
+        ld      de,32
+        add     hl,de
+        push    hl
+        pop     iy
+        pop     ix
+        inc     ix
+        inc     ix
+        pop     bc
+        djnz    pr_loop
+pr_done:
+        pop     iy
+        pop     ix
+        ret
+
+; Restore only covered pixels from the saved cell, preserving the pixels beside the pointer.
+; hl = saved cell, de = screen cell, ix = 32-byte nibble mask.
+mp_maskblit:
+        ld      a,SCRPAGE
+        out     (HMPR),a
+        ld      b,8
+pm_loop:
+        push    bc
+        ld      c,4
+pm_byte:
+        push    bc
+        ld      a,(ix+0)
+        ld      c,a
+        cpl
+        ld      b,a
+        ld      a,(de)
+        and     b
+        ld      b,a
+        ld      a,(hl)
+        and     c
+        or      b
+        ld      (de),a
+        pop     bc
+        inc     hl
+        inc     de
+        inc     ix
+        dec     c
+        jr      nz,pm_byte
+        ld      a,e
+        add     a,124
+        ld      e,a
+        jr      nc,pm_row_next
+        inc     d
+pm_row_next:
+        pop     bc
+        djnz    pm_loop
+        ld      a,(mp_dpage)
+        out     (HMPR),a
+        ret
+
+; void plat_put_black_overlay(uint8_t col, uint8_t row, const uint8_t *art) __smallc
+; Clear screen pixels selected in the 1-bit cell mask.
+        PUBLIC  _plat_put_black_overlay
+_plat_put_black_overlay:
+        push    ix
+        ld      hl,4                      ; saved IX is above the return address
+        add     hl,sp
+        ld      e,(hl)
+        inc     hl
+        ld      d,(hl)                  ; mask
+        push    de
+        ex      de,hl
+        ld      de,mp_pix               ; the mask is in the data page, which will be paged out
+        ld      bc,8
+        ldir
+        pop     de
+        ld      hl,4
+        add     hl,sp
+        inc     hl
+        inc     hl                      ; row
+        ld      a,(hl)
+        inc     hl
+        inc     hl
+        ld      b,(hl)                  ; column
+        call    mp_scraddr
+        push    hl
+        ld      ix,mp_pix               ; read mask from low memory while screen is paged in
+        ld      a,SCRPAGE
+        out     (HMPR),a
+        pop     hl                      ; screen row address
+        ld      b,8
+pb_row:
+        ld      a,(ix+0)
+        inc     ix
+        ld      c,4
+pb_pair:
+        bit     7,a
+        jr      z,pb_right
+        push    af
+        ld      a,(hl)
+        and     $0f
+        ld      (hl),a
+        pop     af
+pb_right:
+        rlca
+        bit     7,a
+        jr      z,pb_next
+        push    af
+        ld      a,(hl)
+        and     $f0
+        ld      (hl),a
+        pop     af
+pb_next:
+        inc     hl
+        rlca
+        dec     c
+        jr      nz,pb_pair
+        ld      a,l
+        add     a,124
+        ld      l,a
+        jr      nc,pb_row_next
+        inc     h
+pb_row_next:
+        djnz    pb_row
+        ld      a,(mp_dpage)
+        out     (HMPR),a
+        pop     ix
+        ret
+
+        SECTION code_user
 ; c = the attribute with ink and paper swapped.  Uses a, b.
+        SECTION code_driver
 mp_swap:
         ld      a,c
         and     7
@@ -521,6 +805,10 @@ mp_swap:
 ; void plat_icons(uint8_t selected) __smallc
 ; The 14 tools as the ST game's buttons, 24x14 pixels, in two rows of seven: icon i is at cell column 3 * (i mod 7) and row
 ; 1 + 2 * (i div 7), in a 24x16 area (a blank line above and below); the selected one has a yellow frame (colour 14).
+; Screen drawing from this point is placed in the resident low code_driver section.
+        PUBLIC  mp_screen_end
+mp_screen_end:
+        SECTION code_driver
         PUBLIC  _plat_icons
 _plat_icons:
         ld      hl,2
@@ -860,6 +1148,7 @@ dc_empty:
         ret
 
 ; Read a cell back from the screen: hl = its address; the 32 bytes go to mp_pix.
+        SECTION code_driver
 mp_fetch:
         ld      a,SCRPAGE
         out     (HMPR),a
@@ -944,6 +1233,7 @@ ta_next:
 
 ; One cell of a bar: the line in mp_bp, four bytes, six times between two black lines, drawn at the cell (column mp_tc, row mp_tc + 1),
 ; and mp_tc moves on a cell.
+        SECTION code_driver
 mp_bar_cell:
         ld      hl,mp_pix               ; black, six lines of the pattern, black
         xor     a
@@ -990,6 +1280,7 @@ br_copy:
 ; void plat_bar(uint8_t col, uint8_t row, uint8_t cells, uint8_t fill, uint8_t attr) __smallc
 ; A horizontal bar chart `cells` cells wide: the first `fill` pixels (0 to 8 * cells) in the ink of the attribute, the rest in its
 ; paper; each cell is six lines tall with black above and below.
+        SECTION code_driver
         PUBLIC  _plat_bar
 _plat_bar:
         ld      hl,2
@@ -1082,6 +1373,7 @@ br_r:
 
 ; void mp_tile1(uint8_t col, uint8_t row, const uint8_t *art, uint8_t attr, uint8_t inverse) __smallc
 ; 8 bytes of 1 bit art in the colours of an attribute (the icons); inverse swaps them.
+        SECTION code_driver
         PUBLIC  _mp_tile1
 _mp_tile1:
         ld      hl,2
@@ -1198,6 +1490,7 @@ mp_puts_next:
         jr      mp_puts_next
 
 ; void plat_init(void): screen mode 4 with its pages at SCRPAGE, and the palette; the game calls this again for a new city.
+        SECTION code_driver
         PUBLIC  _plat_init
 _plat_init:
         di
@@ -1219,15 +1512,11 @@ _plat_init:
         ld      a,(mp_dpage)
         out     (HMPR),a
 mp_up_done:
-        ld      hl,mp_space             ; the nibble tables are on a 256 byte boundary: the first one in mp_space
+        ld      hl,mp_space             ; pixel, overlay and minimap lookup tables
         ld      a,l
-        or      a
-        jr      z,mp_aligned
-        inc     h
-mp_aligned:
+        ld      (mp_tablo),a
         ld      a,h
         ld      (mp_tabhi),a
-        ld      l,0
         ld      de,32
         add     hl,de
         ex      de,hl
@@ -1267,6 +1556,7 @@ mp_clut:
 
 ; void plat_clear_map(void): the screen below the status panel's first six rows (from line 48) to colour 0, and the cache: what
 ; a mini map covers.  The panel, and the icons, stay.
+        SECTION code_driver
         PUBLIC  _plat_clear_map
 _plat_clear_map:
         ld      a,SCRPAGE
@@ -1309,6 +1599,7 @@ mp_clear_cache:
 ; two lines), the picture 192x192 at the left of the screen.  What a colour is depends on the view: mm_tabs has the ST palette entry
 ; of each of the eight for each view; it goes to the aligned page (64 up) as a byte of both nibbles.  For a density (the views in
 ; mm_densities) a tile with no level shows its colour from base, the city's row, through mm_dim (the aligned page, 72 up).
+        SECTION code_driver
         PUBLIC  _plat_put_minirow
         defc    mm_densities = $9E      ; views 2, 3, 4, 5 and 8, a bit each (view - 1)
 _plat_put_minirow:
@@ -1354,9 +1645,12 @@ mm_dd:
         ld      d,0
         ld      hl,mm_tabs
         add     hl,de                   ; this view's eight palette entries
+        ld      a,(mp_tablo)
+        add     a,64
+        ld      e,a
         ld      a,(mp_tabhi)
+        adc     a,0
         ld      d,a
-        ld      e,64
         push    bc
         ld      b,8
 mm_t:
@@ -1411,7 +1705,11 @@ mm_lvl:
         or      64
 mm_look:
         ld      l,a
+        ld      a,(mp_tablo)
+        add     a,l
+        ld      l,a
         ld      a,(mp_tabhi)
+        adc     a,0
         ld      h,a
         ld      a,(hl)
         ld      (de),a
@@ -1497,6 +1795,139 @@ mm_dim:
 _plat_exit:
         ret
 
+; The line pieces of the boxes' frames, pipes two pixels thick with rounded corners: 1 top left, 2 top right, 3 bottom left, 4 bottom
+; right, 5 across, 6 down
+        SECTION code_driver
+mp_box:
+        defb    $00,$00,$00,$0F,$1F,$18,$18,$18
+        defb    $00,$00,$00,$F0,$F8,$18,$18,$18
+        defb    $18,$18,$18,$1F,$0F,$00,$00,$00
+        defb    $18,$18,$18,$F8,$F0,$00,$00,$00
+        defb    $00,$00,$00,$FF,$FF,$00,$00,$00
+        defb    $18,$18,$18,$18,$18,$18,$18,$18
+
+; The overlay's nibble table: 16 entries of two bytes, a nibble's four pixels as a byte pair, a set pixel white (palette entry 15), the
+; others left as they are.  It is copied to the second half of the tables at mp_space, whose first half is made for the text's
+; colours by mp_mktab (the same, with the ink and paper of the attribute).
+mp_ov16:
+        defb    $00,$00
+        defb    $00,$0F
+        defb    $00,$F0
+        defb    $00,$FF
+        defb    $0F,$00
+        defb    $0F,$0F
+        defb    $0F,$F0
+        defb    $0F,$FF
+        defb    $F0,$00
+        defb    $F0,$0F
+        defb    $F0,$F0
+        defb    $F0,$FF
+        defb    $FF,$00
+        defb    $FF,$0F
+        defb    $FF,$F0
+        defb    $FF,$FF
+
+        SECTION code_user
+; Move the city by one cell while the pointer rests on a viewport edge.
+; The top trigger is map_row (below the SAM status panel), not screen row 0.
+; Return HL=1 if the view moved, otherwise HL=0. Called every fourth UI frame.
+        SECTION code_compiler
+_plat_mouse_edge_scroll:
+        ; The C caller invokes this only when the pointer is inside the city
+        ; viewport (not the panel or minimap).
+        ld      a,(_frame)
+        and     3
+        jp      nz,sm_edge_no
+        ld      a,(_plat_mouse_x)
+        rrca
+        rrca
+        rrca
+        and     31
+        ld      b,a                     ; screen cell column
+        ld      a,(_plat_mouse_y)
+        rrca
+        rrca
+        rrca
+        and     31
+        ld      c,a                     ; screen cell row
+        ld      a,(_map_row)
+        ld      d,a
+
+        ld      a,b
+        or      a
+        jr      nz,sm_edge_right
+        ld      a,(_cur_x)
+        or      a
+        jr      z,sm_edge_up
+        dec     a
+        ld      (_cur_x),a
+        ld      a,(_origin_x)
+        dec     a
+        ld      (_origin_x),a
+        jr      sm_edge_yes
+sm_edge_right:
+        ld      a,(_view_w)
+        dec     a
+        cp      b
+        jr      nz,sm_edge_up
+        ld      a,(_cur_x)
+        cp      MAP_W-1
+        jr      z,sm_edge_up
+        inc     a
+        ld      (_cur_x),a
+        ld      a,(_origin_x)
+        inc     a
+        ld      (_origin_x),a
+        jr      sm_edge_yes
+sm_edge_up:
+        ld      a,c
+        cp      d
+        jr      nz,sm_edge_down
+        ld      a,(_cur_y)
+        or      a
+        jr      z,sm_edge_down
+        dec     a
+        ld      (_cur_y),a
+        ld      a,(_origin_y)
+        dec     a
+        ld      (_origin_y),a
+        jr      sm_edge_yes
+sm_edge_down:
+        ld      a,(_view_h)
+        add     a,d
+        dec     a
+        cp      c
+        jr      nz,sm_edge_no
+        ld      a,(_cur_y)
+        cp      MAP_H-1
+        jr      z,sm_edge_no
+        inc     a
+        ld      (_cur_y),a
+        ld      a,(_origin_y)
+        inc     a
+        ld      (_origin_y),a
+sm_edge_yes:
+        ld      hl,1
+        ret
+sm_edge_no:
+        ld      hl,0
+        ret
+
+        SECTION code_user
+
+; End of all code and state that may be used while HMPR maps the screen.
+        SECTION code_driver
+        PUBLIC  _sam_page_data
+        PUBLIC  _plat_page_data
+_sam_page_data:
+_plat_page_data:
+        ld      a,(mp_dpage)
+        out     (HMPR),a
+        ret
+
+        SECTION code_user
+
+; Keyboard polling runs between frames, with the data page mapped at $8000.
 ; uint8_t plat_key(void): the key pressed since the last call, or 0, in the game's codes (letters lower case).  The SAM's matrix is
 ; read as the ZX Spectrum's is: a row for each bit of the port's high byte that is low, its keys in bits 0-4 of port $FE; the
 ; function keys and the like are in bits 5-7 of port $F9; the shift key and the cursor keys are on their own rows.
@@ -1611,72 +2042,6 @@ mp_ktab:
         defb    13,'l','k','j','h',';',':',0
         defb    ' ',0,'m','n','b',',','.',0
         defb    0,11,10,8,9,0,0,0
-
-; The line pieces of the boxes' frames, pipes two pixels thick with rounded corners: 1 top left, 2 top right, 3 bottom left, 4 bottom
-; right, 5 across, 6 down
-mp_box:
-        defb    $00,$00,$00,$0F,$1F,$18,$18,$18
-        defb    $00,$00,$00,$F0,$F8,$18,$18,$18
-        defb    $18,$18,$18,$1F,$0F,$00,$00,$00
-        defb    $18,$18,$18,$F8,$F0,$00,$00,$00
-        defb    $00,$00,$00,$FF,$FF,$00,$00,$00
-        defb    $18,$18,$18,$18,$18,$18,$18,$18
-
-; The overlay's nibble table: 16 entries of two bytes, a nibble's four pixels as a byte pair, a set pixel white (palette entry 15), the
-; others left as they are.  It is copied to the second half of the aligned tables at mp_space, whose first half is made for the text's
-; colours by mp_mktab (the same, with the ink and paper of the attribute).
-mp_ov16:
-        defb    $00,$00
-        defb    $00,$0F
-        defb    $00,$F0
-        defb    $00,$FF
-        defb    $0F,$00
-        defb    $0F,$0F
-        defb    $0F,$F0
-        defb    $0F,$FF
-        defb    $F0,$00
-        defb    $F0,$0F
-        defb    $F0,$F0
-        defb    $F0,$FF
-        defb    $FF,$00
-        defb    $FF,$0F
-        defb    $FF,$F0
-        defb    $FF,$FF
-
-; The placer's variables: in the code section so that they stay in the low RAM
-mp_space: defs  256 + 96                ; room for 80 bytes of tables on a 256 byte boundary: the text's and the overlay's, and the mini map's two
-mp_tabhi: defb  0                       ; the boundary's high byte
-mp_pix:   defs  32                      ; the picture on its way to the screen
-mp_ibuf:  defs  16 * 12                 ; a tool icon's button on its way to the screen
-mp_isel:  defb  0                       ; plat_icons: the selected tool, and the icon being drawn
-mp_ii:    defb  0
-mp_amask: defw  $3FFF                  ; plat_afford: the tools there is money for, what changed since the icons were drawn,
-mp_adiff: defw  0                       ; and plat_icons' own counters
-mp_adw:   defw  0
-mp_dtmp:  defb  0
-mp_drc:   defw  0                       ; plat_demand: the row and the column, the level, the cell
-mp_dlev:  defb  0
-mp_dk:    defb  0
-mp_tn:    defw  0                       ; plat_text_attr: the count; plat_bar: the fill (low byte), the cells (high)
-mp_tc:    defw  0                       ; the column and the row of the cell
-mp_bn:    defw  0
-mp_bp:    defs  4                       ; plat_bar: a line of the cell
-mp_ilast: defb  $FF                    ; the tool whose icon is framed on the screen, or $FF if the icons are not drawn
-mm_buf:   defs  96                      ; the mini map's row on its way to the screen
-mm_ty:    defb  0
-mm_cnt:   defb  0
-mm_dens:  defb  0
-mm_bptr:  defw  0
-mp_gl:    defs  8
-mp_pr:    defs  4                       ; the four pairs of pixels of the current attribute
-mp_pal:   defs  24                      ; the palette, then the palette entries of the attribute's colours
-mp_attrs: defs  8
-mp_cattr: defb  $FF                     ; the attribute mp_t16 is made for
-mp_dpage: defb  0                       ; HMPR while the game runs, and for its baked pictures
-mp_tpage: defb  0
-mp_up:    defb  0                       ; plat_init has been called
-mp_held:  defb  0                       ; the code of the key that is down, or 0
-mp_event: defb  0                       ; the key pressed since plat_key last looked, or 0
 
 ; What each map cell shows (32 x 18 words): in the data, so used only with it paged in
         SECTION bss_user

@@ -41,7 +41,7 @@ AQPLUS_PLATFORM = target/aqplus/plat_aqplus.c target/aqplus/plat_aqplus.asm
 ZX_PLATFORM = target/zx/plat_zx.asm
 MULTI8_PLATFORM = target/multi8/plat_multi8.c target/multi8/plat_multi8.asm target/common/plat_charts.c target/common/plat_icons.c
 PC88_PLATFORM = target/pc88/plat_pc88.c target/pc88/plat_pc88.asm target/pc88/plat_pc88_files.asm target/common/plat_charts.c target/common/plat_icons.c
-SAM_PLATFORM_NOFILES = target/sam/plat_sam.c target/sam/plat_sam.asm target/common/minimap_key.c
+SAM_PLATFORM_NOFILES = target/sam/plat_sam.c target/sam/plat_sam.asm target/sam/sam_mouse.asm target/common/minimap_key.c
 Z88_PLATFORM = target/z88/plat_z88.c target/z88/plat_z88.asm target/z88/fgets_cons.asm
 
 
@@ -185,19 +185,22 @@ $(PC88): $(DEPS) build/common/tiles_640x200_3bpp.bin
 # where the placer pages them in a picture at a time (the screen is paged over the data window to draw).  The disk image is that
 # one file, padded to a block boundary, so the loader's pages follow each other.
 SAM_TEST =              # (-DSOUND_TEST -Ca-DSOUND_TEST: the build of test/sam/sound_check.py, which calls the sound hooks itself)
-SAM_BSS = 0xA200        # the code and the placer's variables are in the low 32 KB; the rest of the image may run on into the high window, and the
-                        # uninitialised data starts after it, where the map (in the data) begins in the upper 16 KB page: see the check below
-
 $(SAM): $(DEPS) build/sam/tiles.bin build/sam/anim.inc
 	@mkdir -p $(@D)
 	$(ZCC) +sam -subtype=allram $(COMMON) -pragma-include:target/sam/zpragma.inc \
-	    -Itarget/sam -DTARGET_SAM -Ca-DTARGET_SAM -Ca-D__crt_org_bss=$(SAM_BSS) -Ca-DFMT_WIDTH=32 -Ca-DHAVE_MINIMAP_SQUARE -Ca-DHAVE_SOUND -Ca-DAY_SAA -Ca-DAY_ISR $(SAM_TEST) target/sam/plat_sam_files.asm $(GAME) $(ENTROPY) $(MENU) target/sam/plat_sound.asm target/common/ay_hooks.asm target/common/ay_sfx.asm $(FIELDS) $(MMNATIVE) $(LINEEDIT) $(SAM_PLATFORM_NOFILES) -o $(@D)/simcity.bin
-	@size=`wc -c < $(@D)/simcity.bin`; echo "sam image: $$size bytes (the uninitialised data starts at $$(( $(SAM_BSS) )))"; \
-	    [ $$size -le $$(( $(SAM_BSS) )) ] || { echo "the image runs into the uninitialised data"; rm -f $@; exit 1; }
-	@# the placer's variables must be in the low 32 KB: the screen is paged over the high window while it draws
+	    -pragma-define:MMAP=-1 -Itarget/sam -Ca-Itarget/sam -DTARGET_SAM -DHAVE_MOUSE -DHAVE_MOUSE_POINTER -Ca-DTARGET_SAM -Ca-DSAM_SIMULATION_HIGH -Ca-DFMT_WIDTH=32 -Ca-DHAVE_MINIMAP_SQUARE -Ca-DHAVE_SOUND -Ca-DAY_SAA -Ca-DAY_ISR $(SAM_TEST) target/sam/plat_sam_files.asm $(GAME) $(ENTROPY) $(MENU) target/sam/plat_sound.asm target/common/ay_hooks.asm target/common/ay_sfx.asm $(FIELDS) $(MMNATIVE) $(LINEEDIT) $(SAM_PLATFORM_NOFILES) -o $(@D)/simcity.bin
+	@size=`wc -c < $(@D)/simcity.bin`; echo "sam image: $$size bytes (BSS trimmed from the disk image)"; \
+	    [ $$size -le 65536 ] || { echo "the initialized image exceeds the 64 KB program window"; rm -f $@; exit 1; }
+	@# Screen-dependent routines must stay below $8000; mp_screen_end marks the start of the low code_driver section.
+	@code=`sed -n 's/^mp_screen_end *= \$$\([0-9A-Fa-f]*\).*/\1/p' $(@D)/simcity.map`; \
+	    [ -n "$$code" ] && [ $$(( 0x$$code )) -le 32768 ] || { echo "screen-dependent code/data crosses $$8000 (boundary at $$code)"; rm -f $@; exit 1; }
 	@v=`sed -n 's/^mp_pix *= \$$\([0-9A-Fa-f]*\).*/\1/p' $(@D)/simcity.map`; \
 	    [ -n "$$v" ] && [ $$(( 0x$$v )) -lt 32768 ] || { echo "the placer's variables are not below $$8000 (mp_pix at $$v)"; rm -f $@; exit 1; }
-	python3 -c "import sys; d = open('$(@D)/simcity.bin', 'rb').read(); d += bytes(65536 - len(d)) + open('build/sam/tiles.bin', 'rb').read(); open('$(@D)/simcity.all', 'wb').write(d)"
+	@v=`sed -n 's/^mp_space *= \$$\([0-9A-Fa-f]*\).*/\1/p' $(@D)/simcity.map`; \
+	    [ -n "$$v" ] && [ $$(( 0x$$v + 80 )) -le 32768 ] || { echo "the SAM lookup buffer is not in resident low RAM (mp_space at $$v)"; rm -f $@; exit 1; }
+	@v=`sed -n 's/^mp_dpage *= \$$\([0-9A-Fa-f]*\).*/\1/p' $(@D)/simcity.map`; \
+	    [ -n "$$v" ] && [ $$(( 0x$$v )) -lt 32768 ] || { echo "the screen restore state is not below $$8000 (mp_dpage at $$v)"; rm -f $@; exit 1; }
+	python3 -c "from pathlib import Path; low=Path('$(@D)/simcity.bin').read_bytes(); high=Path('$(@D)/simcity_code_simulation.bin').read_bytes(); assert len(low) <= 32768, f'low RAM image is {len(low)} bytes (limit 32768)'; assert len(high) <= 32768, f'high RAM image is {len(high)} bytes (limit 32768)'; Path('$(@D)/simcity.all').write_bytes(low + bytes(32768-len(low)) + high + bytes(32768-len(high)) + Path('build/sam/tiles.bin').read_bytes())"
 	z88dk-appmake +mgt -b $(@D)/simcity.all --org 0 --exec --default-dosfile $$ZCCCFG/../target/sam/classic/samdos2.bin -o $@
 
 # The ZX Spectrum Next: Layer 2 (256x192, a byte a pixel), the Atari ST's art in its 16 colours, as the SAM Coupe.  The program is linked at

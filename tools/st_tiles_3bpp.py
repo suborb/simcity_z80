@@ -127,29 +127,43 @@ def st_piece(p):
     return BLANK
 
 
-# The animated tiles.  Micropolis keeps the frames of an animation at the end of its table (832 to 959): four, or for the airport's radar eight,
+# The animated tiles.  Micropolis keeps the building animation frames at the end of its table (832 to 959): four, or for the airport's radar eight,
 # pictures that differ from the tile they animate by a few pixels (the smoke over a chimney, the fountain's spray, the radar's sweep, the nuclear plant's
 # swirl).  base tile: (its first frame, the number of frames).  Found by comparing the pixels of the three tile sets (ST, Amiga 512K and 1 Meg:
 # the same numbers in all); the engine has no animation of its own (only the unpowered flash and the busy roads) so a platform shows the frame
-# itself.  The stadium's game (932 to 947) and the others in the table are not used.
-ANIMATED = {711: (832, 8),                      # the airport's radar
+# itself.  The stadium's game (932 to 947) and the other building frames in the table are not used.
+# An entry is either (first, count) for consecutive frames, or an explicit list of frame tiles.  Alternate the two patterned water
+# frames so the power-of-two frame clock can animate them without showing the solid tile or a shore tile.
+ANIMATED = {2: [2, 4, 2, 4],                    # open water
+            711: (832, 8),                      # the airport's radar
             40: (840, 4),                       # the park's fountain
             649: (892, 4), 650: (896, 4), 686: (908, 4), 689: (912, 4),         # the smoke of the industrial zones' chimneys
             747: (916, 4), 748: (920, 4), 751: (924, 4), 752: (928, 4),         # the coal power plant's
             820: (952, 4)}                      # the nuclear plant's swirl
 ANIM_SHIFT = 4                                  # a frame is 16 ticks of the game's frame counter (V_view_tick), which the platforms use
+WATER_SHIFT = -1                                # a generated water frame: shift tile 2 when the source's tile 4 duplicates it
+
+
+def shift_water(rows):
+    """Move the water's dark ripples one pixel right, keeping the source palette and water colours."""
+    return [row[-1:] + row[:-1] for row in rows]
 
 
 def animation(pictures):
     """For our pictures (their Micropolis tiles): the frame tiles to add after them, a byte a picture (0, or the number of its animation, from 1) and the animations
     as (the number of the first frame's picture, the number of frames)."""
     extra, entries, amap = [], [], bytearray(len(pictures))
-    for base, (first, n) in sorted(ANIMATED.items()):
+    for base, frames in sorted(ANIMATED.items()):
         users = [i for i, t in enumerate(pictures) if t == base]
         if not users:
             continue
+        if isinstance(frames, tuple):
+            first, n = frames
+            frames = range(first, first + n)
+        else:
+            n = len(frames)
         entries.append((len(pictures) + len(extra), n))
-        extra += range(first, first + n)
+        extra += frames
         for i in users:
             amap[i] = len(entries)
     return extra, bytes(amap), entries
@@ -405,6 +419,8 @@ def main():
     baked = [planes(to8(pixels(table[n * PIC:n * PIC + PIC]))) for n in pictures]
     if a.numbering == 'ours':                       # (the SAM and the Next also have the animations' frames, after the pictures)
         extra, amap, entries = animation(pictures)
+        if table[2 * PICSIZE:3 * PICSIZE] == table[4 * PICSIZE:5 * PICSIZE]:
+            extra = [WATER_SHIFT if n == 4 else n for n in extra]
         framed = pictures + extra
     else:
         extra, amap, entries, framed = [], b'', [], pictures
@@ -416,7 +432,10 @@ def main():
         print(f'{len(baked)} pictures, {len(baked) * 5} bytes of mini map pictures -> {a.mini}')
     if a.sam:
         icons = open(a.icons, 'rb').read() if a.icons else b''
-        data = sam_palette(palette, bits) + attr_colours(palette, bits) + icons + b''.join(sam_picture(pixels(table[n * PIC:n * PIC + PIC])) for n in framed)
+        def sam_frame(n):
+            rows = pixels(table[2 * PIC:3 * PIC]) if n == WATER_SHIFT else pixels(table[n * PIC:n * PIC + PIC])
+            return sam_picture(shift_water(rows) if n == WATER_SHIFT else rows)
+        data = sam_palette(palette, bits) + attr_colours(palette, bits) + icons + b''.join(sam_frame(n) for n in framed)
         open(a.sam, 'wb').write(data)
         print(f'{len(framed)} pictures, {len(icons)} bytes of icons, a 16 byte palette, 8 attribute colours and {len(framed) * 32} bytes of mode 4 pictures -> {a.sam}')
         if a.sam_anim:

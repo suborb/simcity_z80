@@ -7,6 +7,31 @@
 #include <stdint.h>
 #include "plat_config.h"       /* the platform's own: what it can do, and which features it has */
 
+/* Targets that bank application data expose the selected data page through
+   this hook. Flat-memory targets compile it away. */
+#ifdef TARGET_SAM
+extern void plat_page_data(void);
+#else
+#define plat_page_data() ((void)0)
+#endif
+
+/* Optional relative mouse device exposed to the UI as absolute screen pixels.
+   Bit 0 of plat_mouse_input() means motion, bit 1 a new left press, and bit 2
+   that the left button is held.  Targets own the device protocol and state. */
+#ifdef HAVE_MOUSE
+extern volatile int16_t plat_mouse_x, plat_mouse_y;
+extern volatile uint8_t plat_mouse_buttons, plat_mouse_present;
+extern uint8_t plat_mouse_input(void);
+extern void plat_mouse_init(void);
+extern uint8_t plat_mouse_icon_hit(void);
+/* Return nonzero when the pointer is at a viewport edge and the view moved. */
+extern uint8_t plat_mouse_edge_scroll(void);
+#endif
+#ifdef HAVE_MOUSE_POINTER
+extern void plat_put_black_overlay(uint8_t col, uint8_t row, const uint8_t *art);
+extern void plat_mouse_pointer_erase(void);
+extern void plat_mouse_pointer_refresh(void);
+#endif
 /* Platforms with budget or evaluation screens state how many text rows their modal screens occupy.  The
    shared layouts are designed on an 8-row grid and spread over MODAL_ROWS, so the Z88 stays compact while
    full-screen targets can use their height. */
