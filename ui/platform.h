@@ -27,6 +27,15 @@ extern uint8_t plat_mouse_icon_hit(void);
 /* Return nonzero when the pointer is at a viewport edge and the view moved. */
 extern uint8_t plat_mouse_edge_scroll(void);
 #endif
+#ifdef HAVE_MOUSE_TOGGLE
+/* A mouse that cannot be detected: the game options switch it on (plat_mouse_present) and off. */
+extern void plat_mouse_toggle(void);
+#endif
+#ifdef HAVE_MOUSE_SPRITE
+/* A pointer drawn by the hardware: positioned once a frame, and hidden while a menu is up (the keys use it). */
+extern void plat_mouse_pointer_refresh(void);
+extern void plat_mouse_pointer_hide(void);
+#endif
 #ifdef HAVE_MOUSE_POINTER
 extern void plat_put_black_overlay(uint8_t col, uint8_t row, const uint8_t *art);
 extern void plat_mouse_pointer_erase(void);

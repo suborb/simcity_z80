@@ -210,8 +210,8 @@ $(SAM): $(DEPS) build/sam/tiles.bin build/sam/anim.inc
 # cooperative switch, the map drawing's tables) and in $4000 to $7FFF, where the NEX loader puts bank 5 and the game runs from; the simulation's code is in a bank of
 # its own (BANK_6, linked at $4000, mapped over bank 5 while the simulation runs: engine/sections.asm); the data starts at $8000 (the image is padded to it:
 # target/zxn/zxn_pad.asm), the stack is above it and the big arrays, the map and the minimaps, from ZXN_BSS.
-ZXN_DATA = 0x8A00
-ZXN_BSS = 0x9A00
+ZXN_DATA = 0x9300
+ZXN_BSS = 0x9C00
 # The map is 120x100 (the engine is made for widths of 96 and 120: engine/mapsize.inc) and the title screen has the eight scenarios.  Its mini map keeps the 96x96
 # square viewport and sidebar; cursor keys pan over the extra 24 columns and 4 rows.  ZXN_MAP=96x96 builds the original's size, with no scenarios.
 ZXN_MAP ?= 120x100
@@ -228,7 +228,7 @@ ZXN_ENTROPY = $(ENTROPY)       # (target/zxn/entropy_test.asm: the build test/zx
 ZXN_ASM = target/zxn/plat_zxn.asm target/zxn/plat_sound.asm target/zxn/zxn_boot.asm target/zxn/zxn_data.asm
 # (the sound: the interrupt plays it, and the simulation's sound hooks start it, so it is in the lowest 16 KB: sections of code_home)
 ZXN_LOW = target/common/ay_hooks.asm target/common/ay_sfx.asm
-ZXN_PLATFORM = target/zxn/plat_zxn.c target/common/minimap_key.c
+ZXN_PLATFORM = target/zxn/plat_zxn.c target/zxn/mouse_zxn.c target/common/minimap_key.c
 ZXN_PLATFORM += $(ZXN_SCENARIO_C)
 
 # (the build's options are in a file that changes with them, so that the NEX is made again when they do)

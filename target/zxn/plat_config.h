@@ -42,6 +42,9 @@
 #ifndef ZXN_NO_SCROLL
 #define HAVE_SCROLL             /* a scroll moves the map's pixels by the DMA (plat_scroll) and draws only the cells that come into view */
 #endif
+#define HAVE_MOUSE              /* a Kempston mouse (target/zxn/mouse_zxn.c), which cannot be detected: the game options switch it on and off */
+#define HAVE_MOUSE_TOGGLE
+#define HAVE_MOUSE_SPRITE       /* the pointer is a hardware sprite: nothing to draw under it or to put back */
 #define PLAT_FIXED_COLS 32
 #define PLAT_FIXED_ROWS 24
 #define MAX_VIEW_W 32

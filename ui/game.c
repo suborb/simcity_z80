@@ -144,6 +144,7 @@ static uint8_t panel_w, panel_h;
 #define MENU_AUTOBUDGET_TOGGLE 0xC9
 #define MENU_DISASTER        0xCA    /* + 0..5 */
 #define MENU_SOUND_TOGGLE    0xCB
+#define MENU_MOUSE_TOGGLE    0xCC
 #define MENU_SAVE            0xD1
 #define MENU_LOAD            0xD2
 #define MENU_TOGGLE          0x10    /* stay on this options page after the action */
@@ -183,6 +184,9 @@ static struct menu_item game_options[] = {
 #endif
 #ifdef HAVE_SOUND
     { "SOUND: ON", MENU_SOUND_TOGGLE | MENU_TOGGLE },
+#endif
+#ifdef HAVE_MOUSE_TOGGLE
+    { "MOUSE: OFF", MENU_MOUSE_TOGGLE | MENU_TOGGLE },
 #endif
     { "BACK", 0 }
 };
@@ -231,6 +235,9 @@ static void update_option_labels(void)
     build_options[0].text = power_nuclear ? "POWER: NUCLEAR" : "POWER: COAL";
     build_options[1].text = V_auto_bulldoze ? "AUTO BULLDOZE: ON" : "AUTO BULLDOZE: OFF";
 #endif
+#ifdef HAVE_MOUSE_TOGGLE
+    game_options[MENU_COUNT(game_options) - 2].text = plat_mouse_present ? "MOUSE: ON" : "MOUSE: OFF";     /* (the one before BACK) */
+#endif
     disaster_menu[6].text = V_disaster_reset ? "RANDOM DISASTERS: OFF" : "RANDOM DISASTERS: ON";
 }
 
@@ -240,6 +247,9 @@ static uint8_t popup_menu(void)
 
 #ifdef HAVE_MOUSE_POINTER
     plat_mouse_pointer_erase();
+#endif
+#ifdef HAVE_MOUSE_SPRITE
+    plat_mouse_pointer_hide();
 #endif
 
     while (choice) {
@@ -260,7 +270,7 @@ static uint8_t popup_menu(void)
         }
         /* A setting changes in place.  Redraw its page so the value column
            immediately describes the new state, rather than dismissing it. */
-        if (choice >= (MENU_PAUSE | MENU_TOGGLE) && choice <= (MENU_SOUND_TOGGLE | MENU_TOGGLE)) {
+        if (choice >= (MENU_PAUSE | MENU_TOGGLE) && choice <= (MENU_MOUSE_TOGGLE | MENU_TOGGLE)) {
             handle_key((uint8_t)(choice & ~MENU_TOGGLE));
             choice = page;
         }
@@ -1755,6 +1765,9 @@ static void handle_key(uint8_t k)
     case CMD_SOUND_OFF:        sound_enabled = 0; break;
 #endif
 #endif
+#ifdef HAVE_MOUSE_TOGGLE
+    case MENU_MOUSE_TOGGLE:    plat_mouse_toggle(); break;
+#endif
 #ifdef HAVE_POPUP_MENU
     case MENU_AUTOBUDGET_TOGGLE: V_auto_budget = !V_auto_budget; break;
 #endif
@@ -2105,7 +2118,7 @@ static void play_city(void)
         }
 #endif
         plat_page_data();
-#ifdef HAVE_MOUSE_POINTER
+#if defined(HAVE_MOUSE_POINTER) || defined(HAVE_MOUSE_SPRITE)
         plat_mouse_pointer_refresh();
 #endif
         plat_flush();
