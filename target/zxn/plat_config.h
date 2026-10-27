@@ -18,9 +18,16 @@
 #define MODAL_COLS 32          /* a 32 column display: the budget and evaluation screens use 32 columns of the 24 rows */
 #define MODAL_ROWS 24
 #define FMT_WIDTH 32            /* a row of a table screen: the display's width (and -Ca-DFMT_WIDTH=32: the Makefile) */
+#if !defined(MAP_H) || MAP_H <= 96
 #define HAVE_MINIMAP
 #define HAVE_MINIMAP_NATIVE    /* the whole city in colour (plat_put_minirow) */
 #define HAVE_MINIMAP_SQUARE    /* ... every tile row, 2x2 pixels a tile, 192x192 with a sidebar */
+#else
+#define HAVE_MINIMAP
+#define HAVE_MINIMAP_NATIVE
+#define HAVE_MINIMAP_SQUARE
+#define HAVE_MINIMAP_SCROLL    /* show a 96x96 tile window of the larger city */
+#endif
 #define HAVE_CLEAR_MAP          /* a mini map clears the screen below the panel only (plat_clear_map) */
 #define HAVE_DEMAND_BARS        /* the R, C and I demand as coloured bar charts (plat_demand) */
 #define HAVE_TEXT_COLOUR        /* the budget and evaluation screens coloured, with bars (plat_text_attr, plat_bar) */

@@ -12,3 +12,4 @@ sim.sna
 # other releases kept here for comparison; copyrighted, never commit
 *.dsk
 *.zip
+*.adf

@@ -8,6 +8,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include "platform.h"
+#include "engine.h"
 
 extern void zxn_tile(uint8_t col, uint8_t row, uint16_t pic, uint8_t inverse);
 extern void zxn_glyph(uint8_t col, uint8_t row, const uint8_t *art, uint8_t ink, uint8_t paper);
@@ -48,8 +49,49 @@ extern const uint8_t zxn_head[];               /* 208 palette entries (2 bytes e
 #define ICON_BYTES  (ICON_W * ICON_H)
 #define ICON_PALETTE 144                        /* (palette entries 144 to 207) */
 
+#ifdef HAVE_SCROLL
+static void screen_move(uint16_t dst, uint16_t src, uint16_t len);
+#endif
+
 static uint16_t cache[COLS * MAP_ROWS];         /* what each map cell shows: its art address xor the inverse flag, or $FFFF */
 static uint16_t clock_count;
+#ifdef HAVE_MINIMAP_SCROLL
+static uint8_t minimap_scroll_x;
+static uint8_t minimap_pan_edge;              /* 1 = left tile column, 2 = right tile column */
+
+void plat_minimap_scroll(uint8_t x)
+{
+    minimap_scroll_x = x;
+    minimap_pan_edge = 0;
+}
+
+#ifdef HAVE_SCROLL
+/* Shift the 192x192-pixel mini map by one tile.  The sidebar is outside the
+   copied rectangle; draw_minimap() repaints the exposed strip afterwards. */
+void plat_minimap_pan(int8_t dx, int8_t dy, uint8_t x)
+{
+    uint16_t y;
+
+    minimap_scroll_x = x;
+    minimap_pan_edge = dx < 0 ? 1 : dx > 0 ? 2 : 0;
+    if (dx > 0) {
+        for (y = 0; y < 192; ++y)
+            screen_move((uint16_t)y * 256, (uint16_t)y * 256 + 2, 190);
+    } else if (dx < 0) {
+        for (y = 0; y < 192; ++y)
+            screen_move((uint16_t)y * 256 + 2, (uint16_t)y * 256, 190);
+    }
+
+    if (dy > 0) {
+        for (y = 0; y < 190; ++y)
+            screen_move((uint16_t)y * 256, (uint16_t)(y + 2) * 256, 192);
+    } else if (dy < 0) {
+        for (y = 190; y != 0; --y)
+            screen_move((uint16_t)(y + 1) * 256, (uint16_t)(y - 1) * 256, 192);
+    }
+}
+#endif
+#endif
 
 /* ---- the cache ------------------------------------------------------------------------------------------------------------- */
 static uint16_t *entry(uint8_t col, uint8_t row)
@@ -261,6 +303,10 @@ void plat_clear_map(void)
 void plat_init(void)
 {
     zxn_reg(0x07, ZXN_SPEED);
+    /* The sound effects use AY channel C: ACB stereo centers C in both speakers (ABC puts it on the right).
+       Preserve the other Peripheral 3 bits set by the machine or loader. */
+    zxn_out(0x243B, 0x08);
+    zxn_reg(0x08, (uint8_t)(zxn_in(0x253B) | 0x20));
     zxn_reg(0xC0, 0);                            /* interrupts as a Spectrum's: mode 1 (not the Next's own mode 2 table) */
     zxn_reg(0xC4, 1);                            /* the frame interrupt of the ULA */
     snd_init();
@@ -290,6 +336,13 @@ void plat_idle(void)
         snd_wait();
 }
 void plat_flush(void) {}
+
+#ifdef ZXN_SCENARIOS
+void plat_scenario_preview_row(uint8_t y, uint8_t x, const uint8_t *pixels)
+{
+    zxn_wr(y, x, pixels, 120);
+}
+#endif
 
 /* ---- a bar of six lines: the demand and the charts, the key's swatches --------------------------------------------------------- */
 /* One cell of a bar: the pixel line `px` (8 pixels) between two black lines, six times, at (col, row). */
@@ -461,22 +514,50 @@ static const uint8_t mm_tabs[8][8] = {
 static const uint8_t mm_dim[8] = { 8, 1, 7, 7, 2, 7, 7, 7 };
 #define MM_DENSITIES 0x9E                       /* views 2, 3, 4, 5 and 8, a bit each (view - 1) */
 
-/* Tile row ty (0..95) of the mini map: 96 colours (0..7, what the builder makes), each a tile of 2x2 pixels, the picture 192x192 at the
-   left of the screen.  For a density a tile with no level shows its colour from base, the city's row, dimmed. */
+/* Tile row ty of the mini map: each tile is 2x2 pixels.  For a density a tile with no level shows its colour from base, the city's row, dimmed. */
 void plat_put_minirow(uint8_t ty, const uint8_t *colours, const uint8_t *base, uint8_t view)
 {
+#ifdef HAVE_MINIMAP_SCROLL
     uint8_t line[192], x, c;
+    uint8_t edge[2];
+#else
+    uint8_t line[MAP_W * 2], x, c;
+#endif
     const uint8_t *tab = mm_tabs[(view - 1) & 7];
     uint8_t dens = (MM_DENSITIES >> ((view - 1) & 7)) & 1;
 
+#ifdef HAVE_MINIMAP_SCROLL
+    if (minimap_pan_edge) {
+        x = minimap_pan_edge == 1 ? 0 : 95;
+        c = colours[x + minimap_scroll_x] & 7;
+        c = c ? tab[c] : dens ? mm_dim[base[x + minimap_scroll_x] & 7] : tab[0];
+        edge[0] = edge[1] = c;
+        x = minimap_pan_edge == 1 ? 0 : 190;
+        zxn_wr((uint8_t)(ty * 2), x, edge, 2);
+        zxn_wr((uint8_t)(ty * 2 + 1), x, edge, 2);
+        return;
+    }
     for (x = 0; x < 96; ++x) {
+        c = colours[x + minimap_scroll_x] & 7;
+        c = c ? tab[c] : dens ? mm_dim[base[x + minimap_scroll_x] & 7] : tab[0];
+        line[x * 2] = c;
+        line[x * 2 + 1] = c;
+    }
+#else
+    for (x = 0; x < MAP_W; ++x) {
         c = colours[x] & 7;
         c = c ? tab[c] : dens ? mm_dim[base[x] & 7] : tab[0];
         line[x * 2] = c;
         line[x * 2 + 1] = c;
     }
+#endif
+#ifdef HAVE_MINIMAP_SCROLL
     zxn_wr((uint8_t)(ty * 2), 0, line, 192);
     zxn_wr((uint8_t)(ty * 2 + 1), 0, line, 192);
+#else
+    zxn_wr((uint8_t)(ty * 2), 0, line, MAP_W * 2);
+    zxn_wr((uint8_t)(ty * 2 + 1), 0, line, MAP_W * 2);
+#endif
 }
 
 /* ---- the keyboard ------------------------------------------------------------------------------------------------------------- */
@@ -586,6 +667,14 @@ uint8_t plat_file_load(const char *name, uint8_t *a, uint16_t alen, uint8_t *b, 
         r = 1;
     else if (read(fd, b, blen) != (int)blen)
         r = 2;
+    else {
+        char extra;
+
+        /* A 96x96 city is a valid prefix of a 120x100 file.  Do not silently
+           accept it (or any other file with the wrong map size). */
+        if (read(fd, &extra, 1) != 0)
+            r = 2;
+    }
     close(fd);
     return r;
 }

@@ -129,7 +129,8 @@ def st_piece(p):
 
 # The animated tiles.  Micropolis keeps the building animation frames at the end of its table (832 to 959): four, or for the airport's radar eight,
 # pictures that differ from the tile they animate by a few pixels (the smoke over a chimney, the fountain's spray, the radar's sweep, the nuclear plant's
-# swirl).  base tile: (its first frame, the number of frames).  Found by comparing the pixels of the three tile sets (ST, Amiga 512K and 1 Meg:
+# swirl).  Water instead alternates the patterned pictures at tiles 2 and 4; tile 3 is solid blue.  In the ST and Amiga 512K sets tiles 2 and 4 are
+# identical, so the alternate frame shifts tile 2's ripples one pixel.  Found by comparing the pixels of the three tile sets (ST, Amiga 512K and 1 Meg:
 # the same numbers in all); the engine has no animation of its own (only the unpowered flash and the busy roads) so a platform shows the frame
 # itself.  The stadium's game (932 to 947) and the other building frames in the table are not used.
 # An entry is either (first, count) for consecutive frames, or an explicit list of frame tiles.  Alternate the two patterned water
@@ -453,7 +454,12 @@ def main():
         art = palette_levels(palette, bits)
         art += [(0, 0, 0)] * (ZXN_TILE_COLOURS - len(art))
         pixel = pixels6 if depth6 else pixels
-        pics = b''.join(bytes(ZXN_TILE_BASE + v for row in pixel(table[n * PICSIZE:n * PICSIZE + PICSIZE]) for v in row) for n in framed)
+        def zxn_frame(n):
+            rows = pixel(table[2 * PICSIZE:3 * PICSIZE]) if n == WATER_SHIFT else pixel(table[n * PICSIZE:n * PICSIZE + PICSIZE])
+            if n == WATER_SHIFT:
+                rows = shift_water(rows)
+            return bytes(ZXN_TILE_BASE + v for row in rows for v in row)
+        pics = b''.join(zxn_frame(n) for n in framed)
         levels = palette_levels(ui, 3) + art + [(7 - r, 7 - g, 7 - b) for r, g, b in art] + icon_levels
         open(os.path.join(a.zxn, 'head.bin'), 'wb').write(zxn_palette(levels) + attr_colours(ui, 3) + dim + amap + b''.join(struct.pack('<HB', first, n - 1) for first, n in entries))
         open(os.path.join(a.zxn, 'icons.bin'), 'wb').write(icons)

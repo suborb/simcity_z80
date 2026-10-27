@@ -1,0 +1,17 @@
+{
+  "title": "San Francisco",
+  "year": 1906,
+  "event": "Earthquake",
+  "description_lines": [
+    "Damage from the earthquake",
+    "was minor compared to that of",
+    "the ensuing fires, which took",
+    "days to control.  1500 people",
+    "died.  Controlling the fires",
+    "should be your initial",
+    "concern.  Then clear the",
+    "rubble and start rebuilding.",
+    "You have 5 years."
+  ],
+  "description": "Damage from the earthquake was minor compared to that of the ensuing fires, which took days to control.  1500 people died.  Controlling the fires should be your initial concern.  Then clear the rubble and start rebuilding. You have 5 years."
+}

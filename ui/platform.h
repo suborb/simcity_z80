@@ -128,6 +128,9 @@ extern uint16_t plat_clock(void);               /* free running counter, for see
 extern uint16_t plat_entropy(void);             /* inexpensive Z80 refresh-register sample */
 extern void     plat_idle(void);                /* called once per frame: may wait */
 extern void     plat_flush(void);               /* end of frame: show what was drawn */
+#ifdef ZXN_SCENARIOS
+extern void     plat_scenario_preview_row(uint8_t y, uint8_t x, const uint8_t *pixels);
+#endif
 
 /* What a platform is and has is set by its plat_config.h, which defines these macros:
      HAVE_TEXT_WINDOW  a text window of its own beside the map (the Z88's OZ window): the map then gets the
@@ -286,7 +289,7 @@ extern void     plat_put_bitmap(uint8_t col, uint8_t row, const uint8_t *art);
    3 sy + 2 of a map 144 lines high, which the Multi 8 centres under the status panel. */
 extern void     plat_put_minirow(uint8_t sy);
 #elif defined(HAVE_MINIMAP_SQUARE)
-/* HAVE_MINIMAP_SQUARE (with HAVE_MINIMAP_NATIVE, a colour display of at least 192x192 pixels): the mini map is the whole city, every tile
+/* HAVE_MINIMAP_SQUARE (with HAVE_MINIMAP_NATIVE, a colour display of at least 192x192 pixels): the mini map shows a tile window, every tile
    row, a tile 2x2 pixels, so a square 192x192 at the left of the screen, and the rest of the screen is a sidebar the game fills
    in (the date, the money, the view's name, the demand, the keys).
      plat_put_minirow(ty, colours, base, view)   draws tile row ty (0..95) from 96 colours (0..7, as the builder makes them) of view
@@ -295,9 +298,17 @@ extern void     plat_put_minirow(uint8_t sy);
                                            show where the density is none (0 otherwise)
      plat_minimap_key(view)                draws the key to the colours of the view in the sidebar's rows 5 to 15 (columns MM_SIDE_COL up: 24, unless
                                            plat_config.h defines it, to centre the picture and the sidebar on a wider display)
-   Opening one clears the whole screen, and the status panel is not drawn while it is open. */
+   With HAVE_MINIMAP_SCROLL, plat_minimap_scroll(x) sets the tile column at the window's left edge.  plat_minimap_pan(dx, dy, x) moves the
+   existing 192x192 picture by one tile with the platform's fast screen copy; the UI then redraws only the exposed edge.  Opening one clears the
+   whole screen, and the status panel is not drawn while it is open. */
 extern void plat_put_minirow(uint8_t ty, const uint8_t *colours, const uint8_t *base, uint8_t view);
 extern void plat_minimap_key(uint8_t view);
+#ifdef HAVE_MINIMAP_SCROLL
+extern void plat_minimap_scroll(uint8_t x);
+#ifdef HAVE_SCROLL
+extern void plat_minimap_pan(int8_t dx, int8_t dy, uint8_t x);
+#endif
+#endif
 #elif defined(HAVE_MINIMAP_NATIVE)
 /* plat_put_minirow() draws row sy (0..47) of the mini map from 96 colours, one a tile column, each a block of pixels (the
    Multi 8: 4x3 hardware pixels, so the map is 384x144).  Bit 0 of a colour is the blue plane, 1 the red, 2 the green.

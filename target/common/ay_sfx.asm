@@ -32,7 +32,11 @@
         defc    AY_SKIP = 0
         ENDIF
 
+        IFDEF   ENGINE_BANK
+        SECTION code_home               ; the Next's engine bank (engine/sections.asm): this is called while the bank is mapped, so it is in the lowest 16 KB
+        ELSE
         SECTION code_user
+        ENDIF
 
 ; The data
 _ay_sfx_data:

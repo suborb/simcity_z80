@@ -10,7 +10,11 @@
         EXTERN  __BSS_head
         EXTERN  __BSS_END_tail
 
-        ld      a,31
+        ; slots 6 and 7 hold the big arrays: the pages the drawing routines put back (PAGE_SLOT6 and 7 in plat_zxn.asm: 8 KB pages 0 and 1, bank 0).  They
+        ; must be there from the start, not in other pages (the loader leaves 31 and 32): the uninitialised data above $C000 (the map, the simulation's stack
+        ; and its frame, which sim_task_reset builds long before the first picture is drawn) is cleared and written there, and the pages the routines
+        ; restore would be a different 16 KB: the map and the stack would vanish at the first picture
+        xor     a
         nextreg $56,a
         inc     a
         nextreg $57,a

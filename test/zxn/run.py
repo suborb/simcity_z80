@@ -77,18 +77,159 @@ def main():
     if not JNEXT or not os.path.exists(JNEXT):
         print('skipped: set JNEXT to the jnext executable')
         return 0
-    made = subprocess.run(['make', '-s', 'ZXN=build/zxntest/simcity.nex', 'ZXN_ENTROPY=target/zxn/entropy_test.asm', 'ZXN_FLAGS=-Ca-DZXN_TEST_ENTROPY=4660',
+    made = subprocess.run(['make', '-s', 'ZXN=build/zxntest/simcity.nex', 'ZXN_MAP=120x100', 'ZXN_ENTROPY=target/zxn/entropy_test.asm', 'ZXN_FLAGS=-Ca-DZXN_TEST_ENTROPY=4660',
                            'build/zxntest/simcity.nex'], cwd=ROOT, capture_output=True, text=True)
     if made.returncode != 0 or not os.path.exists(NEX):
         print('FAIL  the test build: ' + made.stdout[-400:] + made.stderr[-400:])
         return 1
+
+    # Rio's extracted scenario text includes all 774 bytes of its event block;
+    # the NEX record must retain it rather than silently clipping the ending.
+    scenario_dir = os.path.join(ROOT, 'build', 'zxn', 'scenarios')
+    banks = sorted(f for f in os.listdir(scenario_dir) if f.startswith('scenarios_') and f.endswith('.bin'))
+    records = b''.join(open(os.path.join(scenario_dir, f), 'rb').read() for f in banks)
+    # a record, as tools/convert_amiga_scenarios.py and ui/scenarios.c have it: the map, its preview, the power map, the traffic map, 1,024 bytes of text
+    meta_at = 12000 + 12000 + 15 * 100 + 60 * 50
+    record_size = meta_at + 1024
+    rio_meta = 5 * record_size + meta_at
+    rio_text_len = records[rio_meta + 4] | (records[rio_meta + 5] << 8)
+    check('the NEX scenario record keeps Rio’s complete extracted text', rio_text_len == 774, str(rio_text_len))
+    source_hamburg = open(os.path.join(ROOT, 'assets', 'amiga_scenarios', 'Hamburg.map'), 'rb').read()
+    hamburg_map = records[4 * record_size:4 * record_size + 12000]
+    source_water_cells = []
+    source_tiles = [[int.from_bytes(source_hamburg[(x * 100 + y) * 2:(x * 100 + y) * 2 + 2], 'big') & 0x3ff
+                     for x in range(120)] for y in range(100)]
+    frame_conversion_ok = True
+    for x in range(120):
+        for y in range(100):
+            src_at = (x * 100 + y) * 2
+            tile = int.from_bytes(source_hamburg[src_at:src_at + 2], 'big') & 0x3ff
+            map_at = y * 120 + x
+            if tile in (2, 3, 4):
+                source_water_cells.append(map_at)
+            if tile >= 828 and hamburg_map[map_at] == 2:
+                frame_conversion_ok = False
+            if tile == 948:
+                if not (x + 1 < 120 and y + 5 < 100 and
+                        source_tiles[y][x + 1] == 949 and
+                        source_tiles[y + 4][x] == 950 and
+                        source_tiles[y + 4][x + 1] == 951 and
+                        source_tiles[y + 5][x] == 65 and
+                        all(hamburg_map[(yy * 120) + x] == 19 for yy in range(y, y + 5)) and
+                        hamburg_map[y * 120 + x + 1] == 0 and
+                        hamburg_map[(y + 4) * 120 + x + 1] == 0):
+                    frame_conversion_ok = False
+    # Hamburg's drawbridges (a head 948 and a foot 950 in a column, a few cells apart) are drawn raised or lowered by the Amiga: the span's cells are water in one
+    # and bridge in the other.  There is no raising here, so the whole span is bridge (19), water between the head and the foot included; any other water is water (0)
+    bridge_water = set()
+    for x in range(120):
+        for y in range(100):
+            if source_tiles[y][x] == 948:
+                foot = next((yy for yy in range(y + 1, min(y + 7, 100)) if source_tiles[yy][x] == 950), None)
+                if foot is not None:
+                    bridge_water.update((yy * 120) + x for yy in range(y + 1, foot) if source_tiles[yy][x] in (2, 3, 4))
+    converted_animation_water = all(hamburg_map[i] == (19 if i in bridge_water else 0) for i in source_water_cells)
+    check('Hamburg water, animation frames and bridge cells convert to valid map codes',
+          converted_animation_water and frame_conversion_ok and hamburg_map.count(93) == 0,
+          f'{len(source_water_cells)} water cells checked ({len(bridge_water)} in drawbridge spans); frame conversion {frame_conversion_ok}')
+    san_francisco_map = records[6 * record_size:6 * record_size + 12000]
+    san_francisco_coal_plants = 0
+    for y in range(100):
+        for x in range(120):
+            at = y * 120 + x
+            marker = san_francisco_map[at]
+            if marker == 0xB4:
+                piece = ((san_francisco_map[at + 1] & 63) << 3) | (san_francisco_map[at + 2] & 7)
+                if 52 <= piece < 68:
+                    san_francisco_coal_plants += 1
+    dullsville_map = records[3 * record_size:3 * record_size + 12000]
+    dullsville_source = open(os.path.join(ROOT, 'assets', 'amiga_scenarios', 'Dullsville.map'), 'rb').read()
+    dullsville_source_rubble = sum(
+        (int.from_bytes(dullsville_source[(x * 100 + y) * 2:(x * 100 + y) * 2 + 2], 'big') & 0x3ff) == 44
+        for x in range(120) for y in range(100)
+    )
+    check('special building footprints retain San Francisco’s seven coal plants',
+          san_francisco_coal_plants == 7,
+          f'{san_francisco_coal_plants} San Francisco coal plants; {dullsville_map.count(58)} Dullsville rubble cells')
+    check('Dullsville keeps its R zone and clears the overlapping road',
+          dullsville_map[44 * 120 + 66] == 81 and dullsville_map[45 * 120 + 67] == 63 and
+          dullsville_map.count(58) == dullsville_source_rubble,
+          f'center {dullsville_map[44 * 120 + 66]}, road {dullsville_map[45 * 120 + 67]}, rubble {dullsville_map.count(58)}')
+    tokyo_source = open(os.path.join(ROOT, 'assets', 'amiga_scenarios', 'Tokyo.map'), 'rb').read()
+    tokyo_map = records[7 * record_size:7 * record_size + 12000]
+    ring_codes = (73, 74, 75, 80, None, 76, 79, 78, 77)
+    empty_zones_ok = True
+    frame_aliases = {852: 621, 853: 621, 854: 621, 855: 621, 856: 621, 857: 621, 858: 621, 859: 621,
+                     884: 641, 885: 641, 886: 641, 887: 641, 888: 644, 889: 644, 890: 644, 891: 644,
+                     900: 676, 901: 676, 902: 676, 903: 676, 904: 677, 905: 677, 906: 677, 907: 677}
+    for x in range(120):
+        for y in range(100):
+            src_at = (x * 100 + y) * 2
+            word = int.from_bytes(tokyo_source[src_at:src_at + 2], 'big')
+            tile = frame_aliases.get(word & 0x3ff, word & 0x3ff)
+            for first, centre in ((423, (82, 85)), (612, (83, 86))):
+                if first <= tile <= first + 8:
+                    offset = tile - first
+                    expected = centre[0 if word & 0x8000 else 1] if offset == 4 else ring_codes[offset]
+                    if tokyo_map[y * 120 + x] != expected:
+                        empty_zones_ok = False
+    check('Tokyo empty commercial and industrial zones and animated tiles convert without false rubble',
+          empty_zones_ok and tokyo_map.count(58) == 3,
+          f'empty zone conversion {empty_zones_ok}; rubble {tokyo_map.count(58)} cells')
+    scenario_names = ('Bern', 'Boston', 'Detroit', 'Dullsville', 'Hamburg', 'Rio_De_Janerio', 'San_Francisco', 'Tokyo')
+    rubble_matches_source = True
+    rubble_counts = []
+    for i, name in enumerate(scenario_names):
+        source = open(os.path.join(ROOT, 'assets', 'amiga_scenarios', name + '.map'), 'rb').read()
+        expected = sum(
+            (int.from_bytes(source[(x * 100 + y) * 2:(x * 100 + y) * 2 + 2], 'big') & 0x3ff) == 44
+            for x in range(120) for y in range(100)
+        )
+        actual = records[i * record_size:i * record_size + 12000].count(58)
+        rubble_counts.append(actual)
+        rubble_matches_source &= actual == expected
+    check('scenario rubble matches only the tiles explicitly saved as rubble', rubble_matches_source,
+          ', '.join(f'{name}: {n}' for name, n in zip(scenario_names, rubble_counts)))
+    shapes = (0, 1, 3, 4, 2, 5, 8, 6, 9, 7, 10)
+    route_codes = {64: 18, 65: 19, 224: 31, 225: 32, 237: 46, 238: 47,
+                   80: 18, 81: 19, 82: 7, 83: 8, 84: 11, 85: 9, 86: 10,
+                   87: 12, 88: 14, 89: 16, 90: 13, 91: 15, 92: 17,
+                   93: 49, 94: 48}
+    for k, shape in enumerate(shapes):
+        route_codes[66 + shape] = 7 + k
+        route_codes[210 + shape] = 33 + k
+        route_codes[226 + shape] = 20 + k
+    route_errors = 0
+    for x in range(120):
+        for y in range(100):
+            src_at = (x * 100 + y) * 2
+            tile = int.from_bytes(tokyo_source[src_at:src_at + 2], 'big') & 0x3ff
+            if tile in route_codes and tokyo_map[y * 120 + x] != route_codes[tile]:
+                route_errors += 1
+    check('Tokyo road, rail and power-line tile shapes retain their route types', route_errors == 0,
+          f'{route_errors} converted route cells differ from their source mapping')
     sd = os.path.join(TMP, 'sd.img')
     if subprocess.run(['cp', '-c', SD, sd], stderr=subprocess.DEVNULL).returncode != 0:
         shutil.copyfile(SD, sd)
 
     # the level screen
     im = run([], 300)
-    check('the level screen is text on black', lit(im, (0, 0, 256, 64)) > 400 and distinct(im, (0, 80, 256, 192)) == 1, f'{lit(im, (0, 0, 256, 64))}')
+    check('the level screen shows its choices on black', lit(im, (0, 0, 256, 64)) > 400 and distinct(im, (0, 80, 256, 192)) > 1,
+          f'{lit(im, (0, 0, 256, 64))}')
+
+    # The scenario choice displays the Amiga map preview beside its title and text; Enter launches the selected map.
+    picker = run([(69, '4')], 110)
+    check('the scenario picker shows text and the map preview', lit(picker, (0, 0, 128, 192)) > 400 and
+          distinct(picker, (136, 64, 256, 164)) > 8,
+          f'{lit(picker, (0, 0, 128, 192))} {distinct(picker, (136, 64, 256, 164))}')
+    loaded_scenario = run([(69, '4'), (110, 'right'), (150, 'enter')], 900)
+    check('a selected scenario launches into its city map', distinct(loaded_scenario, (0, 56, 256, 192)) >= 4,
+          str(distinct(loaded_scenario, (0, 56, 256, 192))))
+    sf_keys = [(69, '4')] + [(90 + 20 * i, 'right') for i in range(6)] + [(230, 'enter'), (700, 'm')]
+    sf_minimap = run(sf_keys, 1000)
+    check('San Francisco loads as a converted city across the minimap', distinct(sf_minimap, (0, 0, 192, 192)) > 4 and
+          lit(sf_minimap, (0, 0, 192, 192)) > 10000,
+          f'{distinct(sf_minimap, (0, 0, 192, 192))} colours, {lit(sf_minimap, (0, 0, 192, 192))} lit pixels')
 
     # a city: the panel above, ground and trees in the map, the demand bars, the tool icons in two rows
     S = (START, '1')
@@ -116,10 +257,11 @@ def main():
     check('the map scrolled by the DMA is the picture a full redraw makes', n <= 64 and differs(city, scrolled, (0, 56, 256, 192)), f'{n} pixels differ, in {diff.getbbox()}')
 
     # animation: an airport (tool 13: twelve presses of '.' from the road) has a radar, and the park's fountain and the chimneys' smoke are others: the game
-    # shows each animated picture's frames in turn, one every 16 frames.  Eight screenshots 16 frames apart: some cell shows four or more different pictures
-    # (the plane that flies over the airport and the cursor change a cell to one or two)
+    # shows each animated picture's frames in turn, one every 16 game ticks.  Space the emulator screenshots 32 frames apart: the game's main-loop
+    # counter can drift against JNext's frame scheduler, and 16-frame sampling can alias the animation.  Some cell should show four or more pictures
+    # (the plane that flies over the airport and the cursor change a cell to one or two).
     airport = [S] + LAND + [(820 + 40 * i, '.') for i in range(12)] + [(1320, 'space'), (1400, 'caps+o')]
-    frames = [run(airport, 1800 + 16 * k) for k in range(8)]
+    frames = [run(airport, 1800 + 32 * k) for k in range(8)]
     most = max(len({f.crop((x * 8, y * 8, x * 8 + 8, y * 8 + 8)).tobytes() for f in frames}) for y in range(8, 24) for x in range(32))
     check('the airport\'s radar animates: a map cell shows its frames in turn', most >= 4, f'at most {most} different pictures in a cell')
 
@@ -155,6 +297,12 @@ def main():
         d = w.readframes(w.getnframes())
         peak = max(abs(x) for x in struct.unpack('<%dh' % (len(d) // 2), d))
     check('the sound of a building is heard', peak > 200, str(peak))
+
+    # the engine's bank (PORTING.md, a larger map): the simulation's code is in BANK_6, mapped over $4000-$7FFF while it runs, so everything above passed with
+    # it: the city made, the ticks, the tools.  What the tests cannot see is a call or load from the bank to an address of the program's own in that range
+    # (the bank is mapped there instead): the disassembly of the bank is checked for them
+    r = subprocess.run([sys.executable, os.path.join(ROOT, 'tools', 'check_bank_refs.py'), os.path.join(ROOT, 'build', 'zxntest', 'simcity')], cwd=ROOT, capture_output=True, text=True)
+    check('the engine bank refers to nothing of the program\'s in $4000-$7FFF', r.returncode == 0, r.stdout[-400:])
 
     shutil.rmtree(TMP, ignore_errors=True)
     print('%d of %d passed' % (sum(results), len(results)))

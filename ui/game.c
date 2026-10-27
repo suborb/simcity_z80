@@ -47,6 +47,13 @@
 #define NUM_TOOLS   14
 #define TOOL_POWER_STATION 11
 
+#ifdef ZXN_SCENARIOS
+extern uint8_t scenario_choose(void);
+extern uint16_t scenario_load(uint8_t index);
+extern void scenario_restore_state(uint8_t index);
+static uint8_t selected_scenario = 0xff;
+#endif
+
 /* Frames between simulation ticks, indexed by V_simulation_speed. */
 /* Rows of the simulation run per UI frame.  A slice is about 20ms on a 3.5MHz Z80, and
    the keyboard is read once per frame, so this sets how quickly the game answers a key:
@@ -659,12 +666,27 @@ static void draw_view(uint8_t full, uint8_t dirty)
    so that the keyboard is read in between; afterwards a few rows in turn each frame follow the simulation. */
 #define MM_CHUNK_ROWS   12
 #define MM_REFRESH_ROWS 4
+#define MM_PAN_CHUNK_ROWS 24
+#ifdef HAVE_MINIMAP_SCROLL
+#define MM_CHUNK (mm_pan_redraw ? MM_PAN_CHUNK_ROWS : MM_CHUNK_ROWS)    /* rows of a full redraw a frame: more after the picture was panned */
+#else
+#define MM_CHUNK MM_CHUNK_ROWS
+#endif
 static uint8_t mm_full_row;                  /* progress through a full redraw */
+#ifdef HAVE_MINIMAP_SCROLL
+static uint8_t mm_scroll_x, mm_scroll_y;      /* upper-left tile of the 96x96 viewport */
+static uint8_t mm_pan_redraw;                 /* DMA shifted the picture; repaint it in larger row chunks */
+#endif
 
 static void draw_minirow(uint8_t sy)
 {
+#ifdef HAVE_MINIMAP_SCROLL
+    uint8_t source_sy = (uint8_t)(sy + mm_scroll_y);
+#else
+#define source_sy sy                        /* (no scrolling: the row asked for is the row drawn, with no variable for it) */
+#endif
 #ifdef HAVE_MINIMAP_ART
-    minimap_row(map_view, sy);
+    minimap_row(map_view, source_sy);
     plat_put_minirow(sy);
 #else
     static uint8_t colours[MM_NATIVE_COLS];
@@ -672,12 +694,12 @@ static void draw_minirow(uint8_t sy)
     static uint8_t base[MM_NATIVE_COLS];
 #endif
 
-    minimap_row(map_view, sy, colours);
+    minimap_row(map_view, source_sy, colours);
 #ifdef HAVE_MINIMAP_SQUARE
     if (map_view == MM_CITY || map_view == MM_POWER || map_view == MM_TRANSPORT)
         plat_put_minirow(sy, colours, 0, map_view);
     else {                                  /* a density: the land shows through where it is none */
-        minimap_row(MM_CITY, sy, base);
+        minimap_row(MM_CITY, source_sy, base);
         plat_put_minirow(sy, colours, base, map_view);
     }
 #else
@@ -703,14 +725,18 @@ static uint8_t draw_minimap(uint8_t full)
     uint8_t n;
 
     if (full) {
-        for (n = 0; n < MM_CHUNK_ROWS && mm_full_row < MM_NATIVE_ROWS; ++n)
+        for (n = 0; n < MM_CHUNK && mm_full_row < MM_NATIVE_VIEW_ROWS; ++n)
             draw_minirow(mm_full_row++);
-        if (mm_full_row < MM_NATIVE_ROWS)
+        if (mm_full_row < MM_NATIVE_VIEW_ROWS)
             return 1;
         mm_full_row = 0;
+#ifdef HAVE_MINIMAP_SCROLL
+        mm_pan_redraw = 0;
+        plat_minimap_scroll(mm_scroll_x);      /* stop treating rows as a one-column update */
+#endif
     } else {
         for (n = 0; n < MM_REFRESH_ROWS; ++n) {
-            if (++refresh_row >= MM_NATIVE_ROWS)
+            if (++refresh_row >= MM_NATIVE_VIEW_ROWS)
                 refresh_row = 0;
             draw_minirow(refresh_row);
         }
@@ -743,6 +769,14 @@ static void set_map_view(uint8_t v)
     if (v) {
         mm_full_row = 0;
         map_full = 1;
+#ifdef HAVE_MINIMAP_SCROLL
+        mm_pan_redraw = 0;
+        mm_scroll_x = cur_x > 48 ? (uint8_t)(cur_x - 48) : 0;
+        if (mm_scroll_x > MAP_W - 96) mm_scroll_x = MAP_W - 96;
+        mm_scroll_y = cur_y > 48 ? (uint8_t)(cur_y - 48) : 0;
+        if (mm_scroll_y > MAP_H - 96) mm_scroll_y = MAP_H - 96;
+        plat_minimap_scroll(mm_scroll_x);
+#endif
     } else {
         last_cx = 255;                      /* a full pass over the city */
 #ifdef HAVE_MINIMAP_SQUARE
@@ -750,6 +784,45 @@ static void set_map_view(uint8_t v)
 #endif
     }
 }
+
+#ifdef HAVE_MINIMAP_SCROLL
+static void scroll_minimap(int8_t dx, int8_t dy)
+{
+    int16_t x = (int16_t)mm_scroll_x + dx;
+    int16_t y = (int16_t)mm_scroll_y + dy;
+    uint8_t old_x = mm_scroll_x, old_y = mm_scroll_y;
+    uint8_t was_full = map_full;
+
+    if (x < 0) x = 0;
+    if (x > MAP_W - 96) x = MAP_W - 96;
+    if (y < 0) y = 0;
+    if (y > MAP_H - 96) y = MAP_H - 96;
+    if (x == mm_scroll_x && y == mm_scroll_y)
+        return;
+    mm_scroll_x = (uint8_t)x;
+    mm_scroll_y = (uint8_t)y;
+    if (was_full) {
+        plat_minimap_scroll(mm_scroll_x);      /* the picture is incomplete: restart a full redraw */
+        mm_pan_redraw = 0;
+    } else {
+        plat_minimap_pan((int8_t)(x - old_x), (int8_t)(y - old_y), mm_scroll_x);
+        if (x != old_x && y == old_y) {
+            mm_pan_redraw = 1;                 /* redraw the exposed tile column over a few frames */
+            map_full = 1;
+        } else if (y != old_y && x == old_x) {
+            mm_pan_redraw = 0;
+            draw_minirow(dy > 0 ? 95 : 0);      /* only one tile row came into view */
+        } else {
+            plat_minimap_scroll(mm_scroll_x);
+            mm_pan_redraw = 0;
+            map_full = 1;
+        }
+    }
+    mm_full_row = 0;
+    if (was_full || (x != old_x && y != old_y))
+        map_full = 1;
+}
+#endif
 #else
 static uint8_t mm_top;                      /* the pixel row shown at the top */
 static uint8_t mm_col, mm_row;               /* upper-left cell on the physical display */
@@ -1074,6 +1147,11 @@ static void draw_map_sidebar(void)
     side_number(1, '$', V_money);
     side_puts(2, "POP");
     side_number(3, 0, V_display_population);
+#ifdef HAVE_MINIMAP_SCROLL
+    side_puts(4, "PAN MAP");
+#else
+    side_puts(4, "ARROWS");
+#endif
     side_puts(5, sidebar_names[map_view]);
     plat_minimap_key(map_view);
     plat_demand(MM_SIDE_COL, 17, 'R', demand_level(V_RValve, 26));
@@ -1342,8 +1420,15 @@ static void clamp_view(void)
 static void move_cursor(int8_t dx, int8_t dy)
 {
 #ifdef HAVE_MINIMAP_NATIVE
+#ifdef HAVE_MINIMAP_SCROLL
+    if (map_view) {
+        scroll_minimap(dx, dy);
+        return;
+    }
+#else
     if (map_view)
         return;                             /* a map has no cursor */
+#endif
 #endif
 #if defined(HAVE_MINIMAP) && !defined(HAVE_MINIMAP_NATIVE)
     if (map_view) {                         /* on a mini map up and down turn its pages */
@@ -1762,6 +1847,9 @@ title_again:
     plat_text_puts(2, LEVEL_ROW + 2, "1 EASY");
     plat_text_puts(2, LEVEL_ROW + 4, "2 MEDIUM");
     plat_text_puts(2, LEVEL_ROW + 6, "3 HARD");
+#ifdef ZXN_SCENARIOS
+    plat_text_puts(2, LEVEL_ROW + 8, "4 SCENARIOS");
+#endif
     plat_flush();
     do {
         seed++;
@@ -1769,7 +1857,20 @@ title_again:
         k = plat_key();
         if (!k)
             plat_idle();
-    } while (k != '1' && k != '2' && k != '3');
+    } while (k != '1' && k != '2' && k != '3'
+#ifdef ZXN_SCENARIOS
+             && k != '4'
+#endif
+    );
+#ifdef ZXN_SCENARIOS
+    if (k == '4') {
+        selected_scenario = scenario_choose();
+        if (selected_scenario == 0xff) goto title_again;
+        V_difficulty = 0;
+        goto title_done;
+    }
+    selected_scenario = 0xff;
+#endif
     V_difficulty = (uint8_t)(k - '1');
     first = plat_clock();                           /* how long the level took to choose... */
 #ifdef HAVE_APPNAME
@@ -1789,11 +1890,18 @@ title_again:
     }
 #endif
     V_InitialSeed = (uint16_t)(seed ^ first ^ (plat_clock() - first) ^ plat_entropy()) | 1; /* ...and the name took to type */
+#ifdef ZXN_SCENARIOS
+title_done:
+#endif
     plat_text_clear();
 #ifdef HAVE_TEXT_BANNER
     plat_text_puts(0, 1, "GENERATING LANDSCAPE...");        /* (a line down from the banner) */
 #else
-    plat_text_puts(0, 0, "GENERATING LANDSCAPE...");
+    plat_text_puts(0, 0,
+#ifdef ZXN_SCENARIOS
+                   selected_scenario != 0xff ? "LOADING SCENARIO..." :
+#endif
+                   "GENERATING LANDSCAPE...");
 #endif
     plat_flush();
 }
@@ -1816,6 +1924,18 @@ static void play_city(void)
     V_simulation_speed = 1;
     SMC_tax_rate = 7;
     SMC_transport_percent = SMC_police_percent = SMC_fire_percent = 100;
+#ifdef ZXN_SCENARIOS
+    if (selected_scenario != 0xff) {
+        uint16_t year = scenario_load(selected_scenario);
+        sim_loaded();
+        scenario_restore_state(selected_scenario);
+        V_year = year;
+        V_month = 0;
+        V_money[0] = 0x20;
+        V_money[1] = 0x4e;
+        V_money[2] = 0;
+    } else
+#endif
     sim_new_city();
     map_view = 0;
 

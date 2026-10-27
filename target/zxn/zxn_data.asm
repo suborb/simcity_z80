@@ -15,3 +15,7 @@ _zxn_head:
 ; The tool icons, 14 of 22x20, a byte a pixel (a palette index): in a bank of their own, 8 KB page 44 (ICON_PAGE in plat_zxn.c)
         SECTION BANK_22
         BINARY  "build/zxn/icons.bin"
+
+        IFDEF   ZXN_SCENARIOS
+        INCLUDE "build/zxn/scenarios/scenarios.asm"
+        ENDIF
