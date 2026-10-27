@@ -28,6 +28,11 @@ volatile uint8_t plat_mouse_buttons;
 
 static int16_t sent_x, sent_y;                  /* the position as the driver has it: the keys move the pointer too, and it is told before the next read */
 static uint8_t last_buttons, seen;
+static uint8_t esc_pending;                     /* the right button went down: the main loop's Esc */
+static uint8_t armed = 1;                       /* 0 after a key or button ended a modal screen: the main loop's fire waits until it is released */
+static uint8_t modal;                           /* the mouse is being read as keys (plat_modal_key), its position counted from the middle of the screen */
+static uint8_t modal_buttons;
+static int16_t acc_x, acc_y;
 static int16_t shown_x, shown_y;                /* where the sprite is, or -1 if it is hidden */
 
 /* The arrow, 16x16, its tip at the top left: the rows of its black outline and its white fill, the leftmost pixel the top bit. */
@@ -100,8 +105,9 @@ uint8_t plat_mouse_input(void)
     uint16_t x, y;
     int16_t nx, ny;
 
+    modal = 0;
     if (plat_mouse_x != sent_x || plat_mouse_y != sent_y)
-        in_MouseKempSetPos(plat_mouse_x, plat_mouse_y);    /* the keys moved it */
+        in_MouseKempSetPos(plat_mouse_x, plat_mouse_y);    /* the keys moved it (or a modal screen counted the mouse from the middle) */
     in_MouseKemp(&buttons, &x, &y);
     sent_x = nx = (int16_t)x;
     sent_y = ny = (int16_t)y;
@@ -130,6 +136,14 @@ uint8_t plat_mouse_input(void)
     plat_mouse_y = ny;
     if (keys & 16)
         buttons |= 1;
+    if ((buttons & 2) && !(last_buttons & 2))
+        esc_pending = 1;
+    if (!armed) {                               /* what ended a modal screen (Enter, a click) is still down: not a press here */
+        if (buttons & 1)
+            buttons &= (uint8_t)~1;
+        else
+            armed = 1;
+    }
     plat_mouse_buttons = buttons;
     if (buttons & 1) {
         events |= 4;
@@ -206,6 +220,68 @@ uint8_t plat_mouse_edge_scroll(void)
         }
     }
     return 0;
+}
+
+/* The right button as the main loop's Esc, once. */
+uint8_t plat_mouse_esc(void)
+{
+    uint8_t e = esc_pending;
+
+    esc_pending = 0;
+    return e;
+}
+
+#define MID_X 128
+#define MID_Y 96
+#define ROW 8                                   /* pixels of mouse movement to a key: a menu's row */
+
+/* The key a modal screen reads: k (the keyboard's, or 0), or else the mouse as keys: 8 pixels up, down, left or right are those cursor keys, the left button is Enter and the
+   right Esc.  The mouse's steps are counted from the middle of the screen (it is put back there at each look, so the edge of the screen is no limit), and the first look in a
+   screen starts from there with the buttons as they are.  The arrow is hidden; the main loop puts it where it was (plat_mouse_input sees it differs from the driver's). */
+uint8_t plat_modal_key(uint8_t k)
+{
+    uint8_t buttons, down;
+    uint16_t x, y;
+
+    plat_mouse_pointer_hide();
+    if (modal) {
+        in_MouseKemp(&buttons, &x, &y);
+        acc_x += (int16_t)x - MID_X;
+        acc_y += (int16_t)y - MID_Y;
+    } else {
+        modal = 1;
+        acc_x = acc_y = 0;
+        in_MouseKempSetPos(MID_X, MID_Y);
+        in_MouseKemp(&buttons, &x, &y);
+        modal_buttons = buttons;
+    }
+    in_MouseKempSetPos(MID_X, MID_Y);
+    sent_x = MID_X;
+    sent_y = MID_Y;
+    down = buttons & (uint8_t)~modal_buttons;
+    modal_buttons = buttons;
+    if (!k) {
+        if (down & 1)
+            k = KEY_ENTER;
+        else if (down & 2)
+            k = KEY_ESC;
+        else if (acc_y >= ROW) {
+            acc_y -= ROW;
+            k = KEY_DOWN;
+        } else if (acc_y <= -ROW) {
+            acc_y += ROW;
+            k = KEY_UP;
+        } else if (acc_x >= ROW) {
+            acc_x -= ROW;
+            k = KEY_RIGHT;
+        } else if (acc_x <= -ROW) {
+            acc_x += ROW;
+            k = KEY_LEFT;
+        }
+    }
+    if (k)
+        armed = 0;
+    return k;
 }
 
 #endif /* HAVE_MOUSE */

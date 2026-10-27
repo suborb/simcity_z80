@@ -15,6 +15,10 @@ extern void plat_page_data(void);
 #define plat_page_data() ((void)0)
 #endif
 
+#ifndef HAVE_POINTER
+#define plat_key_game() plat_key()              /* (a target with no pointer has one kind of key) */
+#endif
+
 /* Optional relative mouse device exposed to the UI as absolute screen pixels.
    Bit 0 of plat_mouse_input() means motion, bit 1 a new left press, and bit 2
    that the left button is held.  Targets own the device protocol and state. */
@@ -22,6 +26,9 @@ extern void plat_page_data(void);
 extern volatile int16_t plat_mouse_x, plat_mouse_y;
 extern volatile uint8_t plat_mouse_buttons;
 #ifdef HAVE_POINTER
+/* The game's main loop reads its keys with plat_key_game(): the keyboard, and the mouse's right button as Esc (the menu).  Every other screen (the menus, the budget, the
+   pickers) reads plat_key(), which also turns the mouse into keys: a step of 8 pixels is Up, Down, Left or Right, the left button Enter, the right Esc, and the arrow is hidden. */
+extern uint8_t plat_key_game(void);
 #define plat_mouse_present 1                    /* HAVE_POINTER (plat_config.h): the pointer is always there, and the keys move it if no mouse does */
 #else
 extern volatile uint8_t plat_mouse_present;

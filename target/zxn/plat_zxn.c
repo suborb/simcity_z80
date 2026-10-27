@@ -626,7 +626,13 @@ static uint8_t scan(void)
     return k;
 }
 
+#ifdef HAVE_POINTER
+extern uint8_t plat_modal_key(uint8_t k);
+extern uint8_t plat_mouse_esc(void);
+static uint8_t keyboard_key(void)
+#else
 uint8_t plat_key(void)
+#endif
 {
     uint8_t k = scan();
 
@@ -640,6 +646,23 @@ uint8_t plat_key(void)
     caps_was = caps_now;
     return k;
 }
+
+#ifdef HAVE_POINTER
+/* The main loop's keys: the keyboard, or a right click as Esc.  Everywhere else (plat_key) the mouse is a set of keys too (zxn_mouse.c). */
+uint8_t plat_key_game(void)
+{
+    uint8_t k = keyboard_key();
+
+    if (!k && plat_mouse_esc())
+        k = KEY_ESC;
+    return k;
+}
+
+uint8_t plat_key(void)
+{
+    return plat_modal_key(keyboard_key());
+}
+#endif
 
 /* ---- files --------------------------------------------------------------------------------------------------------------------- */
 /* The city to and from an esxDOS file (z88dk's esxdos fcntl: open, read, write and close).  What esxDOS is given to read and write is

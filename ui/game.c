@@ -2020,7 +2020,7 @@ static void play_city(void)
             countdown = tick_frames[V_simulation_speed];
         }
         plat_page_data();
-        k = plat_key();
+        k = plat_key_game();
 #ifdef HAVE_MOUSE
         /* Sample the keyboard first; some mouse interfaces also read from
            the keyboard ports. */
