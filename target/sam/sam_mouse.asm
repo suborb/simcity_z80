@@ -1,216 +1,52 @@
-; SAM Coupe mouse driver prototype.
-; User-land SAM Coupe mouse polling using the RDMSEL port.
+; SAM Coupe mouse: the game's side of it.  The scanning and detection are z88dk's
+; in_MouseSAM (libsrc/target/sam/input); this turns a reading into the events
+; the UI wants and hit-tests the tool icons.  The library keeps its state in
+; the bss, which is in the data bank: every entry here pages that in.
 
         SECTION code_user
         PUBLIC  _plat_mouse_init
-        PUBLIC  _plat_mouse_poll
         PUBLIC  _plat_mouse_input
         PUBLIC  _plat_mouse_icon_hit
+        EXTERN  _in_MouseSAMInit
+        EXTERN  _in_MouseSAM_callee
+        GLOBAL  _in_SAMcoordX, _in_SAMcoordY, _in_SAMpresent
+        PUBLIC  _plat_mouse_x, _plat_mouse_y, _plat_mouse_present
         IFDEF   TARGET_SAM
         EXTERN  _sam_page_data
         ENDIF
+
+; the UI's names for the library's position and presence (the keyboard moves the pointer too)
+        defc    _plat_mouse_x = _in_SAMcoordX
+        defc    _plat_mouse_y = _in_SAMcoordY
+        defc    _plat_mouse_present = _in_SAMpresent
 
 _plat_mouse_init:
         IFDEF   TARGET_SAM
         call    _sam_page_data
         ENDIF
         ld      hl,0
-        ld      (_plat_mouse_x),hl
-        ld      (_plat_mouse_y),hl
-        ld      (_plat_mouse_polls),hl
         ld      (_plat_mouse_prev_x),hl
         ld      (_plat_mouse_prev_y),hl
         xor     a
         ld      (_plat_mouse_buttons),a
-        ld      (_plat_mouse_present),a
         ld      (_plat_mouse_buttons_last),a
         ld      (_plat_mouse_seen),a
-        ld      a,1
-        ld      (_plat_mouse_enabled),a
-        ld      a,30
-        ld      (_plat_mouse_retry),a
-        ld      b,4                     ; (a held cursor key fails the scan: try again)
-sm_init_try:
-        call    sm_detect
-        ld      a,(_plat_mouse_present)
-        or      a
-        jr      nz,sm_detected
-        djnz    sm_init_try
-sm_detected:
-        ld      hl,0                    ; the detecting scans' movement is discarded
-        ld      (_plat_mouse_x),hl
-        ld      (_plat_mouse_y),hl
-        xor     a
-        ld      (_plat_mouse_buttons),a
-        ret
+        jp      _in_MouseSAMInit
 
-; One detection attempt: a scan to clear the registers, then the detecting one.
-sm_detect:
-        xor     a
-        ld      (_plat_mouse_detect),a
-        call    _plat_mouse_poll
-        ld      a,1
-        ld      (_plat_mouse_detect),a
-        call    _plat_mouse_poll
-        xor     a
-        ld      (_plat_mouse_detect),a
-        ret
-
-; Called by user code to consume one complete mouse scan.
-_plat_mouse_poll:
-        IFDEF   TARGET_SAM
-        call    _sam_page_data          ; the coordinates and scan buffer are in the game data bank
-        ENDIF
-        push    bc
-        push    de
-        push    hl
-        ld      a,(_plat_mouse_enabled)
-        or      a
-        jp      z,sm_frame_done
-
-        ld      hl,(_plat_mouse_polls)
-        inc     hl
-        ld      (_plat_mouse_polls),hl
-
-        ld      bc,$fffe                ; RDMSEL and keyboard/mouse port
-        ld      hl,_plat_mouse_raw
-        in      a,(c)                   ; strobe mouse interface
-        ld      (hl),a
-        inc     hl
-        in      a,(c)                   ; gate/button byte: cursor keys must be released
-        ld      (hl),a
-        and     $0f
-        cp      $0f
-        jr      nz,sm_no_gate
-        inc     hl
-        ld      d,7                     ; the interface sends nine nibbles (strobe, gate, seven more) and then starts over: a tenth read would put the next scan out of step
-sm_scan_loop:
-        in      a,(c)
-        ld      (hl),a
-        inc     hl
-        dec     d
-        jr      nz,sm_scan_loop
-
-; Mouse detection, made only by sm_detect: a scan clears the interface's
-; registers, so the next one has zero in the low nibbles of the delta bytes
-; (raw+3 to raw+8) from a mouse at rest, but not from a bare port, which returns
-; the keyboard state ($F).  (mc-fred part 9 tests the last one, raw+8.)  Once
-; found, every scan is decoded; before, the game keeps to the keyboard.
-        ld      a,(_plat_mouse_present)
-        or      a
-        jr      nz,sm_update
-        ld      a,(_plat_mouse_detect)
-        or      a
-        jr      z,sm_frame_done
-        ld      hl,_plat_mouse_raw+3
-        ld      d,6
-        xor     a
-sm_detect_or:
-        or      (hl)
-        inc     hl
-        dec     d
-        jr      nz,sm_detect_or
-        and     $0f
-        jr      nz,sm_frame_done
-        ld      a,1
-        ld      (_plat_mouse_present),a
-        jr      sm_update
-
-sm_no_gate:
-        jp      sm_frame_done          ; held cursor key/control: retry next poll
-
-; Fred's 16-bit X update, with FATPIX=1 for the 256-pixel-wide probe.
-sm_update:
-        ld      a,(_plat_mouse_raw+7)    ; X delta high nibble
-        and     $0f
-        rlca
-        rlca
-        rlca
-        rlca
-        ld      d,a
-        ld      a,(_plat_mouse_raw+8)    ; X delta low nibble
-        and     $0f
-        or      d
-        ld      e,a
-        rla                             ; sign extend 8-bit delta to DE
-        sbc     a,a
-        ld      d,a
-        ld      hl,(_plat_mouse_x)
-        add     hl,de
-        ld      a,h
-        inc     a
-        jr      z,sm_x_min             ; negative overflow clamps to zero
-        cp      2                       ; FATPIX=1: coordinate range is 0..255
-        jr      c,sm_x_store
-        ld      hl,$00ff
-        jr      sm_x_store
-sm_x_min:
-        ld      hl,0
-sm_x_store:
-        ld      (_plat_mouse_x),hl
-
-; Fred's Y update with NEG enabled for screen coordinates (zero at the top).
-        ld      a,(_plat_mouse_raw+4)    ; Y delta high nibble
-        and     $0f
-        rlca
-        rlca
-        rlca
-        rlca
-        ld      d,a
-        ld      a,(_plat_mouse_raw+5)    ; Y delta low nibble
-        and     $0f
-        or      d
-        neg
-        ld      d,a
-        ld      a,(_plat_mouse_y)
-        add     a,d
-        cp      192
-        jr      c,sm_y_inrange
-        xor     a
-        bit     7,d
-        jr      nz,sm_y_inrange
-sm_y_max:
-        ld      a,191
-        ld      l,a
-        ld      h,0
-        jr      sm_y_store
-sm_y_inrange:
-        ld      l,a
-        ld      h,0
-sm_y_store:
-        ld      (_plat_mouse_y),hl
-
-        ld      a,(_plat_mouse_raw+2)    ; mouse button byte
-        cpl
-        and     $07
-        ld      (_plat_mouse_buttons),a
-
-sm_frame_done:
-        pop     hl
-        pop     de
-        pop     bc
-        ret
-
-; Poll once, then return bit 0 for coordinate movement, bit 1 for a new
-; left-button press, and bit 2 while the left button is held. Keeping this
+; Read the mouse, then return bit 0 for coordinate movement, bit 1 for a new
+; left-button press, and bit 2 while the left button is held.  Keeping this
 ; comparison in the SAM target avoids growing the low-memory UI section.
 _plat_mouse_input:
         IFDEF   TARGET_SAM
         call    _sam_page_data
         ENDIF
-        ld      a,(_plat_mouse_present)
-        or      a
-        jr      nz,sm_input_scan
-        ld      hl,_plat_mouse_retry    ; no mouse yet (an emulator may only attach it later): look again now and then
-        dec     (hl)
-        jr      nz,sm_input_scan
-        ld      (hl),30
-        call    sm_detect
-        ld      hl,0                    ; (the detecting scans' movement is not the player's)
-        ld      (_plat_mouse_x),hl
-        ld      (_plat_mouse_y),hl
-sm_input_scan:
-        call    _plat_mouse_poll
+        ld      hl,_plat_mouse_buttons
+        push    hl
+        ld      hl,_plat_mouse_x
+        push    hl
+        ld      hl,_plat_mouse_y
+        push    hl
+        call    _in_MouseSAM_callee
         ld      b,0
         ld      a,(_plat_mouse_seen)
         or      a
@@ -295,33 +131,13 @@ sm_icon_miss:
         ret
 
         SECTION bss_user
-        PUBLIC  _plat_mouse_x
-        PUBLIC  _plat_mouse_y
         PUBLIC  _plat_mouse_buttons
-        PUBLIC  _plat_mouse_present
-        PUBLIC  _plat_mouse_polls
-        PUBLIC  _plat_mouse_raw
-        PUBLIC  _plat_mouse_enabled
-        PUBLIC  _plat_mouse_detect
-        PUBLIC  _plat_mouse_retry
-        PUBLIC  _plat_mouse_prev_x
-        PUBLIC  _plat_mouse_prev_y
-        PUBLIC  _plat_mouse_buttons_last
-        PUBLIC  _plat_mouse_seen
         PUBLIC  _plat_mouse_pointer_cell_count
         PUBLIC  _plat_mouse_pointer_cells
         PUBLIC  _plat_mouse_pointer_background
         PUBLIC  _plat_mouse_pointer_mask
 
-_plat_mouse_x:       defs 2
-_plat_mouse_y:       defs 2
 _plat_mouse_buttons: defs 1
-_plat_mouse_present: defs 1
-_plat_mouse_polls:   defs 2
-_plat_mouse_raw:     defs 10
-_plat_mouse_enabled: defs 1
-_plat_mouse_detect:  defs 1
-_plat_mouse_retry:   defs 1
 _plat_mouse_prev_x:  defs 2
 _plat_mouse_prev_y:  defs 2
 _plat_mouse_buttons_last: defs 1
