@@ -5,7 +5,7 @@
         call    set_alert_message
         call    play_rising_tone
 .L90af  ld      hl,levelmap
-        ld      bc,9216
+        ld      bc,MAP_CELLS
 .L90b5  call    get_random_number
         and     127
         call    z,ignite_cell_if_flammable
@@ -36,7 +36,7 @@
         call    set_alert_message
         call    play_falling_tone
 .L90dd  ld      hl,levelmap
-        ld      bc,9216
+        ld      bc,MAP_CELLS
 .L90e3  ld      a,(hl)
         bit     7,a
         jr      nz,L90fc                ; (20)

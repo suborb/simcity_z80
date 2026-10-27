@@ -23,6 +23,12 @@
 
 ; ---- driver ------------------------------------------------------------
 test_start:
+        IFDEF   POWER_SCAN_TEST
+        jp      power_scan_test_start
+        ELSE
+        IFDEF   MAPSIZE_TEST
+        jp      mapsize_test            ; (test/mapsize: the map arithmetic, not a simulation)
+        ENDIF
         ld      sp,$fff0
         di
         call    sim_init
@@ -129,6 +135,7 @@ test_view_col:
         djnz    test_view_row
 test_done:
         jr      test_done               ; z88dk-ticks stops here (-end)
+        ENDIF
 
         IN_DATA
 test_ticks:     defw    1               ; patched by the harness
@@ -145,6 +152,10 @@ test_view_out:  defs    16*32*9         ; per cell: 8 bytes of art + attribute
 
 ; ---- the engine --------------------------------------------------------
         INCLUDE "../../engine/engine.asm"
+
+        IFDEF   POWER_SCAN_TEST
+        INCLUDE "../../test/power_scan/driver.asm"
+        ENDIF
 
 ; ---- settings the engine reads (normally owned by the UI) -----------------
         IN_DATA
@@ -180,3 +191,7 @@ render_status_bar:      ret
         IN_RODATA
 text_generating_landscape:      defb    0
         IN_CODE
+
+        IFDEF   MAPSIZE_TEST
+        INCLUDE "../../test/mapsize/driver.asm"
+        ENDIF

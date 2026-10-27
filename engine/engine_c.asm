@@ -38,13 +38,16 @@
         EXTERN  text_generating_landscape
 
         INCLUDE "engine.asm"
+        IN_CODE                         ; (the glue below is not in the engine's bank)
 
 ; ---- calls ------------------------------------------------------------
 _sim_new_city:
         push    ix
         push    iy
+        BANK_IN
         call    sim_task_reset          ;a new city abandons any tick in progress
         call    sim_new_city
+        BANK_OUT
         pop     iy
         pop     ix
         ret
@@ -52,7 +55,9 @@ _sim_new_city:
 _sim_init:
         push    ix
         push    iy
+        BANK_IN
         call    sim_init
+        BANK_OUT
         pop     iy
         pop     ix
         ret
@@ -60,7 +65,9 @@ _sim_init:
 _sim_tick:
         push    ix
         push    iy
+        BANK_IN
         call    sim_tick
+        BANK_OUT
         pop     iy
         pop     ix
         ret
@@ -78,7 +85,9 @@ _sim_step:
         pop     hl
         ld      (z88_int_state),hl
         ENDIF
+        BANK_IN                         ; (the simulation runs in its bank until it yields, which comes back here)
         call    sim_step                ;L = 1 when a whole tick has completed
+        BANK_OUT
         IFDEF   Z88_DI_SIM
         push    hl                      ;the result
         ld      hl,(z88_int_state)
@@ -95,7 +104,9 @@ _sim_periodic:
         push    ix
         push    iy
         ld      a,(_engine_a)
+        BANK_IN
         call    sim_periodic
+        BANK_OUT
         pop     iy
         pop     ix
         ret
@@ -106,8 +117,10 @@ _sim_periodic:
 _budget_recalc:
         push    ix
         push    iy
+        BANK_IN
         call    calculate_tax
         call    run_budget
+        BANK_OUT
         pop     iy
         pop     ix
         ret
@@ -117,8 +130,10 @@ _budget_recalc:
 _sim_loaded:
         push    ix
         push    iy
+        BANK_IN
         call    sim_task_reset
         call    sim_init
+        BANK_OUT
         pop     iy
         pop     ix
         ret
@@ -126,7 +141,9 @@ _sim_loaded:
 _tool_apply:
         push    ix
         push    iy
+        BANK_IN
         call    tool_apply
+        BANK_OUT
         pop     iy
         pop     ix
         ret

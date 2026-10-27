@@ -1,6 +1,6 @@
 /* Saving and loading a city.  The file is what the Spectrum writes to tape, without the tape
    framing: a 31 byte header (the 12 character file name, 7 bytes of money, month and year from the
-   engine's variables, and the 12 character city name) and then the 9216 byte map. */
+   engine's variables, and the 12 character city name) and then the map (MAP_W * MAP_H bytes: 9216 at 96x96). */
 #ifndef CITYFILE_H
 #define CITYFILE_H
 

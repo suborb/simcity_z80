@@ -44,6 +44,9 @@ move_transport_sprite:                                    ; $77DC / 30684 - If t
         jr      z,L7822                 ; (14)
         ld      a,(V_transport_new_dir)               ;Direction to look in
         call    levelmap_addr_in_direction                   ;Move in direction
+        IF      MAP_W != 96
+        jr      nc,L7822                ; off-map neighbour
+        ENDIF
         ld      a,(hl)
         call    tile_to_flags
         and     2

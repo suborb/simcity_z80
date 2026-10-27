@@ -1,12 +1,11 @@
 // z88dk pragmas for the ZX Spectrum build, used by the Makefile and tile test.
-// (The load address is -zorg=24000 on the command line: below about that appmake embeds
+// (The load address is -zorg=23900 on the command line: below about that appmake embeds
 // the program in a BASIC REM line at 23760 instead of using a separate loader.)
 
 #pragma output CRT_ORG_CODE = 24000
 // The stack grows down from the start of the program, over the loader and BASIC workspace (the game never goes
-// back to BASIC), and stops short of the ROM's system variables at $5C00-$5CB5.  The game needs about 200 bytes
-// of it: measure with a pattern in the area under ticks (see the porting notes) if the UI changes.
-#pragma output REGISTER_SP = 24000
+// back to BASIC).  It needs about 200 bytes; this origin allows it to use part of the system-variable area.
+#pragma output REGISTER_SP = 23900
 #pragma output CRT_ENABLE_STDIO = 0
 #pragma output CLIB_EXIT_STACK_SIZE = 0
 #pragma output CRT_DISABLELOADER = 1

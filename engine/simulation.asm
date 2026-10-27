@@ -1,15 +1,21 @@
 ; simulation: lines 4985-8158 of disassembly/sim_game.asm (engine)
+
 ; Thing this gets the top left of the zone for a map position
 fill_zone_with_tile:                                    ; $7B86 / 31622 - Find top-left of zone at HL, fill entire zone area with V_fill_tile tile
 .L7b86  push    hl
         pop     ix
         call    find_left_edge_of_zone
-        ld      de,-96
+        IF      MAP_W == 96
+        ld      de,-MAP_W
 
 .L7b8f  bit     5,(ix+0)
         jr      nz,L7b99                ; (4)
         add     ix,de
         jr      L7b8f                   ; (-10)
+        ELSE
+        call    find_top_edge_of_zone
+        ret     nc
+        ENDIF
 
 .L7b99  ld      a,(ix+0)
         and     7
@@ -32,7 +38,7 @@ SMC_31652:
         dec     c
         jr      nz,L7ba6                ; (-11)
         pop     ix
-        ld      de,96
+        ld      de,MAP_W
         add     ix,de
         djnz    L7ba2                   ; (-24)
         ret     
@@ -41,13 +47,18 @@ SMC_31652:
 .L7bbb  push    hl
         pop     ix
         call    find_left_edge_of_zone
-        ld      de,-96
+        IF      MAP_W == 96
+        ld      de,-MAP_W
 
 tornado_find_zone_top:                                    ; $7BC4 / 31684 - Walk IX upward (-96) until bit 5 set; used by tornado zone-destruction path
 .L7bc4  bit     5,(ix+0)
         jr      nz,L7bce                ; (4)
         add     ix,de
         jr      tornado_find_zone_top                   ; (-10)
+        ELSE
+        call    find_top_edge_of_zone
+        ret     nc
+        ENDIF
 
 .L7bce  ld      a,(ix+0)
         and     7
@@ -70,7 +81,7 @@ SMC_31705:
         dec     c
         jr      nz,L7bdb                ; (-10)
         pop     ix
-        ld      de,96
+        ld      de,MAP_W
         add     ix,de
         djnz    L7bd7                   ; (-23)
         ret     
@@ -89,18 +100,18 @@ D_station_influence_kernel:                        ; $7BEF / 31727
         defb    $02, $01, $01, $01, $02 
         defb    $09, $02, $01, $02, $09 
         defb    $09, $09, $02, $09, $09
-        IN_CODE
+        IN_SIM_CODE
 
 
         IN_DATA
 V_FireEffect:    defb        0       ; VAR $7C08 / 31752 -
-        IN_CODE
+        IN_SIM_CODE
 
 apply_fire_station_kernel:                                    ; $7C09 / 31753 - Apply D_station_influence_kernel 5x5 around current pos to fire coverage minimap
 .L7c09  ld      bc,(V_map_iter_xy)
         ld      ix,D_station_influence_kernel
         call    get_fire_minimap_value           ;Fire map
-        ld      de,50
+        ld      de,2*MM25_W+2
         and     a
         sbc     hl,de
         ld      d,5
@@ -112,7 +123,7 @@ apply_fire_station_kernel:                                    ; $7C09 / 31753 - 
         dec     e
         jr      nz,L7c1f                ; (-9)
         pop     hl
-        ld      bc,24
+        ld      bc,MM25_W
         add     hl,bc
         dec     d
         jr      nz,L7c1c                ; (-20)
@@ -120,13 +131,13 @@ apply_fire_station_kernel:                                    ; $7C09 / 31753 - 
 
         IN_DATA
 V_PoliceEffect:    defb    0       ; VAR $7C31 / 31793 -
-        IN_CODE
+        IN_SIM_CODE
 
 apply_police_station_kernel:                                    ; $7C32 / 31794 - Apply D_station_influence_kernel 5x5 around current pos to police coverage minimap
 .L7c32  ld      bc,(V_map_iter_xy)
         ld      ix,D_station_influence_kernel
         call    get_police_minimap_value           ;Get police minimap address
-        ld      de,50           ;Go 8 tiles up and two left??
+        ld      de,2*MM25_W+2   ;Go 8 tiles up and two left??
         and     a
         sbc     hl,de
         ld      d,5             ;5x5 zone around it?
@@ -138,7 +149,7 @@ apply_police_station_kernel:                                    ; $7C32 / 31794 
         dec     e
         jr      nz,L7c48                ; (-9)
         pop     hl
-        ld      bc,24           ;4 rows down
+        ld      bc,MM25_W       ;4 rows down
         add     hl,bc
         dec     d
         jr      nz,L7c45                ; (-20)
@@ -191,11 +202,11 @@ D_stadium_effect_kernel:                        ; $7C77 / 31863
         defb    $09, $05, $01, $01, $05, $09
         defb    $09, $09, $05, $05, $09, $09
         defb    $09, $09, $09, $09, $09, $09
-        IN_CODE
+        IN_SIM_CODE
 
         IN_DATA
 V_traffic_bfs_steps:    defb    $ff       ; VAR $7CBF / 31935 - traffic BFS step limit (initialised to 5, decremented per step; $ff = inactive)
-        IN_CODE
+        IN_SIM_CODE
 
 
 apply_stadium_kernel_from_iter:                                    ; $7CC0 / 31936 - Load BC from V_map_iter_xy and IX from D_stadium_effect_kernel, then call apply_stadium_kernel
@@ -207,7 +218,7 @@ apply_stadium_kernel_from_iter:                                    ; $7CC0 / 319
 ; do_minimap_pollution use.
 apply_stadium_kernel:                                    ; $7CC8 / 31944
 .L7cc8  call    get_land_value_minimap_value       ;minimaps+2304
-        ld      de,98
+        ld      de,2*MM50_W+2
         and     a
         sbc     hl,de
         ld      d,6
@@ -219,7 +230,7 @@ apply_stadium_kernel:                                    ; $7CC8 / 31944
         dec     e
         jr      nz,L7cd6                ; (-9)
         pop     hl
-        ld      bc,48
+        ld      bc,MM50_W
         add     hl,bc
         dec     d
         jr      nz,L7cd3                ; (-20)
@@ -252,6 +263,11 @@ accumulate_pollution:                                    ; $7CFE / 31998 - Read 
         ld      hl,(V_pollution_sum)
         add     hl,de
         ld      (V_pollution_sum),hl
+        IF      MAP_W != 96
+        ld      a,(V_pollution_sum_high)
+        adc     a,0
+        ld      (V_pollution_sum_high),a
+        ENDIF
         ld      hl,(V_pollution_count)
         inc     hl
         ld      (V_pollution_count),hl
@@ -271,7 +287,7 @@ V_zone_best_coords:    defw        0       ; VAR $7D2B / 32043 - map coords of h
 
 
 V_zone_size_to_scan:    defw    0       ; VAR $7D2D / 32045 - size of zone to scan
-        IN_CODE
+        IN_SIM_CODE
 
 scan_zone_with_size:                                    ; $7D2F / 32047 - Store HL as zone scan size in V_zone_size_to_scan, then enter zone scan loop
 .L7d2f  ld      (V_zone_size_to_scan),hl
@@ -468,7 +484,7 @@ V_zone_trees:    defb        0       ; VAR $7E19 / 32281 - tree tile count withi
 V_zone_transport_count:    defb        0       ; VAR $7E1A / 32282 - transport tile count within 3x3 zone scan
 V_zone_transport_score:    defb        0       ; VAR $7E1B / 32283 - accumulated transport score (capped at 127)
 V_zone_land_value_base:    defb        0       ; VAR $7E1C / 32284 - combined land value base score (parks + transport - pollution)
-        IN_CODE
+        IN_SIM_CODE
 
 
 ;
@@ -532,7 +548,7 @@ proximity_score_to_centroid:                                    ; $7E5A / 32346 
 
         IN_DATA
 V_zone_police_score:    defb    0       ; VAR $7E69 / 32361 - police coverage score for zone (proximity to police station)
-        IN_CODE
+        IN_SIM_CODE
 
 ; Despite the name this produces a CRIME figure for the zone, later subtracted
 ; from its land value:
@@ -570,7 +586,7 @@ calc_police_coverage_score:                                    ; $7E6A / 32362
 
         IN_DATA
 V_zone_tax_penalty:    defb        0       ; VAR $7E9A / 32410 - tax rate * 8 + difficulty bonus; subtracted from zone land value
-        IN_CODE
+        IN_SIM_CODE
 
 ; penalty = tax_rate * 8, plus one more tax_rate for difficulty 1 and 2, plus a
 ; second one for difficulty 1 only (so *8, *10, *9 for difficulty 0, 1, 2 - the
@@ -603,7 +619,7 @@ V_zone_landval_local:    defb        0       ; VAR $7EBF / 32447 - zone's local 
 V_zone_traffic_density:    defb        0       ; VAR $7EC0 / 32448 - zone's traffic density from traffic minimap
 V_zone_landval_final:    defb        0       ; VAR $7EC1 / 32449 - final computed land value for this zone (0-255)
 V_zone_landval_mult:    defw        0       ; VAR $7EC2 / 32450 - land value demand multiplier (scales growth/shrink probability)
-        IN_CODE
+        IN_SIM_CODE
 
 ; Compute the final land value of the zone being processed (0-255).
 ;
@@ -669,7 +685,7 @@ clamp_h_to_byte:                                    ; $7F04 / 32516 - If H=0 ret
         IN_DATA
 V_zone_growth_factor:    defb    0       ; VAR $7F10 / 32528 - zone growth probability factor (land value based)
 V_zone_half_landval:    defb    0       ; VAR $7F11 / 32529 - half of zone land value (used in population growth threshold)
-        IN_CODE
+        IN_SIM_CODE
 
 ; Derive the residential growth thresholds from land value.
 ;   V_zone_half_landval = value / 2                     (value < 128)
@@ -711,7 +727,7 @@ V_zone_half_landval:    defb    0       ; VAR $7F11 / 32529 - half of zone land 
         IN_DATA
 V_com_growth_index:    defb    0       ; VAR $7F43 / 32579 -
 V_com_growth_scaled:    defb    0       ; VAR $7F44 / 32580 - unused?
-        IN_CODE
+        IN_SIM_CODE
 
 
 calc_commercial_growth_index:                                    ; $7F45 / 32581 - Compute land value / 25 -> V_com_growth_index growth index; *4 -> V_com_growth_scaled; for commercial zone upgrade
@@ -731,7 +747,7 @@ calc_commercial_growth_index:                                    ; $7F45 / 32581
         IN_DATA
 V_ind_growth_index:    defb    0       ; VAR $7F5D / 32605 -
 V_ind_growth_scaled:    defb    0       ; VAR $7F5E / 32606 - unused?
-        IN_CODE
+        IN_SIM_CODE
 
 
 calc_industrial_growth_index:                                    ; $7F5F / 32607 - Compute land value / 31 -> V_ind_growth_index growth index; *8 -> V_ind_growth_scaled; for industrial zone upgrade
@@ -752,14 +768,14 @@ calc_industrial_growth_index:                                    ; $7F5F / 32607
 
 ; Holds result f searching the map - address within map?
         IN_BSS
-V_powerstation_list:    defs        32          ; VAR $7F78 / 32632 - : 32632/7f78 - list of map addresses for all power stations (16 x 2-byte entries, zero-terminated)
-        IN_CODE
+V_powerstation_list:    defs        POWER_STATION_LIST_BYTES ; map addresses of power stations, then a zero terminator
+        IN_SIM_CODE
 
 
 build_powerstation_list:                                    ; $7F98 / 32664 - Scan levelmap for power station tiles (coal/nuclear); store addresses into V_powerstation_list
 .L7f98  ld      ix,V_powerstation_list
         ld      hl,levelmap         ;Search for a power station
-        ld      bc,9216             ;somehow we know it exists?
+        ld      bc,MAP_CELLS        ;somehow we know it exists?
 powerstation_list_scan_loop:                                    ; $7FA2 / 32674 - Inner loop of build_powerstation_list: cpir for $B4, check coal/nuclear type, record address
 .L7fa2  ld      a,$b4
         cpir    
@@ -776,113 +792,244 @@ powerstation_list_scan_loop:                                    ; $7FA2 / 32674 
         ld      (ix+1),0
         ret     
 .L7fbe  dec     hl
+        IF      POWER_CITYWIDE
+        ; Keep the list bounded even if a loaded or damaged map contains more station markers than fit its legal 4x4 placement capacity.
+        push    hl
+        push    ix
+        pop     hl
+        ld      de,V_powerstation_list+2*POWER_STATION_SLOTS
+        and     a
+        sbc     hl,de
+        pop     hl
+        jr      nc,powerstation_list_skip
+        ENDIF
         ld      (ix+0),l
         inc     ix
         ld      (ix+0),h
         inc     ix
+        IF      POWER_CITYWIDE
+powerstation_list_skip:
+        ENDIF
         inc     hl
         jr      powerstation_list_scan_loop                   ; (-42)
 
 
         IN_DATA
 V_brownout_detected:    defb    0       ; VAR $7FCC / 32716 - (32716/7fcc) - brownouts detected
-        IN_CODE
+        IN_SIM_CODE
 
 generate_power_map:
-.L7fcd  call    build_powerstation_list
-        ld      hl,minimaps + 5760              ;Clear power map
-        ld      de,minimaps + 5760 + 1
-        ld      bc,1151
+.L7fcd
+        call    build_powerstation_list
+        ld      hl,minimaps + MMO_POWER          ;Clear power map
+        ld      de,minimaps + MMO_POWER + 1
+        ld      bc,MMO_POWER_SIZE-1
         ld      (hl),0
         ldir    
         xor     a
         ld      (V_brownout_detected),a
-        ld      ix,V_powerstation_list                  ;Map address of power stations
-power_bfs_per_station:                                    ; $7FE5 / 32741 - For each station in V_powerstation_list: set power budget, start BFS from station coords
-.L7fe5  ld      l,(ix+0)
+        IF      POWER_CITYWIDE
+        call    power_bfs_start              ;One scan from all stations; capacity is shared citywide
+        ret
+        ELSE
+        ld      ix,V_powerstation_list
+power_bfs_per_station:
+        ld      l,(ix+0)
         ld      h,(ix+1)
         ld      a,h
         or      l
         ret     z
         inc     hl
-        ld      a,(hl)                      ;Find power station type
+        ld      a,(hl)
         and     63
         dec     hl
-        ld      de,1350                     ;Amount of power available for nuclear
+        ld      de,1350
         cp      8
-        jr      z,L7ffd                 ; (3)
-        ld      de,450                      ;Coal power is a lot less
-
-.L7ffd  ld      (V_power_units_left),de              ;Power available
+        jr      z,power_bfs_legacy_budget_set
+        ld      de,450
+power_bfs_legacy_budget_set:
+        ld      (V_power_units_left),de
         call    map_addr_to_xy
-        ld      (V_power_bfs_pos),bc              ;Current coordinates
+        ld      (V_power_bfs_pos),bc
         push    ix
-        call    power_bfs_start                   ;Start tracing the connections
+        call    power_bfs_start
         pop     ix
         inc     ix
         inc     ix
-        jr      power_bfs_per_station                   ; (-48)
+        jr      power_bfs_per_station
+        ENDIF
 
 ;8015
         IN_DATA
 V_power_bfs_down:        defb    0       ; VAR $8015 / 32789 - power BFS downward traversal flag (set if going south, prevents backtrack)
 V_power_bfs_up:        defb    0       ; VAR $8016 / 32790 - power BFS upward traversal flag (set if going north, prevents backtrack)
 V_power_bfs_pos:        defw    0       ; VAR $8017 / 32791 - power BFS current map coordinates (b=y, c=x)
-V_power_units_left: defw    0          ; VAR $8019 / 32793 - power units remaining from current station (coal=450, nuclear=1350; decrements each powered tile)
+V_power_units_left: defw    0          ; remaining power capacity (citywide portable scan, per station in legacy path)
 V_powersp:  defw    0       ; VAR $801B / 32795 - saved stack when aborting power search 
-        IN_CODE
+        IN_SIM_CODE
 
+        IF      MAP_W == 96
         IN_BSS
-V_powerqueue:   defs    256 ; VAR $801D / 32797 - list of coordinates to check for power connection
-        IN_CODE
+        ELSE
+        IN_ENGINE_BSS
+        ENDIF
+V_powerqueue:   defs    POWER_QUEUE_BYTES ; coordinate-pair queue, also reused as a short traffic-path stack
+        IN_SIM_CODE
 
 
 
 ;
-; Power distribution for ONE power station - a scan-line flood fill over every
-; tile that conducts power (check_tile_needs_power: not yet powered AND either a
-; zone or a tile with flag bit 3, i.e. power line / station).
+; PORTABLE power distribution uses one citywide capacity, matching Micropolis. The
+; power map is also the visited map: each reached conductor is marked once
+; and consumes one unit from the combined plant budget.
 ;
-;   1. seed the queue with a $FFFF end marker and the station's coordinates
+;   1. sum plant capacities and seed the queue with all station coordinates
 ;   2. pop a seed; run LEFT until the next tile does not conduct
 ;   3. run RIGHT along the row: power each tile (set_tile_as_powered) and look at
 ;      the tiles directly above and below (power_bfs_expand_row).  A neighbour
 ;      that conducts is queued as a new seed - but only once per run, tracked
 ;      by V_power_bfs_up / V_power_bfs_down - so a long wire running alongside
 ;      is not queued for every cell.
-;   4. repeat until the end marker is popped.
+;   4. stop when capacity is exhausted and another unpowered conductor is
+;      reached; increment V_brownout_detected and leave the rest unpowered.
 ;
-; Each powered tile uses up one unit of the station's budget (V_power_units_left:
-; 450 coal, 1350 nuclear).  When it hits zero set_tile_as_powered abandons the
-; whole search by reloading SP from V_powersp - which makes this routine return
-; straight to its caller - and bumps V_brownout_detected.
-power_bfs_start:                                    ; $811D / 33053
-.L811d  call    check_tile_needs_power
-        ret     nz              ;We don't need power
-        ld      ix,V_powerqueue            ;801d
+; PORTABLE capacity is 450/1,350 on 96x96 maps and 700/2,000 on 120x100 maps,
+; summed across stations and capped at the number of map cells. The IFNDEF
+; PORTABLE path retains the original independent per-station budgets.
+; The portable path yields between seeds and during queue refills because this
+; scan runs before the simulation's normal row-by-row yields.
+power_bfs_start:
+        IF      POWER_CITYWIDE
         ld      (V_powersp),sp
-        ld      bc,$ffff        ;Place an endmarker
-        call    powerqueue_push_bc          
-        ld      bc,(V_power_bfs_pos)      ;Current coordinate we're dealing with
+        ld      hl,0
+        ld      (V_power_units_left),hl
+        xor     a
+        ld      (V_brownout_detected),a
+        ld      ix,V_powerqueue
+        ld      bc,$ffff
+        call    powerqueue_push_bc          ;bottom-of-stack end marker
+        ld      hl,V_powerstation_list
+power_bfs_seed_stations:
+        ld      e,(hl)
+        inc     hl
+        ld      d,(hl)
+        inc     hl
+        ld      a,d
+        or      e
+        jr      nz,power_bfs_have_station
+        jr      power_bfs_next
+power_bfs_have_station:
+        push    hl                          ;save station-list pointer
+        ex      de,hl                       ;station map address
+        push    hl
+        inc     hl
+        ld      a,(hl)
+        and     63
+        cp      8
+        jr      z,power_bfs_seed_nuclear
+        IF      MAP_W == 120
+        ld      de,700
+        ELSE
+        ld      de,450
+        ENDIF
+        jr      power_bfs_add_capacity
+power_bfs_seed_nuclear:
+        IF      MAP_W == 120
+        ld      de,2000
+        ELSE
+        ld      de,1350
+        ENDIF
+power_bfs_add_capacity:
+        ld      hl,(V_power_units_left)
+        add     hl,de
+        jr      c,power_bfs_capacity_full
+        push    hl
+        ld      de,MAP_CELLS
+        and     a
+        sbc     hl,de
+        pop     hl
+        jr      c,power_bfs_store_capacity
+power_bfs_capacity_full:
+        ld      hl,MAP_CELLS
+power_bfs_store_capacity:
+        ld      (V_power_units_left),hl
+        pop     hl                          ;restore station map address
+        call    map_addr_to_xy
+        call    powerqueue_push_bc          ;seed this station
+        pop     hl                          ;restore station-list pointer
+        call    sim_yield                   ;keep the UI responsive while many plants are seeded
+        jr      power_bfs_seed_stations
+        ELSE
+        call    check_tile_needs_power
+        ret     nz
+        ld      ix,V_powerqueue
+        ld      (V_powersp),sp
+        ld      bc,$ffff
         call    powerqueue_push_bc
+        ld      bc,(V_power_bfs_pos)
+        call    powerqueue_push_bc
+        ENDIF
 power_bfs_next:                                    ; $8136 / 33078 - Pop next coords from power queue; return if sentinel (BFS complete)
 .L8136  call    powerqueue_pop_to_bc           ;Get next cell 
         ld      a,b             ;Check if we're at the end
         cp      255
+        IF      POWER_CITYWIDE
+        jr      nz,power_bfs_process_seed
+        ld      a,(V_brownout_detected)
+        or      a
         ret     z
+        xor     a
+        ld      (V_brownout_detected),a
+        ld      ix,V_powerqueue
+        ld      bc,$ffff
+        call    powerqueue_push_bc
+        call    power_bfs_refill_queue
+        jr      power_bfs_next
+power_bfs_process_seed:
+        call    sim_yield                   ;power distribution runs before the tick's row-by-row yields
+        call    check_tile_needs_power
+        jr      nz,power_bfs_next
+        ELSE
+        ret     z
+        ENDIF
 power_bfs_scan_left:                                    ; $813D / 33085 - From current BC, scan left (dec C) until tile does not need power; column scan entry
-.L813d  call    check_tile_needs_power
+.L813d  IF      POWER_CITYWIDE
+        call    check_tile_conducts
+        ELSE
+        call    check_tile_needs_power
+        ENDIF
         jr      nz,L8145                ; We don't need power
         dec     c
         jr      power_bfs_scan_left                   ; Go left and try again
 
 .L8145  inc     c                       ;Check right
+        IF      POWER_CITYWIDE
+        call    check_tile_conducts
+        ELSE
         call    check_tile_needs_power
-        jr      nz,power_bfs_next                ;Power not needed, go get next starting point
+        ENDIF
+        jr      nz,power_bfs_next                ;No conductor at this seed
         xor     a
         ld      (V_power_bfs_down),a           ;Down power check indicator
         ld      (V_power_bfs_up),a           ;Up power check indicator
-.L8152  call    set_tile_as_powered ;Turns power on for tile
+.L8152
+        IF      POWER_CITYWIDE
+        call    check_tile_needs_power
+        jr      nz,power_bfs_already_powered
+        ld      hl,(V_power_units_left)
+        ld      a,h
+        or      l
+        jr      nz,power_bfs_capacity_available
+        ld      sp,(V_powersp)
+        ld      hl,V_brownout_detected
+        ld      (hl),1
+        ret
+power_bfs_capacity_available:
+        ENDIF
+        call    set_tile_as_powered ;Turns power on and charges only new cells
+        IF      POWER_CITYWIDE
+power_bfs_already_powered:
+        ENDIF
         dec     b                   ;Up a row
         ld      hl,V_power_bfs_down
         call    power_bfs_expand_row
@@ -892,25 +1039,87 @@ power_bfs_scan_left:                                    ; $813D / 33085 - From c
         call    power_bfs_expand_row
         dec     b                   ;And then to the right
         inc     c
+        IF      POWER_CITYWIDE
+        call    check_tile_conducts
+        ELSE
         call    check_tile_needs_power
+        ENDIF
         jr      z,L8152                 ; (-25)
         jr      power_bfs_next                   ; (-55)
 
 power_bfs_expand_row:                                    ; $816D / 33133 - From BC in power BFS, check tiles above/below for power need; push unvisited to queue
-.L816d  call    check_tile_needs_power
-        jr      nz,L818c                ; (26)
+.L816d  IF      POWER_CITYWIDE
+        call    check_tile_conducts
+        jr      nz,L818c                ; Not a conductor: clear the direction flag.
+        call    check_tile_needs_power
+        jr      nz,power_bfs_expand_seen
+        ELSE
+        call    check_tile_needs_power
+        jr      nz,L818c
+        ENDIF
         ld      a,(hl)                  ;Flag that we've already checked in this direction
         and     a
         ret     nz
         ld      (hl),1
                                         ;Fall into adding another point for consideration
+        IF      POWER_CITYWIDE
+        jr      powerqueue_push_bc
+power_bfs_expand_seen:
+        ld      (hl),1
+        ret
+; A full queue can drop a vertical seed. Once the current batch drains, walk
+; the powered cells and queue unvisited conductors immediately
+; above or below them. Refill batches until the connected grid is exhausted.
+power_bfs_refill_queue:
+        ld      b,0
+power_bfs_refill_row:
+        ld      c,0
+power_bfs_refill_col:
+        call    get_power_map_addr
+        ld      a,(hl)
+        and     e
+        jr      z,power_bfs_refill_next
+        xor     a
+        ld      (V_power_bfs_down),a
+        ld      (V_power_bfs_up),a
+        dec     b
+        ld      hl,V_power_bfs_down
+        call    power_bfs_expand_row
+        inc     b
+        inc     b
+        ld      hl,V_power_bfs_up
+        call    power_bfs_expand_row
+        dec     b
+power_bfs_refill_next:
+        inc     c
+        ld      a,c
+        cp      MAP_W
+        jr      nz,power_bfs_refill_col
+        inc     b
+        ld      a,b
+        cp      MAP_H
+        jr      z,power_bfs_refill_done
+        call    sim_yield                   ;a refill can scan the whole map; yield once per row
+        jr      power_bfs_refill_row
+power_bfs_refill_done:
+        ret
+        ENDIF
+
 powerqueue_push_bc:                                    ; $8177 / 33143 - Push BC coords onto V_powerqueue at IX; guard against overflow
 .L8177  push    ix
         pop     hl
-        ld      de,V_powerqueue+256     ;FIXME: Check that we've not run out of space
+        ld      de,V_powerqueue+POWER_QUEUE_BYTES
         and     a
         sbc     hl,de
+        IF      POWER_CITYWIDE
+        jr      c,powerqueue_push_room
+        ld      a,1
+        ld      (V_brownout_detected),a ;temporary queue-overflow flag until a brownout is confirmed
+        ret
+powerqueue_push_room:
+        ELSE
         ret     nc
+        ENDIF
         ld      (ix+0),c
         inc     ix
         ld      (ix+0),b
@@ -933,6 +1142,43 @@ powerqueue_pop_to_bc:                                    ; $818F / 33167 - Pop n
 ; Exit:    a = 0 + z       we need to supply power
 ;          a = 1 + nz      we don't need to?
 ; Preserves: bc, hl
+        IF      POWER_CITYWIDE
+check_tile_needs_power:
+.L819a  call    check_tile_conducts
+        ret     nz
+        push    hl
+        call    get_power_map_addr
+        ld      a,(hl)
+        and     e
+        pop     hl
+        ret
+
+; Is this an in-bounds conductor, whether already powered or not?
+check_tile_conducts:
+        push    bc
+        push    hl
+        push    bc
+        call    levelmap_xypos_with_check
+        pop     bc
+        jr      nc,power_conducts_no
+check_tile_conducts_at_hl:
+        ld      a,(hl)
+        cp      128
+        jr      nc,L81b8                ; (7)
+        call    tile_to_flags
+        bit     3,a                     ;Needs power?
+        jr      z,power_conducts_no
+.L81b8  xor     a
+        pop     hl
+        pop     bc
+        ret    
+power_conducts_no:
+        ld      a,1
+        and     a
+        pop     hl
+        pop     bc
+        ret     
+        ELSE
 check_tile_needs_power:
 .L819a  push    bc
         push    hl
@@ -962,6 +1208,7 @@ check_tile_needs_power:
         pop     hl
         pop     bc
         ret     
+        ENDIF
 
 ; Turn power for zone
 set_tile_as_powered:
@@ -974,20 +1221,21 @@ set_tile_as_powered:
         ld      hl,(V_power_units_left)          ;We have one less tile we can give power to
         dec     hl
         ld      (V_power_units_left),hl
+        IF      POWER_CITYWIDE == 0             ; (the citywide scan stops itself when the capacity is gone)
         ld      a,h
         or      l
         ret     nz
-        ; Abort power search - we've run out of power to distribute
         ld      sp,(V_powersp)
         ld      hl,V_brownout_detected
         inc     (hl)
+        ENDIF
         ret     
 
 ;33245
         IN_BSS
 V_city_score:           defs    3   ; VAR $81DD / 33245 - calculated city score
 V_previous_city_score:  defs    3   ; VAR $81E0 / 33248 - previous city score
-        IN_CODE
+        IN_SIM_CODE
 
 
 ; cf s_eval.c::GetAssValue()
@@ -1045,7 +1293,7 @@ calculate_city_score:
 
         IN_DATA
 V_unemployment:    defw    0       ; VAR $8265 / 33381 - unemployment level (derived from industrial demand; feeds concern score)
-        IN_CODE
+        IN_SIM_CODE
 
 
 ; (Res-(Com+Ind))*4
@@ -1067,7 +1315,7 @@ set_unemployment:
 V_RValve:    defw    0       ; VAR $827C / 33404 - residential demand index (positive = demand, negative = surplus)
 V_CValve:    defw    0       ; VAR $827E / 33406 - commercial demand index
 V_IValve:    defw    0       ; VAR $8280 / 33408 - industrial demand index
-        IN_CODE
+        IN_SIM_CODE
 
 
 ; Calculate economic balance indices (unemployment, commercial/industrial balance, etc.)
@@ -1233,9 +1481,10 @@ initialise_simulation_variables:
 ;
 ; POWER PROPAGATION (generate_power_map / power_bfs_start):
 ;   For each entry in V_powerstation_list (power station map addresses):
-;     - Coal gives 450 units, Nuclear gives 1350 units (V_power_units_left)
-;     - BFS via V_powerqueue (256-byte queue of BC coords)
-;     - set_tile_as_powered marks power minimap bit; decrements unit counter
+;     - Coal gives 450 units, Nuclear gives 1350 units (120x100: 700/2000; V_power_units_left)
+;     - BFS via V_powerqueue (coordinate-pair queue; capacity is target/map-size dependent)
+;     - already-powered conductors are pass-through cells; only new cells are charged
+;     - set_tile_as_powered marks the power minimap bit and decrements the unit counter
 ;     - If units reach 0 before BFS completes: abort via saved SP,
 ;       increment V_brownout_detected
 ;
@@ -1305,7 +1554,7 @@ initialise_simulation_variables:
         IN_DATA
 .V_zone_dispatch_suppress            defb        0       ; VAR $835D / 33629 -
 .V_sim_loop_counter defb       0       ; VAR $835E / 33630 - loop counter for simulation (increments each time through)
-        IN_CODE
+        IN_SIM_CODE
 
 start_simulation:
         call    zero_simulation_state                           ;Initialise all simulation vars (minimaps, disaster flags, budgets)
@@ -1339,7 +1588,7 @@ zero_simulation_state:                                    ; $83A1 / 33697 - Zero
         ld      (V_CCxy),hl
         ld      hl,minimaps
         ld      de,minimaps+1
-        ld      bc,6911
+        ld      bc,MM_BYTES-1
         ld      (hl),0
         ldir    
         ld      a,255
@@ -1438,16 +1687,23 @@ V_landval_den:        defw        0   ; VAR $8474 / 33908 - land value denominat
 V_traffic_sum:        defw        0   ; VAR $8476 / 33910 - traffic density accumulator (sum, for average)
 V_traffic_count:        defw        0   ; VAR $8478 / 33912 - traffic tile count (denominator for average)
 V_pollution_sum:        defw        0   ; VAR $847A / 33914 - pollution accumulator (sum, for average)
+        IF      MAP_W != 96
+V_pollution_sum_high:   defb        0   ; high byte for the 120x100 pollution accumulator
+        ENDIF
 V_pollution_count:        defw        0   ; VAR $847C / 33916 - pollution tile count (denominator for average)
 V_landval_accum:        defw        0   ; VAR $847E / 33918 - land value accumulator (used by update_stats for tornado centroid)
-        IN_CODE
+        IN_SIM_CODE
 
       
 ;33920
 reset_simulation_vars:
 .L8480  ld      hl,V_CityPop           ;wipe out all populations
         ld      de,V_CityPop+1
+        IF      MAP_W == 96
         ld      bc,60
+        ELSE
+        ld      bc,61
+        ENDIF
         ld      (hl),0
         ldir    
         xor     a
@@ -1466,7 +1722,7 @@ V_safe_NuclearPop:        defw    0           ; VAR $84A0 / 33952
 
 ;V_CCxy
 V_CCxy:    defb $20, $20       ; VAR $84A2 / 33954 - midpoint of active zone extent (x,y); used as tornado spawn target
-        IN_CODE
+        IN_SIM_CODE
 
 
 ; Update safe copies of airport/nuclear pop, land value centroid, pollution average
@@ -1487,16 +1743,67 @@ update_stats:
         ld      (V_safe_NuclearPop),hl  ;Snapshot for disaster probability check
         ld      hl,(V_AirportPop)
         ld      (V_safe_AirportPop),hl  ;Snapshot for aircrash probability check
+        IF      MAP_W == 96
         ld      hl,(V_pollution_sum)
         ld      de,(V_pollution_count)
         call    L_div16x16
         ld      a,l
+        ELSE
+        ; 12,000 8-bit pollution samples need 22 accumulator bits.  The average
+        ; is bounded by 255, so repeated subtraction is a compact exact divide.
+        ld      de,(V_pollution_count)
+        ld      a,d
+        or      e
+        jr      nz,pollution_average_has_samples
+        xor     a                       ; an empty city has no samples: its average is zero
+        ld      (V_PolluteAverage),a
+        ret
+pollution_average_has_samples:
+        ; Divide a working copy: the running numerator keeps accumulating across
+        ; ticks, so do not leave the remainder in the live accumulator.
+        ld      a,(V_pollution_sum_high)
+        push    af
+        ld      hl,(V_pollution_sum)
+        push    hl
+        ld      b,0
+pollution_average_divide:
+        ld      a,(V_pollution_sum_high)
+        or      a
+        jr      nz,pollution_average_subtract_high
+        ld      hl,(V_pollution_sum)
+        ld      de,(V_pollution_count)
+        and     a
+        sbc     hl,de
+        jr      c,pollution_average_done
+        ld      (V_pollution_sum),hl
+        jr      pollution_average_count
+pollution_average_subtract_high:
+        ld      hl,(V_pollution_sum)
+        ld      de,(V_pollution_count)
+        and     a
+        sbc     hl,de
+        ld      (V_pollution_sum),hl
+        ld      a,(V_pollution_sum_high)
+        sbc     a,0
+        ld      (V_pollution_sum_high),a
+pollution_average_count:
+        inc     b
+        jr      pollution_average_divide
+pollution_average_done:
+        ld      a,b
+        ld      (V_PolluteAverage),a
+        pop     hl
+        ld      (V_pollution_sum),hl
+        pop     af
+        ld      (V_pollution_sum_high),a
+        ret
+        ENDIF
         ld      (V_PolluteAverage),a             ;V_PolluteAverage = average pollution level
         ret
 
         IN_DATA
 V_PolluteAverage:    defb        0       ; VAR $84DD / 34013 - average pollution level city-wide (V_pollution_sum / V_pollution_count)
-        IN_CODE
+        IN_SIM_CODE
 
 
 ; Decay pollution minimap and compute average (runs every other tick)
@@ -1504,8 +1811,8 @@ decay_pollution_minimap:                                    ; $84DE / 34014 - On
 .L84de  ld      a,(V_sim_loop_counter)
         and     1
         ret     z
-        ld      hl,minimaps+1152        ;pollution minimap
-        ld      bc,2304
+        ld      hl,minimaps+MMO_POLLUTION    ;pollution minimap
+        ld      bc,MM50_SIZE
         ld      de,$4000
 .L84ed  ld      a,(hl)
         sub     d
@@ -1531,20 +1838,20 @@ decay_pollution_minimap:                                    ; $84DE / 34014 - On
 zero_police_fire_minimaps:                                    ; $850C / 34060 - Zero first 1152 bytes of minimaps (police + fire coverage maps)
 .L850c  ld      hl,minimaps
         ld      de,minimaps+1
-        ld      bc,1151
+        ld      bc,2*MM25_SIZE-1
         ld      (hl),0
         ldir    
         ret     
 
         IN_DATA
 V_TrafficAverage:    defb        0       ; VAR $851A / 34074 - average traffic density city-wide (rolling average from DecTrafficMem)
-        IN_CODE
+        IN_SIM_CODE
 
 ; Decay traffic density minimap every tick; compute rolling average -> V_TrafficAverage
 ; Decay tiers: value<24 -> 0, 24-199 -> sub 24, 200-255 -> sub 34
 DecTrafficMem:
-.L851b  ld      hl,minimaps+3456
-        ld      bc,2304
+.L851b  ld      hl,minimaps+MMO_TRAFFIC
+        ld      bc,MM50_SIZE
 
 .L8521  ld      a,(hl)    
         exx     
@@ -1594,7 +1901,7 @@ traffic_decay_loop_next:                                    ; $854F / 34127 - Ad
         IN_DATA
 V_traffic_active:    defb    0       ; VAR $8568 / 34152 - traffic BFS active (1=road traffic, 2=rail traffic)
 V_Zsource:    defb    0       ; VAR $8569 / 34153 - tile-flag mask for the traffic walk: the transport bits (4=road, 2=rail) of the start tile; only neighbours sharing a bit are walkable
-        IN_CODE
+        IN_SIM_CODE
 
 ;
 ; TRAFFIC MODEL.  Not a true BFS: each call sends a single "commuter" on a
@@ -1689,7 +1996,7 @@ V_Zsource:    defb    0       ; VAR $8569 / 34153 - tile-flag mask for the traff
         IN_DATA
 V_LDir:    defb    0       ; VAR $85D4 / 34260 - traffic BFS previous direction (prevents immediate U-turns)
 V_PosStackN:    defb    0       ; VAR $85D5 / 34261 - traffic BFS steps taken so far (trip ends at 30)
-        IN_CODE
+        IN_SIM_CODE
 
 
 ;
@@ -1737,7 +2044,7 @@ traffic_bfs_check_limit:                                    ; $85FD / 34301 - Ch
 V_traffic_rand_dir:    defb    0       ; VAR $8606 / 34310 - traffic BFS initial random direction (0-3) for this step
 V_traffic_cur_dir:    defb    0       ; VAR $8607 / 34311 - traffic BFS current direction being tried
 V_traffic_attempts:    defb    0       ; VAR $8608 / 34312 - traffic BFS attempts remaining before step fails (tries all 4 directions)
-        IN_CODE
+        IN_SIM_CODE
 
 
 ;
@@ -1762,6 +2069,9 @@ traffic_bfs_try_step:                                    ; $8609 / 34313
         jr      z,L8638                 ; (20)
         ld      a,(V_traffic_cur_dir)
         call    levelmap_addr_in_direction                   ;Get cell in direction
+        IF      MAP_W != 96
+        jr      nc,L8638                ; off-map neighbour
+        ENDIF
         ld      a,(hl)
         bit     7,a
         jr      nz,L8638                ; (9)
@@ -1793,7 +2103,7 @@ traffic_bfs_try_step:                                    ; $8609 / 34313
 
         IN_DATA
 V_zone_neighbour_filter:    defw    0           ; VAR $865E / 34398 -
-        IN_CODE
+        IN_SIM_CODE
 
 ; Look at the four cells orthogonally around BC; if any belongs to a zone whose
 ; handler type (get_zone_handler_type) matches either byte of
@@ -1807,6 +2117,9 @@ find_zone_neighbour_of_type:                                    ; $8660 / 34400 
         ld      a,e
         dec     a
         call    levelmap_addr_in_direction                   ;Get cell in direction
+        IF      MAP_W != 96
+        jr      nc,L8677                ; off-map neighbour
+        ENDIF
         call    get_zone_handler_type
         jr      c,L8677                 ; (10)
         ld      hl,V_zone_neighbour_filter
@@ -1834,9 +2147,9 @@ create_police_fire_minimaps:
         ret     nz
         call    zero_police_fire_minimaps
         ld      hl,levelmap         ;
-        ld      b,96
+        ld      b,MAP_H
         ld      d,0
-.L8690  ld      c,96
+.L8690  ld      c,MAP_W
         ld      e,0
 .L8694  ld      a,(hl)
         and     $f0
@@ -1879,15 +2192,15 @@ V_ZonePwrFlg: defb    0       ; VAR $86C5 / 34501 - zone is powered this cell (1
 V_zone_proc_type: defb    0       ; VAR $86C6 / 34502 - zone processing type (1=big zone centre, 2=compact RIC tile)
 V_CChr: defb    0       ; VAR $86C7 / 34503 - raw tile type of the zone centre tile (used to index D_zone_handler_config)
 V_zone_unpow_tile: defb    0       ; VAR $86C8 / 34504 - unpowered tile variant for check_ric_power
-        IN_CODE
+        IN_SIM_CODE
 
 ; Scan full 96x96 map; evaluate zone tiles and dispatch to zone handlers
 ; Called once per simulation tick
 process_ric_zones:
 .L86c9  ld      hl,levelmap
-        ld      b,96
+        ld      b,MAP_H
         ld      d,0
-.L86d0  ld      c,96
+.L86d0  ld      c,MAP_W
         ld      e,0
 .L86d4  xor     a
         ld      (V_ZonePwrFlg),a             ;Reset per-cell zone state
@@ -1951,7 +2264,7 @@ set_zone_power_state:
 
         IN_DATA
 V_ric_tile_current: defb    0   ; VAR $873B / 34619 - current RIC tile state byte (powered/unpowered variant)
-        IN_CODE
+        IN_SIM_CODE
 
 
 ; Process RIC characters
@@ -2003,7 +2316,7 @@ check_ric_power:
         IN_DATA
 V_map_iter_xy: defw    0       ; VAR $8785 / 34693 - map coordinates whilst iterating
 V_map_iter_addr: defw    0       ; VAR $8787 / 34695 - map address whilst iterating
-        IN_CODE
+        IN_SIM_CODE
 
 
 .L8789  ld      (V_map_iter_addr),hl
@@ -2047,7 +2360,7 @@ update_powered_zone_count:                                    ; $87AA / 34730 - 
 
         IN_DATA
 V_zone_extent:    defb    0, 255, 0, 255      ; VAR $87C8 / 34760 - zone bounding box: minX, maxX, minY, maxY (reset to 0,255,0,255 each tick)
-        IN_CODE
+        IN_SIM_CODE
 
 
 
@@ -2159,12 +2472,12 @@ D_zone_handler_config:                  ; $8813 / 34835 - per-zone config: (tile
         defb    $1d,$0b,$03,$40         ;industrial density 4
         ENDIF
         defb    $ff,$ff                 ;sentinel
-        IN_CODE
+        IN_SIM_CODE
 
         IN_DATA
 V_zone_handler_params:                                        ; VAR $8869 / 34921
         defb    $00, $00         ;VAR 8869/34921 - density/sub-type from D_zone_handler_config for current zone
-        IN_CODE
+        IN_SIM_CODE
 
 ; Dispatch zone handler: search D_zone_handler_config for V_CChr (tile type), load V_zone_handler_params
 ; parameters, then jump via D_zone_handler_table to the appropriate DoXxx handler
@@ -2238,7 +2551,7 @@ L8898_return:
 
         IN_DATA
 V_rail_upgrade_mask:    defb    $FF         ; VAR $88C5 / 35013 -
-        IN_CODE
+        IN_SIM_CODE
 
 .L88c6  ld      hl,V_rail_upgrade_mask
         ld      a,(hl)
@@ -2280,7 +2593,7 @@ V_rail_upgrade_mask:    defb    $FF         ; VAR $88C5 / 35013 -
 
         IN_DATA
 V_road_upgrade_mask:    defb    0       ; VAR $8902 / 35074 -
-        IN_CODE
+        IN_SIM_CODE
 
 .L8903  ld      hl,V_road_upgrade_mask
         ld      a,(hl)
@@ -2374,7 +2687,7 @@ place_dirt:
 
         IN_DATA
 V_flood_timer:  defb    $32         ; VAR $8985 / 35205 -
-        IN_CODE
+        IN_SIM_CODE
 
 .process_flood_tile                     ; $8986 / 35206
 .L8986
@@ -2392,7 +2705,7 @@ V_flood_timer:  defb    $32         ; VAR $8985 / 35205 -
 V_fill_tile:    defb    0       ; VAR $8998 / 35224 -
 V_fill_mode_flag:    defb    0       ; VAR $8999 / 35225 -
 V_fire_neighbour_count:    defb    0       ; VAR $899A / 35226 -
-        IN_CODE
+        IN_SIM_CODE
 
 fire_spread_to_neighbours:                                    ; $899B / 35227 - Scan 4 neighbours of current zone; probabilistically bulldoze flammable tiles to spread fire
 .L899b  xor     a
@@ -2403,7 +2716,11 @@ fire_spread_to_neighbours:                                    ; $899B / 35227 - 
         ld      a,e
         dec     a
         call    coords_add_direction_offset               ;Move coords in direction
+        IF      MAP_W == 96
         call    levelmap_xypos
+        ELSE
+        call    levelmap_xypos_with_check
+        ENDIF
         jr      nc,L89d3                ; (35)
         ld      a,(V_fill_mode_flag)
         and     a
@@ -2471,7 +2788,7 @@ D_zone_ring_offsets:                    ; $8A08 / 35336
         
         
         defb    $01, $4D
-        IN_CODE
+        IN_SIM_CODE
 
 
 ;
@@ -2536,7 +2853,16 @@ zone_ring_grow_ticks:
 ;        c  = nothing changed (ignored cell or already fully built); the
 ;             caller picks another random cell and tries again
 zone_ring_grow:                                    ; $8A53 / 35411
-.L8a53  call    levelmap_xypos
+.L8a53
+        IF      MAP_W == 96
+        call    levelmap_xypos
+        ELSE
+        call    levelmap_xypos_with_check
+        jr      c,zone_ring_grow_on_map
+        scf
+        ret
+zone_ring_grow_on_map:
+        ENDIF
         ld      a,(hl)
         call    tile_to_flags
         bit     4,a
@@ -2583,7 +2909,16 @@ zone_ring_shrink_ticks:                                    ; $8A70 / 35440
 ; If the cell already holds the empty ring tile there is nothing left to remove.
 ; Entry/Exit as zone_ring_grow: nc = a stage was removed, c = nothing changed.
 zone_ring_shrink:                                    ; $8A83 / 35459
-.L8a83  call    levelmap_xypos
+.L8a83
+        IF      MAP_W == 96
+        call    levelmap_xypos
+        ELSE
+        call    levelmap_xypos_with_check
+        jr      c,zone_ring_shrink_on_map
+        scf
+        ret
+zone_ring_shrink_on_map:
+        ENDIF
         ld      a,(hl)
         call    tile_to_flags
         bit     4,a
@@ -2735,7 +3070,7 @@ residential_zone_2:
         defb    $49, $4a, $4b
         defb    $50, $51, $4c
         defb    $4f, $4e, $4d
-        IN_CODE
+        IN_SIM_CODE
 
 
 .L8ba9  ld      ix,residential_zone_1
@@ -2751,7 +3086,7 @@ sim_place_zone_3x3:
 D_density_class_table:                  ; $8BBA / 35770 - population count index -> density class 0-3
         defb    $00, $00, $01, $01, $01, $02
         defb    $02, $03, $03, $03
-        IN_CODE
+        IN_SIM_CODE
         
 
 .L8bc4  ld      hl,(V_ComZPop)
@@ -2828,7 +3163,7 @@ commercial_zone_1:
         defb    $49, $4a, $4b
         defb    $50, $52, $4c
         defb    $4f, $4e, $4d
-        IN_CODE
+        IN_SIM_CODE
 
 
 .L8c4a  ld      bc,(V_map_iter_xy)
@@ -2934,7 +3269,7 @@ industrial_zone_1:
         defb    $49, $4a, $4b
         defb    $50, $53, $4c
         defb    $4f, $4e, $4d
-        IN_CODE
+        IN_SIM_CODE
 
 
 .L8cfa  ld      bc,(V_map_iter_xy)
@@ -3167,7 +3502,7 @@ V_population:   defb    0,0,0        ; VAR $8E90 / 36496 - running population sn
 
 ; Simulation stops whilst waiting for budget confirmation, this variable is checked
 .V_wait_for_budget_confirm defb    0   ; VAR $8E93 / 36499 - set waiting for budget to complete
-        IN_CODE
+        IN_SIM_CODE
 
 
 ; Budget processing - runs every tick to update V_display_population (current pop for display);
@@ -3241,7 +3576,7 @@ V_concern_crime:    defb    0       ; VAR $8F01 / 36609 - crime concern
 V_concern_house_price:    defb    0       ; VAR $8F02 / 36610 - house price concern
 
 V_transport_total:    defw    0       ; VAR $8F03 / 36611 - road/transport total (for city score display)
-        IN_CODE
+        IN_SIM_CODE
 
 
 ; Compute city concern scores from per-tick accumulators
@@ -3271,7 +3606,7 @@ compute_concern_scores:
         IN_DATA
 V_hospital_demand:    defb    0       ; VAR $8F2F / 36655 - hopsital demand
 V_church_demand:    defb    0       ; VAR $8F30 / 36656 - church demand
-        IN_CODE
+        IN_SIM_CODE
 
 ; Determine if we need a hospital or church
 census_church_hosp:
@@ -3311,7 +3646,7 @@ census_church_hosp:
 ;   +4 = month-advance mask (budget fires when sim_loop_counter & this == 0)
         IN_DATA
 V_sim_speed_block:  defb    $08, $07, $07, $07, $01     ; VAR $8F67 / 36711 - 5-byte simulation speed control block (default = NORMAL speed)
-        IN_CODE
+        IN_SIM_CODE
 
 ; Speed settings table: 5 bytes per row, indexed by V_simulation_speed (0=FAST..3=PAUSED)
         IN_RODATA
@@ -3321,7 +3656,7 @@ D_sim_speed_params:                        ; $8F6C / 36716
         defb    $04, $03, $1f, $03, $01     ;NORMAL (month every 2 ticks)
         defb    $03, $07, $3f, $07, $03     ;SLOW   (month every 4 ticks)
         defb    $ff, $ff, $ff, $ff, $ff     ;PAUSED (never advance month)
-        IN_CODE
+        IN_SIM_CODE
 
 
 ; Copy D_sim_speed_params row for current speed into V_sim_speed_block
@@ -3348,4 +3683,4 @@ V_money:       defb  0,0,0   ; VAR $8F97 / 36759 - money!! - 8f99
 V_month:     defb  0       ; VAR $8F9B / 36763 - (8f9b) - Month
 V_year:      defw  1902    ; VAR $8F9C / 36764 - (8f9c) - Year
 V_8f9e:      defb  0       ; VAR $8F9E / 36766 - unreferenced, likely struct padding
-        IN_CODE
+        IN_SIM_CODE

@@ -1,4 +1,7 @@
 ; mapaccess: lines 3870-4333 of disassembly/sim_game.asm (engine)
+        IFDEF   ENGINE_BANK
+        defl    ENGINE_IN_BANK = 0              ; the minimaps' accessors are called by view_cell, which the UI calls: they stay below $4000
+        ENDIF
         IN_DATA
 V_minimap_start:    defw        0   ; VAR $753C / 30012 - 753c/30012, address of mini map being handled
         IN_CODE
@@ -13,6 +16,7 @@ minimap_xypos_50:
         ld      l,b
         ld      h,0
         ld      b,h
+        IF      MM50_W == 48
         add     hl,hl
         add     hl,hl
         add     hl,hl
@@ -20,7 +24,21 @@ minimap_xypos_50:
         ld      d,h
         ld      e,l
         add     hl,hl
-        add     hl,de
+        add     hl,de                   ;*48
+        ELIF    MM50_W == 60
+        add     hl,hl
+        add     hl,hl                   ;*4
+        ld      d,h
+        ld      e,l
+        add     hl,hl
+        add     hl,hl
+        add     hl,hl
+        add     hl,hl                   ;*64
+        and     a
+        sbc     hl,de                   ;*60
+        ELSE
+        call    UNSUPPORTED_MAP_SIZE
+        ENDIF
         add     hl,bc
         ld      bc,(V_minimap_start)
         add     hl,bc
@@ -41,13 +59,27 @@ minimap_xypos_25:
         ld      l,b
         ld      h,0
         ld      b,h
+        IF      MM25_W == 24
         add     hl,hl
         add     hl,hl
         add     hl,hl
         ld      d,h
         ld      e,l
         add     hl,hl
-        add     hl,de
+        add     hl,de                   ;*24
+        ELIF    MM25_W == 30
+        add     hl,hl                   ;*2
+        ld      d,h
+        ld      e,l
+        add     hl,hl
+        add     hl,hl
+        add     hl,hl
+        add     hl,hl                   ;*32
+        and     a
+        sbc     hl,de                   ;*30
+        ELSE
+        call    UNSUPPORTED_MAP_SIZE
+        ENDIF
         add     hl,bc
         ld      bc,(V_minimap_start)
         add     hl,bc
@@ -58,20 +90,20 @@ minimap_xypos_25:
 
 
 get_land_value_minimap_value:                                    ; $7579 / 30073 - Point V_minimap_start at land-value minimap and read value at current map pos
-.L7579  ld      hl,minimaps+1152
+.L7579  ld      hl,minimaps+MMO_POLLUTION
         ld      (V_minimap_start),hl
         jr      minimap_xypos_50                   ; (-67)
 
 
 ; Traffic density map
 get_traffic_density_value:
-.L7581  ld      hl,minimaps+3456
+.L7581  ld      hl,minimaps+MMO_TRAFFIC
         ld      (V_minimap_start),hl
         jr      minimap_xypos_50                   ; (-75)
 
 ; Police minimap - get value
 get_police_minimap_value:                                    ; $7589 / 30089 - Point V_minimap_start at police minimap (minimaps+576) and read value
-.L7589  ld      hl,minimaps+576
+.L7589  ld      hl,minimaps+MMO_POLICE
         ld      (V_minimap_start),hl
         jr      minimap_xypos_25                   ; (-55)
 
@@ -80,6 +112,11 @@ get_fire_minimap_value:                                    ; $7591 / 30097 - Poi
 .L7591  ld      hl,minimaps
         ld      (V_minimap_start),hl
         jr      minimap_xypos_25                   ; (-63)
+
+        IFDEF   ENGINE_BANK
+        defl    ENGINE_IN_BANK = 1
+        ENDIF
+        IN_CODE
 
 ; Entry:    a=tile data in levelmap
 ; Exit:     a=properties
@@ -126,7 +163,9 @@ tile_flags_return:                                    ; $75AC / 30124 - Restore 
         ret     
 
 
-; Write one tile + packed screen-address pair to printer buffer, advance both pointers
+; Write one tile + two bytes of the zone's picture (a group and a piece) into the map at hl, then on to the next row of it (the engine keeps
+; the picture of a zone in the cells of its rows); de = the picture's screen coordinates
+; (the name says printer buffer: it was the Spectrum's, and now is the map)
 ; Entry: a = tile value, hl = dest in buffer, de = screen coords
 .write_print_entry
 .L75cd  ld      (hl),a
@@ -146,7 +185,7 @@ tile_flags_return:                                    ; $75AC / 30124 - Restore 
         and     7
         or      192
         ld      (hl),a
-        ld      bc,94
+        ld      bc,MAP_W-2              ; (the three cells written: the next row of the map)
         add     hl,bc
         ex      de,hl
         ld      bc,3
@@ -187,17 +226,30 @@ get_power_map_addr:
         ld      l,b
         ld      h,0
         ld      b,h
+        IF      MM_POWER_ROW == 12
         add     hl,hl
         add     hl,hl
         ld      d,h
         ld      e,l
         add     hl,hl
         add     hl,de           ;*12
+        ELIF    MM_POWER_ROW == 15
+        ld      d,h
+        ld      e,l
+        add     hl,hl
+        add     hl,hl
+        add     hl,hl
+        add     hl,hl           ;*16
+        and     a
+        sbc     hl,de           ;*15
+        ELSE
+        call    UNSUPPORTED_MAP_SIZE
+        ENDIF
         srl     c
         srl     c
         srl     c
         add     hl,bc
-        ld      bc,minimaps+5760
+        ld      bc,minimaps+MMO_POWER
         add     hl,bc
         ld      e,a            
         cpl     
@@ -238,7 +290,7 @@ get_power_map_addr:
         srl     h
         rra     
         ld      l,a
-        ld      bc,minimaps+5760
+        ld      bc,minimaps+MMO_POWER
         add     hl,bc
         ret     
 
@@ -249,7 +301,7 @@ get_power_map_addr:
 .L7635  ld      de,65536 - levelmap
         add     hl,de
         xor     a
-        ld      de,-96
+        ld      de,-MAP_W
 .L763d  inc     a
         add     hl,de
         jr      c,L763d                 ; (-4)
@@ -309,7 +361,7 @@ l_mult_hlxde:                               ; $7657 / 30295
         jr      nz,L766f                ; (-9)
         pop     hl
         ld      a,d
-        ld      de,48
+        ld      de,MM50_W
         add     hl,de
         ld      d,a
         djnz    L766c                   ; (-21)
@@ -347,13 +399,18 @@ get_zone_handler_type:                                    ; $768E / 30350 - Give
         push    hl
         pop     ix
         call    find_left_edge_of_zone
-        ld      de,-96
+        IF      MAP_W == 96
+        ld      de,-MAP_W
 
 find_special_zone_top:                                    ; $769D / 30365 - Walk IX upward until bit 5 set; extract tile type from IX+1 to look up handler config
 .L769d  bit     5,(ix+0)
         jr      nz,L76a7                ; (4)
         add     ix,de
         jr      find_special_zone_top                   ; (-10)
+        ELSE
+        call    find_top_edge_of_zone
+        jr      nc,L76c9                ; malformed zone reaches top edge
+        ENDIF
 
 .L76a7  ld      a,(ix+1)
         and     63
@@ -412,7 +469,11 @@ D_cardinal_offsets:                     ; $76DC / 30428 - (dx, dy) pairs for 4 c
 levelmap_addr_in_direction:                                    ; $76E4 / 30436 - Entry: a=direction, bc=coords; return HL=levelmap address of neighbour cell in that direction
 .L76e4  push    bc
         call    coords_add_direction_offset
+        IF      MAP_W == 96
         call    levelmap_xypos
+        ELSE
+        call    levelmap_xypos_with_check       ; carry clear: off the map (the callers look)
+        ENDIF
         pop     bc
         ret     
 

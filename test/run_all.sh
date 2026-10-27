@@ -71,6 +71,13 @@ for t in aqplus z88rom zx multi8; do
 done
 echo "== the Z88 card image boots under z88dk-ticks, with OZ stubbed"
 python3 test/z88/boot.py || status=1
+echo "== the map's size: the engine's address arithmetic and a town on a 96x96 and a 120x100 map, under z88dk-ticks"
+python3 test/mapsize/check.py || status=1
+python3 test/mapsize/smoke.py || status=1
+echo "== portable power distribution: connectivity and plant capacity on both map sizes"
+python3 test/power_scan/run.py || status=1
+echo "== SAM Coupe: the animations' routine (mp_anim) against its tables, under z88dk-ticks"
+python3 test/sam/anim_check.py || status=1
 if [ -n "$SAM_MAME" ]; then
     echo "== SAM Coupe: save a city as a SAMDOS file and load it back (MAME in \$SAM_MAME; make sam first)"
     test/sam/roundtrip.sh || status=1

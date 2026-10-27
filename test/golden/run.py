@@ -196,6 +196,19 @@ def actions_tools():
     return a
 
 
+def scenario_brownout(c):
+    """A coal plant (450 units) on a power grid of about 800 tiles: the search runs out of power part way, so the cells it reaches first are powered and the
+    rest are not (and zones on both sides): the plant's budget and the abort when it is spent are what is compared with the original."""
+    c.lake(0, 0, 95, 2)
+    c.zone('coal', 6, 6)
+    c.vline(8, 10, 70, TILE_H_POWER)                 # a spine down from the plant
+    for y in range(12, 70, 6):
+        c.hline(9, 70, y, TILE_H_POWER)             # ribs off the spine: 10 rows of 62 tiles
+    for i, name in enumerate(['res', 'com', 'ind', 'res', 'com', 'res', 'ind', 'res']):
+        c.zone(name, 12 + 8 * i, 14 + 6 * (i % 4))   # zones the ribs run past: some reached first, some after the budget is gone
+    c.hline(6, 76, 78, TILE_H_ROAD)
+
+
 def scenario_traffic(c):
     """Roads with seeded traffic densities, to exercise the busy-road pictures."""
     c.hline(10, 40, 20, TILE_H_ROAD)
@@ -216,7 +229,7 @@ def scenario_tools(c):
     c.hline(2, 6, 5, TILE_DIRT)
 
 
-SCENARIOS = {'town': scenario_town, 'unpowered': scenario_unpowered, 'big': scenario_big,
+SCENARIOS = {'town': scenario_town, 'unpowered': scenario_unpowered, 'big': scenario_big, 'brownout': scenario_brownout,
              'tools': scenario_tools, 'traffic': scenario_traffic}
 ACTIONS = {'tools': actions_tools}
 
@@ -248,6 +261,12 @@ def normalise(name, data, syms):
     return bytes(sum(([(w - base) & 255, ((w - base) >> 8) & 255] if w else [0, 0]
                       for w in words(data)), []))
 
+# The sizes engine/mapsize.inc gives by name (defs POWER_QUEUE_BYTES), for the 96x96 map the original Spectrum program has
+# Variables engine/simulation.asm has only for the maps bigger than the original's (inside IF MAP_W != 96)
+BIGGER_MAP_ONLY = {'V_pollution_sum_high'}
+SIZES = {'POWER_STATION_LIST_BYTES': '32', 'POWER_QUEUE_BYTES': '256', 'MAP_CELLS': '9216', 'MM_BYTES': '6912'}
+
+
 def engine_vars():
     """(name, size) for every V_ variable defined by an engine segment."""
     out = []
@@ -259,9 +278,12 @@ def engine_vars():
             if not m:
                 continue
             name, kind, args = m.groups()
+            if name in BIGGER_MAP_ONLY:
+                continue
             args = args.strip()
             if kind == 'defs':
-                n = int(args.split(',')[0], 0)
+                size = args.split(',')[0].strip()
+                n = int(SIZES.get(size, size), 0)       # (a size by name: engine/mapsize.inc's, for the 96x96 map)
             else:
                 n = len([a for a in args.split(',') if a.strip()]) * (2 if kind == 'defw' else 1)
             out.append((name, n))

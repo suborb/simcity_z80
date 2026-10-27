@@ -176,7 +176,7 @@ L7141_found:
         dec     c
         jp      nz,L7138
         pop     hl
-        ld      de,96
+        ld      de,MAP_W
         add     hl,de
         djnz    L7135                   ; (-60)
 .L7171  or      a
@@ -212,7 +212,7 @@ SMC_29056:
         dec     c
         jr      nz,L7182                ; (-12)
         pop     hl
-        ld      de,96
+        ld      de,MAP_W
         add     hl,de
         djnz    L717f                   ; (-22)
         or      a
@@ -249,7 +249,7 @@ SMC_29092:
         dec     c
         jr      nz,L71a6                ; (-10)
         pop     hl
-        ld      de,96
+        ld      de,MAP_W
         add     hl,de
         djnz    L71a3                   ; (-20)
         ret   

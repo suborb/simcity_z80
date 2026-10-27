@@ -1,4 +1,5 @@
         INCLUDE "sections.asm"
+        INCLUDE "mapsize.inc"
 ; Constants the engine needs (the Spectrum build gets these from target/zx-original/zx_start.asm).
         defc        TILE_DIRT = 2
         defc        TILE_WATER = 0

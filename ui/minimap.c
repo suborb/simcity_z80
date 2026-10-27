@@ -9,11 +9,11 @@
 #include "platform.h"
 #include "minimap.h"
 #ifdef HAVE_MINIMAP
-#define MM_POLLUTION_OFFSET 1152            /* into minimaps[] */
-#define MM_FIRE_OFFSET      0
-#define MM_POLICE_OFFSET    576
-#define MM_TRAFFIC_OFFSET   3456
-#define MM_POWER_OFFSET     5760
+#define MM_POLLUTION_OFFSET MM_POLLUTION_AT /* into minimaps[] (ui/engine.h) */
+#define MM_FIRE_OFFSET      MM_FIRE_AT
+#define MM_POLICE_OFFSET    MM_POLICE_AT
+#define MM_TRAFFIC_OFFSET   MM_TRAFFIC_AT
+#define MM_POWER_OFFSET     MM_POWER_AT
 
 extern const uint8_t D_tile_flags[];
 
@@ -22,8 +22,8 @@ const char *const minimap_names[MM_VIEWS + 1] = {
 };
 
 #ifdef HAVE_MINIMAP_NATIVE
-/* The native pixel mini map: all 96 tile columns of every other tile row.  Every view but crime is built by the assembler
-   routine in target/common/minimap_640x200_3bpp.asm (96 tiles a row is too slow in C).  Colours are 0 black, 1 blue, 2 red,
+/* The native pixel mini map: every view but crime is built by the assembler
+   routine in target/common/minimap_640x200_3bpp.asm (a full row is too slow in C).  Colours are 0 black, 1 blue, 2 red,
    3 magenta, 4 green, 5 cyan, 6 yellow, 7 white. */
 #ifdef HAVE_MINIMAP_ART
 extern void minimap_fast(uint8_t v, uint8_t sy);
@@ -41,7 +41,7 @@ static uint8_t crime(uint8_t tx, uint8_t ty)    /* 0..15 on built-up tiles: grow
     if (d > 31)
         d = 31;
     e = d ? (uint8_t)(15 - ((32 - d) >> 1)) : 0;
-    p = minimaps[MM_POLICE_OFFSET + (ty >> 2) * 24u + (tx >> 2)];
+    p = minimaps[MM_POLICE_OFFSET + (ty >> 2) * (uint16_t)MM25_W + (tx >> 2)];
     return e > p ? (uint8_t)(e - p) : 0;
 }
 
@@ -129,9 +129,9 @@ static uint8_t lv_city(uint8_t tx, uint8_t ty)
     return tile_level(at(tx, ty));
 }
 
-static uint8_t lv_power(uint8_t tx, uint8_t ty)         /* the power map has a bit a tile, 12 bytes a row */
+static uint8_t lv_power(uint8_t tx, uint8_t ty)         /* the power map has a bit a tile */
 {
-    return (minimaps[MM_POWER_OFFSET + ty * 12u + (tx >> 3)] & (0x80 >> (tx & 7))) ? 4 : outline(at(tx, ty));
+    return (minimaps[MM_POWER_OFFSET + ty * (uint16_t)MM_POWER_ROW + (tx >> 3)] & (0x80 >> (tx & 7))) ? 4 : outline(at(tx, ty));
 }
 
 static uint8_t lv_transport(uint8_t tx, uint8_t ty)
@@ -140,9 +140,9 @@ static uint8_t lv_transport(uint8_t tx, uint8_t ty)
     return (tile_flags(t) & 6) ? 4 : outline(t);
 }
 
-static uint8_t lv_density(uint16_t offset, uint8_t tx, uint8_t ty)      /* a 48x48 map of 0..255 */
+static uint8_t lv_density(uint16_t offset, uint8_t tx, uint8_t ty)      /* a MAP_W/2 by MAP_H/2 map of 0..255 */
 {
-    uint8_t v = minimaps[offset + (ty >> 1) * 48u + (tx >> 1)] >> 2;
+    uint8_t v = minimaps[offset + (ty >> 1) * (uint16_t)MM50_W + (tx >> 1)] >> 2;
     return v > 16 ? 16 : v;
 }
 
@@ -158,12 +158,12 @@ static uint8_t lv_traffic(uint8_t tx, uint8_t ty)
 
 static uint8_t lv_police(uint8_t tx, uint8_t ty)        /* a 24x24 map of 0..15 */
 {
-    return minimaps[MM_POLICE_OFFSET + (ty >> 2) * 24u + (tx >> 2)];
+    return minimaps[MM_POLICE_OFFSET + (ty >> 2) * (uint16_t)MM25_W + (tx >> 2)];
 }
 
 static uint8_t lv_fire(uint8_t tx, uint8_t ty)
 {
-    return minimaps[MM_FIRE_OFFSET + (ty >> 2) * 24u + (tx >> 2)];
+    return minimaps[MM_FIRE_OFFSET + (ty >> 2) * (uint16_t)MM25_W + (tx >> 2)];
 }
 
 /* Crime on the built-up tiles, 0..15, as the Spectrum works it out: it grows with the distance from the city's

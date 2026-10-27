@@ -20,12 +20,17 @@ D_bulldoze_costs:                        ; $7301 / 29441
         push    hl
         pop     ix
         call    find_left_edge_of_zone
-        ld      de,-96
+        IF      MAP_W == 96
+        ld      de,-MAP_W
 find_zone_top_row:                                    ; $7315 / 29461 - Walk IX upward (-96) until bit 5 set (top row of zone); locates zone header tile
 .L7315  bit     5,(ix+0)
         jr      nz,L731f                ; (4)
         add     ix,de
         jr      find_zone_top_row                   ; (-10)
+        ELSE
+        call    find_top_edge_of_zone
+        ret     nc
+        ENDIF
 
 .L731f  ld      a,(ix+0)
         and     7
@@ -63,7 +68,7 @@ SMC_bulldoze_zone_width:
         dec     c
         jr      nz,L733f                ; (-9)
         pop     ix
-        ld      de,96
+        ld      de,MAP_W
         add     ix,de
         djnz    L733b                   ; (-22)
         call    draw_map
@@ -81,7 +86,7 @@ SMC_bulldoze_zone_width:
         ld      de,9            ;3x3 RIC zone = $9 to bulldoze
         call    spend_money
         ret     c
-        ld      bc,-97
+        ld      bc,-(MAP_W+1)
         add     hl,bc
         push    hl
         pop     ix
@@ -104,7 +109,7 @@ bulldoze_degrade_tile:
         call    levelmap_xypos
         push    hl
         pop     ix
-        ld      de,1152
+        ld      de,12*MAP_W             ;12 rows
 .L7395  ld      a,(ix+0)
         ld      hl,D29565
         ld      bc,3

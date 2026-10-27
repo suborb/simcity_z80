@@ -1,5 +1,5 @@
 ; Row builder for the native pixel mini maps (HAVE_MINIMAP_NATIVE, see ui/minimap.h), in assembler because C is too slow
-; for 96 tiles a row.  For 640x200 screens of 3 bits a pixel, three planes (the Multi 8, the PC-8801).  Plain Z80 on the engine's tables; drawing is the platform's plat_put_minirow().  Row sy covers
+; for a full tile row.  For 640x200 screens of 3 bits a pixel, three planes (the Multi 8, the PC-8801).  Plain Z80 on the engine's tables; drawing is the platform's plat_put_minirow().  Row sy covers
 ; tile row 2 * sy.  Colours are 3 bits: bit 0 blue, 1 red, 2 green.  Both entry points keep IX.
 ;
 ; Flat colour mode:
@@ -30,11 +30,12 @@
         defc    C_COM = 6
         defc    C_ROAD = 7              ; roads, rails and wires: the network
 
-        defc    OFF_FIRE = 0            ; into minimaps (ui/minimap.c)
-        defc    OFF_POLICE = 576
-        defc    OFF_POLLUTION = 1152
-        defc    OFF_TRAFFIC = 3456
-        defc    OFF_POWER = 5760
+        INCLUDE "mapsize.inc"
+        defc    OFF_FIRE = MMO_FIRE      ; into minimaps (ui/minimap.c)
+        defc    OFF_POLICE = MMO_POLICE
+        defc    OFF_POLLUTION = MMO_POLLUTION
+        defc    OFF_TRAFFIC = MMO_TRAFFIC
+        defc    OFF_POWER = MMO_POWER
 
         IN_BSS
         IFDEF   HAVE_MINIMAP_SQUARE
@@ -110,9 +111,10 @@ mm_done:
 mm_ret: pop     ix
         ret
 
-; hl = levelmap + 192 sy, the start of tile row 2 * sy (HAVE_MINIMAP_SQUARE: the next row if mm_odd is set: a picture of every tile row)
+; hl = levelmap + MAP_W * 2 * sy, the start of tile row 2 * sy (HAVE_MINIMAP_SQUARE: the next row if mm_odd is set)
 mm_levelrow:
         ld      a,(mm_sy)
+        IF      MAP_W == 96
         ld      l,a
         ld      h,0
         add     hl,hl
@@ -125,13 +127,37 @@ mm_levelrow:
         ld      e,l
         add     hl,hl                   ; 128 sy
         add     hl,de
+        ELIF    MAP_W == 120
+        ld      l,a
+        ld      h,0
+        add     hl,hl
+        add     hl,hl
+        add     hl,hl
+        add     hl,hl                   ; 16 sy
+        ld      b,h
+        ld      c,l
+        ld      l,a
+        ld      h,0
+        add     hl,hl
+        add     hl,hl
+        add     hl,hl
+        add     hl,hl
+        add     hl,hl
+        add     hl,hl
+        add     hl,hl
+        add     hl,hl                   ; 256 sy
+        and     a
+        sbc     hl,bc                   ; 240 sy
+        ELSE
+        call    UNSUPPORTED_MAP_SIZE
+        ENDIF
         ld      de,_levelmap
         add     hl,de
         IFDEF   HAVE_MINIMAP_SQUARE
         ld      a,(mm_odd)
         or      a
         ret     z
-        ld      de,96
+        ld      de,MAP_W
         add     hl,de
         ENDIF
         ret
@@ -140,7 +166,7 @@ mm_levelrow:
 ; with the group; the rest of its cells (bits 7 and 6 set) take the colour the marker's group gives.
 mm_city:
         call    mm_levelrow
-        ld      b,96
+        ld      b,MAP_W
         ld      c,C_FIRE                ; the zone colour so far
 mm_c1:  ld      a,(hl)
         inc     hl
@@ -195,6 +221,7 @@ mm_density:
         ld      a,(mm_sy)
         ld      l,a
         ld      h,0
+        IF      MM50_W == 48
         ld      b,h
         ld      c,l
         add     hl,hl
@@ -203,8 +230,24 @@ mm_density:
         add     hl,hl
         add     hl,hl
         add     hl,hl                   ; 48 sy
+        ELIF    MM50_W == 60
+        push    de                      ; preserve the minimap base address
+        add     hl,hl
+        add     hl,hl                   ; 4 sy
+        ld      b,h
+        ld      c,l
+        add     hl,hl
+        add     hl,hl
+        add     hl,hl
+        add     hl,hl                   ; 64 sy
+        and     a
+        sbc     hl,bc                   ; 60 sy
+        pop     de
+        ELSE
+        call    UNSUPPORTED_MAP_SIZE
+        ENDIF
         add     hl,de
-        ld      b,48
+        ld      b,MM50_W
 mm_d1:  ld      a,(hl)
         inc     hl
         rrca
@@ -231,6 +274,7 @@ mm_cover:
         srl     a
         ld      l,a
         ld      h,0
+        IF      MM25_W == 24
         ld      b,h
         ld      c,l
         add     hl,hl
@@ -238,8 +282,21 @@ mm_cover:
         add     hl,hl
         add     hl,hl
         add     hl,hl                   ; 24 * (sy / 2)
+        ELIF    MM25_W == 30
+        add     hl,hl                   ; 2 * (sy / 2)
+        ld      b,h
+        ld      c,l
+        add     hl,hl
+        add     hl,hl
+        add     hl,hl
+        add     hl,hl                   ; 32 * (sy / 2)
+        and     a
+        sbc     hl,bc                   ; 30 * (sy / 2)
+        ELSE
+        call    UNSUPPORTED_MAP_SIZE
+        ENDIF
         add     hl,de
-        ld      b,24
+        ld      b,MM25_W
 mm_v1:  ld      a,(hl)
         inc     hl
         srl     a
@@ -263,22 +320,36 @@ mm_power:
         ld      h,0
         ld      d,h
         ld      e,l
+        IF      MM_POWER_ROW == 12
         add     hl,hl
         add     hl,de                   ; 3 sy
         add     hl,hl
         add     hl,hl
         add     hl,hl                   ; 24 sy: 12 bytes a row of tiles, two rows a map row
+        ELIF    MM_POWER_ROW == 15
+        add     hl,hl                   ; 2 sy
+        ld      b,h
+        ld      c,l
+        add     hl,hl
+        add     hl,hl
+        add     hl,hl
+        add     hl,hl                   ; 32 sy
+        and     a
+        sbc     hl,bc                   ; 30 sy
+        ELSE
+        call    UNSUPPORTED_MAP_SIZE
+        ENDIF
         ld      de,_minimaps + OFF_POWER
         add     hl,de
         IFDEF   HAVE_MINIMAP_SQUARE
         ld      a,(mm_odd)
         or      a
         jr      z,mm_p0
-        ld      de,12
+        ld      de,MM_POWER_ROW
         add     hl,de
 mm_p0:
         ENDIF
-        ld      b,12
+        ld      b,MM_POWER_ROW
 mm_p1:  ld      c,(hl)
         inc     hl
         ld      d,8
@@ -307,7 +378,7 @@ mm_transport:
         call    mm_city
         ld      ix,(mm_out)
         call    mm_levelrow
-        ld      b,96
+        ld      b,MAP_W
 mm_t1:  ld      a,(hl)
         inc     hl
         cp      128

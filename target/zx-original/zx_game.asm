@@ -1,6 +1,7 @@
 ; Spectrum build: all segments in their original order.
 ; Assembles to exactly the same bytes as disassembly/sim_game.asm.
         INCLUDE "../../engine/sections.asm"        ; IN_CODE etc.: empty here
+        INCLUDE "../../engine/mapsize.inc"         ; the size of the map (96x96 here): only constants
         INCLUDE "zx_start.asm"
         INCLUDE "../../engine/rand.asm"
         INCLUDE "zx_ui1.asm"

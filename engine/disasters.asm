@@ -15,7 +15,7 @@
         ld      bc,(V_map_iter_xy)
         ld      a,c
         ld      (V_aircrash_col),a
-        ld      c,96
+        ld      c,MAP_W
         ld      (V_CrashXY),bc
 
 activate_aircrash:                                    ; $78EA / 30954 - Set V_aircrash_active=1; entry after CrashXY and aircrash column set up
@@ -167,8 +167,15 @@ move_tornado:                                    ; $7998 / 31128 - If tornado ac
         add     a,c
         ld      c,a
 .L79c7  push    bc
+        IF      MAP_W == 96
         call    levelmap_xypos
+        ELSE
+        call    levelmap_xypos_with_check
+        ENDIF
         pop     bc
+        IF      MAP_W != 96
+        ret     nc
+        ENDIF
         ld      a,(hl)
         cp      0
         ret     z
@@ -193,8 +200,15 @@ tornado_destroy_cell:                                    ; $79D4 / 31188 - At BC
         and     3
         call    coords_add_direction_offset               ;Move coords in direction
         push    bc
+        IF      MAP_W == 96
         call    levelmap_xypos
+        ELSE
+        call    levelmap_xypos_with_check
+        ENDIF
         pop     bc
+        IF      MAP_W != 96
+        ret     nc
+        ENDIF
         ld      a,(hl)
         cp      0
         ret     z

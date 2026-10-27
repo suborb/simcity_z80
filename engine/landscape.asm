@@ -7,11 +7,14 @@ V_InitialSeed:   defw    3       ; VAR $6A8C / 27276 - initial random seed
 ; LANDSCAPE GENERATION
 ; ============================================================
 ;
-; The map is 96x96 cells.  Generation runs in three passes:
+; Generation runs in three passes.  The Spectrum-sized map uses the original 128 land and 32 tree strokes, with centres at 16..79.  A larger map scales
+; the stroke count to the area in which centres may fall, samples centres over that full area, and scales blob offsets by 9/8 to make the landmasses grow
+; with the map.  The 120x100 map keeps tighter 10-cell margins and clears the outer border after painting, so random blobs can fill the map without
+; leaving land on its edge.
 ;
 ; PASS 1 - LAND BLOBS
 ;   The map is zeroed (all TILE_WATER).  paint_landscape_strokes is
-;   called to lay down 128 filled elliptical blobs of TILE_DIRT.
+;   called to lay down LAND_STROKES filled elliptical blobs of TILE_DIRT.
 ;   No constraint is set, so blobs paint over water freely.
 ;   Together the overlapping blobs form the main landmasses and
 ;   coastlines.
@@ -24,7 +27,7 @@ V_InitialSeed:   defw    3       ; VAR $6A8C / 27276 - initial random seed
 ;   replacement tile.  This gives visually smooth coastlines.
 ;
 ; PASS 3 - TREE COVERAGE
-;   paint_landscape_strokes is called again for 32 blobs, this time
+;   paint_landscape_strokes is called again for TREE_STROKES blobs, this time
 ;   painting tile 6 (trees) but ONLY over existing TILE_DIRT cells
 ;   (V_stroke_constraint = TILE_DIRT acts as the constraint).  This scatters
 ;   woodland across the interior of landmasses.
@@ -41,7 +44,9 @@ V_InitialSeed:   defw    3       ; VAR $6A8C / 27276 - initial random seed
 ;   w and h are the per-axis divisor exponents chosen from D_blob_shape_table:
 ;     (4,4) square-ish,  (5,3) wide,  (3,5) tall.
 ;   The high bytes of (dx, dy) give the integer map offset from the
-;   blob centre.  Because the update equations approximate a rotation,
+;   blob centre.  On the 120x100 map, the offsets are enlarged by 1/8 so
+;   blobs grow with the larger map instead of keeping their 96x96 size.
+;   Because the update equations approximate a rotation,
 ;   (dx_high, dy_high) traces an ellipse over 49 steps.
 ;   At each step a horizontal span of width = -2*dx_high cells is
 ;   painted at row (y_center + dy_high), giving the filled interior.
@@ -51,7 +56,7 @@ create_landscape:
 .L6a8e  call    initialise_simulation_variables
         ld      hl,levelmap         ; zero the whole map → all TILE_WATER
         ld      de,levelmap+1
-        ld      bc,9215
+        ld      bc,MAP_CELLS-1
         ld      (hl),0
         ldir
         ld      ix,text_generating_landscape
@@ -60,23 +65,23 @@ create_landscape:
         call    render_status_bar
         ld      hl,(V_InitialSeed)
         ld      (V_random_seed),hl  ; seed RNG from saved initial seed
-        ; --- Pass 1: land blobs (128 strokes, TILE_DIRT, no constraint)
+        ; --- Pass 1: land blobs (the count scales with the centre-placement area; 128 on the 96x96 map)
         xor     a
         ld      (V_stroke_constraint),a         ; constraint=0: paint anywhere
-        ld      bc,32770            ; b=128 strokes, c=TILE_DIRT
+        ld      bc,LAND_STROKES*256+2 ; b=LAND_STROKES, c=TILE_DIRT
         ld      e,7                 ; step-size mask (produces 2-7)
         call    paint_landscape_strokes
         ; --- Pass 2: shoreline smoothing
         ld      a,2
         ld      (V_stroke_tile),a         ; tile=TILE_DIRT (used by smooth_shoreline_tiles)
         call    smooth_shoreline_tiles
-        ; --- Pass 3: tree coverage (32 strokes, tile 6=trees, only over dirt)
+        ; --- Pass 3: tree coverage (scaled strokes, tile 6=trees, only over dirt)
         ld      a,2
         ld      (V_stroke_constraint),a         ; constraint=TILE_DIRT: only overwrite land
-        ld      bc,$2006            ; b=32 strokes, c=6 (trees)
+        ld      bc,TREE_STROKES*256+6 ; b=TREE_STROKES, c=6 (trees)
         ld      e,3                 ; step-size mask (produces 2-3, smaller blobs)
         call    paint_landscape_strokes
-        ret     
+        ret
 
 ; Ellipse shape table: pairs of (w exponent, h exponent) for draw_filled_ellipse_stroke.
 ; Larger exponent = more compression in that axis.
@@ -119,15 +124,33 @@ SMC_27367:
         jr      nc,L6aef
         ld      a,2                 ; clamp minimum step size to 2
 .L6aef  ld      (V_stroke_step),a
-        ; randomise centre x (16-79)
+        ; Randomise the centre over the usable map interior.  Preserve the original 96-wide RNG sequence; other supported sizes use rejection sampling
+        ; so every legal coordinate is equally likely even when the range is not a power of two.
+        IF      MAP_W == 96
         call    get_random_number
         and     63
         add     a,16
+        ELSE
+landscape_x_retry:
+        call    get_random_number
+        and     127
+        cp      MAP_W-(2*LANDSCAPE_X_MARGIN)
+        jr      nc,landscape_x_retry
+        add     a,LANDSCAPE_X_MARGIN
+        ENDIF
         ld      (V_stroke_center),a         ; x centre
-        ; randomise centre y (16-79)
+        IF      MAP_H == 96
         call    get_random_number
         and     63
         add     a,16
+        ELSE
+landscape_y_retry:
+        call    get_random_number
+        and     127
+        cp      MAP_H-(2*LANDSCAPE_Y_MARGIN)
+        jr      nc,landscape_y_retry
+        add     a,LANDSCAPE_Y_MARGIN
+        ENDIF
         ld      (V_stroke_center+1),a       ; y centre
         ; pick random shape from D_blob_shape_table: (4,4), (5,3) or (3,5)
         call    get_random_number
@@ -144,6 +167,19 @@ SMC_27367:
         pop     bc
         djnz    L6ae3               ; repeat for all b strokes
         ret     
+
+; Scale the amount of land and tree cover with the area available to stroke centres.  Round to nearest so that the original 96x96 counts remain exactly
+; 128 and 32.  The 120x100 map uses 10-cell margins and a water-only outer border, for 250 land and 63 tree strokes.
+        IF      MAP_H == 96
+        defc    LANDSCAPE_X_MARGIN = 16
+        defc    LANDSCAPE_Y_MARGIN = 16
+        ELSE
+        defc    LANDSCAPE_X_MARGIN = 10
+        defc    LANDSCAPE_Y_MARGIN = 10
+        ENDIF
+        defc    LANDSCAPE_CENTER_AREA = (MAP_W-(2*LANDSCAPE_X_MARGIN)) * (MAP_H-(2*LANDSCAPE_Y_MARGIN))
+        defc    LAND_STROKES = (128 * LANDSCAPE_CENTER_AREA + 2048) / 4096
+        defc    TREE_STROKES = (32 * LANDSCAPE_CENTER_AREA + 2048) / 4096
 
 
 ; Two-part shoreline lookup table used by smooth_shoreline_tiles.
@@ -180,8 +216,8 @@ D_shoreline_lookup:                        ; $6B21 / 27425
 ; For each TILE_WATER cell: get the 8-neighbour dirt bitmask, search D_shoreline_lookup
 ; first half for a matching pattern, then write the corresponding edge tile.
 smooth_shoreline_tiles:
-.L6ba5  ld      b,96
-.L6ba7  ld      c,96
+.L6ba5  ld      b,MAP_H
+.L6ba7  ld      c,MAP_W
 .L6ba9  push    bc
         push    bc
         call    levelmap_xypos_with_check
@@ -219,9 +255,13 @@ V_levelmap_bounds_flag:   defb        0   ; VAR $6BDA / 27610 - ?? unused?
 
 ;Range check
 .levelmap_xypos_with_check
-.L6bdb  ld      hl,96
+.L6bdb  ld      hl,MAP_W
         ld      a,b
+        IF      MAP_W == MAP_H
         cp      l
+        ELSE
+        cp      MAP_H
+        ENDIF
         jr      nc,L6bfd                ; (27)
         ld      a,c
         cp      l
@@ -238,6 +278,7 @@ levelmap_xypos:                             ; $6BE6 / 27622
         ld      a,c
         ld      b,h
         ld      c,l
+        IF      MAP_W == 96
         add     hl,hl   ;*2
         add     hl,bc   ;*3
         add     hl,hl   ;*6
@@ -245,6 +286,21 @@ levelmap_xypos:                             ; $6BE6 / 27622
         add     hl,hl   ;*24
         add     hl,hl   ;*48
         add     hl,hl   ;*96
+        ELIF    MAP_W == 120
+        add     hl,hl
+        add     hl,hl
+        add     hl,hl   ;*8
+        ld      b,h
+        ld      c,l
+        add     hl,hl
+        add     hl,hl
+        add     hl,hl
+        add     hl,hl   ;*128
+        and     a
+        sbc     hl,bc   ;*120
+        ELSE
+        call    UNSUPPORTED_MAP_SIZE
+        ENDIF
         ld      b,0
         ld      c,a     ;+x
         add     hl,bc
@@ -351,15 +407,44 @@ SMC_27676:
         ; --- compute map position and span width for this step ---
         ld      bc,(V_stroke_center)    ; bc = (y_center, x_center)
         ld      a,d             ; dy high byte = row offset
+        IF      MAP_H == 100
+        ; Scale the signed offset by 9/8.  This keeps the original 96x96
+        ; landscape byte-for-byte unchanged while giving larger maps broader
+        ; landmasses and woodland patches.
+        ld      e,a
+        bit     7,a
+        jr      z,landscape_scale_y_positive
+        add     a,7              ; arithmetic shift rounds negative values down; correct toward zero
+landscape_scale_y_positive:
+        sra     a
+        sra     a
+        sra     a
+        add     a,e
+        ENDIF
         add     a,b
         ld      b,a             ; b = y_center + dy_high
         ld      a,h             ; dx high byte = col offset (negative at equator)
+        IF      MAP_W == 120
+        ld      e,a
+        bit     7,a
+        jr      z,landscape_scale_x_positive
+        add     a,7
+landscape_scale_x_positive:
+        sra     a
+        sra     a
+        sra     a
+        add     a,e
+        ld      h,a             ; keep the scaled x offset for the span below
+        ENDIF
         add     a,c
         ld      c,a             ; c = x_center + dx_high (left edge of span)
         IFDEF PORTABLE
         ld      a,(V_ellipse_dx+1) ; dx_high (high byte of stored dx)
         ELSE
         ld      a,(SMC_27673+2) ; dx_high (high byte of stored dx)
+        ENDIF
+        IF      MAP_W == 120
+        ld      a,h             ; same 9/8-scaled dx as the left edge
         ENDIF
         neg
         add     a,a

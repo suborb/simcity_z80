@@ -46,7 +46,7 @@ Z88_PLATFORM = target/z88/plat_z88.c target/z88/plat_z88.asm target/z88/fgets_co
 
 
 # Everything a build depends on.
-DEPS = Makefile $(wildcard ui/*.c ui/*.h ui/*.asm engine/*.asm engine/*.h platform/common/*.asm \
+DEPS = Makefile $(wildcard ui/*.c ui/*.h ui/*.asm engine/*.asm engine/*.inc engine/*.h platform/common/*.asm \
          platform/console/*.[chai]* target/*/*.[chai]* target/*/*.inc) assets/map_art.bin assets/map_art_aq.bin assets/udgs.bin assets/icons.bin assets/icons_spec.bin assets/cpc_icons.bin assets/st_sounds.bin
 
 AQPLUS = build/aqplus/simcity.aqx

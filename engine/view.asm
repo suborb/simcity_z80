@@ -27,9 +27,10 @@ view_cell:
         ret
 
 view_cell_1:
-        ; hl = levelmap + row*96 + column
+        ; hl = levelmap + row*MAP_W + column
         ld      h,0
         ld      l,b
+        IF      MAP_W == 96
         ld      d,h
         ld      e,l
         add     hl,hl
@@ -39,6 +40,21 @@ view_cell_1:
         add     hl,hl
         add     hl,hl
         add     hl,hl                   ;96 * row
+        ELIF    MAP_W == 120
+        add     hl,hl
+        add     hl,hl
+        add     hl,hl                   ;8 * row
+        ld      d,h
+        ld      e,l
+        add     hl,hl
+        add     hl,hl
+        add     hl,hl
+        add     hl,hl                   ;128 * row
+        and     a
+        sbc     hl,de                   ;120 * row
+        ELSE
+        call    UNSUPPORTED_MAP_SIZE
+        ENDIF
         ld      e,c
         ld      d,0
         add     hl,de
@@ -107,8 +123,16 @@ view_zone_left:
         and     192
         cp      192
         jr      nz,view_zone_found
+        IF      MAP_W != 96             ; (the 96x96 map's zones never reach its edge: its code is the original's)
+        ld      a,c
+        and     a
+        jr      z,view_zone_malformed
+        ENDIF
         inc     d
         dec     hl
+        IF      MAP_W != 96
+        dec     c
+        ENDIF
         jr      view_zone_left
 view_zone_found:                        ;hl -> marker cell of this row
         ld      a,d
@@ -123,7 +147,17 @@ view_zone_found:                        ;hl -> marker cell of this row
         jr      z,view_zone_piece
         ld      e,TILE_NEED_POWER
         jr      view_tile
+        IF      MAP_W != 96
+view_zone_malformed:
+        ld      e,TILE_DIRT
+        jr      view_tile
+        ENDIF
 view_zone_piece:
+        IF      MAP_W != 96
+        ld      a,c
+        cp      MAP_W-2                  ; marker needs two metadata bytes in this row
+        jr      nc,view_zone_malformed
+        ENDIF
         inc     hl
         ld      a,(hl)                  ;byte 1: group
         inc     hl

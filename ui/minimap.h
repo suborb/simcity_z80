@@ -8,6 +8,7 @@
 #define MINIMAP_H
 
 #include <stdint.h>
+#include "engine.h"
 
 #define MM_CITY      1      /* the land: water, trees, roads and wires, buildings */
 #define MM_POLLUTION 2
@@ -20,15 +21,19 @@
 #define MM_VIEWS     8      /* views 1..MM_VIEWS */
 
 #ifdef HAVE_MINIMAP_NATIVE
-/* Native pixel mini maps (HAVE_MINIMAP_NATIVE, the Multi 8): the whole city, every tile column and every other tile row,
-   96 x 48 tiles drawn a row at a time by plat_put_minirow().  No dithering and no paging.  Row sy is tile row 2 * sy. */
+/* Native pixel mini maps (HAVE_MINIMAP_NATIVE): the city is drawn a row at a time by plat_put_minirow(). */
 #ifdef HAVE_MINIMAP_SQUARE
-#define MM_NATIVE_ROWS 96                   /* HAVE_MINIMAP_SQUARE: every tile row, so the picture is square (row ty is tile row ty) */
+#define MM_NATIVE_ROWS MAP_H                /* HAVE_MINIMAP_SQUARE: every tile row (row ty is tile row ty) */
 extern uint8_t mm_odd;                      /* (the builder's: the odd row of a pair) */
 #else
-#define MM_NATIVE_ROWS 48
+#define MM_NATIVE_ROWS (MAP_H / 2)
 #endif
-#define MM_NATIVE_COLS 96
+#define MM_NATIVE_COLS MAP_W
+#ifdef HAVE_MINIMAP_SCROLL
+#define MM_NATIVE_VIEW_ROWS 96
+#else
+#define MM_NATIVE_VIEW_ROWS MM_NATIVE_ROWS
+#endif
 
 extern const char *const minimap_names[MM_VIEWS + 1];
 
@@ -46,7 +51,7 @@ extern void minimap_row(uint8_t v, uint8_t sy);
 extern void minimap_row(uint8_t v, uint8_t sy, uint8_t *colours);
 #endif
 #else
-#define MM_CELLS_W   24     /* the complete city picture is 24x24 cells: 192x192 pixels */
+#define MM_CELLS_W   (MAP_W / 4)    /* one cell represents a 4x4 tile block */
 #ifndef MINIMAP_CELLS_H
 #define MINIMAP_CELLS_H 8   /* the Z88-sized default */
 #endif

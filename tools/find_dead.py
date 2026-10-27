@@ -37,23 +37,48 @@ equ if ifdef ifndef else endif section public extern macro endm align'''.split()
 WORDS = re.compile(r'[A-Za-z_][A-Za-z0-9_]*')
 
 
+# The values the conditions of IF in the engine (engine/mapsize.inc) see: the Spectrum's map, 96x96
+SIZE = {'MAP_W': 96, 'MAP_H': 96, 'MM25_W': 24, 'MM50_W': 48, 'MM_POWER_ROW': 12, 'ENGINE_IN_BANK': 0, 'POWER_CITYWIDE': 0}
+
+
+def cond_value(expr):
+    """The value of an IF's expression (names of SIZE, numbers, ==, !=, &&)."""
+    e = re.sub(r'[A-Za-z_][A-Za-z_0-9]*', lambda m: str(SIZE[m.group(0)]), expr).replace('&&', ' and ')
+    assert re.fullmatch(r'[0-9 =!<>and()+*/-]*', e), expr
+    return bool(eval(e))
+
+
 def source_lines():
     """The engine source in assembly order, with IFDEF/IFNDEF/ELSE/ENDIF resolved."""
     order = ['engine_defs.asm']
     out = []
 
     def read(path):
-        stack = []          # (active_before, taken)
+        stack = []          # (active_before, a branch was taken)
         active = True
         for raw in open(path, encoding='latin-1'):
             line = raw.rstrip('\n')
             code = line.split(';', 1)[0]
             tok = code.split()
+            if len(tok) > 1 and (tok[0].startswith('.') or tok[0].endswith(':')) and tok[1].upper() in ('IFDEF', 'IFNDEF', 'IF', 'ELIF', 'ELSE', 'ENDIF'):
+                code = ' '.join(tok[1:])        # a label on the line of a conditional (.L813d  IFDEF PORTABLE)
+                tok = tok[1:]
             u = tok[0].upper() if tok else ''
             if u in ('IFDEF', 'IFNDEF'):
                 cond = (tok[1] in DEFINED) == (u == 'IFDEF')
                 stack.append((active, cond))
                 active = active and cond
+                continue
+            if u == 'IF':               # IF expression: the map's size, at 96x96 (engine/mapsize.inc)
+                cond = cond_value(code.split(None, 1)[1])
+                stack.append((active, cond))
+                active = active and cond
+                continue
+            if u == 'ELIF':
+                before, taken = stack[-1]
+                cond = cond_value(code.split(None, 1)[1])
+                active = before and not taken and cond
+                stack[-1] = (before, taken or cond)
                 continue
             if u == 'ELSE':
                 before, cond = stack[-1]
@@ -111,7 +136,7 @@ def parse(lines):
         mn = tok[0].lower()
         ops = tok[1] if len(tok) > 1 else ''
         if mn == 'defc' or mn in ('section', 'public', 'extern', 'org', 'macro', 'endm', 'align',
-                                  'in_code', 'in_rodata', 'in_data', 'in_bss'):
+                                  'in_code', 'in_sim_code', 'in_rodata', 'in_data', 'in_bss', 'in_engine_bss'):
             continue
         for w in WORDS.findall(ops):
             cur['refs'].add(w)

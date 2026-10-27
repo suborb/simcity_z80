@@ -533,15 +533,14 @@ static void draw_view(uint8_t full, uint8_t dirty)
 
 #ifdef HAVE_MINIMAP
 /* ---- the mini maps ---------------------------------------------------------------
-   The city is 24 cells square at two pixels a tile (see ui/minimap.h).  The compact default is the
+   The city mini map is shown at two pixels a tile (see ui/minimap.h).  The compact default is the
    Z88's 24x8 window, with pages.  A platform can make it taller, but it remains in the normal map window
    beneath the status panel.  A cell row is redrawn every few frames to follow the simulation (a row of
    24 cells is a lot of work), and the cursor's cell every frame (it blinks, as in the city view). */
 
 #ifdef HAVE_MINIMAP_NATIVE
-/* Native pixel mini maps (see ui/minimap.h): the whole city, a row at a time.  A full pass draws a chunk of rows a frame
-   so that the keyboard is read in between; afterwards a few rows in turn each frame follow the simulation.  The map has
-   no cursor, and the cursor keys and the tools do nothing while it is shown. */
+/* Native pixel mini maps (see ui/minimap.h): a row at a time.  A full pass draws a chunk of rows a frame
+   so that the keyboard is read in between; afterwards a few rows in turn each frame follow the simulation. */
 #define MM_CHUNK_ROWS   12
 #define MM_REFRESH_ROWS 4
 static uint8_t mm_full_row;                  /* progress through a full redraw */
