@@ -246,21 +246,38 @@ def main():
     check('the tool icons are drawn: many colours and the yellow frame of the tool in use', len(icons) >= 12 and sum(n for n, c in icons if c[0] > 150 and c[2] < 150) > 60,
           str(sorted(icons, reverse=True)[:6]))
 
-    # the cursor moves a cell with caps shift and 5 to 8 (JNext's arrows), then roads
-    built = run([S] + LAND + [(820, 'right'), (860, 'right'), (900, 'space'), (940, 'right'), (980, 'space')], 1200)
-    check('the cursor moves and a road is built', differs(city, built, (0, 56, 256, 192)))
-    check('the funds are spent', differs(city, built, (72, 0, 120, 8)))
+    # the pointer: the keys move it (P right, A down; caps shift makes it fast: JNext's arrows are caps shift and 5 to 8 too) and Space is its button, so
+    # a road is built where it is; the city's cursor is the cell under it
+    base = run([S], 900)
+    built = run([S, (700, 'p'), (740, 'p'), (780, 'a'), (820, 'space')], 900)
+    check('the pointer moves with the keys and a road is built under it', differs(base, built, (0, 56, 256, 192)))
+    check('the funds are spent', differs(base, built, (72, 0, 120, 8)))
+    moved = run([S, (700, 'p'), (740, 'p'), (780, 'a')], 900)
+    check('moving the pointer builds nothing', not differs(base, moved, (72, 0, 120, 8)) and differs(base, moved, (0, 56, 256, 192)))
 
-    # scrolling: the view moved by the DMA (plat_scroll moves the map's pixels, and the game draws the cells that come into view) is the picture a
-    # full redraw makes (opening a mini map and going back): the cursor's blinking cell is the only difference
-    moves = [S] + [(700 + 40 * i, k) for i, k in enumerate(['caps+p'] * 4 + ['caps+a'] * 3 + ['caps+o'] * 2 + ['caps+q'] * 2 + ['p', 'a', 'o', 'q'])]
-    end = moves[-1][0]
-    scrolled = run(moves, end + 300)
-    redrawn = run(moves + [(end + 60, 'm'), (end + 140, 'x')], end + 400)
+    # fire on an icon picks the tool: three fast presses left (to about x=80: the fourth button, the railroad), eight up (to the top: it stops there), two small steps
+    # down onto the buttons' row, then fire: the status line no longer says ROAD.  (A step is a pass of the game's loop, so the pointer goes slower while the
+    # view scrolls at an edge: this keeps off the edges.)
+    to_icon = [S] + [(700 + 40 * i, 'caps+o') for i in range(3)] + [(820 + 40 * i, 'caps+q') for i in range(8)] + [(1140, 'a'), (1180, 'a'), (1220, 'space')]
+    picked = run(to_icon, 1350)
+    check('fire on an icon picks that tool', differs(base, picked, (0, 48, 128, 56)))
+
+    # the map scrolls when the pointer rests on its edge (and not by the keys): ten fast presses to the left edge, then three to the right, off the edge
+    edge = [S] + [(700 + 40 * i, 'caps+o') for i in range(10)] + [(1120 + 40 * i, 'caps+p') for i in range(3)]
+    end = edge[-1][0]
+    scrolled = run(edge, end + 300)
+    check('the view scrolls at the pointer on the edge', differs(base, scrolled, (0, 56, 256, 192)))
+    # the same picture as a full redraw makes (opening a mini map and going back); the cursor's blinking cell is the only difference
+    redrawn = run(edge + [(end + 60, 'm'), (end + 140, 'x')], end + 400)
     diff = ImageChops.difference(scrolled, redrawn).convert('L').point(lambda v: 255 if v else 0)
     # (the two pictures are of different moments, and the water ripples: its pixels are not compared)
     n = sum(1 for k, v in enumerate(diff.tobytes()) if v and not (is_blue(scrolled.getpixel((k % 256, k // 256))) or is_blue(redrawn.getpixel((k % 256, k // 256)))))
-    check('the map scrolled by the DMA is the picture a full redraw makes', n <= 64 and differs(city, scrolled, (0, 56, 256, 192)), f'{n} pixels differ, in {diff.getbbox()}')
+    check('the map scrolled by the DMA is the picture a full redraw makes', n <= 64 and differs(base, scrolled, (0, 56, 256, 192)), f'{n} pixels differ, in {diff.getbbox()}')
+
+    # on a mini map the pointer is at the middle of the picture (tile 64,64): fire jumps the city there and comes back to it, spending nothing
+    jumped = run([S, (700, 'm'), (800, 'space')], 1000)
+    check('fire on the mini map jumps there and shows the city again', distinct(jumped, (0, 8, 161, 48)) >= 12 and differs(base, jumped, (0, 56, 256, 192)) and
+          not differs(base, jumped, (72, 0, 120, 8)))
 
     # the water: a subtle ripple, the patterned water picture and the same with its ripples one pixel along, a step every 16 frames (the 1 Meg art's two water pictures
     # differ by a single pixel, so the second is made, as the SAM's; cycling the blues instead made the whole sea flash).  The sea is wherever the city has it, so its

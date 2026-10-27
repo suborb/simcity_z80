@@ -356,6 +356,88 @@ _zxn_show:
         ret
 
 ; uint8_t zxn_in(uint16_t port) __smallc: the byte read from the port (the whole 16 bits are the address, as the keyboard needs)
+; uint8_t plat_pointer_keys(void): the keys that drive the pointer, as what is down now (the game's own plat_key reports a key once, when it goes down):
+; bit 0 left, 1 right, 2 up, 3 down, 4 fire, 5 fast.  Q A O P, and Caps Shift with 5 6 7 8 (the Next's cursor keys); fire is Space (not with Caps Shift:
+; that is Esc) or Enter; fast is a letter with Caps Shift, or anything with Symbol Shift.  Uses all registers but IX.
+        PUBLIC  _plat_pointer_keys
+_plat_pointer_keys:
+        ld      d,0                     ; the letters' directions
+        ld      e,0                     ; the cursor keys' (then everything)
+        ld      bc,$FEFE
+        in      a,(c)
+        and     1
+        ld      h,a                     ; 0 if Caps Shift is down
+        ld      b,$7F
+        in      a,(c)
+        ld      l,a                     ; Space (bit 0) and Symbol Shift (bit 1)
+        ld      b,$FB
+        in      a,(c)
+        rra
+        jr      c,pk_nq
+        set     2,d                     ; Q up
+pk_nq:  ld      b,$FD
+        in      a,(c)
+        rra
+        jr      c,pk_na
+        set     3,d                     ; A down
+pk_na:  ld      b,$DF
+        in      a,(c)
+        rra
+        jr      c,pk_np
+        set     1,d                     ; P right
+pk_np:  rra
+        jr      c,pk_no
+        set     0,d                     ; O left
+pk_no:  ld      a,h
+        or      a
+        jr      nz,pk_nocur             ; the cursor keys are Caps Shift with 5 to 8
+        ld      b,$F7
+        in      a,(c)
+        bit     4,a
+        jr      nz,pk_n5
+        set     0,e                     ; 5 left
+pk_n5:  ld      b,$EF
+        in      a,(c)
+        bit     4,a
+        jr      nz,pk_n6
+        set     3,e                     ; 6 down
+pk_n6:  bit     3,a
+        jr      nz,pk_n7
+        set     2,e                     ; 7 up
+pk_n7:  bit     2,a
+        jr      nz,pk_nocur
+        set     1,e                     ; 8 right
+pk_nocur:
+        ld      a,d
+        or      e
+        ld      e,a                     ; the directions
+        bit     1,l
+        jr      nz,pk_nosym
+        set     5,e                     ; Symbol Shift: fast
+pk_nosym:
+        ld      a,h
+        or      a
+        jr      nz,pk_space
+        ld      a,d
+        or      a
+        jr      z,pk_nospace            ; Caps Shift: a letter's direction is fast, and Space is Esc
+        set     5,e
+        jr      pk_nospace
+pk_space:
+        bit     0,l
+        jr      nz,pk_nospace
+        set     4,e                     ; Space: fire
+pk_nospace:
+        ld      b,$BF
+        in      a,(c)
+        rra
+        jr      c,pk_noenter
+        set     4,e                     ; Enter: fire
+pk_noenter:
+        ld      l,e
+        ld      h,0
+        ret
+
         PUBLIC  _zxn_in
 _zxn_in:
         ld      hl,2

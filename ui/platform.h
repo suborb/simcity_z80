@@ -20,16 +20,17 @@ extern void plat_page_data(void);
    that the left button is held.  Targets own the device protocol and state. */
 #ifdef HAVE_MOUSE
 extern volatile int16_t plat_mouse_x, plat_mouse_y;
-extern volatile uint8_t plat_mouse_buttons, plat_mouse_present;
+extern volatile uint8_t plat_mouse_buttons;
+#ifdef HAVE_POINTER
+#define plat_mouse_present 1                    /* HAVE_POINTER (plat_config.h): the pointer is always there, and the keys move it if no mouse does */
+#else
+extern volatile uint8_t plat_mouse_present;
+#endif
 extern uint8_t plat_mouse_input(void);
 extern void plat_mouse_init(void);
 extern uint8_t plat_mouse_icon_hit(void);
 /* Return nonzero when the pointer is at a viewport edge and the view moved. */
 extern uint8_t plat_mouse_edge_scroll(void);
-#endif
-#ifdef HAVE_MOUSE_TOGGLE
-/* A mouse that cannot be detected: the game options switch it on (plat_mouse_present) and off. */
-extern void plat_mouse_toggle(void);
 #endif
 #ifdef HAVE_MOUSE_SPRITE
 /* A pointer drawn by the hardware: positioned once a frame, and hidden while a menu is up (the keys use it). */

@@ -42,8 +42,8 @@
 #ifndef ZXN_NO_SCROLL
 #define HAVE_SCROLL             /* a scroll moves the map's pixels by the DMA (plat_scroll) and draws only the cells that come into view */
 #endif
-#define HAVE_MOUSE              /* a Kempston mouse (target/zxn/zxn_mouse.c), which cannot be detected: the game options switch it on and off */
-#define HAVE_MOUSE_TOGGLE
+#define HAVE_MOUSE              /* a Kempston mouse (target/zxn/zxn_mouse.c), which cannot be detected, so it is always read ... */
+#define HAVE_POINTER            /* ... and the pointer is always there: the keys move it too (QAOP, Space or Enter its button), and the city has no other cursor */
 #define HAVE_MOUSE_SPRITE       /* the pointer is a hardware sprite: nothing to draw under it or to put back */
 #define PLAT_FIXED_COLS 32
 #define PLAT_FIXED_ROWS 24

@@ -1,8 +1,8 @@
-/* ZX Spectrum Next: the Kempston mouse.  There is no way to find out whether one is connected (its ports read as anything without), so the game's
-   menu switches it on and off (plat_mouse_toggle).  Once it is on it behaves as the SAM Coupe's does (target/sam/sam_mouse.asm): the pointer takes the
-   city's cursor over the map, a click on an icon picks the tool, and the view scrolls when the pointer rests on its edge.  The mouse is read by z88dk's
-   in_MouseKemp, which keeps the position as 0..255 by 0..191 in the four variables below; the pointer is hardware sprite 0, so nothing has to be
-   drawn under it or put back. */
+/* ZX Spectrum Next: the pointer.  The arrow is always there (HAVE_POINTER): the keys move it (plat_pointer_keys: Q A O P, the cursor keys; Space or Enter is its
+   button), and so does a Kempston mouse, whose steps are added.  A Kempston mouse cannot be detected (its ports read as anything without one), so it is always read: with
+   none the position does not change.  The mouse is read by z88dk's in_MouseKemp, which keeps the position as 0..255 by 0..191 in the four variables below.  The pointer
+   takes the city's cursor over the map, a click on an icon picks the tool, and the view scrolls when the pointer rests on its edge, as on the SAM Coupe
+   (target/sam/sam_mouse.asm); the pointer is hardware sprite 0, so nothing has to be drawn under it or put back. */
 #include <stdint.h>
 #include <arch/zxn.h>
 #include <arch/zx/zx_input.h>
@@ -12,8 +12,11 @@
 #ifdef HAVE_MOUSE                               /* (plat_config.h: a build without the mouse has nothing here) */
 
 extern void zxn_out(uint16_t port, uint8_t value);
+extern uint8_t plat_pointer_keys(void);         /* what is down: 1 left, 2 right, 4 up, 8 down, 16 fire, 32 fast (plat_zxn.asm) */
 
 #define REG_PERIPHERAL_5 0x0A                   /* (z88dk has no name for it) bits 1 and 0: the mouse's DPI, 0 low, 1 the default, 2 medium, 3 high */
+#define STEP        2                           /* pixels a frame (the map's cells and the mini map's tiles are 8 and 2) */
+#define STEP_FAST   4
 
 extern uint8_t cur_x, cur_y, origin_x, origin_y, frame, view_w, view_h, map_row;
 
@@ -21,10 +24,9 @@ extern uint8_t cur_x, cur_y, origin_x, origin_y, frame, view_w, view_h, map_row;
 uint8_t in_KempcoordX, in_KempcoordY, in_KemprawX, in_KemprawY;
 
 volatile int16_t plat_mouse_x, plat_mouse_y;
-volatile uint8_t plat_mouse_buttons, plat_mouse_present;
+volatile uint8_t plat_mouse_buttons;
 
-static uint8_t peripheral_5;                    /* the register as it was, for the mouse's DPI to go back to when it is switched off */
-static int16_t sent_x, sent_y;                  /* the position as the driver has it: the game moves the pointer too (the keys carry it with the cursor) */
+static int16_t sent_x, sent_y;                  /* the position as the driver has it: the keys move the pointer too, and it is told before the next read */
 static uint8_t last_buttons, seen;
 static int16_t shown_x, shown_y;                /* where the sprite is, or -1 if it is hidden */
 
@@ -76,56 +78,58 @@ static void sprite_at(int16_t x, int16_t y)
     zxn_out(0x57, x < 0 ? 0x00 : 0x80);         /* visible, pattern 0 */
 }
 
+/* The pointer starts in the middle of the map, with the mouse at its default DPI (left as it was, it can be far too quick). */
 void plat_mouse_init(void)
 {
-    plat_mouse_present = 0;
-    shown_x = -1;
+    uint8_t p5 = ZXN_READ_REG(REG_PERIPHERAL_5);
+
+    ZXN_NEXTREGA(REG_PERIPHERAL_5, (uint8_t)((p5 & ~3) | 1));
     sprite_define();
-    sprite_at(-1, 0);
+    in_MouseKempInit();                         /* (reads once, to drop what the mouse has counted) */
+    plat_mouse_x = 128;
+    plat_mouse_y = 128;
+    in_MouseKempSetPos(128, 128);
+    sent_x = sent_y = 128;
+    shown_x = -1;
 }
 
-/* The menu's switch.  Switched on, the pointer starts over the city's cursor, or at the middle of the screen if that is not in view. */
-void plat_mouse_toggle(void)
-{
-    plat_mouse_present = !plat_mouse_present;
-    if (plat_mouse_present) {
-        peripheral_5 = ZXN_READ_REG(REG_PERIPHERAL_5);
-        ZXN_NEXTREGA(REG_PERIPHERAL_5, (uint8_t)((peripheral_5 & ~3) | 1));     /* the mouse's default DPI, not whatever it was left at */
-        in_MouseKempInit();                     /* (reads once, to drop what the mouse has counted) */
-        plat_mouse_x = 128;
-        plat_mouse_y = 96;
-        if ((uint8_t)(cur_x - origin_x) < view_w && (uint8_t)(cur_y - origin_y) < view_h) {
-            plat_mouse_x = (int16_t)((uint8_t)(cur_x - origin_x) << 3);
-            plat_mouse_y = (int16_t)((uint8_t)(map_row + cur_y - origin_y) << 3);
-        }
-        in_MouseKempSetPos(plat_mouse_x, plat_mouse_y);
-        sent_x = plat_mouse_x;
-        sent_y = plat_mouse_y;
-        seen = 0;
-        last_buttons = 0;
-    } else {
-        ZXN_NEXTREGA(REG_PERIPHERAL_5, peripheral_5);
-        sprite_at(-1, 0);
-        shown_x = -1;
-    }
-}
-
-/* Read the mouse, then return bit 0 for movement, bit 1 for a new press of the left button and bit 2 while it is held. */
+/* Read the mouse and the keys, then return bit 0 for movement, bit 1 for a new press of the left button (or fire) and bit 2 while it is held. */
 uint8_t plat_mouse_input(void)
 {
-    uint8_t buttons, events = 0;
+    uint8_t buttons, keys, step, events = 0;
     uint16_t x, y;
+    int16_t nx, ny;
 
-    if (!plat_mouse_present)
-        return 0;
     if (plat_mouse_x != sent_x || plat_mouse_y != sent_y)
         in_MouseKempSetPos(plat_mouse_x, plat_mouse_y);    /* the keys moved it */
     in_MouseKemp(&buttons, &x, &y);
-    if (!seen || (int16_t)x != plat_mouse_x || (int16_t)y != plat_mouse_y)
+    sent_x = nx = (int16_t)x;
+    sent_y = ny = (int16_t)y;
+    keys = plat_pointer_keys();
+    step = (keys & 32) ? STEP_FAST : STEP;
+    if (keys & 1)
+        nx -= step;
+    if (keys & 2)
+        nx += step;
+    if (keys & 4)
+        ny -= step;
+    if (keys & 8)
+        ny += step;
+    if (nx < 0)
+        nx = 0;
+    if (nx > 255)
+        nx = 255;
+    if (ny < 0)
+        ny = 0;
+    if (ny > 191)
+        ny = 191;
+    if (!seen || nx != plat_mouse_x || ny != plat_mouse_y)
         events |= 1;
     seen = 1;
-    sent_x = plat_mouse_x = (int16_t)x;
-    sent_y = plat_mouse_y = (int16_t)y;
+    plat_mouse_x = nx;
+    plat_mouse_y = ny;
+    if (keys & 16)
+        buttons |= 1;
     plat_mouse_buttons = buttons;
     if (buttons & 1) {
         events |= 4;
@@ -139,8 +143,6 @@ uint8_t plat_mouse_input(void)
 /* The pointer, once a frame. */
 void plat_mouse_pointer_refresh(void)
 {
-    if (!plat_mouse_present)
-        return;
     if (plat_mouse_x != shown_x || plat_mouse_y != shown_y) {
         sprite_at(plat_mouse_x, plat_mouse_y);
         shown_x = plat_mouse_x;
