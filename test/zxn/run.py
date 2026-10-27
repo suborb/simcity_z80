@@ -52,6 +52,11 @@ def run(keys, frame, sd=None, wav=None):
     return im.crop((64, 64, 576, 448)).resize((256, 192), Image.NEAREST)
 
 
+def is_blue(p):
+    """a pixel of the water (its blues: not the icons' or the cursor's)"""
+    return p[2] > 150 and p[0] < 80
+
+
 def colours(im, box):
     return im.crop(box).getcolors(100000)
 
@@ -77,7 +82,7 @@ def main():
     if not JNEXT or not os.path.exists(JNEXT):
         print('skipped: set JNEXT to the jnext executable')
         return 0
-    made = subprocess.run(['make', '-s', 'ZXN=build/zxntest/simcity.nex', 'ZXN_MAP=120x100', 'ZXN_ENTROPY=target/zxn/entropy_test.asm', 'ZXN_FLAGS=-Ca-DZXN_TEST_ENTROPY=4660',
+    made = subprocess.run(['make', '-s', 'ZXN=build/zxntest/simcity.nex', 'ZXN_ENTROPY=target/zxn/entropy_test.asm', 'ZXN_FLAGS=-Ca-DZXN_TEST_ENTROPY=4660',
                            'build/zxntest/simcity.nex'], cwd=ROOT, capture_output=True, text=True)
     if made.returncode != 0 or not os.path.exists(NEX):
         print('FAIL  the test build: ' + made.stdout[-400:] + made.stderr[-400:])
@@ -253,8 +258,19 @@ def main():
     scrolled = run(moves, end + 300)
     redrawn = run(moves + [(end + 60, 'm'), (end + 140, 'x')], end + 400)
     diff = ImageChops.difference(scrolled, redrawn).convert('L').point(lambda v: 255 if v else 0)
-    n = sum(1 for v in diff.tobytes() if v)
+    # (the two pictures are of different moments, and the water ripples: its pixels are not compared)
+    n = sum(1 for k, v in enumerate(diff.tobytes()) if v and not (is_blue(scrolled.getpixel((k % 256, k // 256))) or is_blue(redrawn.getpixel((k % 256, k // 256)))))
     check('the map scrolled by the DMA is the picture a full redraw makes', n <= 64 and differs(city, scrolled, (0, 56, 256, 192)), f'{n} pixels differ, in {diff.getbbox()}')
+
+    # the water: a subtle ripple, the patterned water picture and the same with its ripples one pixel along, a step every 16 frames (the 1 Meg art's two water pictures
+    # differ by a single pixel, so the second is made, as the SAM's; cycling the blues instead made the whole sea flash).  The sea is wherever the city has it, so its
+    # blue pixels are looked for, not a place: some of them change in a step (a fifth or so: not none, not a flash) and are as they were two steps later
+    water = [run([S], 900 + 16 * k) for k in range(3)]
+    cells = [p for p in ((x, y) for y in range(56, 192) for x in range(256)) if is_blue(water[0].getpixel(p)) or is_blue(water[1].getpixel(p))]
+    moved = sum(1 for p in cells if water[0].getpixel(p) != water[1].getpixel(p))
+    back = sum(1 for p in cells if water[0].getpixel(p) != water[2].getpixel(p))
+    check('the water ripples: a few of its pixels move in a step and are back after two', len(cells) > 300 and len(cells) // 20 < moved < len(cells) * 2 // 5 and back == 0,
+          f'{len(cells)} water pixels, {moved} differ after a step, {back} after two')
 
     # animation: an airport (tool 13: twelve presses of '.' from the road) has a radar, and the park's fountain and the chimneys' smoke are others: the game
     # shows each animated picture's frames in turn, one every 16 game ticks.  Space the emulator screenshots 32 frames apart: the game's main-loop

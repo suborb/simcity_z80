@@ -381,21 +381,6 @@ _zxn_out:
         out     (c),a
         ret
 
-; void zxn_reg(uint8_t reg, uint8_t value) __smallc: a Next register
-        PUBLIC  _zxn_reg
-_zxn_reg:
-        ld      hl,2
-        add     hl,sp
-        ld      e,(hl)                  ; value
-        inc     hl
-        inc     hl
-        ld      a,(hl)                  ; reg
-        ld      bc,$243B
-        out     (c),a                   ; the register number to port $243B ...
-        inc     b
-        out     (c),e                   ; ... and the value to $253B
-        ret
-
 ; void zxn_dma(uint8_t srcpage, uint16_t srcoff, uint8_t dstpage, uint16_t dstoff, uint16_t len, uint8_t dec) __smallc
 ; `len` bytes between two 8 KB pages of the screen by the DMA, which stops the CPU while it moves them: page srcpage is mapped into slot 6 and dstpage
 ; into slot 7 (the same page may be both: the move is then a memmove, upwards with dec = 0 from the first bytes, downwards with dec = 1 from the

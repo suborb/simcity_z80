@@ -130,7 +130,7 @@ def st_piece(p):
 # The animated tiles.  Micropolis keeps the building animation frames at the end of its table (832 to 959): four, or for the airport's radar eight,
 # pictures that differ from the tile they animate by a few pixels (the smoke over a chimney, the fountain's spray, the radar's sweep, the nuclear plant's
 # swirl).  Water instead alternates the patterned pictures at tiles 2 and 4; tile 3 is solid blue.  In the ST and Amiga 512K sets tiles 2 and 4 are
-# identical, so the alternate frame shifts tile 2's ripples one pixel.  Found by comparing the pixels of the three tile sets (ST, Amiga 512K and 1 Meg:
+# identical, and in the 1 Meg set they differ by a pixel, so the alternate frame shifts tile 2's ripples one pixel.  Found by comparing the pixels of the three tile sets (ST, Amiga 512K and 1 Meg:
 # the same numbers in all); the engine has no animation of its own (only the unpowered flash and the busy roads) so a platform shows the frame
 # itself.  The stadium's game (932 to 947) and the other building frames in the table are not used.
 # An entry is either (first, count) for consecutive frames, or an explicit list of frame tiles.  Alternate the two patterned water
@@ -143,6 +143,14 @@ ANIMATED = {2: [2, 4, 2, 4],                    # open water
             820: (952, 4)}                      # the nuclear plant's swirl
 ANIM_SHIFT = 4                                  # a frame is 16 ticks of the game's frame counter (V_view_tick), which the platforms use
 WATER_SHIFT = -1                                # a generated water frame: shift tile 2 when the source's tile 4 duplicates it
+
+
+def near_identical(table, picsize, pixel):
+    """True if the two patterned water pictures (Micropolis tiles 2 and 4) differ by no more than a pixel or two, so alternating them shows nothing: the ST and the Amiga
+    512K sets have them identical, and the 1 Meg set's differ by one pixel (the Amiga's water moved that little)."""
+    a = [v for row in pixel(table[2 * picsize:3 * picsize]) for v in row]
+    b = [v for row in pixel(table[4 * picsize:5 * picsize]) for v in row]
+    return sum(1 for x, y in zip(a, b) if x != y) <= 2
 
 
 def shift_water(rows):
@@ -420,7 +428,7 @@ def main():
     baked = [planes(to8(pixels(table[n * PIC:n * PIC + PIC]))) for n in pictures]
     if a.numbering == 'ours':                       # (the SAM and the Next also have the animations' frames, after the pictures)
         extra, amap, entries = animation(pictures)
-        if table[2 * PICSIZE:3 * PICSIZE] == table[4 * PICSIZE:5 * PICSIZE]:
+        if near_identical(table, PICSIZE, pixels6 if depth6 else pixels):
             extra = [WATER_SHIFT if n == 4 else n for n in extra]
         framed = pictures + extra
     else:

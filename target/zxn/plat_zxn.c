@@ -4,6 +4,7 @@
    black and 15 white), which the text, charts, mini maps and tool icons use, then the map art's 64 (the Amiga SimCity 1 Meg's by default), those inverted
    (the cursor), and the Amiga's 16 for the tool icons; this follows the SAM Coupe (target/sam/plat_sam.asm); tools/st_tiles_3bpp.py --zxn makes the art. */
 #include <stdint.h>
+#include <arch/zxn.h>                  /* ZXN_NEXTREG, REG_* (z88dk's names for the Next's registers) */
 #include <string.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -22,7 +23,6 @@ extern void zxn_bank_read(uint8_t *dst, uint8_t page, uint16_t off, uint16_t len
 extern void zxn_dma(uint8_t srcpage, uint16_t srcoff, uint8_t dstpage, uint16_t dstoff, uint16_t len, uint8_t dec);
 extern void snd_init(void);
 extern void snd_wait(void);
-extern void zxn_reg(uint8_t reg, uint8_t value);
 extern uint8_t zxn_in(uint16_t port);
 extern void zxn_out(uint16_t port, uint8_t value);
 
@@ -297,18 +297,19 @@ void plat_clear_map(void)
 }
 
 #ifndef ZXN_SPEED
-#define ZXN_SPEED 1                            /* the CPU's speed: 0 3.5 MHz, 1 7, 2 14, 3 28 (the SAM Coupe is 6) */
+#define ZXN_SPEED RTM_14MHZ                    /* the CPU's speed: RTM_3MHZ, RTM_7MHZ, RTM_14MHZ or RTM_28MHZ: the game's pace is the frame interrupt's (plat_idle), not the CPU's */
 #endif
+#define REG_INTERRUPT_CONTROL   0xC0           /* (z88dk has no names for these two) */
+#define REG_INTERRUPT_ENABLE_0  0xC4
 
 void plat_init(void)
 {
-    zxn_reg(0x07, ZXN_SPEED);
+    ZXN_NEXTREG(REG_TURBO_MODE, ZXN_SPEED);
     /* The sound effects use AY channel C: ACB stereo centers C in both speakers (ABC puts it on the right).
        Preserve the other Peripheral 3 bits set by the machine or loader. */
-    zxn_out(0x243B, 0x08);
-    zxn_reg(0x08, (uint8_t)(zxn_in(0x253B) | 0x20));
-    zxn_reg(0xC0, 0);                            /* interrupts as a Spectrum's: mode 1 (not the Next's own mode 2 table) */
-    zxn_reg(0xC4, 1);                            /* the frame interrupt of the ULA */
+    ZXN_NEXTREGA(REG_PERIPHERAL_3, ZXN_READ_REG(REG_PERIPHERAL_3) | RP3_STEREO_ACB);
+    ZXN_NEXTREG(REG_INTERRUPT_CONTROL, 0);       /* interrupts as a Spectrum's: mode 1 (not the Next's own mode 2 table) */
+    ZXN_NEXTREG(REG_INTERRUPT_ENABLE_0, 1);      /* the frame interrupt of the ULA */
     snd_init();
                                                 /* (the sound's frame interrupt: interrupts are on from here) */
     zxn_palette(zxn_head, 0, 100);                /* (the call takes up to 127 entries) */

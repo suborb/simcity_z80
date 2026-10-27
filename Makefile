@@ -212,17 +212,16 @@ $(SAM): $(DEPS) build/sam/tiles.bin build/sam/anim.inc
 # target/zxn/zxn_pad.asm), the stack is above it and the big arrays, the map and the minimaps, from ZXN_BSS.
 ZXN_DATA = 0x8A00
 ZXN_BSS = 0x9A00
-# ZXN_MAP=120x100 builds a bigger map (the engine is made for widths of 96 and 120: engine/mapsize.inc).  Its mini map keeps the 96x96
-# square viewport and sidebar; cursor keys pan over the extra 24 columns and 4 rows.
-ZXN_MAP ?=
-ifneq ($(ZXN_MAP),)
-ifneq ($(ZXN_MAP),120x100)
-$(error ZXN_MAP must be empty (96x96) or 120x100)
-endif
+# The map is 120x100 (the engine is made for widths of 96 and 120: engine/mapsize.inc) and the title screen has the eight scenarios.  Its mini map keeps the 96x96
+# square viewport and sidebar; cursor keys pan over the extra 24 columns and 4 rows.  ZXN_MAP=96x96 builds the original's size, with no scenarios.
+ZXN_MAP ?= 120x100
+ifeq ($(ZXN_MAP),120x100)
 ZXN_MAPFLAGS = -DMAP_W=120 -DMAP_H=100 -Ca-DMAP_W=120 -Ca-DMAP_H=100
 ZXN_MAPFLAGS += -DHAVE_SCENARIOS -Ca-DHAVE_SCENARIOS
 ZXN_SCENARIO_ASM = build/zxn/scenarios/scenarios.asm
 ZXN_SCENARIO_C = target/zxn/scenarios.c
+else ifneq ($(ZXN_MAP),96x96)
+$(error ZXN_MAP must be 120x100 (the default) or 96x96)
 endif
 ZXN_FLAGS =                    # (-DZXN_NO_SCROLL: no scrolling by the DMA; -DZXN_PACE=2: 25 frames a second)
 ZXN_ENTROPY = $(ENTROPY)       # (target/zxn/entropy_test.asm: the build test/zxn/run.py runs, which makes the same city each time)
