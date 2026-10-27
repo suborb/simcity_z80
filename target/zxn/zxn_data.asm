@@ -16,6 +16,6 @@ _zxn_head:
         SECTION BANK_22
         BINARY  "build/zxn/icons.bin"
 
-        IFDEF   ZXN_SCENARIOS
+        IFDEF   HAVE_SCENARIOS
         INCLUDE "build/zxn/scenarios/scenarios.asm"
         ENDIF

@@ -41,9 +41,10 @@
         MACRO   BANK_OUT
         ENDM
         ENDIF
-        IFDEF   SAM_SIMULATION_HIGH
+        IFDEF   ENGINE_SIM_SECTION              ; a target that links the simulation's code in a section of its own supplies it: engine_sim.inc defines ENGINE_SIM_CODE
+        INCLUDE "engine_sim.inc"
         MACRO   IN_SIM_CODE
-        SECTION code_simulation
+        ENGINE_SIM_CODE
         ENDM
         ELSE
         IFDEF   ENGINE_BANK

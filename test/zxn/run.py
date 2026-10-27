@@ -88,7 +88,7 @@ def main():
     scenario_dir = os.path.join(ROOT, 'build', 'zxn', 'scenarios')
     banks = sorted(f for f in os.listdir(scenario_dir) if f.startswith('scenarios_') and f.endswith('.bin'))
     records = b''.join(open(os.path.join(scenario_dir, f), 'rb').read() for f in banks)
-    # a record, as tools/convert_amiga_scenarios.py and ui/scenarios.c have it: the map, its preview, the power map, the traffic map, 1,024 bytes of text
+    # a record, as tools/convert_amiga_scenarios.py and target/zxn/scenarios.c have it: the map, its preview, the power map, the traffic map, 1,024 bytes of text
     meta_at = 12000 + 12000 + 15 * 100 + 60 * 50
     record_size = meta_at + 1024
     rio_meta = 5 * record_size + meta_at

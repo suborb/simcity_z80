@@ -17,6 +17,7 @@
 #define HAVE_EVALUATION
 #define MODAL_COLS 32          /* a 32 column display: the budget and evaluation screens use 32 columns of the 24 rows */
 #define MODAL_ROWS 24
+#define HAVE_DATA_PAGING       /* the data is in a bank that the display code pages out: the UI calls plat_page_data() (ui/platform.h) */
 #define FMT_WIDTH 32            /* a row of a table screen: the display's width (and -Ca-DFMT_WIDTH=32: the Makefile) */
 #define HAVE_MINIMAP
 #define HAVE_MINIMAP_NATIVE    /* the whole city in colour (plat_put_minirow) */

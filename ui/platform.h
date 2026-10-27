@@ -7,9 +7,9 @@
 #include <stdint.h>
 #include "plat_config.h"       /* the platform's own: what it can do, and which features it has */
 
-/* Targets that bank application data expose the selected data page through
-   this hook. Flat-memory targets compile it away. */
-#ifdef TARGET_SAM
+/* HAVE_DATA_PAGING (plat_config.h): the target banks the application's data, and plat_page_data() selects the data page (the UI calls it before it touches
+   its variables again after the display code has run).  Flat-memory targets compile it away. */
+#ifdef HAVE_DATA_PAGING
 extern void plat_page_data(void);
 #else
 #define plat_page_data() ((void)0)
@@ -128,7 +128,15 @@ extern uint16_t plat_clock(void);               /* free running counter, for see
 extern uint16_t plat_entropy(void);             /* inexpensive Z80 refresh-register sample */
 extern void     plat_idle(void);                /* called once per frame: may wait */
 extern void     plat_flush(void);               /* end of frame: show what was drawn */
-#ifdef ZXN_SCENARIOS
+#ifdef HAVE_SCENARIOS
+/* HAVE_SCENARIOS: the title screen offers scenarios (ready-made cities in the platform's own storage).
+     plat_scenario_choose()                  shows them (a picture of each, its title and text) and returns the number chosen, or 0xff for none
+     plat_scenario_load(n)                   puts scenario n's map in levelmap and returns its year
+     plat_scenario_restore_state(n)          after the engine has been reset for it (sim_loaded): puts back what it keeps in the minimaps (power, traffic)
+     plat_scenario_preview_row(y, x, pixels) draws a row of the picture of a scenario: one colour a tile */
+extern uint8_t  plat_scenario_choose(void);
+extern uint16_t plat_scenario_load(uint8_t index);
+extern void     plat_scenario_restore_state(uint8_t index);
 extern void     plat_scenario_preview_row(uint8_t y, uint8_t x, const uint8_t *pixels);
 #endif
 

@@ -47,10 +47,7 @@
 #define NUM_TOOLS   14
 #define TOOL_POWER_STATION 11
 
-#ifdef ZXN_SCENARIOS
-extern uint8_t scenario_choose(void);
-extern uint16_t scenario_load(uint8_t index);
-extern void scenario_restore_state(uint8_t index);
+#ifdef HAVE_SCENARIOS
 static uint8_t selected_scenario = 0xff;
 #endif
 
@@ -1847,7 +1844,7 @@ title_again:
     plat_text_puts(2, LEVEL_ROW + 2, "1 EASY");
     plat_text_puts(2, LEVEL_ROW + 4, "2 MEDIUM");
     plat_text_puts(2, LEVEL_ROW + 6, "3 HARD");
-#ifdef ZXN_SCENARIOS
+#ifdef HAVE_SCENARIOS
     plat_text_puts(2, LEVEL_ROW + 8, "4 SCENARIOS");
 #endif
     plat_flush();
@@ -1858,13 +1855,13 @@ title_again:
         if (!k)
             plat_idle();
     } while (k != '1' && k != '2' && k != '3'
-#ifdef ZXN_SCENARIOS
+#ifdef HAVE_SCENARIOS
              && k != '4'
 #endif
     );
-#ifdef ZXN_SCENARIOS
+#ifdef HAVE_SCENARIOS
     if (k == '4') {
-        selected_scenario = scenario_choose();
+        selected_scenario = plat_scenario_choose();
         if (selected_scenario == 0xff) goto title_again;
         V_difficulty = 0;
         goto title_done;
@@ -1890,7 +1887,7 @@ title_again:
     }
 #endif
     V_InitialSeed = (uint16_t)(seed ^ first ^ (plat_clock() - first) ^ plat_entropy()) | 1; /* ...and the name took to type */
-#ifdef ZXN_SCENARIOS
+#ifdef HAVE_SCENARIOS
 title_done:
 #endif
     plat_text_clear();
@@ -1898,7 +1895,7 @@ title_done:
     plat_text_puts(0, 1, "GENERATING LANDSCAPE...");        /* (a line down from the banner) */
 #else
     plat_text_puts(0, 0,
-#ifdef ZXN_SCENARIOS
+#ifdef HAVE_SCENARIOS
                    selected_scenario != 0xff ? "LOADING SCENARIO..." :
 #endif
                    "GENERATING LANDSCAPE...");
@@ -1924,11 +1921,11 @@ static void play_city(void)
     V_simulation_speed = 1;
     SMC_tax_rate = 7;
     SMC_transport_percent = SMC_police_percent = SMC_fire_percent = 100;
-#ifdef ZXN_SCENARIOS
+#ifdef HAVE_SCENARIOS
     if (selected_scenario != 0xff) {
-        uint16_t year = scenario_load(selected_scenario);
+        uint16_t year = plat_scenario_load(selected_scenario);
         sim_loaded();
-        scenario_restore_state(selected_scenario);
+        plat_scenario_restore_state(selected_scenario);
         V_year = year;
         V_month = 0;
         V_money[0] = 0x20;
@@ -2109,9 +2106,7 @@ static void play_city(void)
 #endif
         plat_page_data();
 #ifdef HAVE_MOUSE_POINTER
-#ifndef SAM_DISABLE_MOUSE_POINTER
         plat_mouse_pointer_refresh();
-#endif
 #endif
         plat_flush();
         map_dirty = 0;

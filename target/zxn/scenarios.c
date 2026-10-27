@@ -1,4 +1,4 @@
-/* ZX Spectrum Next scenario picker and loader.  Scenario records are packed in
+/* ZX Spectrum Next scenario picker and loader (the platform's side of HAVE_SCENARIOS: ui/platform.h).  Scenario records are packed in
    the NEX's banks 23..34 by tools/convert_amiga_scenarios.py. */
 #include <stdint.h>
 #include <string.h>
@@ -110,7 +110,7 @@ static uint8_t text_pages(void)
     return pages ? pages : 1;
 }
 
-uint8_t scenario_choose(void)
+uint8_t plat_scenario_choose(void)
 {
     uint8_t index = 0, page = 0, k;
     show_scenario(index, page);
@@ -132,7 +132,7 @@ uint8_t scenario_choose(void)
     }
 }
 
-uint16_t scenario_load(uint8_t index)
+uint16_t plat_scenario_load(uint8_t index)
 {
     uint16_t year, offset = 0;
 
@@ -153,7 +153,7 @@ uint16_t scenario_load(uint8_t index)
 
 /* Restore saved scenario power and congestion after sim_loaded() clears all
    minimaps. The first simulation tick rebuilds both from live conditions. */
-void scenario_restore_state(uint8_t index)
+void plat_scenario_restore_state(uint8_t index)
 {
     uint16_t offset = 0;
     while (offset < POWER_BYTES) {

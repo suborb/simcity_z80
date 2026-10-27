@@ -107,13 +107,11 @@ static uint8_t pointer_cell_has_pixels(uint16_t px, uint16_t py, uint8_t cx, uin
 
 void plat_mouse_pointer_erase(void)
 {
-#ifndef SAM_DISABLE_MOUSE_POINTER
     plat_page_data();
     if (plat_mouse_pointer_cell_count) {
         plat_mouse_pointer_restore_screen();
         plat_mouse_pointer_cell_count = 0;
     }
-#endif
 }
 
 static void pointer_overlay(uint8_t cx, uint8_t screen_row, uint16_t px, uint16_t py)

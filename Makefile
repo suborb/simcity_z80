@@ -188,7 +188,7 @@ SAM_TEST =              # (-DSOUND_TEST -Ca-DSOUND_TEST: the build of test/sam/s
 $(SAM): $(DEPS) build/sam/tiles.bin build/sam/anim.inc
 	@mkdir -p $(@D)
 	$(ZCC) +sam -subtype=allram $(COMMON) -pragma-include:target/sam/zpragma.inc \
-	    -pragma-define:MMAP=-1 -Itarget/sam -Ca-Itarget/sam -DTARGET_SAM -DHAVE_MOUSE -DHAVE_MOUSE_POINTER -Ca-DTARGET_SAM -Ca-DSAM_SIMULATION_HIGH -Ca-DFMT_WIDTH=32 -Ca-DHAVE_MINIMAP_SQUARE -Ca-DHAVE_SOUND -Ca-DAY_SAA -Ca-DAY_ISR $(SAM_TEST) target/sam/plat_sam_files.asm $(GAME) $(ENTROPY) $(MENU) target/sam/plat_sound.asm target/common/ay_hooks.asm target/common/ay_sfx.asm $(FIELDS) $(MMNATIVE) $(LINEEDIT) $(SAM_PLATFORM_NOFILES) -o $(@D)/simcity.bin
+	    -pragma-define:MMAP=-1 -Itarget/sam -Ca-Itarget/sam -DTARGET_SAM -DHAVE_MOUSE -DHAVE_MOUSE_POINTER -Ca-DTARGET_SAM -Ca-DENGINE_SIM_SECTION -Ca-DFMT_WIDTH=32 -Ca-DHAVE_MINIMAP_SQUARE -Ca-DHAVE_SOUND -Ca-DAY_SAA -Ca-DAY_ISR $(SAM_TEST) target/sam/plat_sam_files.asm $(GAME) $(ENTROPY) $(MENU) target/sam/plat_sound.asm target/common/ay_hooks.asm target/common/ay_sfx.asm $(FIELDS) $(MMNATIVE) $(LINEEDIT) $(SAM_PLATFORM_NOFILES) -o $(@D)/simcity.bin
 	@size=`wc -c < $(@D)/simcity.bin`; echo "sam image: $$size bytes (BSS trimmed from the disk image)"; \
 	    [ $$size -le 65536 ] || { echo "the initialized image exceeds the 64 KB program window"; rm -f $@; exit 1; }
 	@# Screen-dependent routines must stay below $8000; mp_screen_end marks the start of the low code_driver section.
@@ -220,9 +220,9 @@ ifneq ($(ZXN_MAP),120x100)
 $(error ZXN_MAP must be empty (96x96) or 120x100)
 endif
 ZXN_MAPFLAGS = -DMAP_W=120 -DMAP_H=100 -Ca-DMAP_W=120 -Ca-DMAP_H=100
-ZXN_MAPFLAGS += -DZXN_SCENARIOS -Ca-DZXN_SCENARIOS
+ZXN_MAPFLAGS += -DHAVE_SCENARIOS -Ca-DHAVE_SCENARIOS
 ZXN_SCENARIO_ASM = build/zxn/scenarios/scenarios.asm
-ZXN_SCENARIO_C = ui/scenarios.c
+ZXN_SCENARIO_C = target/zxn/scenarios.c
 endif
 ZXN_FLAGS =                    # (-DZXN_NO_SCROLL: no scrolling by the DMA; -DZXN_PACE=2: 25 frames a second)
 ZXN_ENTROPY = $(ENTROPY)       # (target/zxn/entropy_test.asm: the build test/zxn/run.py runs, which makes the same city each time)

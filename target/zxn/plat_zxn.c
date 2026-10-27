@@ -337,7 +337,7 @@ void plat_idle(void)
 }
 void plat_flush(void) {}
 
-#ifdef ZXN_SCENARIOS
+#ifdef HAVE_SCENARIOS
 void plat_scenario_preview_row(uint8_t y, uint8_t x, const uint8_t *pixels)
 {
     zxn_wr(y, x, pixels, 120);
