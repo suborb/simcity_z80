@@ -1917,6 +1917,63 @@ title_done:
 }
 
 /* One city, from the title screen until it is quit or replaced. */
+#if defined(HAVE_MOUSE) && defined(HAVE_MINIMAP) && defined(HAVE_MINIMAP_SQUARE)
+/* The pointer on a mini map.  A press on the picture goes to that place: the city's cursor is the tile (the picture is two pixels a tile) and the view is
+   centred on it, back in the city; M NEXT and X BACK in the sidebar are pressed as the keys are; and where the picture is a window on a larger city, the
+   pointer at its edge pans it a tile every fourth frame, as the city's view scrolls. */
+static uint8_t mouse_hold_off;              /* a press the mini map took: the button is held while the city shows again, and must not paint */
+#define MM_NEXT_ROW 22                      /* the sidebar's last two lines (draw_map_sidebar) */
+#define MM_BACK_ROW 23
+static void minimap_mouse(uint8_t events)
+{
+    uint8_t col, row, half;
+#ifdef HAVE_MINIMAP_SCROLL
+    int8_t dx = 0, dy = 0;
+#endif
+
+    plat_page_data();
+    col = (uint8_t)plat_mouse_x >> 3;
+    row = (uint8_t)plat_mouse_y >> 3;
+    if (events & 2) {                       /* a new press */
+        mouse_hold_off = 1;
+        if (col >= MM_SIDE_COL) {
+            if (row == MM_NEXT_ROW)
+                set_map_view((uint8_t)(map_view < MM_VIEWS ? map_view + 1 : 0));
+            else if (row == MM_BACK_ROW)
+                set_map_view(0);
+            return;
+        }
+        cur_x = (uint8_t)plat_mouse_x >> 1;
+        cur_y = (uint8_t)plat_mouse_y >> 1;
+#ifdef HAVE_MINIMAP_SCROLL
+        cur_x += mm_scroll_x;
+        cur_y += mm_scroll_y;
+#endif
+        half = view_w >> 1;
+        origin_x = cur_x > half ? cur_x - half : 0;
+        half = view_h >> 1;
+        origin_y = cur_y > half ? cur_y - half : 0;
+        clamp_view();                       /* (the far edges) */
+        set_map_view(0);
+        return;
+    }
+#ifdef HAVE_MINIMAP_SCROLL
+    if (!(frame & 3) && col < MM_SIDE_COL) {
+        if (col == 0)
+            dx = -1;
+        else if (col == MM_SIDE_COL - 1)
+            dx = 1;
+        if (row == 0)
+            dy = -1;
+        else if (row == 23)
+            dy = 1;
+        if (dx | dy)
+            scroll_minimap(dx, dy);
+    }
+#endif
+}
+#endif
+
 static void play_city(void)
 {
     uint8_t k, countdown, ticking = 0, full, last_ox = 0, last_oy = 0;
@@ -1976,6 +2033,12 @@ static void play_city(void)
         plat_page_data();                /* the driver state may be in banked memory */
         {
             uint8_t mouse_event = plat_mouse_input();
+#if defined(HAVE_MINIMAP) && defined(HAVE_MINIMAP_SQUARE)
+            if (!(mouse_event & 4))
+                mouse_hold_off = 0;
+            else if (mouse_hold_off)
+                mouse_event &= (uint8_t)~4;     /* (the button that closed the mini map is still down) */
+#endif
             /* Some mouse button interfaces can also appear in the keyboard
                scan. Do not let a mouse press become a second Enter/Space
                placement, especially when the pointer is outside the map. */
@@ -2001,6 +2064,10 @@ static void play_city(void)
             if (plat_mouse_update_city_cursor() &&
                 plat_mouse_edge_scroll() && (mouse_event & 4))
                 apply_tool();             /* continue a drag as the map moves under the edge */
+#if defined(HAVE_MINIMAP) && defined(HAVE_MINIMAP_SQUARE)
+            if (map_view && plat_mouse_present)
+                minimap_mouse(mouse_event);
+#endif
         }
 #else
         if (k)
