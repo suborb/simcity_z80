@@ -27,6 +27,33 @@ _plat_mouse_init:
         ld      (_plat_mouse_seen),a
         ld      a,1
         ld      (_plat_mouse_enabled),a
+        ld      a,30
+        ld      (_plat_mouse_retry),a
+        ld      b,4                     ; (a held cursor key fails the scan: try again)
+sm_init_try:
+        call    sm_detect
+        ld      a,(_plat_mouse_present)
+        or      a
+        jr      nz,sm_detected
+        djnz    sm_init_try
+sm_detected:
+        ld      hl,0                    ; the detecting scans' movement is discarded
+        ld      (_plat_mouse_x),hl
+        ld      (_plat_mouse_y),hl
+        xor     a
+        ld      (_plat_mouse_buttons),a
+        ret
+
+; One detection attempt: a scan to clear the registers, then the detecting one.
+sm_detect:
+        xor     a
+        ld      (_plat_mouse_detect),a
+        call    _plat_mouse_poll
+        ld      a,1
+        ld      (_plat_mouse_detect),a
+        call    _plat_mouse_poll
+        xor     a
+        ld      (_plat_mouse_detect),a
         ret
 
 ; Called by user code to consume one complete mouse scan.
@@ -55,10 +82,8 @@ _plat_mouse_poll:
         and     $0f
         cp      $0f
         jr      nz,sm_no_gate
-        ld      a,1
-        ld      (_plat_mouse_present),a
         inc     hl
-        ld      d,8                     ; original mouse scan: eight bytes after the keyboard-state gate
+        ld      d,7                     ; the interface sends nine nibbles (strobe, gate, seven more) and then starts over: a tenth read would put the next scan out of step
 sm_scan_loop:
         in      a,(c)
         ld      (hl),a
@@ -66,6 +91,29 @@ sm_scan_loop:
         dec     d
         jr      nz,sm_scan_loop
 
+; Mouse detection, made only by sm_detect: a scan clears the interface's
+; registers, so the next one has zero in the low nibbles of the delta bytes
+; (raw+3 to raw+8) from a mouse at rest, but not from a bare port, which returns
+; the keyboard state ($F).  (mc-fred part 9 tests the last one, raw+8.)  Once
+; found, every scan is decoded; before, the game keeps to the keyboard.
+        ld      a,(_plat_mouse_present)
+        or      a
+        jr      nz,sm_update
+        ld      a,(_plat_mouse_detect)
+        or      a
+        jr      z,sm_frame_done
+        ld      hl,_plat_mouse_raw+3
+        ld      d,6
+        xor     a
+sm_detect_or:
+        or      (hl)
+        inc     hl
+        dec     d
+        jr      nz,sm_detect_or
+        and     $0f
+        jr      nz,sm_frame_done
+        ld      a,1
+        ld      (_plat_mouse_present),a
         jr      sm_update
 
 sm_no_gate:
@@ -150,6 +198,18 @@ _plat_mouse_input:
         IFDEF   TARGET_SAM
         call    _sam_page_data
         ENDIF
+        ld      a,(_plat_mouse_present)
+        or      a
+        jr      nz,sm_input_scan
+        ld      hl,_plat_mouse_retry    ; no mouse yet (an emulator may only attach it later): look again now and then
+        dec     (hl)
+        jr      nz,sm_input_scan
+        ld      (hl),30
+        call    sm_detect
+        ld      hl,0                    ; (the detecting scans' movement is not the player's)
+        ld      (_plat_mouse_x),hl
+        ld      (_plat_mouse_y),hl
+sm_input_scan:
         call    _plat_mouse_poll
         ld      b,0
         ld      a,(_plat_mouse_seen)
@@ -242,6 +302,8 @@ sm_icon_miss:
         PUBLIC  _plat_mouse_polls
         PUBLIC  _plat_mouse_raw
         PUBLIC  _plat_mouse_enabled
+        PUBLIC  _plat_mouse_detect
+        PUBLIC  _plat_mouse_retry
         PUBLIC  _plat_mouse_prev_x
         PUBLIC  _plat_mouse_prev_y
         PUBLIC  _plat_mouse_buttons_last
@@ -258,6 +320,8 @@ _plat_mouse_present: defs 1
 _plat_mouse_polls:   defs 2
 _plat_mouse_raw:     defs 10
 _plat_mouse_enabled: defs 1
+_plat_mouse_detect:  defs 1
+_plat_mouse_retry:   defs 1
 _plat_mouse_prev_x:  defs 2
 _plat_mouse_prev_y:  defs 2
 _plat_mouse_buttons_last: defs 1
