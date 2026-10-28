@@ -1093,6 +1093,9 @@ static const struct field top_map[] = {
 #ifndef MM_SIDE_COL
 #define MM_SIDE_COL 24                      /* the sidebar's first column: after the 24 cells of the picture (a wider display can centre them: plat_config.h) */
 #endif
+#ifndef MM_PIC_COL
+#define MM_PIC_COL 0                        /* ... and the picture's first (the Aquarius+'s is 4: MM_SIDE_COL 28) */
+#endif
 /* The sidebar of a square mini map (eight columns at the right of the picture): the date, the money, the population, the view,
    its key (the platform's), the demand, the speed and the keys.  Only plat_text_puts() and plat_demand(): a field table would print
    whole rows, picture and all. */
@@ -1921,13 +1924,15 @@ static uint8_t mouse_hold_off;              /* a press the mini map took: the bu
 static void minimap_mouse(uint8_t events)
 {
     uint8_t col, row, half;
+    uint16_t px;
 #ifdef HAVE_MINIMAP_SCROLL
     int8_t dx = 0, dy = 0;
 #endif
 
     plat_page_data();
-    col = (uint8_t)plat_mouse_x >> 3;
-    row = (uint8_t)plat_mouse_y >> 3;
+    px = (uint16_t)plat_mouse_x;
+    col = (uint8_t)(px >> 3);
+    row = (uint8_t)((uint16_t)plat_mouse_y >> 3);
     if (events & 2) {                       /* a new press */
         mouse_hold_off = 1;
         if (col >= MM_SIDE_COL) {
@@ -1937,8 +1942,10 @@ static void minimap_mouse(uint8_t events)
                 set_map_view(0);
             return;
         }
-        cur_x = (uint8_t)plat_mouse_x >> 1;
-        cur_y = (uint8_t)plat_mouse_y >> 1;
+        if (col < MM_PIC_COL)
+            return;                         /* (beside the picture) */
+        cur_x = (uint8_t)((px - MM_PIC_COL * 8) >> 1);
+        cur_y = (uint8_t)((uint16_t)plat_mouse_y >> 1);
 #ifdef HAVE_MINIMAP_SCROLL
         cur_x += mm_scroll_x;
         cur_y += mm_scroll_y;
@@ -1952,8 +1959,8 @@ static void minimap_mouse(uint8_t events)
         return;
     }
 #ifdef HAVE_MINIMAP_SCROLL
-    if (!(frame & 3) && col < MM_SIDE_COL) {
-        if (col == 0)
+    if (!(frame & 3) && col >= MM_PIC_COL && col < MM_SIDE_COL) {
+        if (col == MM_PIC_COL)
             dx = -1;
         else if (col == MM_SIDE_COL - 1)
             dx = 1;

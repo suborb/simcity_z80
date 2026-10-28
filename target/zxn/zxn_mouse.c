@@ -1,6 +1,6 @@
 /* ZX Spectrum Next: the pointer's own parts (the rest is target/common/pointer.c, with ptr_driver.h).  A Kempston mouse cannot be detected (its ports read as anything
    without one), so it is always read: with none the position does not change.  It is read by z88dk's in_MouseKemp, which keeps the position as 0..255 by 0..191 in the four
-   variables below.  The pointer is hardware sprite 0, so nothing has to be drawn under it or put back; here too are the tool icons' places and the view's edge scrolling. */
+   variables below.  The pointer is hardware sprite 0, so nothing has to be drawn under it or put back; here too are the tool icons' places. */
 #include <stdint.h>
 #include <arch/zxn.h>
 #include <arch/zx/zx_input.h>
@@ -13,8 +13,6 @@ extern void zxn_out(uint16_t port, uint8_t value);
 extern void pointer_start(void);                /* (target/common/pointer.c) */
 
 #define REG_PERIPHERAL_5 0x0A                   /* (z88dk has no name for it) bits 1 and 0: the mouse's DPI, 0 low, 1 the default, 2 medium, 3 high */
-
-extern uint8_t cur_x, cur_y, origin_x, origin_y, frame, view_w, view_h, map_row;
 
 /* the variables in_MouseKemp needs (arch/zx/zx_input.h) */
 uint8_t in_KempcoordX, in_KempcoordY, in_KemprawX, in_KemprawY;
@@ -108,45 +106,6 @@ uint8_t plat_mouse_icon_hit(void)
     if (y < 8 || y >= 48 || x >= 161)
         return 0xFF;
     return (uint8_t)((y >= 28 ? 7 : 0) + x / 23);
-}
-
-/* Move the view by one cell while the pointer rests on its edge (the game asks only when the pointer is over the map).  Returns 1 if it moved.
-   It looks every fourth frame: the city would otherwise fly past. */
-uint8_t plat_mouse_edge_scroll(void)
-{
-    uint8_t col, row;
-
-    if (frame & 3)
-        return 0;
-    col = (uint8_t)plat_mouse_x >> 3;
-    row = (uint8_t)plat_mouse_y >> 3;
-    if (col == 0) {
-        if (cur_x) {
-            --cur_x;
-            --origin_x;
-            return 1;
-        }
-    } else if (col == view_w - 1) {
-        if (cur_x != MAP_W - 1) {
-            ++cur_x;
-            ++origin_x;
-            return 1;
-        }
-    }
-    if (row == map_row) {
-        if (cur_y) {
-            --cur_y;
-            --origin_y;
-            return 1;
-        }
-    } else if (row == map_row + view_h - 1) {
-        if (cur_y != MAP_H - 1) {
-            ++cur_y;
-            ++origin_y;
-            return 1;
-        }
-    }
-    return 0;
 }
 
 #endif /* HAVE_MOUSE */

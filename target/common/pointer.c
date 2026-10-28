@@ -5,15 +5,24 @@
    is a set of keys, so a mouse alone can drive a menu.  A mouse that is not there adds nothing (the SAM's driver reports none until it finds one). */
 #include <stdint.h>
 #include "platform.h"
+#include "engine.h"
 #include "ptr_driver.h"
 
 #ifdef HAVE_POINTER
 
+#ifndef PTR_MAX_X                               /* the screen in pixels: the target's ptr_driver.h can say otherwise (the Aquarius+ is 320x200) */
+#define PTR_MAX_X   255
+#define PTR_MAX_Y   191
+#endif
+#ifndef PTR_START_X                             /* where the pointer starts, and where a modal screen counts the mouse from */
+#define PTR_START_X 128
+#define PTR_START_Y 128
+#endif
+#define MID_X       (PTR_MAX_X / 2)
+#define MID_Y       (PTR_MAX_Y / 2)
 #define STEP        2                           /* pixels a frame (the map's cells and the mini map's tiles are 8 and 2) */
 #define MAX_FRAMES  8                           /* of the frames a slow pass took */
 #define STEP_FAST   4
-#define MID_X       128                         /* where a modal screen counts the mouse from */
-#define MID_Y       96
 #define ROW         8                           /* pixels of mouse movement to a key in a modal screen: a menu's row */
 
 volatile int16_t plat_mouse_x, plat_mouse_y;
@@ -34,10 +43,11 @@ static int16_t acc_x, acc_y;
 void pointer_start(void)
 {
     plat_page_data();
-    plat_mouse_x = 128;
-    plat_mouse_y = 128;
-    PTR_SETPOS(128, 128);
-    sent_x = sent_y = 128;
+    plat_mouse_x = PTR_START_X;
+    plat_mouse_y = PTR_START_Y;
+    PTR_SETPOS(PTR_START_X, PTR_START_Y);
+    sent_x = PTR_START_X;
+    sent_y = PTR_START_Y;
 }
 
 /* Read the mouse and the keys, then return bit 0 for movement, bit 1 for a new press of the left button (or fire) and bit 2 while it is held. */
@@ -76,12 +86,12 @@ uint8_t plat_mouse_input(void)
         ny += step;
     if (nx < 0)
         nx = 0;
-    if (nx > 255)
-        nx = 255;
+    if (nx > PTR_MAX_X)
+        nx = PTR_MAX_X;
     if (ny < 0)
         ny = 0;
-    if (ny > 191)
-        ny = 191;
+    if (ny > PTR_MAX_Y)
+        ny = PTR_MAX_Y;
     if (!seen || nx != plat_mouse_x || ny != plat_mouse_y)
         events |= 1;
     seen = 1;
@@ -176,5 +186,48 @@ uint8_t plat_key(void)
         armed = 0;
     return k;
 }
+
+#ifndef PTR_OWN_EDGE                            /* (the SAM's is in assembler, plat_sam.asm) */
+extern uint8_t cur_x, cur_y, origin_x, origin_y, frame, view_w, view_h, map_row;
+
+/* Move the view by one cell while the pointer rests on its edge (the game asks only when the pointer is over the map).  Returns 1 if it moved.
+   It looks every fourth pass: the city would otherwise fly past. */
+uint8_t plat_mouse_edge_scroll(void)
+{
+    uint8_t col, row;
+
+    if (frame & 3)
+        return 0;
+    col = (uint8_t)((uint16_t)plat_mouse_x >> 3);
+    row = (uint8_t)((uint16_t)plat_mouse_y >> 3);
+    if (col == 0) {
+        if (cur_x) {
+            --cur_x;
+            --origin_x;
+            return 1;
+        }
+    } else if (col == view_w - 1) {
+        if (cur_x != MAP_W - 1) {
+            ++cur_x;
+            ++origin_x;
+            return 1;
+        }
+    }
+    if (row == map_row) {
+        if (cur_y) {
+            --cur_y;
+            --origin_y;
+            return 1;
+        }
+    } else if (row == map_row + view_h - 1) {
+        if (cur_y != MAP_H - 1) {
+            ++cur_y;
+            ++origin_y;
+            return 1;
+        }
+    }
+    return 0;
+}
+#endif
 
 #endif /* HAVE_POINTER */

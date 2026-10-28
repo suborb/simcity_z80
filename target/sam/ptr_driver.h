@@ -7,6 +7,7 @@
 #define PTR_HIDE()          plat_mouse_pointer_erase()
 
 /* The game's loop does not wait for the frame (a pass takes a few of them), so the keys move the arrow by the frames that have gone by, not by the pass. */
+#define PTR_OWN_EDGE                            /* the edge scrolling is in assembler (plat_sam.asm) */
 #define PTR_FRAMES()        plat_frames()
 
 extern uint8_t plat_frames(void);               /* the 50 Hz interrupt's count (plat_sound.asm) */
