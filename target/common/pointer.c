@@ -23,7 +23,8 @@
 #define STEP        2                           /* pixels a frame (the map's cells and the mini map's tiles are 8 and 2) */
 #define MAX_FRAMES  8                           /* of the frames a slow pass took */
 #define STEP_FAST   4
-#define ROW         8                           /* pixels of mouse movement to a key in a modal screen: a menu's row */
+#define KEY_GAP     3                           /* looks (frames) between the keys the mouse sends: about 12 a second */
+#define ROW         16                          /* pixels of mouse movement to a key in a modal screen: a menu's row */
 
 volatile int16_t plat_mouse_x, plat_mouse_y;
 volatile uint8_t plat_mouse_buttons;
@@ -37,6 +38,7 @@ static uint8_t esc_pending;                     /* the right button went down: t
 static uint8_t armed = 1;                       /* 0 after a key or button ended a modal screen: the main loop's fire waits until it is released */
 static uint8_t modal;                           /* the mouse is being read as keys (plat_modal_key), its position counted from the middle of the screen */
 static uint8_t modal_buttons;
+static uint8_t key_gap;                         /* looks until the mouse may send another key */
 #ifdef PTR_FRAMES
 static uint8_t modal_frame;                     /* the frame count at the last look */
 #endif
@@ -183,18 +185,22 @@ uint8_t plat_key(void)
             k = KEY_ENTER;
         else if (down & 2)
             k = KEY_ESC;
-        else if (acc_y >= ROW) {
-            acc_y -= ROW;
-            k = KEY_DOWN;
-        } else if (acc_y <= -ROW) {
-            acc_y += ROW;
-            k = KEY_UP;
-        } else if (acc_x >= ROW) {
-            acc_x -= ROW;
-            k = KEY_RIGHT;
-        } else if (acc_x <= -ROW) {
-            acc_x += ROW;
-            k = KEY_LEFT;
+        else if (key_gap)
+            --key_gap;                          /* (a screen redraws all of itself for each key: they are not sent faster than that) */
+        else {
+            if (acc_y >= ROW) {
+                k = KEY_DOWN;
+            } else if (acc_y <= -ROW) {
+                k = KEY_UP;
+            } else if (acc_x >= ROW) {
+                k = KEY_RIGHT;
+            } else if (acc_x <= -ROW) {
+                k = KEY_LEFT;
+            }
+            if (k) {                            /* what the mouse did besides is dropped: a diagonal does not also change a value */
+                acc_x = acc_y = 0;
+                key_gap = KEY_GAP;
+            }
         }
     }
     if (k)

@@ -226,7 +226,7 @@ static void draw(void)
 }
 
 /* Change the selected item by one step: 1 for tax, 10 for a funding level. */
-static void change(int8_t dir)
+static uint8_t change(int8_t dir)
 {
     int16_t v, step;
     uint8_t *p;
@@ -239,8 +239,11 @@ static void change(int8_t dir)
         v = 0;
     if (v > (sel == 0 ? MAX_TAX : 100))
         v = (sel == 0 ? MAX_TAX : 100);
+    if (*p == (uint8_t)v)
+        return 0;
     *p = (uint8_t)v;
     budget_recalc();
+    return 1;
 }
 
 uint8_t budget_screen(void)
@@ -260,10 +263,10 @@ uint8_t budget_screen(void)
             continue;
         }
         switch (k) {
-        case KEY_UP:    if (sel) --sel; break;
-        case KEY_DOWN:  if (sel < 3) ++sel; break;
-        case KEY_LEFT: case '-': change(-1); break;
-        case KEY_RIGHT: case '+': change(1); break;
+        case KEY_UP:    if (!sel) continue; --sel; break;      /* (a key that changes nothing, a mouse's nudge, does not redraw it all) */
+        case KEY_DOWN:  if (sel == 3) continue; ++sel; break;
+        case KEY_LEFT: case '-': if (!change(-1)) continue; break;
+        case KEY_RIGHT: case '+': if (!change(1)) continue; break;
 #ifndef HAVE_MENUS
         case 'q': if (sel) --sel; break;
         case 'a': if (sel < 3) ++sel; break;
