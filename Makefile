@@ -39,8 +39,8 @@ NOSOUND = platform/common/nosound.asm
 CONSOLE = platform/console/plat_console.c platform/console/plat_font.asm
 AQPLUS_PLATFORM = target/aqplus/plat_aqplus.c target/aqplus/plat_aqplus.asm target/aqplus/aq_mouse.c target/aqplus/aq_mouse.asm target/common/pointer.c
 ZX_PLATFORM = target/zx/plat_zx.asm
-MULTI8_PLATFORM = target/multi8/plat_multi8.c target/multi8/plat_multi8.asm target/common/plat_charts.c target/common/plat_icons.c
-PC88_PLATFORM = target/pc88/plat_pc88.c target/pc88/plat_pc88.asm target/pc88/plat_pc88_files.asm target/common/plat_charts.c target/common/plat_icons.c
+MULTI8_PLATFORM = target/multi8/plat_multi8.c target/multi8/plat_multi8.asm target/common/plat_charts.c target/common/minimap_key_3bpp.c target/common/plat_icons.c
+PC88_PLATFORM = target/pc88/plat_pc88.c target/pc88/plat_pc88.asm target/pc88/plat_pc88_files.asm target/common/plat_charts.c target/common/minimap_key_3bpp.c target/common/plat_icons.c
 SAM_PLATFORM_NOFILES = target/sam/plat_sam.c target/sam/plat_sam.asm target/sam/sam_mouse.asm target/common/pointer.c target/common/minimap_key.c
 Z88_PLATFORM = target/z88/plat_z88.c target/z88/plat_z88.asm target/z88/fgets_cons.asm
 
@@ -156,7 +156,7 @@ MULTI8_TABLE = 0xF800
 $(MULTI8): $(DEPS) build/common/tiles_640x200_3bpp.bin
 	@mkdir -p $(@D)
 	$(ZCC) +multi8 -subtype=64k -create-app $(COMMON) -pragma-include:target/multi8/zpragma.inc \
-	    -Itarget/multi8 -DTARGET_MULTI8 -Ca-DTARGET_MULTI8 -Ca-DHAVE_SOUND -Ca-DAY_ADDR_PORT=24 -Ca-DAY_DATA_PORT=25 -Ca-DAY_SCALE $(GAME) $(ENTROPY) $(MENU) target/multi8/plat_sound.asm target/common/ay_hooks.asm target/common/ay_sfx.asm $(FIELDS) $(MMNATIVE) $(LINEEDIT) $(MULTI8_PLATFORM) -o $(@D)/simcity
+	    -Itarget/multi8 -DTARGET_MULTI8 -Ca-DTARGET_MULTI8 -Ca-DHAVE_MINIMAP_SQUARE -Ca-DHAVE_SOUND -Ca-DAY_ADDR_PORT=24 -Ca-DAY_DATA_PORT=25 -Ca-DAY_SCALE $(GAME) $(ENTROPY) $(MENU) target/multi8/plat_sound.asm target/common/ay_hooks.asm target/common/ay_sfx.asm $(FIELDS) $(MMNATIVE) $(LINEEDIT) $(MULTI8_PLATFORM) -o $(@D)/simcity
 	@size=`wc -c < $(@D)/simcity.bin`; end=`sed -n 's/^__BSS_END_tail *= \$$\([0-9A-Fa-f]*\).*/\1/p' $(@D)/simcity.map`; \
 	    echo "multi8 image: $$size bytes (the uninitialised data ends at $$(printf '%X' $$(( 0x$$end ))), the table is at $$(printf '%X' $$(( $(MULTI8_TABLE) ))))"; \
 	    [ $$(( 0x$$end )) -le $$(( $(MULTI8_TABLE) )) ] || { echo "the uninitialised data runs into the doubling table"; rm -f $@; exit 1; }
@@ -173,7 +173,7 @@ PC88_IMAGE_LIMIT = 0xB100       # (the doubling table is at $B100-$B2FF, and the
 $(PC88): $(DEPS) build/common/tiles_640x200_3bpp.bin
 	@mkdir -p $(@D)
 	$(ZCC) +pc88 -subtype=disk $(PC88_CLIB) -create-app $(COMMON) -pragma-include:target/pc88/zpragma.inc \
-	    -Itarget/pc88 -DTARGET_PC88 -Ca-DTARGET_PC88 -Ca-D__crt_org_bss=$(PC88_BSS) $(GAME) $(ENTROPY) $(MENU) $(NOSOUND) $(FIELDS) $(MMNATIVE) $(LINEEDIT) $(PC88_PLATFORM) -o $(@D)/simcity.bin
+	    -Itarget/pc88 -DTARGET_PC88 -Ca-DTARGET_PC88 -Ca-DHAVE_MINIMAP_SQUARE -Ca-D__crt_org_bss=$(PC88_BSS) $(GAME) $(ENTROPY) $(MENU) $(NOSOUND) $(FIELDS) $(MMNATIVE) $(LINEEDIT) $(PC88_PLATFORM) -o $(@D)/simcity.bin
 	@size=`wc -c < $(@D)/simcity.bin`; echo "pc88 image: $$size bytes (limit $$(( $(PC88_IMAGE_LIMIT) )))"; \
 	    [ $$size -le $$(( $(PC88_IMAGE_LIMIT) )) ] || { echo "the image runs into the stack"; rm -f $@; exit 1; }
 	@# the placer's variables must be in the low RAM: the screen is paged over $$C000-$$FFFF while it draws

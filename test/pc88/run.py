@@ -779,11 +779,16 @@ nextrow:
         jr      z,rowsdone
         ld      h,0
         ld      l,(ix+0)
-        push    hl                      ; sy
+        push    hl                      ; ty
         ld      e,(ix+1)
         ld      d,(ix+2)
         push    de                      ; the colours
+        ld      hl,0
+        push    hl                      ; base: not used
+        push    hl                      ; view
         call    _plat_put_minirow
+        pop     hl
+        pop     hl
         pop     de
         pop     hl
         inc     ix
@@ -960,7 +965,7 @@ def minirow_art_test(art=True):
     """plat_put_minirow: for each plane, the row's three lines of 48 bytes (mm_row: plane k line j at 144 k + 48 j) go to lines
     52 + 3 sy, 53 + 3 sy and 54 + 3 sy of that plane, 16 bytes in."""
     rng = random.Random(11)
-    sel = [0, 1, 47, 23, 24, 5, 5, 0]
+    sel = [0, 1, 47, 23, 24, 5, 5, 0] if art else [0, 1, 95, 47, 48, 5, 5, 0]
     model = [bytearray(0x4000) for _ in range(3)]
     if art:
         data = [bytes(rng.randrange(256) for _ in range(432)) for _ in sel]
@@ -971,7 +976,7 @@ def minirow_art_test(art=True):
                 for line in range(3):
                     for i in range(48):
                         model[k][(52 + 3 * sy + line) * 80 + 16 + i] = d[k * 144 + line * 48 + i]
-    else:                                   # flat colours: 96 a row (0..7), blocks of 4 pixels by 3 lines in the three planes
+    else:                                   # flat colours: 96 a row (0..7), blocks of 4 pixels by 2 lines in the three planes, from line 2 ty, 8 bytes in
         data = [[rng.randrange(16) for _ in range(96)] for _ in sel]
         data[1] = [7] * 96
         data[2] = [0] * 96
@@ -979,12 +984,12 @@ def minirow_art_test(art=True):
                                   + ''.join(f'd{i}:     defb {",".join(str(c) for c in d)}\n' for i, d in enumerate(data)))
         for sy, d in zip(sel, data):
             for x, c in enumerate(d):
-                for line in range(52 + 3 * sy, 52 + 3 * sy + 3):
+                for line in range(2 * sy, 2 * sy + 2):
                     for k in range(3):
-                        byte = line * 80 + 16 + x // 2
+                        byte = line * 80 + 8 + x // 2
                         mask = 0xF0 if x % 2 == 0 else 0x0F
                         if c & 8:                   # the base map's tile: a checker of its colour, the other way round on the middle line
-                            mask &= 0x55 if (line - 52 - 3 * sy) == 1 else 0xAA
+                            mask &= 0x55 if (line - 2 * sy) == 1 else 0xAA
                             full = 0xF0 if x % 2 == 0 else 0x0F
                             model[k][byte] = (model[k][byte] & ~full & 0xFF) | (mask if (c >> k) & 1 else 0)
                         else:
@@ -1026,7 +1031,7 @@ def minirow_art_test(art=True):
     sp = mem[syms['sp_end']] | mem[syms['sp_end'] + 1] << 8
     paged = m.sel() == 0 and m.plane == 0
     ok = not bad and sp == 0x7000 and paged
-    print(('PASS' if ok else 'FAIL') + f'  plat_put_minirow ({"art" if art else "flat colours"}): {len(sel)} rows, each plane\'s three lines written to the right lines of that plane (a row drawn again is '
+    print(('PASS' if ok else 'FAIL') + f'  plat_put_minirow ({"art" if art else "flat colours"}): {len(sel)} rows, each plane\'s lines written to the right lines of that plane (a row drawn again is '
           f'overwritten), the stack is balanced and the RAM under the screen is paged back in'
           + (f' ({len(bad)} bytes differ, first plane {bad[0][0]} at offset {bad[0][1]}, line {bad[0][1] // 80}, byte {bad[0][1] % 80}; sp ${sp:04X}; plane {m.plane})' if not ok else ''))
     return ok

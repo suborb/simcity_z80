@@ -507,11 +507,16 @@ nextrow:
         jr      z,rowsdone
         ld      h,0
         ld      l,a
-        push    hl                      ; sy
+        push    hl                      ; ty
         ld      l,(ix+1)
         ld      h,(ix+2)
         push    hl                      ; the colours
+        ld      hl,0
+        push    hl                      ; base: not used
+        push    hl                      ; view
         call    _plat_put_minirow
+        pop     hl
+        pop     hl
         pop     hl
         pop     hl
         ld      de,3
@@ -634,9 +639,9 @@ def minirow_art_test():
 
 
 def minirow_test():
-    """plat_put_minirow: each of a row's 96 colours is a block of four pixels by three lines, in the right bytes of the planes."""
+    """plat_put_minirow: each of a row's 96 colours is a block of four pixels by two lines (tile row ty is lines 2 ty and 2 ty + 1), in the right bytes of the planes."""
     rng = random.Random(7)
-    sel = [0, 1, 2, 23, 24, 46, 47, 5, 5, 0]                       # the last rows again with other colours (they must overwrite)
+    sel = [0, 1, 2, 47, 48, 94, 95, 5, 5, 0]                       # the last rows again with other colours (they must overwrite)
     data = [[rng.randrange(16) for _ in range(96)] for _ in sel]
     data[1] = [7] * 96
     data[2] = [0] * 96
@@ -646,11 +651,11 @@ def minirow_test():
     model = [bytearray(0x4000) for _ in range(3)]
     for sy, d in zip(sel, data):
         for x, c in enumerate(d):
-            for line in range(52 + 3 * sy, 52 + 3 * sy + 3):
+            for line in range(2 * sy, 2 * sy + 2):
                 for p in range(3):
-                    byte = line * 80 + 16 + x // 2
+                    byte = line * 80 + 8 + x // 2
                     full = 0xF0 if x % 2 == 0 else 0x0F
-                    mask = full & ((0x55 if line == 53 + 3 * sy else 0xAA) if c & 8 else 0xFF)
+                    mask = full & ((0x55 if line == 2 * sy + 1 else 0xAA) if c & 8 else 0xFF)
                     model[p][byte] = (model[p][byte] & ~full & 0xFF) | (mask if (c >> p) & 1 else 0)
     with tempfile.TemporaryDirectory() as tmp:
         open(os.path.join(tmp, 'h.asm'), 'w').write(src)
@@ -689,7 +694,7 @@ def minirow_test():
     bad = [(p, i) for p in range(3) for i in range(80 * 200) if m.planes[p][i] != model[p][i]]
     sp = mem[syms['sp_end']] | mem[syms['sp_end'] + 1] << 8
     ok = not bad and sp == 0x7000 and m.port == IDLE
-    print(('PASS' if ok else 'FAIL') + f'  plat_put_minirow: {len(sel)} rows of 96 colours are blocks of 4x3 pixels in the three planes (a row drawn again is overwritten), '
+    print(('PASS' if ok else 'FAIL') + f'  plat_put_minirow: {len(sel)} rows of 96 colours are blocks of 4x2 pixels in the three planes (a row drawn again is overwritten), '
           f'the stack is balanced and the RAM under the screen is paged back in'
           + (f' ({len(bad)} bytes differ, first plane {bad[0][0]} at offset {bad[0][1]}, line {bad[0][1] // 80}, byte {bad[0][1] % 80}; sp ${sp:04X}; port ${m.port:02X})' if bad or sp != 0x7000 or m.port != IDLE else ''))
     return ok

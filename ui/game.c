@@ -681,6 +681,18 @@ static uint8_t mm_scroll_x, mm_scroll_y;      /* upper-left tile of the 96x96 vi
 static uint8_t mm_pan_redraw;                 /* DMA shifted the picture; repaint it in larger row chunks */
 #endif
 
+#ifdef HAVE_MINIMAP_FLAT_BASE
+/* A density: the city shows through, as a half lit checker (colour bit 3), where it is none. */
+static void flat_base(uint8_t *colours, const uint8_t *base)
+{
+    uint8_t i;
+
+    for (i = 0; i < MM_NATIVE_COLS; ++i)
+        if (!colours[i] && base[i])
+            colours[i] = (uint8_t)(base[i] | 8);
+}
+#endif
+
 static void draw_minirow(uint8_t sy)
 {
 #ifdef HAVE_MINIMAP_SCROLL
@@ -703,18 +715,20 @@ static void draw_minirow(uint8_t sy)
         plat_put_minirow(sy, colours, 0, map_view);
     else {                                  /* a density: the land shows through where it is none */
         minimap_row(MM_CITY, source_sy, base);
+#ifdef HAVE_MINIMAP_FLAT_BASE
+        flat_base(colours, base);
+        plat_put_minirow(sy, colours, 0, map_view);
+#else
         plat_put_minirow(sy, colours, base, map_view);
+#endif
     }
 #else
 #ifdef HAVE_MINIMAP_FLAT_BASE
     if (map_view == MM_POLLUTION || map_view == MM_POLICE || map_view == MM_FIRE || map_view == MM_TRAFFIC || map_view == MM_CRIME) {
         static uint8_t base[MM_NATIVE_COLS];
-        uint8_t i;
 
-        minimap_row(MM_CITY, sy, base);         /* a density: the land shows through, as a half lit checker (colour bit 3), where it is none */
-        for (i = 0; i < MM_NATIVE_COLS; ++i)
-            if (!colours[i] && base[i])
-                colours[i] = (uint8_t)(base[i] | 8);
+        minimap_row(MM_CITY, sy, base);
+        flat_base(colours, base);
     }
 #endif
     plat_put_minirow(sy, colours);

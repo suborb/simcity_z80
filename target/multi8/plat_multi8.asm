@@ -885,35 +885,34 @@ mm_art_pl:
 mm_sel: defb    $3E, $3D, $3B           ; only the blue, red or green plane (see mp_one)
 
         ELSE
-; void plat_put_minirow(uint8_t sy, const uint8_t *colours) __smallc
-; Flat colour mode.  Draws row sy (0..47) of the mini map from 96 colours (bit 0 blue, 1 red, 2 green), one a tile column.  A
-; tile is a block 4 pixels wide and 3 lines high, so a row is 384 pixels (48 bytes a plane) by 3 lines.  Each plane's 48
-; bytes are made from the colours (two tiles to a byte), then written to the row's three lines.
-        defc    MM_LINE0 = 52           ; the map is 144 lines, centred in the 152 below the status panel
-        defc    MM_BYTE = 16            ; (80 - 48) / 2: centred
+; void plat_put_minirow(uint8_t ty, const uint8_t *colours, const uint8_t *base, uint8_t view) __smallc
+; Draws tile row ty (0..95) of the mini map from its 96 colours (bit 0 blue, 1 red, 2 green), one a tile column.  A tile is a block
+; 4 pixels wide and 2 lines high, so a row is 384 pixels (48 bytes a plane) by 2 lines, from line 2 ty, 8 bytes in (the picture's 24 cells
+; start at column 4).  Each plane's 48 bytes are made from the colours (two tiles to a byte), then written to the row's two lines.
+; base and view are not used: a tile of the city shown dim where a view has none comes in the colours as colour bit 3 (ui/game.c, HAVE_MINIMAP_FLAT_BASE).
+        defc    MM_LINE0 = 0            ; 192 lines from the top of the screen
+        defc    MM_BYTE = 8             ; column 4 of the 40, two bytes a cell: the picture and the sidebar are centred
         PUBLIC  _plat_put_minirow
 _plat_put_minirow:
-        ld      hl,2
+        ld      hl,6
         add     hl,sp
         ld      e,(hl)
         inc     hl
         ld      d,(hl)                  ; de = the colours
-        inc     hl
-        ld      l,(hl)                  ; sy
+        inc     hl                      ; (the colours are at sp+6, the row at sp+8)
+        ld      l,(hl)                  ; ty
         ld      h,0
         push    de
         ld      d,h
         ld      e,l
         add     hl,hl
         add     hl,hl
-        add     hl,hl
-        add     hl,hl                   ; 16 sy
-        or      a
-        sbc     hl,de                   ; 15 sy
+        add     hl,de                   ; 5 ty
         add     hl,hl
         add     hl,hl
         add     hl,hl
-        add     hl,hl                   ; 240 sy: three lines of 80 bytes
+        add     hl,hl
+        add     hl,hl                   ; 160 ty: two lines of 80 bytes
         ld      de,SCREEN + MM_LINE0 * 80 + MM_BYTE
         add     hl,de
         ld      (mm_dst),hl
@@ -922,7 +921,7 @@ _plat_put_minirow:
         pop     de
         ld      hl,mm_buf
         call    mm_pack3
-        ld      a,$55                   ; the middle line has the other half of it
+        ld      a,$55                   ; the second line has the other half of it
         ld      (mm_pat),a
         call    mm_pack3
         ld      hl,mm_buf
@@ -934,7 +933,7 @@ mm_plane:
         and     7
         or      $38
         out     (PORT_MEM),a            ; only this plane paged in
-        ld      de,(mm_dst)             ; the plane's 48 bytes to each of the three lines (nothing is read back from the plane)
+        ld      de,(mm_dst)             ; the plane's 48 bytes to the first line, the other half of the checker to the second (nothing is read back)
         ld      hl,(mm_src)
         ld      bc,48
         ldir
@@ -945,13 +944,6 @@ mm_plane:
         ld      hl,(mm_src)
         ld      bc,144
         add     hl,bc
-        ld      bc,48
-        ldir
-        ld      hl,160
-        ld      de,(mm_dst)
-        add     hl,de
-        ex      de,hl
-        ld      hl,(mm_src)
         ld      bc,48
         ldir
         ld      hl,(mm_src)

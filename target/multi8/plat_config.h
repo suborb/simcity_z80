@@ -16,7 +16,10 @@
 #define HAVE_EVALUATION
 #define MODAL_ROWS 24          /* budget and evaluation use the full 40x24 text area */
 #define HAVE_MINIMAP
-#define HAVE_MINIMAP_NATIVE    /* mini maps in native pixels: the whole city, every other row, a tile a flat colour (plat_put_minirow) */
+#define HAVE_MINIMAP_NATIVE    /* the mini maps a row of tiles at a time, a tile a flat colour (plat_put_minirow) */
+#define HAVE_MINIMAP_SQUARE    /* ... every tile row, a tile 4 pixels by 2 lines (which are tall), 384x192: a picture of 24 cells and a sidebar, as the SAM Coupe's (the Makefile defines it for the assembler too) */
+#define MM_PIC_COL 4            /* the picture's 24 cells and the sidebar's 8 are centred in the 40 columns */
+#define MM_SIDE_COL 28
 #define HAVE_SPRITES
 #define HAVE_SPRITE_OVERLAY     /* the sprites go over the baked tiles, which have colours */
 #define HAVE_ICONS              /* the tools as 16x16 pictures */
