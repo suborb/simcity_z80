@@ -62,17 +62,37 @@ static void text_field(uint8_t col, uint8_t row, uint8_t at, uint8_t len)
     plat_text_puts(col, row, s);
 }
 
+/* A page of the description (the metadata is read): its 16 columns are written over, blanks to the end, so the other page need not be cleared away. */
+static void show_text(uint8_t page)
+{
+    uint8_t row;
+    uint16_t desc_len = (uint16_t)metadata[4] | ((uint16_t)metadata[5] << 8);
+    uint16_t start = (uint16_t)page * 256;
+
+    for (row = 6; row < 22; ++row) {                    /* (row 22 is left blank above the key guide) */
+        char s[17];
+        uint8_t n = 0;
+        if (start < desc_len) {
+            uint16_t left = (uint16_t)(desc_len - start);       /* (not 8 bits: 257 is 1) */
+            n = left > 16 ? 16 : (uint8_t)left;
+            memcpy(s, metadata + 64 + start, n);
+            start += n;
+        }
+        memset(s + n, ' ', 16 - n);
+        s[16] = 0;
+        plat_text_puts(0, row, s);
+    }
+}
+
 static void show_scenario(uint8_t index, uint8_t page)
 {
-    uint8_t title_len, event_len, row = 7;
-    uint16_t desc_len, start;
+    uint8_t title_len, event_len;
     uint16_t year;
 
     scenario_read(record_at(index) + META_AT, metadata, META_BYTES);
     year = (uint16_t)metadata[0] | ((uint16_t)metadata[1] << 8);
     title_len = metadata[2];
     event_len = metadata[3];
-    desc_len = (uint16_t)metadata[4] | ((uint16_t)metadata[5] << 8);
     plat_text_clear();
     plat_text_puts(0, 0, "CHOOSE SCENARIO");
     text_field(0, 2, 8, title_len);
@@ -88,16 +108,7 @@ static void show_scenario(uint8_t index, uint8_t page)
         plat_text_puts(6, 3, y);
     }
     text_field(0, 4, 32, event_len);
-    start = (uint16_t)page * 256;
-    while (start < desc_len && row < 23) {
-        uint8_t n = (uint8_t)(desc_len - start);
-        char s[17];
-        if (n > 16) n = 16;
-        memcpy(s, metadata + 64 + start, n);
-        s[n] = 0;
-        plat_text_puts(0, row++, s);
-        start += n;
-    }
+    show_text(page);
     plat_text_puts(0, 23, "ARROWS SELECT/PAGE ENTER");
     show_preview(index);
     plat_flush();
@@ -125,7 +136,8 @@ uint8_t plat_scenario_choose(void)
         } else if (k == KEY_UP || k == KEY_DOWN) {
             uint8_t pages = text_pages();
             page = (uint8_t)((page + (k == KEY_DOWN ? 1 : pages - 1)) % pages);
-            show_scenario(index, page);
+            show_text(page);
+            plat_flush();
         } else if (!k) {
             plat_idle();
         }

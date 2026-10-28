@@ -14,6 +14,7 @@ import json
 import os
 import struct
 import sys
+import textwrap
 
 from PIL import Image
 
@@ -149,7 +150,11 @@ def disaster_of(event):
 def make_meta(info):
     title = ascii_text(info['title'])[:23]
     event = ascii_text(info['event'])[:31]
-    desc = ascii_text(info['description'])[:META_BYTES - 64]
+    # the text as the picker shows it: 16 columns (the picture has the rest), a line of 16 characters, 16 lines a page
+    # (Rio's extracted text goes on with the game's win and lose messages: they are not the scenario's description)
+    text = info['description'].split("You're A Winner!")[0]
+    desc = ''.join(line.ljust(16) for line in textwrap.wrap(text, 16, break_long_words=True))
+    desc = ascii_text(desc)[:(META_BYTES - 64) // 16 * 16]
     out = bytearray(META_BYTES)
     struct.pack_into('<HBBH', out, 0, info['year'], len(title), len(event), len(desc))
     out[6] = disaster_of(info['event'])

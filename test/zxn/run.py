@@ -6,6 +6,7 @@ budget and evaluation screens, scrolling by the DMA, the animated pictures, a ci
 
 The game's screen is 256x192 pixels of Layer 2, which JNext's screenshot shows at 2x from (64, 64).  Keys are given as (frame, key) pairs
 for JNext's --delayed-keypress-frames; the SD card is a copy of JNext's own (a city saved goes to the copy, never to the original)."""
+import json
 import os
 import shutil
 import subprocess
@@ -88,8 +89,8 @@ def main():
         print('FAIL  the test build: ' + made.stdout[-400:] + made.stderr[-400:])
         return 1
 
-    # Rio's extracted scenario text includes all 774 bytes of its event block;
-    # the NEX record must retain it rather than silently clipping the ending.
+    # Rio's extracted scenario text goes on past its description into the win and lose messages (774 bytes); the NEX record has the description, wrapped to 16 columns,
+    # and must retain all of it rather than silently clipping the ending.
     scenario_dir = os.path.join(ROOT, 'build', 'zxn', 'scenarios')
     banks = sorted(f for f in os.listdir(scenario_dir) if f.startswith('scenarios_') and f.endswith('.bin'))
     records = b''.join(open(os.path.join(scenario_dir, f), 'rb').read() for f in banks)
@@ -98,7 +99,10 @@ def main():
     record_size = meta_at + 1024
     rio_meta = 5 * record_size + meta_at
     rio_text_len = records[rio_meta + 4] | (records[rio_meta + 5] << 8)
-    check('the NEX scenario record keeps Rio’s complete extracted text', rio_text_len == 774, str(rio_text_len))
+    rio_text = bytes(records[rio_meta + 64:rio_meta + 64 + rio_text_len])
+    rio_words = json.load(open(os.path.join(ROOT, 'assets', 'amiga_scenarios', 'Rio_De_Janerio.json')))['description'].split("You're A Winner!")[0].split()
+    check('the NEX scenario record keeps Rio’s complete extracted text, wrapped to 16 columns',
+          rio_text_len % 16 == 0 and b''.join(rio_text.split()) == ''.join(rio_words).encode('ascii', 'replace'), str(rio_text_len))
     source_hamburg = open(os.path.join(ROOT, 'assets', 'amiga_scenarios', 'Hamburg.map'), 'rb').read()
     hamburg_map = records[4 * record_size:4 * record_size + 12000]
     source_water_cells = []
