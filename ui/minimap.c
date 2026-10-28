@@ -17,9 +17,11 @@
 
 extern const uint8_t D_tile_flags[];
 
+#ifndef HAVE_MINIMAP_SQUARE                 /* (a square mini map's sidebar has its own, shorter names: ui/game.c) */
 const char *const minimap_names[MM_VIEWS + 1] = {
     "", "CITY", "POLLUTION", "POLICE COVERAGE", "FIRE COVERAGE", "TRAFFIC", "POWER", "TRANSPORT", "CRIME"
 };
+#endif
 
 #ifdef HAVE_MINIMAP_NATIVE
 /* The native pixel mini map: every view but crime is built by the assembler

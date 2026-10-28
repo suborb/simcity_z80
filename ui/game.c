@@ -1098,11 +1098,13 @@ static const struct field top_status[] = {
 static const struct field top_alert[] = {
     { 5,  0, F_STR,  0, &st_alert },
 };
+#ifndef HAVE_MINIMAP_SQUARE
 static const struct field top_map[] = {
     { 5,  0, F_TEXT, 0, "MAP:" },
     { 5,  5, F_STR,  0, &st_line[1] },
     { 5, TOP_MAP_KEYS_COL, F_TEXT, 0, TOP_MAP_KEYS },
 };
+#endif
 
 
 /* (for both layouts of the top panel) */
@@ -1238,7 +1240,7 @@ static void draw_status(void)
     demand_bar(buf, 'I', V_IValve);
     plat_text_puts(22, 3, buf);
 #endif
-#ifdef HAVE_MINIMAP
+#if defined(HAVE_MINIMAP) && !defined(HAVE_MINIMAP_SQUARE)     /* (a square mini map has its sidebar and has returned) */
     if (map_view) {
         fmt_fields(top_status27, sizeof(top_status27) / sizeof(struct field) - 1);
         st_line[1] = minimap_names[map_view];
@@ -1283,7 +1285,7 @@ static void draw_status(void)
     demand_bar(buf + TOP_DEMAND_I, 'I', V_IValve);
     plat_text_puts(0, 4, buf);
 #endif
-#ifdef HAVE_MINIMAP
+#if defined(HAVE_MINIMAP) && !defined(HAVE_MINIMAP_SQUARE)
     if (map_view) {
         st_line[1] = minimap_names[map_view];
         fmt_fields(top_map, sizeof(top_map) / sizeof(struct field));
