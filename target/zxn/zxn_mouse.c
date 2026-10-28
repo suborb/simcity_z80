@@ -9,7 +9,6 @@
 
 #ifdef HAVE_MOUSE                               /* (plat_config.h: a build without the mouse has nothing here) */
 
-extern void zxn_out(uint16_t port, uint8_t value);
 extern void pointer_start(void);                /* (target/common/pointer.c) */
 
 #define REG_PERIPHERAL_5 0x0A                   /* (z88dk has no name for it) bits 1 and 0: the mouse's DPI, 0 low, 1 the default, 2 medium, 3 high */
@@ -19,53 +18,11 @@ uint8_t in_KempcoordX, in_KempcoordY, in_KemprawX, in_KemprawY;
 
 static int16_t shown_x, shown_y;                /* where the sprite is, or -1 if it is hidden */
 
-/* The arrow, 16x16, its tip at the top left: the rows of its black outline and its white fill, the leftmost pixel the top bit. */
-static const uint16_t arrow_outline[16] = {
-    0x8000, 0xC000, 0xA000, 0x9000, 0x8800, 0x8400, 0x8200, 0x8100, 0x8080, 0x8040, 0x83E0, 0x9200, 0xA900, 0xC900, 0x8480, 0x0700
-};
-static const uint16_t arrow_fill[16] = {
-    0x0000, 0x0000, 0x4000, 0x6000, 0x7000, 0x7800, 0x7C00, 0x7E00, 0x7F00, 0x7F80, 0x7C00, 0x6C00, 0x4600, 0x0600, 0x0300, 0x0000
-};
-#define PEN_BLACK   1                           /* (the sprite palette's entries it uses) */
-#define PEN_WHITE   2
-#define PEN_CLEAR   0xE3                        /* (the transparent index the Next starts with) */
-
-/* The screen's pixel (0,0) is the sprites' (32,32). */
-#define SPRITE_ORIGIN 32
-
-static void sprite_define(void)
-{
-    uint8_t row, col, pen, saved;
-    uint16_t bit;
-
-    saved = ZXN_READ_REG(REG_PALETTE_CONTROL);  /* two pens in the first sprite palette (the Layer 2 palette is written the same way) */
-    ZXN_NEXTREGA(REG_PALETTE_CONTROL, (uint8_t)((saved & 0x0F) | RPC_SELECT_SPRITES_PALETTE_0));
-    ZXN_NEXTREG(REG_PALETTE_INDEX, PEN_BLACK);
-    ZXN_NEXTREG(REG_PALETTE_VALUE_8, 0x00);
-    ZXN_NEXTREG(REG_PALETTE_INDEX, PEN_WHITE);
-    ZXN_NEXTREG(REG_PALETTE_VALUE_8, 0xFF);
-    ZXN_NEXTREGA(REG_PALETTE_CONTROL, saved);
-
-    zxn_out(0x303B, 0);                         /* pattern 0 (and sprite 0) */
-    for (row = 0; row < 16; ++row)
-        for (col = 0, bit = 0x8000; col < 16; ++col, bit >>= 1) {
-            pen = (arrow_fill[row] & bit) ? PEN_WHITE : (arrow_outline[row] & bit) ? PEN_BLACK : PEN_CLEAR;
-            zxn_out(0x5B, pen);
-        }
-    ZXN_NEXTREGA(REG_SPRITE_LAYER_SYSTEM, (uint8_t)(ZXN_READ_REG(REG_SPRITE_LAYER_SYSTEM) | RSLS_SPRITES_VISIBLE));
-}
-
-/* Put sprite 0 at screen pixel (x,y), or hide it with x < 0. */
-static void sprite_at(int16_t x, int16_t y)
-{
-    uint16_t sx = (uint16_t)(x + SPRITE_ORIGIN);
-
-    zxn_out(0x303B, 0);
-    zxn_out(0x57, (uint8_t)sx);                 /* x, low 8 bits */
-    zxn_out(0x57, (uint8_t)(y + SPRITE_ORIGIN));
-    zxn_out(0x57, (uint8_t)(sx >> 8));          /* no palette offset or mirrors; the x's top bit */
-    zxn_out(0x57, x < 0 ? 0x00 : 0x80);         /* visible, pattern 0 */
-}
+/* The arrow's sprite (plat_zxn.asm): its pixels and pens, and sprite 0 put at a screen pixel. */
+extern void zxn_sprite_define(void);
+extern void zxn_sprite_at(int16_t x, int16_t y) __smallc;
+#define sprite_define() zxn_sprite_define()
+#define sprite_at(x, y) zxn_sprite_at(x, y)
 
 /* The pointer starts in the middle of the map, with the mouse at its default DPI (left as it was, it can be far too quick). */
 void plat_mouse_init(void)

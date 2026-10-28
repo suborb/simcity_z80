@@ -578,3 +578,101 @@ _zxn_bank_read:
         jp      z,zxn_done
         ldir
         jp      zxn_done
+
+; The pointer's arrow, hardware sprite 0 (zxn_mouse.c).  Its 16x16 pixels, the tip at the top left, are a row of outline and fill words each: the outline black (pen 1),
+; the fill white (pen 2) over it, the rest the transparent index.  The pens are the first sprite palette's, which this sets, and the sprites are turned on.
+        PUBLIC  _zxn_sprite_define
+        defc    PEN_CLEAR = $E3
+_zxn_sprite_define:
+        ld      bc,$243B
+        ld      a,$43                   ; REG_PALETTE_CONTROL
+        out     (c),a
+        inc     b
+        in      a,(c)
+        ld      e,a                     ; as it was
+        and     $0F
+        or      $20                     ; the first sprite palette
+        nextreg $43,a
+        nextreg $40,1
+        nextreg $41,$00                 ; pen 1 black
+        nextreg $40,2
+        nextreg $41,$FF                 ; pen 2 white
+        ld      a,e
+        nextreg $43,a
+        ld      bc,$303B
+        xor     a
+        out     (c),a                   ; pattern 0
+        ld      ix,arrow_rows
+        ld      c,16
+sd_row: ld      e,(ix+0)
+        ld      d,(ix+1)                ; the outline
+        ld      l,(ix+2)
+        ld      h,(ix+3)                ; the fill
+        ld      b,16
+sd_px:  ld      a,PEN_CLEAR
+        add     hl,hl
+        jr      nc,sd_nofill
+        ld      a,2
+        ex      de,hl
+        add     hl,hl
+        ex      de,hl
+        jr      sd_put
+sd_nofill:
+        ex      de,hl
+        add     hl,hl
+        ex      de,hl
+        jr      nc,sd_put
+        ld      a,1
+sd_put: out     ($5B),a
+        djnz    sd_px
+        inc     ix
+        inc     ix
+        inc     ix
+        inc     ix
+        dec     c
+        jr      nz,sd_row
+        ld      bc,$243B
+        ld      a,$15                   ; REG_SPRITE_LAYER_SYSTEM
+        out     (c),a
+        inc     b
+        in      a,(c)
+        or      1                       ; the sprites visible
+        nextreg $15,a
+        ret
+
+; void zxn_sprite_at(int16_t x, int16_t y) __smallc: sprite 0's tip at screen pixel (x,y) (the sprites' origin is (32,32)), or hidden with x < 0
+        PUBLIC  _zxn_sprite_at
+_zxn_sprite_at:
+        ld      bc,$303B
+        xor     a
+        out     (c),a
+        ld      hl,2
+        add     hl,sp
+        ld      a,(hl)                  ; y
+        add     a,32
+        ld      d,a
+        inc     hl
+        inc     hl
+        ld      e,(hl)
+        inc     hl
+        ld      h,(hl)
+        ld      l,e                     ; x
+        ld      e,$80                   ; visible, pattern 0
+        bit     7,h
+        jr      z,sa_shown
+        ld      e,0
+sa_shown:
+        ld      bc,32
+        add     hl,bc
+        ld      c,$57
+        out     (c),l                   ; x, low 8 bits
+        out     (c),d
+        out     (c),h                   ; no palette offset or mirrors; the x's top bit
+        out     (c),e
+        ret
+
+arrow_rows:                             ; outline, fill: a word each, the leftmost pixel the top bit
+        defw    $8000,$0000, $C000,$0000, $A000,$4000, $9000,$6000
+        defw    $8800,$7000, $8400,$7800, $8200,$7C00, $8100,$7E00
+        defw    $8080,$7F00, $8040,$7F80, $83E0,$7C00, $9200,$6C00
+        defw    $A900,$4600, $C900,$0600, $8480,$0300, $0700,$0000
