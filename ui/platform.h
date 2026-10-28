@@ -328,6 +328,11 @@ extern void     plat_put_minirow(uint8_t sy);
    whole screen, and the status panel is not drawn while it is open. */
 extern void plat_put_minirow(uint8_t ty, const uint8_t *colours, const uint8_t *base, uint8_t view);
 extern void plat_minimap_key(uint8_t view);
+#ifdef HAVE_MINIMAP_4BPP
+/* HAVE_MINIMAP_4BPP: a mini map is a different video mode.  plat_minimap_mode(1) is called when one is opened (after plat_clear) and (0) when the
+   city is back (plat_clear is called then too); a view to another view calls (1) again. */
+extern void plat_minimap_mode(uint8_t on);
+#endif
 #ifdef HAVE_MINIMAP_SCROLL
 extern void plat_minimap_scroll(uint8_t x);
 #ifdef HAVE_SCROLL

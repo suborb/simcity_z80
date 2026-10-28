@@ -783,6 +783,9 @@ static void set_map_view(uint8_t v)
         plat_clear();                       /* entering the mini map replaces the city layout */
 #endif
     map_view = v;
+#ifdef HAVE_MINIMAP_4BPP
+    plat_minimap_mode(v != 0);              /* (the mini map is a video mode of its own) */
+#endif
     if (v) {
         mm_full_row = 0;
         map_full = 1;
@@ -2087,6 +2090,9 @@ static void play_city(void)
 #endif
     sim_new_city();
     map_view = 0;
+#ifdef HAVE_MINIMAP_4BPP
+    plat_minimap_mode(0);
+#endif
 
     cur_x = cur_y = MAP_W / 2;
     origin_x = (uint8_t)(cur_x - view_w / 2);

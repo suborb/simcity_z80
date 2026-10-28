@@ -26,6 +26,7 @@ echo
 echo "== Aquarius+ glyph placer and colour tables"
 python3 test/aqplus/run.py
 python3 test/aqplus/minirow.py
+python3 test/aqplus/text4.py
 python3 test/aqplus/mouse.py
 echo
 echo "== AY sound effect player"

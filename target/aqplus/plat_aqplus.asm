@@ -55,6 +55,10 @@ _aq_blit8:
         ; falls into the cell: a = row, b = col, c = colour, de = the picture
 aq_cell:
         ld      h,a
+        ld      a,(_aq_mm4)             ; a cell over the 4bpp mini map (a dialogue): the 1bpp screen first
+        or      a
+        jp      nz,aq_cell_leave
+aq_cell_go:
         ld      a,20                    ; the video RAM
         out     (VID_PORT),a
         ld      a,h
@@ -214,6 +218,10 @@ _plat_init:
 ; void plat_clear(void): the bitmap (40 x 25 cells of 8 bytes) to 0 and the colour RAM (1000 bytes) to white on black
         PUBLIC  _plat_clear
 _plat_clear:
+        ld      a,(_aq_mm_want)
+        or      a
+        jp      nz,_aq_mm_enter         ; (the mini map is up: its picture and text are cleared instead)
+aq_clear_1bpp:
         ld      a,20                    ; the video RAM
         out     (VID_PORT),a
         ld      hl,VID_BASE * 256
@@ -234,6 +242,9 @@ _plat_clear:
 ; screen of text is coloured by this alone.  The cells are on one row (the colour RAM is 40 bytes a row).
         PUBLIC  _aq_colours
 _aq_colours:
+        ld      a,(_aq_mm4)
+        or      a
+        call    nz,_aq_mm_leave
         ld      hl,2
         add     hl,sp
         ld      c,(hl)                  ; colour
@@ -308,6 +319,162 @@ _aq_vcopy:
         ret
         ENDIF
 
+; ---- The 4bpp mini map: the 160x200 bitmap (two display pixels wide, so a tile is one pixel by two lines), the text layer over it for the sidebar
+; (our font in the character RAM: ASCII 32 to 127 as the characters 160 to 255, the sidebar's own pictures from 128).  _aq_mm_want says a mini map is up (plat_clear then clears its picture, not the 1bpp screen); _aq_mm4 that the
+; hardware is in its mode.
+        PUBLIC  _aq_mm4
+        PUBLIC  _aq_mm_want
+        PUBLIC  _aq_mm_enter
+        PUBLIC  _aq_mm_leave
+        PUBLIC  _aq_tcell
+        PUBLIC  _aq_defchar
+        defc    VCTRL_MM4 = $1F                 ; text on and in front, mode 3, sprites
+        defc    VCTRL_1BPP = $0C                ; mode 2, sprites, text off
+        defc    CHR_SAVED = 128                 ; the characters 128 to 255 are ours while the mini map is up
+_aq_mm4:
+        defb    0
+_aq_mm_want:
+        defb    0
+
+; void aq_mm_enter(void): into the mode (when not in it already), the picture and the text cleared
+_aq_mm_enter:
+        ld      a,(_aq_mm4)
+        or      a
+        jr      nz,aq_mm_clear
+        inc     a
+        ld      (_aq_mm4),a
+        ld      a,21                    ; the character RAM: keep characters 128 to 255, ours from the font (160 up) and 128 to 159 blank
+        out     (VID_PORT),a
+        ld      hl,VID_BASE * 256 + CHR_SAVED * 8
+        ld      de,aq_chr_save
+        ld      bc,1024
+        ldir
+        ld      hl,VID_BASE * 256 + CHR_SAVED * 8
+        ld      de,VID_BASE * 256 + CHR_SAVED * 8 + 1
+        ld      (hl),0
+        ld      bc,32 * 8 - 1
+        ldir
+        ld      hl,_font_8x8_bbc_system
+        ld      de,VID_BASE * 256 + 160 * 8
+        ld      bc,96 * 8
+        ldir
+        VID_PAGE_OUT
+aq_mm_clear:
+        ld      a,20                    ; the 4bpp bitmap to 0 (black)
+        out     (VID_PORT),a
+        ld      hl,VID_BASE * 256
+        ld      de,VID_BASE * 256 + 1
+        ld      (hl),0
+        ld      bc,16000 - 1
+        ldir
+        in      a,(PORT_BANK2)          ; the text: blanks (character 160) with colour 0, through the overlay window
+        inc     a
+        or      $40
+        out     (VID_PORT),a
+        ld      hl,$F000
+        ld      de,$F001
+        ld      (hl),160
+        ld      bc,40 * 25 - 1
+        ldir
+        ld      hl,$F400
+        ld      de,$F401
+        ld      (hl),0
+        ld      bc,40 * 25 - 1
+        ldir
+        VID_PAGE_OUT
+        ld      a,VCTRL_MM4
+        out     (PORT_VCTRL),a
+        ret
+
+; void aq_mm_leave(void): back to the 1bpp screen, cleared; the character RAM as it was
+_aq_mm_leave:
+        xor     a
+        ld      (_aq_mm4),a
+        ld      a,VCTRL_1BPP
+        out     (PORT_VCTRL),a
+        ld      a,21
+        out     (VID_PORT),a
+        ld      hl,aq_chr_save
+        ld      de,VID_BASE * 256 + CHR_SAVED * 8
+        ld      bc,1024
+        ldir
+        VID_PAGE_OUT
+        jp      aq_clear_1bpp
+
+aq_cell_leave:                          ; (in aq_cell: h = the row, b, c and de are the cell's)
+        push    hl
+        push    bc
+        push    de
+        call    _aq_mm_leave
+        pop     de
+        pop     bc
+        pop     hl
+        jp      aq_cell_go
+
+; void aq_tcell(uint8_t col, uint8_t row, uint8_t ch, uint8_t colour) __smallc: a cell of the text layer
+_aq_tcell:
+        ld      hl,2
+        add     hl,sp
+        ld      c,(hl)                  ; colour
+        inc     hl
+        inc     hl
+        ld      b,(hl)                  ; ch
+        inc     hl
+        inc     hl
+        ld      e,(hl)                  ; row
+        inc     hl
+        inc     hl
+        ld      a,(hl)                  ; col
+        ld      d,0
+        ld      h,d
+        ld      l,e
+        add     hl,hl
+        add     hl,hl
+        add     hl,de                   ; row * 5
+        add     hl,hl
+        add     hl,hl
+        add     hl,hl                   ; row * 40
+        ld      e,a
+        add     hl,de
+        ld      de,$F000
+        add     hl,de                   ; in the overlay window: the characters here, the colours $400 on
+        in      a,(PORT_BANK2)
+        inc     a
+        or      $40
+        out     (VID_PORT),a
+        ld      (hl),b
+        ld      de,$0400
+        add     hl,de
+        ld      (hl),c
+        VID_PAGE_OUT
+        ret
+
+; void aq_defchar(uint8_t ch, const uint8_t *art) __smallc: character ch (128 to 255) of the character RAM from 8 bytes (below $C000)
+_aq_defchar:
+        ld      hl,2
+        add     hl,sp
+        ld      e,(hl)
+        inc     hl
+        ld      d,(hl)                  ; de = art
+        inc     hl
+        ld      l,(hl)                  ; ch
+        ld      h,0
+        add     hl,hl
+        add     hl,hl
+        add     hl,hl
+        ld      bc,VID_BASE * 256
+        add     hl,bc
+        ex      de,hl                   ; de = where, hl = art
+        ld      a,21
+        out     (VID_PORT),a
+        ld      bc,8
+        ldir
+        VID_PAGE_OUT
+        ret
+
+aq_chr_save:
+        defs    1024                    ; (in the code section, not under the video window)
+
 ; The mini map's row buffers (the pixel lines of a row of tiles, 24 bytes each, then the 24 colour bytes of the cells), in the code section
 ; so that it is not under the video RAM.
 _aq_mm_buf:
@@ -316,6 +483,9 @@ _aq_mm_buf:
 ; void plat_exit(void): back to the text screen
         PUBLIC  _plat_exit
 _plat_exit:
+        ld      a,(_aq_mm4)
+        or      a
+        call    nz,_aq_mm_leave         ; (the character RAM as it was)
         ld      a,VCTRL_TEXT
         out     (PORT_VCTRL),a
         ret

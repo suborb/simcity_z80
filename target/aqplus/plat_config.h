@@ -19,6 +19,7 @@
 #define HAVE_SOUND              /* the Atari ST game's effects on the AY-3-8910 (target/aqplus/plat_sound.asm) */
 #define HAVE_MINIMAP_NATIVE     /* the mini maps a row of tiles at a time (plat_put_minirow), as the SAM Coupe's: a square picture, a sidebar */
 #define HAVE_MINIMAP_SQUARE
+#define HAVE_MINIMAP_4BPP       /* ... in the 160x200 4bpp bitmap, a colour to each tile, the sidebar on the text layer (plat_minimap_mode) */
 #define MM_SIDE_COL 28          /* the picture's 24 cells start at column 4, centred in the 40, and the sidebar is after them */
 /* (The original cell mini maps, HAVE_MINIMAP_COLOUR with MINIMAP_CELLS_H 19 and MINIMAP_CHUNK_ROWS 4, are still in the shared code and plat_put_minimap()
    in plat_aqplus.c, but no build uses them now: the Aquarius+ build has the room for the square ones.) */

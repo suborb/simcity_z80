@@ -18,6 +18,26 @@ static uint8_t key_held;
 /* target/aqplus/plat_aqplus.asm: aq_blit8 is plat_put_tile as well (the tile attributes are colour bytes) */
 extern void aq_blit8(uint8_t col, uint8_t row, const uint8_t *art, uint8_t colour, uint8_t inverse) __smallc;
 extern void plat_aq_printc(uint8_t col, uint8_t row, uint8_t ch) __smallc;    /* the same as plat_put */
+
+/* The 4bpp mini map's sidebar is on the text layer (the font is in the character RAM from 160, ASCII + 128; the pictures from 128): the cells here,
+   the colour bytes ink << 4 | paper of the text palette (plat_aqplus.asm) */
+extern uint8_t aq_mm4;                  /* the mini map's mode is on */
+extern uint8_t aq_mm_want;              /* a mini map is up */
+extern void aq_mm_enter(void);
+extern void aq_mm_leave(void);
+extern void aq_tcell(uint8_t col, uint8_t row, uint8_t ch, uint8_t colour) __smallc;
+extern void aq_defchar(uint8_t ch, const uint8_t *art) __smallc;
+#define MM_CH_SOLID 128                 /* a solid cell */
+#define MM_CH_BAR   130                 /* seven cells for each of the demand bars (rows mod 3) */
+
+static void tcells(uint8_t col, uint8_t row, const char *s, uint8_t colour)
+{
+    uint8_t c;
+
+    while ((c = (uint8_t)*s++) != 0) {
+        aq_tcell(col++, row, c >= 32 && c < 128 ? (uint8_t)(c + 128) : 160, colour);
+    }
+}
 extern const uint8_t aq_icons[];
 
 /* plat_init, plat_exit, plat_clear, plat_put and plat_puts are in the assembler too */
@@ -65,6 +85,28 @@ void plat_demand(uint8_t col, uint8_t row, char name, int8_t level)
     uint8_t k, b, bits, a[8], colour;
     int16_t x;
 
+    if (aq_mm4) {                       /* on the text layer: the bar's cells are characters redefined each time */
+        char s[2];
+        uint8_t ch = (uint8_t)(MM_CH_BAR + row % 3 * 7);
+
+        s[0] = name;
+        s[1] = 0;
+        tcells(col, row, s, 0x70);
+        colour = (uint8_t)(aq_pal[level > 0 ? COL_GREEN : level < 0 ? COL_RED : COL_WHITE] << 4 | 15);
+        for (k = 0; k < 7; ++k) {
+            bits = 0;
+            for (b = 0; b < 8; ++b) {
+                x = 8 * k + b;
+                if (level == 0 ? x == 27 : (level > 0 ? x > 27 && x <= 27 + level : x < 27 && x >= 27 + level))
+                    bits |= (uint8_t)(0x80 >> b);
+            }
+            for (b = 0; b < 8; ++b)
+                a[b] = (b && b < 7) ? bits : 0;
+            aq_defchar((uint8_t)(ch + k), a);
+            aq_tcell((uint8_t)(col + 1 + k), row, (uint8_t)(ch + k), colour);
+        }
+        return;
+    }
     plat_put(col, row, (uint8_t)name);
     colour = (uint8_t)(aq_pal[level > 0 ? COL_GREEN : level < 0 ? COL_RED : COL_WHITE] << 4 | 15);
     for (k = 0; k < 7; ++k) {
@@ -82,7 +124,13 @@ void plat_demand(uint8_t col, uint8_t row, char name, int8_t level)
 #endif
 
 void plat_text_clear(void) { plat_clear(); }
-void plat_text_puts(uint8_t col, uint8_t row, const char *s) { plat_puts(col, row, s); }
+void plat_text_puts(uint8_t col, uint8_t row, const char *s)
+{
+    if (aq_mm4)
+        tcells(col, row, s, 0x70);
+    else
+        plat_puts(col, row, s);
+}
 
 void plat_put_bitmap(uint8_t col, uint8_t row, const uint8_t *art)
 {
@@ -231,65 +279,71 @@ void plat_idle(void) { ++clock_count; }
 void plat_flush(void) {}
 
 #ifdef HAVE_MINIMAP_SQUARE
-/* The square mini maps (as the SAM Coupe's page, the picture 24 cells wide at MM_COL0 and the sidebar after it): the whole city, a tile 2x2
-   pixels, white on black.  plat_put_minirow() gets the 96 colours of a row of tiles (0..7 as ui/minimap.c's builder makes them: dirt 0, water 1,
-   services 2, industry 3, trees 4, housing 5, shops 6, roads and the like 7) and draws the tile as a solid block when there is something built
-   or a road, water as two pixels corner to corner, and nothing for dirt and trees.  A cell has only two colours, so a view's colours are the
-   cell's: for a density its level (the highest in the 4x4 tiles) makes the cell solid in a colour, and a cell with none shows the white map, and for power the cell is red when anything in
-   it has none and yellow when all has. */
-#define MM_COL0 4
+/* The square mini maps (as the SAM Coupe's page, the picture 24 cells wide at MM_PIC_COL and the sidebar after it): the whole city in the 160x200 4bpp
+   bitmap, where a tile is one pixel by two lines (2x2 display pixels) in a colour of its own.  plat_put_minirow() gets the 96 colours of a row of
+   tiles (0..7 as ui/minimap.c's builder makes them: dirt 0, water 1, services 2, industry 3, trees 4, housing 5, shops 6, roads and the like 7) and
+   looks each up in the view's table of palette entries (the bitmap's palette is the 1bpp screen's: aq_colours[] of tools/make_aq_assets.py).  A
+   density is the same ramp of seven colours the key shows, and where it is none the city shows through, dim. */
+#define MM_COL0 8                       /* the picture's first byte in a line (display pixel 32, two to a byte) */
 extern void aq_vcopy(uint16_t offset, const uint8_t *src, uint8_t n) __smallc;
 extern uint8_t aq_mm_buf[72];
 
-static const uint8_t mm_pattern[8] = { 0, 9, 15, 15, 0, 15, 15, 15 };       /* line 0 in bits 3-2 and line 1 in bits 1-0 */
-static const uint8_t mm_density[8] = { 0x70, 0xBB, 0x44, 0x66, 0x22, 0x33, 0x55, 0x11 };   /* from none (the map, white on black) to the most: a solid cell (ink and paper the same) of dark blue, blue, cyan, green, yellow, magenta, red */
-static const uint8_t mm_power[3] = { 0x70, 0x30, 0x10 };                    /* nothing, all powered (yellow), some without (red) */
-static uint8_t mm_cell[24];
+static const uint8_t mm_city[8]  = { 0, 4, 7, 3, 15, 13, 6, 8 };       /* dirt black, water blue, services white, industry yellow, trees dark grey, housing light green, shops cyan, roads light grey */
+static const uint8_t mm_power[8] = { 0, 9, 1, 15, 0, 15, 3, 15 };      /* a building without power red, powered yellow, other things dark grey, water teal */
+static const uint8_t mm_trans[8] = { 0, 9, 15, 15, 0, 15, 15, 7 };     /* roads white */
+static const uint8_t mm_dim[8]   = { 0, 9, 15, 15, 0, 15, 15, 8 };     /* what shows through where a density is none */
+static const uint8_t mm_ramp[8]  = { 0, 11, 4, 6, 2, 3, 5, 1 };        /* from none to the most: dark blue, blue, cyan, green, yellow, magenta, red */
+
+void plat_minimap_mode(uint8_t on)
+{
+    static const uint8_t solid[8] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
+
+    aq_mm_want = on;
+    if (on) {
+        if (!aq_mm4) {
+            aq_mm_enter();
+            aq_defchar(MM_CH_SOLID, solid);
+        }
+    } else if (aq_mm4)
+        aq_mm_leave();
+}
 
 void plat_put_minirow(uint8_t ty, const uint8_t *colours, const uint8_t *base, uint8_t view)
 {
-    const uint8_t *src = base ? base : colours;
-    uint8_t cx, i, c, t, b0, b1, w, cy = ty >> 2, r = (uint8_t)((ty & 3) * 2);
-    uint8_t dens = view == 2 || view == 3 || view == 4 || view == 5 || view == 8;
+    const uint8_t *tab = view == 1 ? mm_city : view == 6 ? mm_power : view == 7 ? mm_trans : mm_ramp;
+    uint8_t i, a, b, dens;
+    uint16_t off = (uint16_t)ty * 160 + MM_COL0;
 
-    for (cx = 0; cx < 24; ++cx) {
-        b0 = b1 = 0;
-        for (i = 0; i < 4; ++i) {
-            t = mm_pattern[*src++ & 7];
-            b0 = (uint8_t)(b0 << 2 | t >> 2);
-            b1 = (uint8_t)(b1 << 2 | (t & 3));
+    dens = view != 1 && view != 6 && view != 7;
+
+    if (!aq_mm4) {                      /* (a dialogue left the mode) */
+        aq_mm_want = 1;
+        plat_minimap_mode(1);
+    }
+    for (i = 0; i < 48; ++i) {
+        a = colours[0] & 7;
+        b = colours[1] & 7;
+        colours += 2;
+        if (dens) {
+            a = a ? mm_ramp[a] : base ? mm_dim[base[0] & 7] : 0;
+            b = b ? mm_ramp[b] : base ? mm_dim[base[1] & 7] : 0;
+            if (base)
+                base += 2;
+        } else {
+            a = tab[a];
+            b = tab[b];
         }
-        aq_mm_buf[cx] = b0;
-        aq_mm_buf[24 + cx] = b1;
+        aq_mm_buf[i] = (uint8_t)(a << 4 | b);
     }
-    aq_vcopy((uint16_t)(cy * 320 + r * 40 + MM_COL0), aq_mm_buf, 24);
-    aq_vcopy((uint16_t)(cy * 320 + (r + 1) * 40 + MM_COL0), aq_mm_buf + 24, 24);
-    if (!(ty & 3))
-        for (cx = 0; cx < 24; ++cx)
-            mm_cell[cx] = 0;
-    if (dens || view == 6)
-        for (cx = 0; cx < 24; ++cx)
-            for (i = 0; i < 4; ++i) {
-                c = (uint8_t)(colours[cx * 4 + i] & 7);
-                w = dens ? c : c == 2 ? 2 : c == 6 ? 1 : 0;      /* power: the builder has unpowered buildings 2 and powered tiles 6 */
-                if (w > mm_cell[cx])
-                    mm_cell[cx] = w;
-            }
-    if ((ty & 3) == 3) {                    /* the cell row is complete: its colours */
-        for (cx = 0; cx < 24; ++cx)
-            aq_mm_buf[48 + cx] = dens ? mm_density[mm_cell[cx]] : view == 6 ? mm_power[mm_cell[cx]] : 0x70;
-        aq_vcopy((uint16_t)(0x2000 + cy * 40 + MM_COL0), aq_mm_buf + 48, 24);
-    }
+    aq_vcopy(off, aq_mm_buf, 48);
+    aq_vcopy((uint16_t)(off + 80), aq_mm_buf, 48);
 }
 
-/* The key in the sidebar's rows 6 to 14 (columns MM_SIDE_COL up): a cell of the colour and what it is. */
-static const uint8_t key_solid[8] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
-static const uint8_t key_water[8] = { 0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55 };
-
-static void key_cell(uint8_t row, const uint8_t *art, uint8_t colour, const char *label)
+/* The key in the sidebar's rows 6 to 14 (columns MM_SIDE_COL up, to the edge: 12): a cell of the colour and what it is, in full. */
+static void key_cell(uint8_t row, uint8_t colour, const char *label)
 {
-    aq_blit8(MM_SIDE_COL, row, art, colour, 0);
-    plat_text_puts((uint8_t)(MM_SIDE_COL + 1), row, label);
+    aq_tcell(MM_SIDE_COL, row, MM_CH_SOLID, (uint8_t)(colour << 4));
+    tcells((uint8_t)(MM_SIDE_COL + 1), row, label, 0x70);
 }
 
 void plat_minimap_key(uint8_t view)
@@ -297,26 +351,33 @@ void plat_minimap_key(uint8_t view)
     uint8_t i;
 
     for (i = 6; i < 16; ++i)
-        plat_text_puts(MM_SIDE_COL, i, "        ");
+        tcells(MM_SIDE_COL, i, "            ", 0x70);
     switch (view) {
     case 1:
-        key_cell(6, key_solid, 0x70, "BUILT");
-        key_cell(7, key_water, 0x70, "WATER");
+        key_cell(6, mm_city[5], "HOUSES");
+        key_cell(7, mm_city[6], "SHOPS");
+        key_cell(8, mm_city[3], "INDUSTRY");
+        key_cell(9, mm_city[2], "SERVICES");
+        key_cell(10, mm_city[7], "ROAD");
+        key_cell(11, mm_city[1], "WATER");
+        key_cell(12, mm_city[4], "TREES");
         break;
     case 6:
-        key_cell(6, key_solid, 0x30, "POWER");
-        key_cell(7, key_solid, 0x10, "NO PWR");
-        key_cell(8, key_water, 0x70, "WATER");
+        key_cell(6, 3, "POWER");
+        key_cell(7, 1, "NO PWR");
+        key_cell(8, 15, "BUILT");
+        key_cell(9, mm_power[1], "WATER");
         break;
     case 7:
-        key_cell(6, key_solid, 0x70, "ROAD");
-        key_cell(7, key_water, 0x70, "WATER");
+        key_cell(6, 7, "ROAD");
+        key_cell(7, 15, "BUILT");
+        key_cell(8, mm_trans[1], "WATER");
         break;
-    default:                                /* a density: none, the levels, the most (solid cells of those colours) */
-        plat_text_puts(MM_SIDE_COL, 6, "LOW");
+    default:                                /* a density: none (the city, dim), the levels, the most */
+        tcells(MM_SIDE_COL, 6, "LOW", 0x70);
         for (i = 1; i < 8; ++i)
-            aq_blit8(MM_SIDE_COL, (uint8_t)(6 + i), key_solid, mm_density[i], 0);
-        plat_text_puts(MM_SIDE_COL, 14, "HIGH");
+            aq_tcell(MM_SIDE_COL, (uint8_t)(6 + i), MM_CH_SOLID, (uint8_t)(mm_ramp[i] << 4));
+        tcells(MM_SIDE_COL, 14, "HIGH", 0x70);
         break;
     }
 }

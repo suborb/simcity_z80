@@ -1,5 +1,5 @@
 ; Aquarius+ pointer: the arrow is hardware sprites 0 and 1, an 8x16 arrow in two 8x8 halves (sprite 1 below sprite 0), so nothing is drawn under it or put back.
-; Their patterns are in the video RAM above the bitmap and its colour RAM (patterns 288 and 289, $2400 on): the video RAM is paged over bank 3 ($C000), where the
+; Their patterns are in the last of the video RAM (patterns 504 and 505, $3F00 on), past the end of both bitmaps (the 1bpp's and its colour RAM, and the mini map's 4bpp, $3E80): the video RAM is paged over bank 3 ($C000), where the
 ; program's buffers are, so nothing in them can be touched until it is put back (as aq_blit8 does).  Palette 3 (the bitmap's is 1) has the arrow's pens: 1 black, 2 white.
 
         SECTION code_user
@@ -17,7 +17,7 @@
         defc    PORT_BANK2 = $F2
         defc    PORT_BANK3 = $F3
         defc    VCTRL_BITMAP_SPRITES = $0C      ; the bitmap, and the sprites on
-        defc    ATTR_ARROW = $B1                ; enabled, palette 3, pattern 256 up (288 = 256 + $20)
+        defc    ATTR_ARROW = $B1                ; enabled, palette 3, pattern 256 up (504 = 256 + $F8)
 
 ; void aq_arrow_define(void): the pens, the patterns, and the sprites on (nothing shows until aq_arrow_at)
 _aq_arrow_define:
@@ -33,7 +33,7 @@ pen:    ld      a,(hl)                  ; the palette select (palette 3, the ent
         ld      a,20                    ; the video RAM
         out     (PORT_BANK3),a
         ld      hl,arrow_pattern
-        ld      de,$E400
+        ld      de,$FF00
         ld      bc,64
         ldir
         in      a,(PORT_BANK2)
@@ -64,14 +64,14 @@ _aq_arrow_at:
         out     (PORT_VSPRSEL),a
         bit     7,d
         jr      nz,arrow_off
-        ld      b,$20
+        ld      b,$F8
         call    arrow_half
         ld      a,c
         add     a,8
         ld      c,a
         ld      a,1
         out     (PORT_VSPRSEL),a
-        ld      b,$21
+        ld      b,$F9
 arrow_half:                             ; the selected sprite: x in de, y in c, the pattern's low byte in b
         ld      a,e
         out     (PORT_VSPRXL),a
