@@ -228,7 +228,7 @@ ZXN_ENTROPY = $(ENTROPY)       # (target/zxn/entropy_test.asm: the build test/zx
 ZXN_ASM = target/zxn/plat_zxn.asm target/zxn/plat_sound.asm target/zxn/zxn_boot.asm target/zxn/zxn_data.asm
 # (the sound: the interrupt plays it, and the simulation's sound hooks start it, so it is in the lowest 16 KB: sections of code_home)
 ZXN_LOW = target/common/ay_hooks.asm target/common/ay_sfx.asm
-ZXN_PLATFORM = target/zxn/plat_zxn.c target/zxn/zxn_mouse.c target/common/minimap_key.c
+ZXN_PLATFORM = target/zxn/plat_zxn.c target/zxn/zxn_mouse.c target/common/pointer.c target/common/minimap_key.c
 ZXN_PLATFORM += $(ZXN_SCENARIO_C)
 
 # (the build's options are in a file that changes with them, so that the NEX is made again when they do)

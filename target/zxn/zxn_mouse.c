@@ -1,8 +1,6 @@
-/* ZX Spectrum Next: the pointer.  The arrow is always there (HAVE_POINTER): the keys move it (plat_pointer_keys: Q A O P, the cursor keys; Space or Enter is its
-   button), and so does a Kempston mouse, whose steps are added.  A Kempston mouse cannot be detected (its ports read as anything without one), so it is always read: with
-   none the position does not change.  The mouse is read by z88dk's in_MouseKemp, which keeps the position as 0..255 by 0..191 in the four variables below.  The pointer
-   takes the city's cursor over the map, a click on an icon picks the tool, and the view scrolls when the pointer rests on its edge, as on the SAM Coupe
-   (target/sam/sam_mouse.asm); the pointer is hardware sprite 0, so nothing has to be drawn under it or put back. */
+/* ZX Spectrum Next: the pointer's own parts (the rest is target/common/pointer.c, with ptr_driver.h).  A Kempston mouse cannot be detected (its ports read as anything
+   without one), so it is always read: with none the position does not change.  It is read by z88dk's in_MouseKemp, which keeps the position as 0..255 by 0..191 in the four
+   variables below.  The pointer is hardware sprite 0, so nothing has to be drawn under it or put back; here too are the tool icons' places and the view's edge scrolling. */
 #include <stdint.h>
 #include <arch/zxn.h>
 #include <arch/zx/zx_input.h>
@@ -12,27 +10,15 @@
 #ifdef HAVE_MOUSE                               /* (plat_config.h: a build without the mouse has nothing here) */
 
 extern void zxn_out(uint16_t port, uint8_t value);
-extern uint8_t plat_pointer_keys(void);         /* what is down: 1 left, 2 right, 4 up, 8 down, 16 fire, 32 fast (plat_zxn.asm) */
+extern void pointer_start(void);                /* (target/common/pointer.c) */
 
 #define REG_PERIPHERAL_5 0x0A                   /* (z88dk has no name for it) bits 1 and 0: the mouse's DPI, 0 low, 1 the default, 2 medium, 3 high */
-#define STEP        2                           /* pixels a frame (the map's cells and the mini map's tiles are 8 and 2) */
-#define STEP_FAST   4
 
 extern uint8_t cur_x, cur_y, origin_x, origin_y, frame, view_w, view_h, map_row;
 
 /* the variables in_MouseKemp needs (arch/zx/zx_input.h) */
 uint8_t in_KempcoordX, in_KempcoordY, in_KemprawX, in_KemprawY;
 
-volatile int16_t plat_mouse_x, plat_mouse_y;
-volatile uint8_t plat_mouse_buttons;
-
-static int16_t sent_x, sent_y;                  /* the position as the driver has it: the keys move the pointer too, and it is told before the next read */
-static uint8_t last_buttons, seen;
-static uint8_t esc_pending;                     /* the right button went down: the main loop's Esc */
-static uint8_t armed = 1;                       /* 0 after a key or button ended a modal screen: the main loop's fire waits until it is released */
-static uint8_t modal;                           /* the mouse is being read as keys (plat_modal_key), its position counted from the middle of the screen */
-static uint8_t modal_buttons;
-static int16_t acc_x, acc_y;
 static int16_t shown_x, shown_y;                /* where the sprite is, or -1 if it is hidden */
 
 /* The arrow, 16x16, its tip at the top left: the rows of its black outline and its white fill, the leftmost pixel the top bit. */
@@ -91,67 +77,8 @@ void plat_mouse_init(void)
     ZXN_NEXTREGA(REG_PERIPHERAL_5, (uint8_t)((p5 & ~3) | 1));
     sprite_define();
     in_MouseKempInit();                         /* (reads once, to drop what the mouse has counted) */
-    plat_mouse_x = 128;
-    plat_mouse_y = 128;
-    in_MouseKempSetPos(128, 128);
-    sent_x = sent_y = 128;
+    pointer_start();
     shown_x = -1;
-}
-
-/* Read the mouse and the keys, then return bit 0 for movement, bit 1 for a new press of the left button (or fire) and bit 2 while it is held. */
-uint8_t plat_mouse_input(void)
-{
-    uint8_t buttons, keys, step, events = 0;
-    uint16_t x, y;
-    int16_t nx, ny;
-
-    modal = 0;
-    if (plat_mouse_x != sent_x || plat_mouse_y != sent_y)
-        in_MouseKempSetPos(plat_mouse_x, plat_mouse_y);    /* the keys moved it (or a modal screen counted the mouse from the middle) */
-    in_MouseKemp(&buttons, &x, &y);
-    sent_x = nx = (int16_t)x;
-    sent_y = ny = (int16_t)y;
-    keys = plat_pointer_keys();
-    step = (keys & 32) ? STEP_FAST : STEP;
-    if (keys & 1)
-        nx -= step;
-    if (keys & 2)
-        nx += step;
-    if (keys & 4)
-        ny -= step;
-    if (keys & 8)
-        ny += step;
-    if (nx < 0)
-        nx = 0;
-    if (nx > 255)
-        nx = 255;
-    if (ny < 0)
-        ny = 0;
-    if (ny > 191)
-        ny = 191;
-    if (!seen || nx != plat_mouse_x || ny != plat_mouse_y)
-        events |= 1;
-    seen = 1;
-    plat_mouse_x = nx;
-    plat_mouse_y = ny;
-    if (keys & 16)
-        buttons |= 1;
-    if ((buttons & 2) && !(last_buttons & 2))
-        esc_pending = 1;
-    if (!armed) {                               /* what ended a modal screen (Enter, a click) is still down: not a press here */
-        if (buttons & 1)
-            buttons &= (uint8_t)~1;
-        else
-            armed = 1;
-    }
-    plat_mouse_buttons = buttons;
-    if (buttons & 1) {
-        events |= 4;
-        if (!(last_buttons & 1))
-            events |= 2;
-    }
-    last_buttons = buttons;
-    return events;
 }
 
 /* The pointer, once a frame. */
@@ -220,68 +147,6 @@ uint8_t plat_mouse_edge_scroll(void)
         }
     }
     return 0;
-}
-
-/* The right button as the main loop's Esc, once. */
-uint8_t plat_mouse_esc(void)
-{
-    uint8_t e = esc_pending;
-
-    esc_pending = 0;
-    return e;
-}
-
-#define MID_X 128
-#define MID_Y 96
-#define ROW 8                                   /* pixels of mouse movement to a key: a menu's row */
-
-/* The key a modal screen reads: k (the keyboard's, or 0), or else the mouse as keys: 8 pixels up, down, left or right are those cursor keys, the left button is Enter and the
-   right Esc.  The mouse's steps are counted from the middle of the screen (it is put back there at each look, so the edge of the screen is no limit), and the first look in a
-   screen starts from there with the buttons as they are.  The arrow is hidden; the main loop puts it where it was (plat_mouse_input sees it differs from the driver's). */
-uint8_t plat_modal_key(uint8_t k)
-{
-    uint8_t buttons, down;
-    uint16_t x, y;
-
-    plat_mouse_pointer_hide();
-    if (modal) {
-        in_MouseKemp(&buttons, &x, &y);
-        acc_x += (int16_t)x - MID_X;
-        acc_y += (int16_t)y - MID_Y;
-    } else {
-        modal = 1;
-        acc_x = acc_y = 0;
-        in_MouseKempSetPos(MID_X, MID_Y);
-        in_MouseKemp(&buttons, &x, &y);
-        modal_buttons = buttons;
-    }
-    in_MouseKempSetPos(MID_X, MID_Y);
-    sent_x = MID_X;
-    sent_y = MID_Y;
-    down = buttons & (uint8_t)~modal_buttons;
-    modal_buttons = buttons;
-    if (!k) {
-        if (down & 1)
-            k = KEY_ENTER;
-        else if (down & 2)
-            k = KEY_ESC;
-        else if (acc_y >= ROW) {
-            acc_y -= ROW;
-            k = KEY_DOWN;
-        } else if (acc_y <= -ROW) {
-            acc_y += ROW;
-            k = KEY_UP;
-        } else if (acc_x >= ROW) {
-            acc_x -= ROW;
-            k = KEY_RIGHT;
-        } else if (acc_x <= -ROW) {
-            acc_x += ROW;
-            k = KEY_LEFT;
-        }
-    }
-    if (k)
-        armed = 0;
-    return k;
 }
 
 #endif /* HAVE_MOUSE */
