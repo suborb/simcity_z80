@@ -4,7 +4,7 @@
 ; snd_init (called by plat_init) puts it in the chain, once, and turns interrupts on.
         MODULE  plat_sound
 
-        PUBLIC  ay_sync, snd_init
+        PUBLIC  ay_sync, snd_init, _plat_frames
         IFDEF   SOUND_TEST
         PUBLIC  _snd_test
         EXTERN  play_place_sound, play_built_sound, play_crash_sound, play_rising_tone, play_falling_tone, soundfx1
@@ -21,6 +21,13 @@ ay_isr:
         ld      hl,ay_frames
         inc     (hl)
         jp      ay_tick
+
+; uint8_t plat_frames(void): the frames counted so far (it wraps): how long the game has taken, for the pointer's keys (target/common/pointer.c)
+_plat_frames:
+        ld      a,(ay_frames)
+        ld      l,a
+        ld      h,0
+        ret
 
 ; Z if a frame has gone by since the last call (the soundfx1's wait)
 ay_sync:

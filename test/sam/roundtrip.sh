@@ -4,7 +4,7 @@
 D=$(cd "$(dirname "$0")" && pwd)
 W=${TMPDIR:-/tmp}/sam_roundtrip; mkdir -p $W
 cp build/sam/simcity.mgt $W/disk.mgt
-typ() { K=""; f=$1; shift; for k in "$@"; do K="$K,$f|${k}|8"; f=$((f+40)); done; echo "$K"; }
+typ() { K=""; f=$1; shift; for k in "$@"; do K="$K,$f|${k}|24"; f=$((f+60)); done; echo "$K"; }
 SNAP=${SAM_MAME:-$HOME/emu/mame0283-arm64}/snap/samcoupe
 # the cursor may start on water, where nothing can be built: a row of cells is tried
 B=""; f=1500; for i in 1 2 3 4 5 6 7 8 9 10 11 12; do B="$B,$f|kbd_7|Space|8,$((f+40))|kbd_8|Cursor Right|8"; f=$((f+80)); done

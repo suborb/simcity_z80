@@ -1928,11 +1928,11 @@ _plat_page_data:
         SECTION code_user
 
 ; Keyboard polling runs between frames, with the data page mapped at $8000.
-; uint8_t plat_key(void): the key pressed since the last call, or 0, in the game's codes (letters lower case).  The SAM's matrix is
+; uint8_t plat_keyboard_key(void) (plat_key and plat_key_game are made of it, target/common/pointer.c): the key pressed since the last call, or 0, in the game's codes (letters lower case).  The SAM's matrix is
 ; read as the ZX Spectrum's is: a row for each bit of the port's high byte that is low, its keys in bits 0-4 of port $FE; the
 ; function keys and the like are in bits 5-7 of port $F9; the shift key and the cursor keys are on their own rows.
-        PUBLIC  _plat_key
-_plat_key:
+        PUBLIC  _plat_keyboard_key
+_plat_keyboard_key:
         call    mp_keyscan
         ld      a,(mp_event)
         ld      l,a
@@ -2028,6 +2028,67 @@ mp_ks_shift:
         ld      bc,$FEFE
         in      a,(c)
         and     1
+        ret
+
+; uint8_t plat_pointer_keys(void): the keys that drive the pointer, as what is down now (the game's own key reports a key once, when it goes down):
+; bit 0 left, 1 right, 2 up, 3 down, 4 fire, 5 fast.  Q A O P and the cursor keys; fire is Space or Return; fast is Shift.  Uses a, bc, d, hl.
+        PUBLIC  _plat_pointer_keys
+_plat_pointer_keys:
+        ld      d,0
+        ld      c,$FE
+        ld      b,$FB
+        in      a,(c)
+        rra
+        jr      c,pk_nq
+        set     2,d                     ; Q up
+pk_nq:  ld      b,$FD
+        in      a,(c)
+        rra
+        jr      c,pk_na
+        set     3,d                     ; A down
+pk_na:  ld      b,$DF
+        in      a,(c)
+        rra
+        jr      c,pk_np
+        set     1,d                     ; P right
+pk_np:  rra
+        jr      c,pk_no
+        set     0,d                     ; O left
+pk_no:  ld      b,$FF                   ; the cursor keys: row 8, bits 1 to 4 up, down, left, right (bit 0 is CONTROL)
+        in      a,(c)
+        rra
+        rra
+        jr      c,pk_nu
+        set     2,d
+pk_nu:  rra
+        jr      c,pk_nd
+        set     3,d
+pk_nd:  rra
+        jr      c,pk_nl
+        set     0,d
+pk_nl:  rra
+        jr      c,pk_nr
+        set     1,d
+pk_nr:  ld      b,$FE
+        in      a,(c)
+        rra
+        jr      c,pk_nofast
+        set     5,d                     ; Shift: fast
+pk_nofast:
+        ld      b,$7F
+        in      a,(c)
+        rra
+        jr      c,pk_nosp
+        set     4,d                     ; Space: fire
+pk_nosp:
+        ld      b,$BF
+        in      a,(c)
+        rra
+        jr      c,pk_nort
+        set     4,d                     ; Return: fire
+pk_nort:
+        ld      l,d
+        ld      h,0
         ret
 
 ; The keys, a row of eight each: row 0 SHIFT Z X C V F1 F2 F3, 1 A S D F G F4 F5 F6, 2 Q W E R T F7 F8 F9, 3 1 2 3 4 5 ESC TAB CAPS,
