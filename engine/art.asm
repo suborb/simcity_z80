@@ -20,6 +20,26 @@
         defc    ART_TILE_ATTRS = 2760
         defc    ART_ZONE_ATTRS = 2854
 
+        IFDEF   TARGET_ZXN
+        defc    ART_UNREAD = 1
+        ENDIF
+        IFDEF   TARGET_SAM
+        defc    ART_UNREAD = 1
+        ENDIF
+        IFDEF   TARGET_PC88
+        defc    ART_UNREAD = 1
+        ENDIF
+        IFDEF   TARGET_MULTI8
+        defc    ART_UNREAD = 1
+        ENDIF
+        IFDEF   ART_UNREAD              ; the Next, the SAM, the PC-88 and the Multi 8 draw their own pictures: they number them by the art's address (art - view_tile_art) and never read the art
+                                        ; itself, so only the attribute bytes are stored; the art's 2,760 bytes are an address range with nothing in it (not at 0: the SAM's cache
+                                        ; holds the art's address, and an empty cache entry is 0)
+        defc    view_udgs = $0100
+        SECTION rodata_user
+view_attrs:
+        BINARY  "assets/map_attrs.bin"
+        ELSE
         IFDEF   RODATA_IN_RAM           ; (the Z88's console reads the art with the map bank paged over $4000-$7FFF: it stays in ROM)
         SECTION rodata_user
         ELSE
@@ -30,5 +50,7 @@ view_udgs:
         BINARY  "assets/map_art_aq.bin"
         ELSE
         BINARY  "assets/map_art.bin"
+        ENDIF
+        defc    view_attrs = view_udgs + ART_TILE_ATTRS
         ENDIF
         IN_CODE

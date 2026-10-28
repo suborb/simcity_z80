@@ -97,7 +97,7 @@ view_road_busy:
         ld      e,d
 view_tile:
         ld      d,0
-        ld      hl,view_udgs+ART_TILE_ATTRS
+        ld      hl,view_attrs
         add     hl,de
         ld      a,(hl)                  ;attribute
         ld      hl,view_udgs+ART_TILES
@@ -175,7 +175,7 @@ view_zone_piece:
         ld      d,0
         add     hl,de                   ;hl = zone piece number
         ex      de,hl                   ;de = piece number
-        ld      hl,view_udgs+ART_ZONE_ATTRS
+        ld      hl,view_attrs+ART_ZONE_ATTRS-ART_TILE_ATTRS
         add     hl,de
         ld      a,(hl)                  ;attribute
         ld      hl,view_udgs+ART_ZONES
