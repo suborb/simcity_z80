@@ -674,6 +674,336 @@ pr_done:
         pop     ix
         ret
 
+; void plat_mouse_pointer_draw(void): the arrow at the pointer (plat_mouse_x, plat_mouse_y; 0..255 by 0..191), with none drawn.
+; The arrow is 8 pixels wide and 16 tall: two bit planes, its white and its black outline, a byte a row.  It is shifted right by the pointer's x within
+; its cell (pd_sh: for each row the white's two bytes and then the outline's), which gives the bytes for the (at most) two cells across, and then
+; for each cell down (at most three) that has any of it: its restore mask is built (a nibble of F for each pixel the arrow covers: the 32 bytes of
+; mp_ov16's entries, in the mask buffer, which plat_mouse_pointer_restore_screen reads), the cell is saved, and the cell is composed in mp_pix from the
+; saved one, (saved AND NOT mask) OR white, and put on the screen.  The cells' list and the buffers are in the data, which is in.
+        PUBLIC  _plat_mouse_pointer_draw
+_plat_mouse_pointer_draw:
+        push    ix
+        push    iy
+        ld      a,(_plat_mouse_x)
+        ld      (pd_px),a
+        and     7
+        ld      (pd_sx),a
+        ld      a,(_plat_mouse_y)
+        ld      (pd_py),a
+        ld      hl,pd_art               ; the planes shifted
+        ld      iy,pd_sh
+        ld      b,16
+pd_shrow:
+        push    bc
+        ld      c,(hl)                  ; the white
+        inc     hl
+        call    pd_shift
+        ld      c,(hl)                  ; the outline
+        inc     hl
+        call    pd_shift
+        pop     bc
+        djnz    pd_shrow
+        ld      hl,_plat_mouse_pointer_mask
+        ld      (pd_mp),hl
+        ld      a,(pd_py)
+        rrca
+        rrca
+        rrca
+        and     31
+        ld      (pd_ry),a
+        ld      a,(pd_py)
+        add     a,15
+        rrca
+        rrca
+        rrca
+        and     31
+        ld      (pd_ry1),a
+pd_rowloop:
+        ld      a,(pd_ry)
+        cp      24
+        jr      nc,pd_cellsdone
+        xor     a
+        ld      (pd_k),a
+pd_colloop:
+        ld      a,(pd_px)
+        rrca
+        rrca
+        rrca
+        and     31
+        ld      hl,pd_k
+        add     a,(hl)
+        cp      32
+        jr      nc,pd_nextcol
+        ld      (pd_col),a
+        call    pd_mask
+        jr      z,pd_nextcol
+        ld      a,(_plat_mouse_pointer_cell_count)
+        add     a,a
+        ld      e,a
+        ld      d,0
+        ld      hl,_plat_mouse_pointer_cells
+        add     hl,de
+        ld      a,(pd_col)
+        ld      (hl),a
+        inc     hl
+        ld      a,(pd_ry)
+        ld      (hl),a
+        ld      hl,_plat_mouse_pointer_cell_count
+        inc     (hl)
+        ld      hl,(pd_mp)
+        ld      de,32
+        add     hl,de
+        ld      (pd_mp),hl
+pd_nextcol:
+        ld      hl,pd_k
+        inc     (hl)
+        ld      a,(hl)
+        cp      2
+        jr      c,pd_colloop
+        ld      hl,pd_ry
+        inc     (hl)
+        ld      a,(pd_ry1)
+        cp      (hl)
+        jr      nc,pd_rowloop
+pd_cellsdone:
+        ld      a,(_plat_mouse_pointer_cell_count)
+        or      a
+        jp      z,pd_out
+        ld      (pd_n),a
+        call    _plat_mouse_pointer_save_screen
+        ld      ix,_plat_mouse_pointer_cells
+        ld      hl,_plat_mouse_pointer_background
+        ld      (pd_bp),hl
+        ld      hl,_plat_mouse_pointer_mask
+        ld      (pd_mp),hl
+pd_cell:
+        ld      hl,(pd_bp)              ; the saved cell, to compose on
+        ld      de,mp_pix
+        ld      bc,32
+        ldir
+        ld      (pd_bp),hl
+        ld      a,(pd_px)
+        rrca
+        rrca
+        rrca
+        and     31
+        ld      c,a
+        ld      a,(ix+0)
+        sub     c
+        ld      (pd_k),a                ; the cell's column within the arrow's
+        ld      a,(ix+1)
+        add     a,a
+        add     a,a
+        add     a,a
+        ld      c,a
+        ld      a,(pd_py)
+        ld      b,a
+        ld      a,c
+        sub     b
+        ld      (pd_dy0),a              ; the arrow row at the cell's top (-7 to 15)
+        ld      hl,(pd_mp)
+        ld      de,mp_pix
+        ld      b,0
+pd_line:
+        ld      a,(pd_dy0)
+        add     a,b
+        and     $F0                     ; (a row of the arrow is 0 to 15)
+        jr      nz,pd_skip
+        ld      a,(pd_dy0)
+        add     a,b
+        add     a,a
+        add     a,a                     ; * 4
+        ld      c,a
+        ld      a,(pd_k)
+        add     a,c
+        push    hl
+        push    de
+        ld      e,a
+        ld      d,0
+        ld      hl,pd_sh
+        add     hl,de
+        ld      a,(hl)                  ; its white
+        ld      hl,pd_e
+        call    pd_expand
+        pop     de
+        pop     hl
+        ld      iy,pd_e
+        REPT    4
+        ld      a,(hl)
+        cpl
+        ld      c,a
+        ld      a,(de)
+        and     c
+        or      (iy+0)
+        ld      (de),a
+        inc     hl
+        inc     de
+        inc     iy
+        ENDR
+        jr      pd_lnext
+pd_skip:
+        REPT    4
+        inc     hl
+        inc     de
+        ENDR
+pd_lnext:
+        inc     b
+        ld      a,b
+        cp      8
+        jr      c,pd_line
+        ld      (pd_mp),hl
+        ld      a,(ix+1)
+        ld      b,(ix+0)
+        call    mp_scraddr
+        ex      de,hl
+        ld      hl,mp_pix
+        call    mp_blit
+        inc     ix
+        inc     ix
+        ld      hl,pd_n
+        dec     (hl)
+        jp      nz,pd_cell
+pd_out:
+        pop     iy
+        pop     ix
+        ret
+
+; c shifted right by the pointer's x within its cell as two bytes, to (iy): this cell's part and the next cell's.
+pd_shift:
+        ld      a,(pd_sx)
+        ld      e,0
+        ld      d,c
+        or      a
+        jr      z,pd_shdone
+        ld      b,a
+pd_shbit:
+        srl     d
+        rr      e
+        djnz    pd_shbit
+pd_shdone:
+        ld      (iy+0),d
+        ld      (iy+1),e
+        inc     iy
+        inc     iy
+        ret
+
+; The restore mask of the cell (pd_col, pd_ry) for the arrow column pd_k into (pd_mp): 8 rows of 4 bytes.  NZ if it has any of the arrow.
+pd_mask:
+        ld      hl,(pd_mp)
+        ld      a,(pd_ry)
+        add     a,a
+        add     a,a
+        add     a,a
+        ld      c,a
+        ld      a,(pd_py)
+        ld      b,a
+        ld      a,c
+        sub     b
+        ld      (pd_dy0),a
+        ld      bc,0                    ; b the row, c 1 once there is any of the arrow
+pm_line:
+        ld      a,(pd_dy0)
+        add     a,b
+        ld      d,a
+        and     $F0
+        jr      nz,pm_blank
+        ld      a,d
+        add     a,a
+        add     a,a                     ; * 4
+        ld      d,a
+        ld      a,(pd_k)
+        add     a,d
+        ld      e,a
+        ld      d,0
+        push    hl
+        ld      hl,pd_sh
+        add     hl,de
+        ld      a,(hl)                  ; the white
+        inc     hl
+        inc     hl
+        or      (hl)                    ; or the outline
+        pop     hl
+        jr      z,pm_blank
+        ld      c,1
+        call    pd_expand
+        jr      pm_next
+pm_blank:
+        xor     a
+        ld      (hl),a
+        inc     hl
+        ld      (hl),a
+        inc     hl
+        ld      (hl),a
+        inc     hl
+        ld      (hl),a
+        inc     hl
+pm_next:
+        inc     b
+        ld      a,b
+        cp      8
+        jr      c,pm_line
+        ld      a,c
+        or      a
+        ret
+
+; The 8 bits of a as 4 bytes at hl (a nibble of F for each): hl is advanced.  Uses af and de.
+pd_expand:
+        push    af
+        rrca
+        rrca
+        rrca
+        rrca
+        and     $0F
+        call    pe_nibble
+        pop     af
+        and     $0F
+pe_nibble:
+        add     a,a
+        ld      de,mp_ov16
+        add     a,e
+        ld      e,a
+        jr      nc,pe_ok
+        inc     d
+pe_ok:  ld      a,(de)
+        ld      (hl),a
+        inc     hl
+        inc     de
+        ld      a,(de)
+        ld      (hl),a
+        inc     hl
+        ret
+
+pd_art:                                 ; the arrow's rows: the white, then the outline (the MagicFields pointer: magicfield.bin at $9000 and its mask at $9020)
+        defb    $00,$E0
+        defb    $60,$90
+        defb    $70,$88
+        defb    $78,$84
+        defb    $7C,$82
+        defb    $7E,$81
+        defb    $78,$86
+        defb    $78,$84
+        defb    $48,$B4
+        defb    $08,$54
+        defb    $04,$0A
+        defb    $04,$0A
+        defb    $04,$0A
+        defb    $02,$05
+        defb    $02,$05
+        defb    $00,$02
+pd_sh:  defs    64                      ; each row's white and outline, shifted: 2 bytes each
+pd_e:   defs    4
+pd_px:  defb    0
+pd_py:  defb    0
+pd_sx:  defb    0
+pd_k:   defb    0
+pd_col: defb    0
+pd_ry:  defb    0
+pd_ry1: defb    0
+pd_dy0: defb    0
+pd_n:   defb    0
+pd_mp:  defw    0
+pd_bp:  defw    0
+
 ; Restore only covered pixels from the saved cell, preserving the pixels beside the pointer.
 ; hl = saved cell, de = screen cell, ix = 32-byte nibble mask.
 mp_maskblit:
@@ -712,75 +1042,6 @@ pm_row_next:
         djnz    pm_loop
         ld      a,(mp_dpage)
         out     (HMPR),a
-        ret
-
-; void plat_put_black_overlay(uint8_t col, uint8_t row, const uint8_t *art) __smallc
-; Clear screen pixels selected in the 1-bit cell mask.
-        PUBLIC  _plat_put_black_overlay
-_plat_put_black_overlay:
-        push    ix
-        ld      hl,4                      ; saved IX is above the return address
-        add     hl,sp
-        ld      e,(hl)
-        inc     hl
-        ld      d,(hl)                  ; mask
-        push    de
-        ex      de,hl
-        ld      de,mp_pix               ; the mask is in the data page, which will be paged out
-        ld      bc,8
-        ldir
-        pop     de
-        ld      hl,4
-        add     hl,sp
-        inc     hl
-        inc     hl                      ; row
-        ld      a,(hl)
-        inc     hl
-        inc     hl
-        ld      b,(hl)                  ; column
-        call    mp_scraddr
-        push    hl
-        ld      ix,mp_pix               ; read mask from low memory while screen is paged in
-        ld      a,SCRPAGE
-        out     (HMPR),a
-        pop     hl                      ; screen row address
-        ld      b,8
-pb_row:
-        ld      a,(ix+0)
-        inc     ix
-        ld      c,4
-pb_pair:
-        bit     7,a
-        jr      z,pb_right
-        push    af
-        ld      a,(hl)
-        and     $0f
-        ld      (hl),a
-        pop     af
-pb_right:
-        rlca
-        bit     7,a
-        jr      z,pb_next
-        push    af
-        ld      a,(hl)
-        and     $f0
-        ld      (hl),a
-        pop     af
-pb_next:
-        inc     hl
-        rlca
-        dec     c
-        jr      nz,pb_pair
-        ld      a,l
-        add     a,124
-        ld      l,a
-        jr      nc,pb_row_next
-        inc     h
-pb_row_next:
-        djnz    pb_row
-        ld      a,(mp_dpage)
-        out     (HMPR),a
-        pop     ix
         ret
 
         SECTION code_user

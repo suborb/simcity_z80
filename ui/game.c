@@ -605,6 +605,9 @@ static void draw_view(uint8_t full, uint8_t dirty)
 #endif
         for (cx = 0; cx < view_w; ++cx)
             draw_cell(cx, draw_refresh_row);
+#ifdef HAVE_MOUSE_POINTER
+        plat_mouse_pointer_refresh();       /* the arrow is back as soon as the row is (it is not left off for the rest of the pass) */
+#endif
         cx = (uint8_t)(cur_x - origin_x);
         cy = (uint8_t)(cur_y - origin_y);
 #ifdef HAVE_MOUSE
