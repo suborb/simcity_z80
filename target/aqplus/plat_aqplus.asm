@@ -302,7 +302,11 @@ _aq_vcopy:
         ex      de,hl
         ldir
         VID_PAGE_OUT
+        IFDEF   HAVE_SOUND
+        jp      ay_poll                 ; (the frames are counted, and the sound's ticks go on, as the mini map's rows are drawn)
+        ELSE
         ret
+        ENDIF
 
 ; The mini map's row buffers (the pixel lines of a row of tiles, 24 bytes each, then the 24 colour bytes of the cells), in the code section
 ; so that it is not under the video RAM.

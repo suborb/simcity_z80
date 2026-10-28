@@ -37,6 +37,9 @@ static uint8_t esc_pending;                     /* the right button went down: t
 static uint8_t armed = 1;                       /* 0 after a key or button ended a modal screen: the main loop's fire waits until it is released */
 static uint8_t modal;                           /* the mouse is being read as keys (plat_modal_key), its position counted from the middle of the screen */
 static uint8_t modal_buttons;
+#ifdef PTR_FRAMES
+static uint8_t modal_frame;                     /* the frame count at the last look */
+#endif
 static int16_t acc_x, acc_y;
 
 /* The pointer starts in the middle of the map; the target has started its mouse. */
@@ -147,6 +150,18 @@ uint8_t plat_key(void)
 
     plat_page_data();
     PTR_HIDE();
+#ifdef PTR_FRAMES                               /* the mouse is looked at once a frame: a loop that waits for nothing would read it back to back, and a mouse (the SAM's) */
+    {                                           /* that is read so often reports movement that is not there */
+        uint8_t now = PTR_FRAMES();
+
+        if (modal && now == modal_frame) {
+            if (k)
+                armed = 0;
+            return k;
+        }
+        modal_frame = now;
+    }
+#endif
     if (modal) {
         PTR_READ(&buttons, &x, &y);
         acc_x += (int16_t)x - MID_X;
