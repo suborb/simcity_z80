@@ -9,6 +9,9 @@
 char city_name[CITY_NAME_LEN + 1] = "HERESVILLE";
 
 #ifdef HAVE_POPUP_MENU
+#ifdef HAVE_TEXT_LAYER
+#define plat_puts plat_text_puts            /* a dialogue is on the text layer too */
+#endif
 /* The dialogues are boxes over the map, like the menus: a title, a label, the line being typed and the keys to press; or a
    message and "ANY KEY". */
 static void line(uint8_t n, const char *s)

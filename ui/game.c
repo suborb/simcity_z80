@@ -234,6 +234,10 @@ static void update_option_labels(void)
     disaster_menu[6].text = V_disaster_reset ? "RANDOM DISASTERS: OFF" : "RANDOM DISASTERS: ON";
 }
 
+#ifdef HAVE_TEXT_LAYER
+static void text_screen_end(void);
+#endif
+
 static uint8_t popup_menu(void)
 {
     uint8_t choice = MENU_MAIN, page;
@@ -1186,6 +1190,18 @@ static void draw_map_sidebar(void)
     side_puts(22, "M NEXT");
     side_puts(23, "X BACK");
 }
+
+#ifdef HAVE_TEXT_LAYER
+/* A popup or a text page is closed: the picture is as it was.  Only a mini map's sidebar, which is on the layer too, is drawn again. */
+static void text_screen_end(void)
+{
+    plat_text_screen(0);
+#ifdef HAVE_MINIMAP_SQUARE
+    if (map_view)
+        draw_map_sidebar();
+#endif
+}
+#endif
 #endif
 
 #ifdef HAVE_ICONS_2X7
@@ -1581,7 +1597,11 @@ static void apply_tool(void)
 #endif
             uint8_t kind = menu_choose("POWER STATION", kinds, 2);
 
+#ifdef HAVE_TEXT_LAYER
+            text_screen_end();              /* (the box was on the text layer) */
+#else
             redraw |= REDRAW_MAP;           /* the box was over the map */
+#endif
             if (kind != 1 && kind != 2)
                 return;
             V_power_type_chosen = kind;
@@ -1610,10 +1630,18 @@ void game_budget(void)
 #ifdef HAVE_MOUSE_POINTER
     plat_mouse_pointer_erase();
 #endif
+#ifdef HAVE_TEXT_LAYER
+    plat_text_screen(2);
+    if (budget_screen())
+        quit = 1;
+    else
+        text_screen_end();                  /* (the picture is as it was) */
+#else
     if (budget_screen())
         quit = 1;
     else
         redraw |= REDRAW_TEXT;              /* it used the text area */
+#endif
 }
 
 #else
@@ -1627,17 +1655,27 @@ static void game_evaluation(void)
 #ifdef HAVE_MOUSE_POINTER
     plat_mouse_pointer_erase();
 #endif
+#ifdef HAVE_TEXT_LAYER
+    plat_text_screen(2);
+    if (evaluation_screen())
+        quit = 1;
+    else
+        text_screen_end();
+#else
     if (evaluation_screen())
         quit = 1;
     else
         redraw |= REDRAW_TEXT;
+#endif
 }
 #else
 #define game_evaluation()
 #endif
 
 #ifdef HAVE_FILES
-#ifdef HAVE_POPUP_MENU
+#ifdef HAVE_TEXT_LAYER
+#define file_done() text_screen_end()       /* the dialogue was a box on the text layer */
+#elif defined(HAVE_POPUP_MENU)
 #define file_done() (redraw |= (map_view ? REDRAW_ALL : REDRAW_MAP))   /* the dialogue is a box over the map */
 #else
 #define file_done() (redraw |= REDRAW_TEXT)
@@ -1662,6 +1700,9 @@ static void game_load(void)
     } else if (r == CITY_BROKEN) {
         restart = quit = 1;                 /* the map was half read: a new city */
     } else if (r == CITY_LOADED) {
+#ifdef HAVE_TEXT_LAYER
+        plat_text_screen(0);
+#endif
         redraw = REDRAW_ALL;
         tick_reset = 1;
     } else {
@@ -1717,16 +1758,23 @@ static void handle_key(uint8_t k)
             set_map_view(0);             /* X is the documented mini-map back key */
         else {
             k = popup_menu();
+#ifdef HAVE_TEXT_LAYER
+            if (k != MENU_SAVE && k != MENU_LOAD)
+                text_screen_end();          /* (the dialogues open on the menu's box: it is blanked when they do) */
+#else
 #ifdef HAVE_FILES
             if (k == MENU_SAVE || k == MENU_LOAD) {
                 last_cx = 255;              /* the dialogue is a box too: show the map, not the menu's box, around it */
                 draw_view(1, 0);
             }
 #endif
+#endif
             if (k)
                 handle_key(k);
+#ifndef HAVE_TEXT_LAYER
             if (!quit && !redraw)
                 redraw = REDRAW_MAP;
+#endif
         }
         break;
 #else
@@ -1932,6 +1980,9 @@ static void title_screen(void)
 #endif
 title_again:
     plat_page_data();
+#ifdef HAVE_TEXT_LAYER
+    plat_text_screen(2);                            /* a page of text: the picture is not used */
+#endif
     plat_text_clear();
 #ifndef HAVE_TEXT_WINDOW
     plat_text_puts(0, 0, "S I M C I T Y");
@@ -2099,6 +2150,9 @@ static void play_city(void)
     origin_y = (uint8_t)(cur_y - view_h / 2);
     tool = 1;
     clamp_view();
+#ifdef HAVE_TEXT_LAYER
+    plat_text_screen(0);                    /* (the title and the landscape's message) */
+#endif
     plat_clear();
     plat_text_clear();
     last_cx = 255;                          /* draw the whole view on the first frame */

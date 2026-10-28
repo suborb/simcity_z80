@@ -5,6 +5,10 @@
 #include "menu.h"
 
 #ifdef HAVE_POPUP_MENU
+#ifdef HAVE_TEXT_LAYER
+#define plat_puts plat_text_puts            /* a popup is on the text layer */
+#define plat_put plat_text_put
+#endif
 #define MENU_WIDTH 30                   /* wide enough for a file name's 24 characters (ui/prompt.c) */
 #ifdef BOX_TOP                          /* a platform with line drawing characters says what the frame is made of (plat_config.h) */
 static const char top[] = BOX_TOP;
@@ -31,6 +35,9 @@ void menu_box(uint8_t height)
 {
     uint8_t y, r = area_rows ? area_rows : plat_rows();
 
+#ifdef HAVE_TEXT_LAYER
+    plat_text_screen(1);
+#endif
     menu_col = (uint8_t)((plat_cols() - MENU_WIDTH) >> 1);
     menu_row = (uint8_t)(area_row + ((r - height) >> 1));
     plat_puts(menu_col, menu_row, top);

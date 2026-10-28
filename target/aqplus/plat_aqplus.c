@@ -19,24 +19,49 @@ static uint8_t key_held;
 extern void aq_blit8(uint8_t col, uint8_t row, const uint8_t *art, uint8_t colour, uint8_t inverse) __smallc;
 extern void plat_aq_printc(uint8_t col, uint8_t row, uint8_t ch) __smallc;    /* the same as plat_put */
 
-/* The 4bpp mini map's sidebar is on the text layer (the font is in the character RAM from 160, ASCII + 128; the pictures from 128): the cells here,
-   the colour bytes ink << 4 | paper of the text palette (plat_aqplus.asm) */
+/* The text layer (plat_aqplus.asm): the 4bpp mini map's sidebar, and the text screens (plat_text_screen: a popup over the picture, or a page of text with
+   the graphics off).  The font is in the character RAM from 160 (ASCII + 128), our pictures below it; the cells here, the colour bytes ink << 4 | paper
+   of the text palette */
 extern uint8_t aq_mm4;                  /* the mini map's mode is on */
 extern uint8_t aq_mm_want;              /* a mini map is up */
+extern uint8_t aq_txt;                  /* 0, 1 a popup, 2 a page of text */
 extern void aq_mm_enter(void);
 extern void aq_mm_leave(void);
+extern void aq_txt_set(uint8_t mode) __z88dk_fastcall;
+extern void aq_text_blank(void);
 extern void aq_tcell(uint8_t col, uint8_t row, uint8_t ch, uint8_t colour) __smallc;
+extern void aq_tcolour(uint8_t col, uint8_t row, uint8_t n, uint8_t colour) __smallc;
 extern void aq_defchar(uint8_t ch, const uint8_t *art) __smallc;
-#define MM_CH_SOLID 128                 /* a solid cell */
-#define MM_CH_BAR   130                 /* seven cells for each of the demand bars (rows mod 3) */
+#define MM_CH_SOLID 96                  /* a solid cell */
+#define CH_BAR      97                  /* a bar's full cell; 97 + n its cell of n pixels (1..7) */
+#define MM_CH_BAR   105                 /* seven cells for each of the demand bars (rows mod 3) */
+#define CH_BOX      131                 /* + the code 1..6 of a frame piece */
+#define TXT_COLOUR  0x70                /* white on the transparent background */
+#define POPUP_COLOUR 0x7F               /* white on dark grey: a box in a popup is opaque */
 
 static void tcells(uint8_t col, uint8_t row, const char *s, uint8_t colour)
 {
     uint8_t c;
 
     while ((c = (uint8_t)*s++) != 0) {
-        aq_tcell(col++, row, c >= 32 && c < 128 ? (uint8_t)(c + 128) : 160, colour);
+        aq_tcell(col++, row, c >= 32 && c < 128 ? (uint8_t)(c + 128) : c < 7 ? (uint8_t)(c + CH_BOX) : 160, colour);
     }
+}
+
+void plat_text_screen(uint8_t mode)
+{
+    if (mode == 1 && aq_txt == 2)
+        return;                         /* (a popup in a page of text stays in it) */
+    aq_txt_set(mode);
+}
+
+void plat_text_put(uint8_t col, uint8_t row, uint8_t ch)
+{
+    char s[2];
+
+    s[0] = (char)ch;
+    s[1] = 0;
+    tcells(col, row, s, aq_txt == 1 ? POPUP_COLOUR : TXT_COLOUR);
 }
 extern const uint8_t aq_icons[];
 
@@ -52,7 +77,12 @@ static const uint8_t aq_pal[8] = { 0, 4, 1, 5, 2, 6, 3, 7 };
 /* Colours text already drawn: only the colour bytes change, as a glyph's pixels are the ink */
 void plat_text_attr(uint8_t col, uint8_t row, uint8_t n, uint8_t attr)
 {
-    aq_colours(col, row, n, (uint8_t)(aq_pal[attr & 7] << 4 | aq_pal[(attr >> 3) & 7]));
+    uint8_t colour = (uint8_t)(aq_pal[attr & 7] << 4 | aq_pal[(attr >> 3) & 7]);
+
+    if (aq_txt)
+        aq_tcolour(col, row, n, colour);
+    else
+        aq_colours(col, row, n, colour);
 }
 
 /* A bar of n cells, the first `fill` pixels (8 to a cell) in the ink of attr, the rest the track: dark grey.  The cell's own two colours do it
@@ -62,6 +92,13 @@ void plat_bar(uint8_t col, uint8_t row, uint8_t cells, uint8_t fill, uint8_t att
     uint8_t i, k, bits, a[8], colour = (uint8_t)(aq_pal[attr & 7] << 4 | 15);
     int16_t px;
 
+    if (aq_txt) {                       /* on the text layer: a full cell, one of 1 to 7 pixels, or the track (a blank on the dark grey) */
+        for (i = 0; i < cells; ++i) {
+            px = (int16_t)fill - 8 * i;
+            aq_tcell((uint8_t)(col + i), row, px >= 8 ? CH_BAR : px <= 0 ? 160 : (uint8_t)(CH_BAR + px), colour);
+        }
+        return;
+    }
     for (i = 0; i < cells; ++i) {
         px = (int16_t)fill - 8 * i;
         bits = px >= 8 ? 0xFF : px <= 0 ? 0 : (uint8_t)(0xFF << (8 - px));
@@ -91,7 +128,7 @@ void plat_demand(uint8_t col, uint8_t row, char name, int8_t level)
 
         s[0] = name;
         s[1] = 0;
-        tcells(col, row, s, 0x70);
+        tcells(col, row, s, TXT_COLOUR);
         colour = (uint8_t)(aq_pal[level > 0 ? COL_GREEN : level < 0 ? COL_RED : COL_WHITE] << 4 | 15);
         for (k = 0; k < 7; ++k) {
             bits = 0;
@@ -123,11 +160,19 @@ void plat_demand(uint8_t col, uint8_t row, char name, int8_t level)
 }
 #endif
 
-void plat_text_clear(void) { plat_clear(); }
+void plat_text_clear(void)
+{
+    if (aq_txt)
+        aq_text_blank();
+    else
+        plat_clear();
+}
 void plat_text_puts(uint8_t col, uint8_t row, const char *s)
 {
-    if (aq_mm4)
-        tcells(col, row, s, 0x70);
+    if (aq_txt)
+        tcells(col, row, s, aq_txt == 1 ? POPUP_COLOUR : TXT_COLOUR);
+    else if (aq_mm4)
+        tcells(col, row, s, TXT_COLOUR);
     else
         plat_puts(col, row, s);
 }
@@ -215,6 +260,14 @@ uint8_t plat_key(void)
 /* A tiny editor for file names.  This deliberately uses the game console rather
    than fgets_cons: the latter brings in a complete generic console editor, while
    this target already has keyboard polling and a character writer. */
+static void put_ch(uint8_t col, uint8_t row, uint8_t ch)
+{
+    if (aq_txt)
+        plat_text_put(col, row, ch);
+    else
+        plat_aq_printc(col, row, ch);
+}
+
 uint8_t plat_text_input(uint8_t col, uint8_t row, char *buf, uint8_t max, uint8_t spaces)
 {
     uint8_t n = 0, k;
@@ -232,10 +285,10 @@ uint8_t plat_text_input(uint8_t col, uint8_t row, char *buf, uint8_t max, uint8_
             return 0;
         if ((k == KEY_LEFT || k == 127) && n) {
             --n;
-            plat_aq_printc((uint8_t)(col + n), row, ' ');
+            put_ch((uint8_t)(col + n), row, ' ');
         } else if (k >= (spaces ? ' ' : '!') && k < 127 && n < max) {
             buf[n] = (char)k;
-            plat_aq_printc((uint8_t)(col + n), row, k);
+            put_ch((uint8_t)(col + n), row, k);
             ++n;
             buf[n] = 0;
         }
@@ -296,14 +349,10 @@ static const uint8_t mm_ramp[8]  = { 0, 11, 4, 6, 2, 3, 5, 1 };        /* from n
 
 void plat_minimap_mode(uint8_t on)
 {
-    static const uint8_t solid[8] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
-
     aq_mm_want = on;
     if (on) {
-        if (!aq_mm4) {
+        if (!aq_mm4)
             aq_mm_enter();
-            aq_defchar(MM_CH_SOLID, solid);
-        }
     } else if (aq_mm4)
         aq_mm_leave();
 }
@@ -343,7 +392,7 @@ void plat_put_minirow(uint8_t ty, const uint8_t *colours, const uint8_t *base, u
 static void key_cell(uint8_t row, uint8_t colour, const char *label)
 {
     aq_tcell(MM_SIDE_COL, row, MM_CH_SOLID, (uint8_t)(colour << 4));
-    tcells((uint8_t)(MM_SIDE_COL + 1), row, label, 0x70);
+    tcells((uint8_t)(MM_SIDE_COL + 1), row, label, TXT_COLOUR);
 }
 
 void plat_minimap_key(uint8_t view)
@@ -351,7 +400,7 @@ void plat_minimap_key(uint8_t view)
     uint8_t i;
 
     for (i = 6; i < 16; ++i)
-        tcells(MM_SIDE_COL, i, "            ", 0x70);
+        tcells(MM_SIDE_COL, i, "            ", TXT_COLOUR);
     switch (view) {
     case 1:
         key_cell(6, mm_city[5], "HOUSES");
@@ -374,10 +423,10 @@ void plat_minimap_key(uint8_t view)
         key_cell(8, mm_trans[1], "WATER");
         break;
     default:                                /* a density: none (the city, dim), the levels, the most */
-        tcells(MM_SIDE_COL, 6, "LOW", 0x70);
+        tcells(MM_SIDE_COL, 6, "LOW", TXT_COLOUR);
         for (i = 1; i < 8; ++i)
             aq_tcell(MM_SIDE_COL, (uint8_t)(6 + i), MM_CH_SOLID, (uint8_t)(mm_ramp[i] << 4));
-        tcells(MM_SIDE_COL, 14, "HIGH", 0x70);
+        tcells(MM_SIDE_COL, 14, "HIGH", TXT_COLOUR);
         break;
     }
 }

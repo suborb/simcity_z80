@@ -29,9 +29,13 @@ DRIVER = r'''
 #define HAVE_MINIMAP_SQUARE
 #define MM_SIDE_COL 28
 #define __smallc
+#define __z88dk_fastcall
 uint8_t video[0x4000];
 uint8_t aq_mm_buf[72];
-uint8_t aq_mm4, aq_mm_want;
+uint8_t aq_mm4, aq_mm_want, aq_txt;
+void aq_txt_set(uint8_t m) { aq_txt = m; }
+void aq_text_blank(void) {}
+void aq_tcolour(uint8_t col, uint8_t row, uint8_t n, uint8_t colour) {}
 void aq_mm_enter(void) { aq_mm4 = 1; printf("enter\n"); }
 void aq_mm_leave(void) { aq_mm4 = 0; printf("leave\n"); }
 void aq_vcopy(uint16_t offset, const uint8_t *src, uint8_t n) { memcpy(video + offset, src, n); }
@@ -116,7 +120,7 @@ def main():
         print(('PASS' if ok else 'FAIL') + f'  plat_put_minirow: {total_rows} rows over the eight views: the 4bpp lines equal the model (two lines a tile row, from byte {COL0})')
 
     # the mode call and the keys
-    ok2 = out[0] == 'enter' and any(l == 'd 128 255' for l in out)              # opening a mini map enters the mode and defines the solid character
+    ok2 = out[0] == 'enter'                                                    # opening a mini map enters the mode
     keys = {}
     cur = None
     for l in out:
@@ -127,14 +131,14 @@ def main():
             keys[cur].append(tuple(int(x) for x in l.split()[1:]))
     ok2 = ok2 and out[out.index('key 8') + 1:].count('leave') == 1
 
-    def swatches(view):                                                         # the solid cells (character 128) of the sidebar column
-        return [(row, colour >> 4) for col, row, ch, colour in keys[view] if col == SIDE and ch == 128]
+    def swatches(view):                                                         # the solid cells (character 96) of the sidebar column
+        return [(row, colour >> 4) for col, row, ch, colour in keys[view] if col == SIDE and ch == 96]
     ok2 = ok2 and swatches(1) == list(zip(range(6, 13), [CITY[5], CITY[6], CITY[3], CITY[2], CITY[7], CITY[1], CITY[4]]))
     ok2 = ok2 and swatches(6) == [(6, 3), (7, 1), (8, 15), (9, POWER[1])]
     ok2 = ok2 and swatches(7) == [(6, 7), (7, 15), (8, TRANS[1])]
     for v in (2, 3, 4, 5, 8):
         ok2 = ok2 and swatches(v) == [(6 + i, RAMP[i]) for i in range(1, 8)]
-    text = lambda view, row: ''.join(chr(ch - 128) for col, r, ch, colour in keys[view] if r == row and col >= SIDE and ch != 128 and ch != 160 and colour == 0x70 and col > SIDE - 1)
+    text = lambda view, row: ''.join(chr(ch - 128) for col, r, ch, colour in keys[view] if r == row and col >= SIDE and ch != 96 and ch != 160 and colour == 0x70 and col > SIDE - 1)
     ok2 = ok2 and text(2, 6).startswith('LOW') and text(2, 14).startswith('HIGH') and text(1, 6).startswith('HOUSES') and text(6, 7).startswith('NOPWR') and text(1, 8).startswith('INDUSTRY') and text(1, 9).startswith('SERVICES')
     print(('PASS' if ok2 else 'FAIL') + '  plat_minimap_mode and plat_minimap_key: the mode is entered and left, the swatches are the views\' colours and the labels are beside them')
     return 0 if ok and ok2 else 1

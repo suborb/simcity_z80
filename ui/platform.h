@@ -328,6 +328,14 @@ extern void     plat_put_minirow(uint8_t sy);
    whole screen, and the status panel is not drawn while it is open. */
 extern void plat_put_minirow(uint8_t ty, const uint8_t *colours, const uint8_t *base, uint8_t view);
 extern void plat_minimap_key(uint8_t view);
+#ifdef HAVE_TEXT_LAYER
+/* HAVE_TEXT_LAYER: the popups (menu.c, prompt.c) and the text pages (budget, evaluation, title) are drawn on a text layer over the picture, which is not touched.
+   plat_text_screen(1) opens a popup over the picture (the console calls plat_put/plat_puts of menu.c and prompt.c, and the text calls, go to the layer, a box
+   opaque), (2) a page of text (the picture hidden: plat_text_clear(), plat_text_puts(), plat_text_attr(), plat_bar() as always), and (0) closes it: the picture is
+   there as it was and nothing is redrawn.  Opening what is open is a no-op, and a popup in a page stays in the page. */
+extern void plat_text_screen(uint8_t mode);
+extern void plat_text_put(uint8_t col, uint8_t row, uint8_t ch);
+#endif
 #ifdef HAVE_MINIMAP_4BPP
 /* HAVE_MINIMAP_4BPP: a mini map is a different video mode.  plat_minimap_mode(1) is called when one is opened (after plat_clear) and (0) when the
    city is back (plat_clear is called then too); a view to another view calls (1) again. */
