@@ -303,52 +303,31 @@ static const struct field foot[] = {
 #else
 #define MX(c) (c)
 #endif
+static const struct attr_run attrs[] = {
+    {  0,  0, 32, PLAT_ATTR(COL_WHITE, COL_BLUE) },
+    {  2,  1, 30, PLAT_ATTR(COL_CYAN, COL_BLACK) },
+    {  6,  1, 27, PLAT_ATTR(COL_CYAN, COL_BLACK) },
+    { 16,  1, 10, PLAT_ATTR(COL_YELLOW, COL_BLACK) },        /* the labels only: the figures are white */
+    { 17,  1,  9, PLAT_ATTR(COL_YELLOW, COL_BLACK) },
+    { 18,  1, 15, PLAT_ATTR(COL_YELLOW, COL_BLACK) },
+    { 20,  1,  8, PLAT_ATTR(COL_YELLOW, COL_BLACK) },
+    { 21,  1, 10, PLAT_ATTR(COL_YELLOW, COL_BLACK) },
+    { 22,  1, 10, PLAT_ATTR(COL_YELLOW, COL_BLACK) },
+    { 23, 24,  8, PLAT_ATTR(COL_CYAN, COL_BLACK) },
+};
+
 static void colour_row(uint8_t row)
 {
     uint8_t v, c;
 
-    switch (row) {
-    case 0:
-        plat_text_attr(MX(0), 0, 32, PLAT_ATTR(COL_WHITE, COL_BLUE));
-        return;
-    case 2:
-        plat_text_attr(MX(1), 2, 30, PLAT_ATTR(COL_CYAN, COL_BLACK));
-        return;
-    case 3:
-        if (ev.has_people) {
-            plat_text_attr(MX(18), 3, 3, PLAT_ATTR(COL_GREEN, COL_BLACK));
-            plat_bar(MX(22), 3, 10, (uint8_t)((uint16_t)ev.yes * 4 / 5), PLAT_ATTR(COL_GREEN, COL_BLACK));
-        }
-        return;
-    case 4:
-        if (ev.has_people) {
-            plat_text_attr(MX(18), 4, 2, PLAT_ATTR(COL_RED, COL_BLACK));
-            plat_bar(MX(22), 4, 10, (uint8_t)((uint16_t)ev.no * 4 / 5), PLAT_ATTR(COL_RED, COL_BLACK));
-        }
-        return;
-    case 6:
-        if (ev.has_people)
-            plat_text_attr(MX(1), 6, 27, PLAT_ATTR(COL_CYAN, COL_BLACK));
-        return;
-    case 16:                                                    /* the labels only: the figures are white */
-        plat_text_attr(MX(1), 16, 10, PLAT_ATTR(COL_YELLOW, COL_BLACK));
-        return;
-    case 17:
-        plat_text_attr(MX(1), 17, 9, PLAT_ATTR(COL_YELLOW, COL_BLACK));
-        return;
-    case 18:
-        plat_text_attr(MX(1), 18, 15, PLAT_ATTR(COL_YELLOW, COL_BLACK));
-        return;
-    case 20:
-        plat_text_attr(MX(1), 20, 8, PLAT_ATTR(COL_YELLOW, COL_BLACK));
-        return;
-    case 21:
-    case 22:
-        plat_text_attr(MX(1), row, 10, PLAT_ATTR(COL_YELLOW, COL_BLACK));
-        return;
-    case 23:
-        plat_text_attr(MX(24), 23, 8, PLAT_ATTR(COL_CYAN, COL_BLACK));
-        return;
+    fmt_attr_runs(attrs, sizeof(attrs) / sizeof(struct attr_run), row);
+    if (row == 3 && ev.has_people) {
+        plat_text_attr(MX(18), 3, 3, PLAT_ATTR(COL_GREEN, COL_BLACK));
+        plat_bar(MX(22), 3, 10, (uint8_t)((uint16_t)ev.yes * 4 / 5), PLAT_ATTR(COL_GREEN, COL_BLACK));
+    }
+    if (row == 4 && ev.has_people) {
+        plat_text_attr(MX(18), 4, 2, PLAT_ATTR(COL_RED, COL_BLACK));
+        plat_bar(MX(22), 4, 10, (uint8_t)((uint16_t)ev.no * 4 / 5), PLAT_ATTR(COL_RED, COL_BLACK));
     }
     if (row >= 8 && row <= 14 && ev.has_people) {               /* a problem: its label and its bar (green when small, red when large) */
         v = ev.problem[row - 8];

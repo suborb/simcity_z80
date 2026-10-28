@@ -71,5 +71,12 @@ void fmt_fields_each(const struct field *f, uint8_t n, void (*done)(uint8_t row)
         i = j;
     }
 }
+
+void fmt_attr_runs(const struct attr_run *r, uint8_t n, uint8_t row)
+{
+    for (; n; --n, ++r)
+        if (r->row == row)
+            plat_text_attr((uint8_t)(r->col + FMT_COL0), row, r->len, r->attr);
+}
 #endif
 #endif

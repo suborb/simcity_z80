@@ -153,6 +153,16 @@ static const struct field fields[] = {
    service's funding level (green when it is well funded, yellow, red when it is not), the cash flow green or red, and the keys in
    cyan.  The bars are on the rows between the items, which the table leaves empty.  Each row is coloured as soon as it is printed
    (fmt_fields_each), so that no more than a row is ever shown plain. */
+static const struct attr_run attrs[] = {
+    {  0,  0, 32, PLAT_ATTR(COL_WHITE, COL_BLUE) },
+    {  4,  1, 15, PLAT_ATTR(COL_YELLOW, COL_BLACK) },
+    {  6, 11, 18, PLAT_ATTR(COL_CYAN, COL_BLACK) },
+    { 15,  1,  9, PLAT_ATTR(COL_YELLOW, COL_BLACK) },
+    { 17,  1, 15, PLAT_ATTR(COL_YELLOW, COL_BLACK) },
+    { 19,  1, 15, PLAT_ATTR(COL_YELLOW, COL_BLACK) },
+    { 23,  0, 32, PLAT_ATTR(COL_CYAN, COL_BLACK) },
+};
+
 static void colour_row(uint8_t row)
 {
     static const uint8_t item_len[4] = { 8, 9, 6, 4 };
@@ -177,28 +187,9 @@ static void colour_row(uint8_t row)
             }
             return;
         }
-    switch (row) {
-    case 0:
-        plat_text_attr(MX(0), 0, 32, PLAT_ATTR(COL_WHITE, COL_BLUE));
-        break;
-    case 4:
-        plat_text_attr(MX(1), 4, 15, PLAT_ATTR(COL_YELLOW, COL_BLACK));
-        break;
-    case 6:
-        plat_text_attr(MX(11), 6, 18, PLAT_ATTR(COL_CYAN, COL_BLACK));
-        break;
-    case 15:
-        plat_text_attr(MX(1), 15, 9, PLAT_ATTR(COL_YELLOW, COL_BLACK));
+    fmt_attr_runs(attrs, sizeof(attrs) / sizeof(struct attr_run), row);
+    if (row == 15)
         plat_text_attr(MX(14), 15, 9, PLAT_ATTR((V_cashflow[2] & 0x80) ? COL_RED : COL_GREEN, COL_BLACK));
-        break;
-    case 17:
-    case 19:
-        plat_text_attr(MX(1), row, 15, PLAT_ATTR(COL_YELLOW, COL_BLACK));
-        break;
-    case 23:
-        plat_text_attr(MX(0), 23, 32, PLAT_ATTR(COL_CYAN, COL_BLACK));
-        break;
-    }
 }
 #endif
 

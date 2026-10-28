@@ -44,6 +44,10 @@ extern void fmt_run(const struct field *f) __z88dk_fastcall;
 /* The same a row at a time, calling done(row) after each: the screens that colour their text do it row by row, so that only one row at
    a time is ever drawn plain (a whole screen printed and then coloured shows its colours gone for the time that takes). */
 extern void fmt_fields_each(const struct field *f, uint8_t n, void (*done)(uint8_t row));
+
+/* A colour run of a row (plat_text_attr), for the table-driven part of a done(row) routine. */
+struct attr_run { uint8_t row, col, len, attr; };
+extern void fmt_attr_runs(const struct attr_run *r, uint8_t n, uint8_t row);
 #endif
 #endif
 
