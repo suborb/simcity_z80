@@ -10,6 +10,9 @@
 #define PTR_START_X 160
 #define PTR_START_Y 100
 
+/* The game's loop does not wait for the frame, so the keys move the arrow by the frames that have gone by (counted as the sound polls the display's sync). */
+#define PTR_FRAMES()        plat_frames()
+extern uint8_t plat_frames(void);
 extern void plat_mouse_pointer_hide(void);
 extern uint8_t plat_pointer_keys(void);         /* what is down: 1 left, 2 right, 4 up, 8 down, 16 fire, 32 fast (plat_aqplus.asm) */
 extern uint8_t plat_keyboard_key(void);         /* the keyboard's key, once when it goes down (plat_key's, before the mouse is keys too) */
