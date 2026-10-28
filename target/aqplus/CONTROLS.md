@@ -1,18 +1,27 @@
 # Aquarius+ controls
 
-The Aquarius+ port uses the cursor keys and the shared character-cell menu. The
+The Aquarius+ port uses a pointer and the shared character-cell menu. The
 status panel also shows the most useful shortcuts while playing.
 
 ## City view
 
+The arrow is the only cursor. The keys move it, and so does a mouse on the
+ESP32 (a USB or Bluetooth LE mouse), the two added together; with no mouse the
+keys do everything.
+
 | Key | Action |
 | --- | --- |
-| Cursor keys | Move the cursor one square |
-| Shift + cursor keys | Move the cursor by a larger step, when supported by the keyboard |
-| `O` / `P` | Move left / right |
-| `Q` / `A` | Move up / down |
-| `o` / `p` / `q` / `a` | Move left / right / up / down |
-| `Space` or `Enter` | Build or use the selected tool |
+| `Q` / `A` / `O` / `P` | Move the arrow up / down / left / right |
+| `Shift` + those | Move it twice as far |
+| `Space` or `Enter` | The arrow's button: build or use the tool under it, pick a tool or a mini map spot |
+| Mouse left button | The same |
+| Mouse right button | Esc: the game menu |
+
+The map scrolls when the arrow rests on its edge. The tool icons along the top
+and the mini map are clicked with the arrow.
+
+| Key | Action |
+| --- | --- |
 | `,` / `.` | Select the previous / next tool |
 | `0`–`9` | Select a tool directly |
 | `E` | Toggle coal / nuclear power |

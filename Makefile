@@ -37,7 +37,7 @@ SOUND   = target/z88/plat_sound.asm              # one bit sound through the Z88
 NOSOUND = platform/common/nosound.asm
 
 CONSOLE = platform/console/plat_console.c platform/console/plat_font.asm
-AQPLUS_PLATFORM = target/aqplus/plat_aqplus.c target/aqplus/plat_aqplus.asm
+AQPLUS_PLATFORM = target/aqplus/plat_aqplus.c target/aqplus/plat_aqplus.asm target/aqplus/aq_mouse.c target/aqplus/aq_mouse.asm target/common/pointer.c
 ZX_PLATFORM = target/zx/plat_zx.asm
 MULTI8_PLATFORM = target/multi8/plat_multi8.c target/multi8/plat_multi8.asm target/common/plat_charts.c target/common/plat_icons.c
 PC88_PLATFORM = target/pc88/plat_pc88.c target/pc88/plat_pc88.asm target/pc88/plat_pc88_files.asm target/common/plat_charts.c target/common/plat_icons.c

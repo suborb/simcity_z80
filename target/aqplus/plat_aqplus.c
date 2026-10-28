@@ -145,7 +145,11 @@ void plat_icons(uint8_t selected)
 /* in_Inkey() reports the matrix state every poll.  The game and especially its pop-up
    menus run much faster than a human key press, so turn that level into one event until
    the key is released. */
+#ifdef HAVE_POINTER
+uint8_t plat_keyboard_key(void)                 /* (target/common/pointer.c makes plat_key and plat_key_game of it) */
+#else
 uint8_t plat_key(void)
+#endif
 {
     uint8_t k = (uint8_t)in_Inkey();
 

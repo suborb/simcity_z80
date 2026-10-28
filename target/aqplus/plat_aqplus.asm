@@ -329,3 +329,46 @@ aq_box:
 aq_scratch:
         defs    8
 
+
+; uint8_t plat_pointer_keys(void): the keys that are down, for the pointer (target/common/pointer.c): bit 0 left (O), 1 right (P), 2 up (Q), 3 down (A),
+; 4 fire (Space or Enter), 5 fast (Shift).  The keyboard matrix has a row to each port high byte, a key down reading 0.
+        PUBLIC  _plat_pointer_keys
+_plat_pointer_keys:
+        ld      e,0
+        ld      bc,$7FFF
+        in      a,(c)                   ; Shift (bit 4) and Q (bit 3)
+        bit     4,a
+        jr      nz,pk_nshift
+        set     5,e
+pk_nshift:
+        bit     3,a
+        jr      nz,pk_nq
+        set     2,e
+pk_nq:  ld      b,$BF
+        in      a,(c)                   ; A (bit 5) and Space (bit 4)
+        bit     5,a
+        jr      nz,pk_na
+        set     3,e
+pk_na:  bit     4,a
+        jr      nz,pk_nspace
+        set     4,e
+pk_nspace:
+        ld      b,$FB
+        in      a,(c)                   ; O (bit 1)
+        bit     1,a
+        jr      nz,pk_no
+        set     0,e
+pk_no:  ld      b,$FD
+        in      a,(c)                   ; P (bit 3)
+        bit     3,a
+        jr      nz,pk_np
+        set     1,e
+pk_np:  ld      b,$FE
+        in      a,(c)                   ; Enter (bit 3)
+        bit     3,a
+        jr      nz,pk_nenter
+        set     4,e
+pk_nenter:
+        ld      l,e
+        ld      h,0
+        ret

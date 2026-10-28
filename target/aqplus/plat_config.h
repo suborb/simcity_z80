@@ -27,6 +27,10 @@
 #define BOX_TOP    "\1\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\2"
 #define BOX_BOTTOM "\3\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\4"
 #define BOX_SIDE   "\6                            \6"
+#define MM_PIC_COL 4
+#define HAVE_MOUSE              /* the ESP32's mouse (target/aqplus/aq_mouse.c), which may not be there ... */
+#define HAVE_POINTER            /* ... and the pointer is always there: the keys move it too (QAOP, Space or Enter its button), and the city has no other cursor */
+#define HAVE_MOUSE_SPRITE       /* the pointer is two hardware sprites: nothing to draw under it or to put back */
 #define HAVE_ICONS_TOP          /* status panel across the top of the 40-column display */
 #define PLAT_FIXED_COLS 40
 #define PLAT_FIXED_ROWS 25
