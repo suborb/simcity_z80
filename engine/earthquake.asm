@@ -47,6 +47,9 @@ sim_random_disaster:
 
         IN_DATA
 V_disaster_option:  defb       $0   ; VAR $916D / 37229 - which disasters are enabled
+        IFDEF PORTABLE
+V_disaster_at:      defw       0    ; the map address of a cell a fire, flood or meltdown has just set (the UI shows it and clears it)
+        ENDIF
         IN_CODE
 
 sim_start_disaster:

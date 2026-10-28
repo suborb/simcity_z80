@@ -138,12 +138,21 @@ def ascii_text(value):
     return value.encode('ascii', 'replace')
 
 
+# The disaster each scenario starts with, by its event text (the engine's V_disaster_option: 1 fire .. 6 meltdown); the monster is the tornado.
+DISASTERS = (('bombing', 1), ('flood', 2), ('earthquake', 3), ('monster', 5), ('meltdown', 6))
+
+
+def disaster_of(event):
+    return next((n for word, n in DISASTERS if word in event.lower()), 0)
+
+
 def make_meta(info):
     title = ascii_text(info['title'])[:23]
     event = ascii_text(info['event'])[:31]
     desc = ascii_text(info['description'])[:META_BYTES - 64]
     out = bytearray(META_BYTES)
     struct.pack_into('<HBBH', out, 0, info['year'], len(title), len(event), len(desc))
+    out[6] = disaster_of(info['event'])
     out[8:8 + len(title)] = title
     out[32:32 + len(event)] = event
     out[64:64 + len(desc)] = desc

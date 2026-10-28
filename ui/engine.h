@@ -71,6 +71,10 @@ extern uint8_t  V_sim_loop_counter;
 extern uint8_t  V_TrafficAverage, V_PolluteAverage, V_concern_crime;
 extern uint8_t  V_transport_active;
 extern uint8_t  V_CCxy[2];                      /* the city's centre: x then y */
+extern const uint8_t *V_disaster_at;            /* the cell a fire, flood or meltdown last set (0: none yet); the UI clears it */
+extern uint8_t  V_meltdown_triggered;           /* 1 from a meltdown starting until the fallout is down */
+extern uint8_t  V_aircrash_active, V_CrashXY[2];
+extern uint8_t  V_tornado_pos[2];
 extern uint8_t  V_disaster_option;              /* a disaster to start (1 fire .. 6 meltdown); the engine takes it and clears it */
 
 /* ---- settings ---- */

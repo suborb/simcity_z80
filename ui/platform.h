@@ -149,11 +149,11 @@ extern void     plat_flush(void);               /* end of frame: show what was d
 /* HAVE_SCENARIOS: the title screen offers scenarios (ready-made cities in the platform's own storage).
      plat_scenario_choose()                  shows them (a picture of each, its title and text) and returns the number chosen, or 0xff for none
      plat_scenario_load(n)                   puts scenario n's map in levelmap and returns its year
-     plat_scenario_restore_state(n)          after the engine has been reset for it (sim_loaded): puts back what it keeps in the minimaps (power, traffic)
+     plat_scenario_restore_state(n)          after the engine has been reset for it (sim_loaded): puts back what it keeps in the minimaps (power, traffic) and returns the disaster to start (V_disaster_option: 0 none)
      plat_scenario_preview_row(y, x, pixels) draws a row of the picture of a scenario: one colour a tile */
 extern uint8_t  plat_scenario_choose(void);
 extern uint16_t plat_scenario_load(uint8_t index);
-extern void     plat_scenario_restore_state(uint8_t index);
+extern uint8_t  plat_scenario_restore_state(uint8_t index);
 extern void     plat_scenario_preview_row(uint8_t y, uint8_t x, const uint8_t *pixels);
 #endif
 

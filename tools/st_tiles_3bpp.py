@@ -140,7 +140,8 @@ ANIMATED = {2: [2, 4, 2, 4],                    # open water
             40: (840, 4),                       # the park's fountain
             649: (892, 4), 650: (896, 4), 686: (908, 4), 689: (912, 4),         # the smoke of the industrial zones' chimneys
             747: (916, 4), 748: (920, 4), 751: (924, 4), 752: (928, 4),         # the coal power plant's
-            820: (952, 4)}                      # the nuclear plant's swirl
+            820: (952, 4),                      # the nuclear plant's swirl
+            56: (56, 4)}                        # fire (engine tile 69)
 ANIM_SHIFT = 4                                  # a frame is 16 ticks of the game's frame counter (V_view_tick), which the platforms use
 WATER_SHIFT = -1                                # a generated water frame: shift tile 2 when the source's tile 4 duplicates it
 

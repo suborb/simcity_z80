@@ -70,6 +70,9 @@ place_fallout:
         ld      a,69
         ld      (V_fill_tile),a
         ld      hl,(V_map_iter_addr)
+        IFDEF PORTABLE
+        ld      (V_disaster_at),hl
+        ENDIF
         call    fill_zone_with_tile
         ld      hl,(V_map_iter_xy)
         ld      a,h

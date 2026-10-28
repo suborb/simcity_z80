@@ -245,7 +245,7 @@ POINTER_VARS = {
     'V_powerstation_list': 'levelmap',    # zero-terminated list of levelmap pointers
 }
 # V_minimap_start is a scratch pointer the Spectrum's map drawing also writes.
-SKIP_VARS = {'V_powersp', 'V_minimap_start'}
+SKIP_VARS = {'V_powersp', 'V_minimap_start', 'V_disaster_at'}      # (the last is the portable engine's own, for the UI)
 # Scratch variables the Spectrum's map drawing resets (only relevant when a view is rendered).
 VIEW_SCRATCH = {'V_zone_x_offset'}
 

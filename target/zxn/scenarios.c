@@ -153,7 +153,7 @@ uint16_t plat_scenario_load(uint8_t index)
 
 /* Restore saved scenario power and congestion after sim_loaded() clears all
    minimaps. The first simulation tick rebuilds both from live conditions. */
-void plat_scenario_restore_state(uint8_t index)
+uint8_t plat_scenario_restore_state(uint8_t index)
 {
     uint16_t offset = 0;
     while (offset < POWER_BYTES) {
@@ -171,4 +171,5 @@ void plat_scenario_restore_state(uint8_t index)
         memcpy(minimaps + MM_TRAFFIC_AT + offset, mapbuf, n);
         offset += n;
     }
+    return metadata[6];                     /* (plat_scenario_load read it) */
 }

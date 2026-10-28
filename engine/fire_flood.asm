@@ -28,6 +28,9 @@
         cp      6           ;trees
         ret     z
         ld      (hl),TILE_FIRE
+        IFDEF PORTABLE
+        ld      (V_disaster_at),hl      ; (for the UI to show)
+        ENDIF
         ret     
 
 
@@ -50,6 +53,9 @@
         and     31
         jr      nz,L90fc                ; (2)
         ld      (hl),TILE_FLOOD     ;Flood character?
+        IFDEF PORTABLE
+        ld      (V_disaster_at),hl
+        ENDIF
 .L90fc  inc     hl
         dec     bc
         ld      a,b

@@ -1423,6 +1423,73 @@ static void clamp_view(void)
     if (origin_y > MAP_H - view_h) origin_y = (uint8_t)(MAP_H - view_h);
 }
 
+#if defined(HAVE_POINTER) || (defined(HAVE_MOUSE) && defined(HAVE_MINIMAP) && defined(HAVE_MINIMAP_SQUARE))
+/* The city view centred on the cursor (the city view, if it was a mini map). */
+static void jump_to(void)
+{
+    uint8_t half = view_w >> 1;
+
+    origin_x = cur_x > half ? cur_x - half : 0;
+    half = view_h >> 1;
+    origin_y = cur_y > half ? cur_y - half : 0;
+    clamp_view();                           /* (the far edges) */
+    if (map_view)
+        set_map_view(0);
+}
+#endif
+
+#ifdef HAVE_POINTER                         /* (the targets with room: it costs 300 bytes) */
+/* A disaster moves the view to it.  The engine's disaster option is taken a few frames after it is set; the fire, flood and meltdown leave the cell they set in
+   V_disaster_at, and the tornado and the plane have their sprites' places. */
+static uint8_t disaster_taken, crash_was, melt_was;
+
+static void jump_xy(const uint8_t *xy)
+{
+    cur_x = xy[0];
+    cur_y = xy[1];
+    jump_to();
+}
+
+static void jump_at(void)
+{
+    uint16_t i;
+
+    if (V_disaster_at) {
+        cur_y = 0;
+        for (i = (uint16_t)(V_disaster_at - levelmap); i >= MAP_W; i -= MAP_W)
+            ++cur_y;
+        cur_x = (uint8_t)i;
+        V_disaster_at = 0;
+        jump_to();
+    }
+}
+
+static void watch_disasters(void)
+{
+    uint8_t d = V_disaster_option;
+
+    if (d) {
+        disaster_taken = d;
+    } else if (disaster_taken) {
+        d = disaster_taken;
+        disaster_taken = 0;
+        if (d == 5)
+            jump_xy(V_tornado_pos);
+        else if (d < 4)
+            jump_at();                      /* (the plane and the meltdown are found below, when they show) */
+    }
+    if (V_aircrash_active && !crash_was)
+        jump_xy(V_CrashXY);
+    crash_was = V_aircrash_active;
+    if (V_meltdown_triggered)
+        melt_was = 1;
+    else if (melt_was) {
+        melt_was = 0;
+        jump_at();
+    }
+}
+#endif
+
 #ifndef HAVE_POINTER
 static void move_cursor(int8_t dx, int8_t dy)
 {
@@ -1926,7 +1993,7 @@ static uint8_t mouse_hold_off;              /* a press the mini map took: the bu
 #define MM_BACK_ROW 23
 static void minimap_mouse(uint8_t events)
 {
-    uint8_t col, row, half;
+    uint8_t col, row;
     uint16_t px;
 #ifdef HAVE_MINIMAP_SCROLL
     int8_t dx = 0, dy = 0;
@@ -1953,12 +2020,7 @@ static void minimap_mouse(uint8_t events)
         cur_x += mm_scroll_x;
         cur_y += mm_scroll_y;
 #endif
-        half = view_w >> 1;
-        origin_x = cur_x > half ? cur_x - half : 0;
-        half = view_h >> 1;
-        origin_y = cur_y > half ? cur_y - half : 0;
-        clamp_view();                       /* (the far edges) */
-        set_map_view(0);
+        jump_to();
         return;
     }
 #ifdef HAVE_MINIMAP_SCROLL
@@ -1999,7 +2061,7 @@ static void play_city(void)
     if (selected_scenario != 0xff) {
         uint16_t year = plat_scenario_load(selected_scenario);
         sim_loaded();
-        plat_scenario_restore_state(selected_scenario);
+        V_disaster_option = plat_scenario_restore_state(selected_scenario);     /* (the engine starts it a few frames on) */
         V_year = year;
         V_month = 0;
         V_money[0] = 0x20;
@@ -2063,6 +2125,10 @@ static void play_city(void)
                         set_tool(icon);
                     else if (plat_mouse_update_city_cursor())
                         apply_tool();
+#ifdef HAVE_POPUP_MENU
+                    else if ((uint8_t)((uint16_t)plat_mouse_y >> 3) < map_row)
+                        handle_key(KEY_ESC);            /* anywhere else in the status panel: the menu */
+#endif
                 }
             }
             if (plat_mouse_update_city_cursor() &&
@@ -2110,6 +2176,10 @@ static void play_city(void)
             countdown = 1;
         }
 
+#ifdef HAVE_POINTER
+        plat_page_data();
+        watch_disasters();
+#endif
         V_view_tick = frame;
         engine_a = frame;
         sim_periodic();
