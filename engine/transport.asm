@@ -146,8 +146,14 @@ move_aircrash_sprite:                                    ; $787E / 30846 - If ai
 ; Get map address for bc coords and ignite cell if flammable
 .set_cell_on_fire
 .L78b4  push    bc
+        IF      MAP_W == 96
         call    levelmap_xypos
+        ELSE
+        call    levelmap_xypos_with_check       ; (the 2x2 can reach row MAP_H, which is the stack)
+        jr      nc,L78b4_out
+        ENDIF
         call    ignite_cell_if_flammable
+.L78b4_out
         pop     bc
         ret     
 
