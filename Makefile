@@ -185,7 +185,7 @@ $(PC88): $(DEPS) build/common/tiles_640x200_3bpp.bin
 # The Sharp X1 (z88dk +x1, startup 1: all RAM, the program at $0000 on a bootable 2D disk).  Its 40 column mode is a 320x200 screen of three
 # planes behind I/O ports: a cell is a byte wide, so the PC-8801's baked pictures serve undoubled.  The uninitialised data follows the
 # image and the stack is at the top of memory.
-X1_PLATFORM = target/x1/plat_x1.asm target/common/plat_charts.c target/common/minimap_key_3bpp.c target/common/plat_icons.c
+X1_PLATFORM = target/x1/plat_x1.asm target/x1/plat_x1_files.asm target/common/plat_charts.c target/common/minimap_key_3bpp.c target/common/plat_icons.c
 
 $(X1): $(DEPS) build/common/tiles_640x200_3bpp.bin
 	@mkdir -p $(@D)
