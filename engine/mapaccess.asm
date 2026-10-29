@@ -421,7 +421,14 @@ find_special_zone_top:                                    ; $769D / 30365 - Walk
 scan_zone_handler_config:                                    ; $76B3 / 30387 - Linear scan through D_zone_handler_config until tile-type match or $FF sentinel
 .L76b3  ld      a,(hl)
         cp      255
+        IFDEF   ZONE_SAFE
+        jr      nz,L76b3_next
+        pop     bc                      ; (not in the table: the register pushed above goes back, the caller sees z)
+        ret
+.L76b3_next
+        ELSE
         ret     z
+        ENDIF
         cp      e
         jr      z,L76bd                 ; (3)
         add     hl,bc

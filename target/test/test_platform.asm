@@ -29,6 +29,12 @@ test_start:
         IFDEF   MAPSIZE_TEST
         jp      mapsize_test            ; (test/mapsize: the map arithmetic, not a simulation)
         ENDIF
+        IFDEF   LEVELS_TEST
+        jp      levels_test             ; (test/fine_zones/levels.py: every level a zone handler can write)
+        ENDIF
+        IFDEF   BULLDOZE_TEST
+        jp      bulldoze_test           ; (test/mapsize/bulldoze.py: the bulldozer's rubble sequence at the map's edges)
+        ENDIF
         ld      sp,$fff0
         di
         call    sim_init
@@ -194,4 +200,10 @@ text_generating_landscape:      defb    0
 
         IFDEF   MAPSIZE_TEST
         INCLUDE "../../test/mapsize/driver.asm"
+        ENDIF
+        IFDEF   BULLDOZE_TEST
+        INCLUDE "../../test/mapsize/bulldoze.asm"
+        ENDIF
+        IFDEF   LEVELS_TEST
+        INCLUDE "../../test/fine_zones/levels.asm"
         ENDIF

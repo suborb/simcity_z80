@@ -2874,6 +2874,10 @@ zone_ring_grow:                                    ; $8A53 / 35411
 zone_ring_grow_on_map:
         ENDIF
         ld      a,(hl)
+        IFDEF   ZONE_SAFE
+        bit     7,a                     ; (a cell of another zone is not a ring: c, nothing changed)
+        ret     nz
+        ENDIF
         call    tile_to_flags
         bit     4,a
         ret     z
@@ -2930,6 +2934,10 @@ zone_ring_shrink:                                    ; $8A83 / 35459
 zone_ring_shrink_on_map:
         ENDIF
         ld      a,(hl)
+        IFDEF   ZONE_SAFE
+        bit     7,a                     ; (a cell of another zone is not a ring: c, nothing changed)
+        ret     nz
+        ENDIF
         call    tile_to_flags
         bit     4,a
         ret     z

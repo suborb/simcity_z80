@@ -102,6 +102,7 @@ D29565:
 ; Degrade any bulldozed tiles through the sequence
 bulldoze_degrade_tile:
 .L7383  call    get_cursor_charxy
+        IF      MAP_W == 96
         ld      a,b
         sub     6
         ld      b,a
@@ -110,6 +111,37 @@ bulldoze_degrade_tile:
         push    hl
         pop     ix
         ld      de,12*MAP_W             ;12 rows
+        ELSE
+        ; (the 12 rows are the ones from 6 above the cursor, kept inside the map: row 0 up to row MAP_H - 1, and not
+        ; the 250 rows of a negative row nor the stack after the map)
+        ld      a,b
+        sub     6
+        jr      nc,L7383_top
+        xor     a
+.L7383_top
+        ld      b,a                     ;first row
+        ld      c,0
+        ld      a,MAP_H
+        sub     b                       ;rows left in the map
+        ret     z
+        cp      13
+        jr      c,L7383_rows
+        ld      a,12
+.L7383_rows
+        push    af
+        call    levelmap_xypos
+        push    hl
+        pop     ix
+        pop     af
+        ld      de,0
+        ld      bc,MAP_W
+.L7383_size
+        ex      de,hl
+        add     hl,bc
+        ex      de,hl                   ;de = rows * MAP_W
+        dec     a
+        jr      nz,L7383_size
+        ENDIF
 .L7395  ld      a,(ix+0)
         ld      hl,D29565
         ld      bc,3

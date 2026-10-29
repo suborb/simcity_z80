@@ -12,6 +12,18 @@
         ENDIF
         defc    MAP_CELLS = MAP_W * MAP_H           ; the levelmap's bytes
 
+; Three places in the engine are wrong when the cells next to a zone are another zone's (the Spectrum game has them too, and its 96x96 build keeps them, to the
+; byte): the ring routines step a zone's own bytes (flags $99 say a zone is a ring tile, so a group byte $D1 becomes $D0 or $D2), and the lookup of a zone's type
+; leaves a register on the stack when the group is not in D_zone_handler_config.  The bigger maps, and the builds with a picture for every level (whose
+; scenarios and neighbouring zones are denser, and whose table has more groups to be wrong), have them right.
+        IFDEF   FINE_ZONE_LEVELS
+        defc    ZONE_SAFE = 1
+        ELSE
+        IF      MAP_W != 96
+        defc    ZONE_SAFE = 1
+        ENDIF
+        ENDIF
+
 ; The minimaps (buffers.asm): fire and police coverage, a cell to 4x4 tiles; pollution and traffic, 2x2; the power map, a bit to a tile.
         defc    MM25_W = MAP_W / 4
         defc    MM25_H = MAP_H / 4

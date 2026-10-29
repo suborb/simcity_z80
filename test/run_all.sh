@@ -19,6 +19,7 @@ python3 tools/find_dead.py --smc
 echo
 echo "== FINE_ZONE_LEVELS: the engine with a picture for every growth level (the CPC game's)"
 python3 test/fine_zones/run.py
+python3 test/fine_zones/levels.py
 echo
 echo "== ZX Spectrum tile drawing: every picture through the real console code"
 python3 test/tiles/run.py
@@ -76,6 +77,11 @@ python3 test/z88/boot.py || status=1
 echo "== the map's size: the engine's address arithmetic and a town on a 96x96 and a 120x100 map, under z88dk-ticks"
 python3 test/mapsize/check.py || status=1
 python3 test/mapsize/smoke.py || status=1
+python3 test/mapsize/bulldoze.py || status=1
+if [ -d build/zxn/scenarios ]; then
+echo "== the Next's converted scenario cities in the engine: Hamburg's neighbouring zones, with power lines placed (make zxn first)"
+python3 test/zxn/scenario_sim.py --scenario 4 --ticks 8 --lines 10 || status=1
+fi
 echo "== portable power distribution: connectivity and plant capacity on both map sizes"
 python3 test/power_scan/run.py || status=1
 echo "== SAM Coupe: the animations' routine (mp_anim) against its tables, under z88dk-ticks"
