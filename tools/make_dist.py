@@ -24,6 +24,7 @@ MACHINES = {
     'z88': ('Cambridge Z88', ['z88rom/simcity.epr', 'z88rom/simcity.app', 'z88rom/simcity.ap0', 'z88rom/simcity.ap1', 'z88rom/simcity.a5p']),
     'multi8': ('Mitsubishi Multi 8', ['multi8/simcity.cas']),
     'pc88': ('NEC PC-8801', ['pc88/simcity.d88']),
+    'x1': ('Sharp X1', ['x1/simcity.d88']),
     'sam': ('SAM Coupe', ['sam/simcity.mgt']),
     'zxn': ('ZX Spectrum Next', ['zxn/simcity.nex']),
 }
