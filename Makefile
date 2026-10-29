@@ -55,6 +55,7 @@ Z88ROM = build/z88rom/simcity.epr
 ZX     = build/zx/simcity.tap
 MULTI8 = build/multi8/simcity.cas
 PC88   = build/pc88/simcity.d88
+X1     = build/x1/simcity.d88
 SAM    = build/sam/simcity.mgt
 ZXN   = build/zxn/simcity.nex
 TEST   = build/test/simcity.bin
@@ -68,7 +69,7 @@ TESTK  = build/testnative/simcity.bin
 TESTA  = build/testart/simcity.bin
 TESTSC = build/testscroll/simcity.bin
 
-.PHONY: all dist aqplus z88rom zx multi8 pc88 sam zxn amiga-scenarios test testpanel testmodal testnarrow testsprites testoverlay testhires testnative testart testscroll check golden uitest tiletest z88test deadcode clean
+.PHONY: all dist aqplus z88rom zx multi8 pc88 x1 sam zxn amiga-scenarios test testpanel testmodal testnarrow testsprites testoverlay testhires testnative testart testscroll check golden uitest tiletest z88test deadcode clean
 
 all: aqplus z88rom zx multi8 pc88 sam zxn
 
@@ -81,6 +82,7 @@ z88rom: $(Z88ROM)
 zx:     $(ZX)
 multi8: $(MULTI8)
 pc88:   $(PC88)
+x1:     $(X1)
 sam:    $(SAM)
 zxn:   $(ZXN)
 test:   $(TEST)
@@ -179,6 +181,17 @@ $(PC88): $(DEPS) build/common/tiles_640x200_3bpp.bin
 	@# the placer's variables must be in the low RAM: the screen is paged over $$C000-$$FFFF while it draws
 	@v=`sed -n 's/^mm_src *= \$$\([0-9A-Fa-f]*\).*/\1/p' $(@D)/simcity.map`; \
 	    [ -n "$$v" ] && [ $$(( 0x$$v )) -lt 49152 ] || { echo "the placer's variables are not below $$C000 (mm_src at $$v)"; rm -f $@; exit 1; }
+
+# The Sharp X1 (z88dk +x1, startup 1: all RAM, the program at $0000 on a bootable 2D disk).  Its 40 column mode is a 320x200 screen of three
+# planes behind I/O ports: a cell is a byte wide, so the PC-8801's baked pictures serve undoubled.  The uninitialised data follows the
+# image and the stack is at the top of memory.
+X1_PLATFORM = target/x1/plat_x1.asm target/common/plat_charts.c target/common/minimap_key_3bpp.c target/common/plat_icons.c
+
+$(X1): $(DEPS) build/common/tiles_640x200_3bpp.bin
+	@mkdir -p $(@D)
+	$(ZCC) +x1 -create-app $(COMMON) -pragma-include:target/x1/zpragma.inc \
+	    -Itarget/x1 -DTARGET_X1 -Ca-DTARGET_X1 -Ca-DHAVE_MINIMAP_SQUARE -Ca-DHAVE_SOUND -Ca-DAY_PORT16 -Ca-DAY_ADDR_PORT=0x1C00 -Ca-DAY_DATA_PORT=0x1B00 $(GAME) $(ENTROPY) $(MENU) target/x1/plat_sound.asm target/common/ay_hooks.asm target/common/ay_sfx.asm $(FIELDS) $(MMNATIVE) $(LINEEDIT) $(X1_PLATFORM) -o $(@D)/simcity.bin
+	@size=`sed -n 's/^__tail *= \$$\([0-9A-Fa-f]*\).*/\1/p' $(@D)/simcity.map`; echo "x1: image and uninitialised data end at $$size (the stack is the top of memory)"
 
 # The MGT SAM Coupe in its all RAM mode, screen mode 4 (256x192, 16 colours): the program, its data and its stack in the low 32 KB, the
 # uninitialised data in the next 32 KB (which the startup code pages in over $8000-$FFFF), and the baked pictures in the 32 KB after that,
