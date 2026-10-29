@@ -767,7 +767,11 @@ calc_industrial_growth_index:                                    ; $7F5F / 32607
 
 
 ; Holds result f searching the map - address within map?
+        IF      MAP_W == 96
         IN_BSS
+        ELSE
+        IN_ENGINE_BSS                   ; (only the engine reads it: in the bank, it leaves the program's RAM for the second power map)
+        ENDIF
 V_powerstation_list:    defs        POWER_STATION_LIST_BYTES ; map addresses of power stations, then a zero terminator
         IN_SIM_CODE
 
@@ -830,6 +834,12 @@ generate_power_map:
         ld      (V_brownout_detected),a
         IF      POWER_CITYWIDE
         call    power_bfs_start              ;One scan from all stations; capacity is shared citywide
+        IFDEF   POWER_SHOWN
+        ld      hl,minimaps + MMO_POWER                 ;whole: the UI's copy
+        ld      de,minimaps + MMO_POWER_SHOWN
+        ld      bc,MMO_POWER_SIZE
+        ldir
+        ENDIF
         ret
         ELSE
         ld      ix,V_powerstation_list

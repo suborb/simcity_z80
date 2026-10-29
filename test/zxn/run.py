@@ -35,12 +35,12 @@ def check(name, ok, detail=''):
     print(('PASS  ' if ok else 'FAIL  ') + name + ('' if ok else '  ' + detail))
 
 
-def run(keys, frame, sd=None, wav=None):
+def run(keys, frame, sd=None, wav=None, nex=None):
     """Run the game, press keys, and return the screenshot (a 256x192 image) at the frame."""
     shot = os.path.join(TMP, 'shot.png')
     if os.path.exists(shot):
         os.remove(shot)
-    cmd = [JNEXT, '--headless', '--load', NEX, '--delayed-screenshot', shot, '--delayed-screenshot-frames', str(frame),
+    cmd = [JNEXT, '--headless', '--load', nex or NEX, '--delayed-screenshot', shot, '--delayed-screenshot-frames', str(frame),
            '--delayed-automatic-exit-frames', str(frame + 10)]
     if sd:
         cmd += ['--sd-card', sd]
@@ -89,6 +89,14 @@ def main():
         print('FAIL  the test build: ' + made.stdout[-400:] + made.stderr[-400:])
         return 1
 
+    # the scenario build whose time is up at once: the win or lose message must come up (and the game goes on after it)
+    end_nex = os.path.join(ROOT, 'build', 'zxntest_end', 'simcity.nex')
+    made = subprocess.run(['make', '-s', 'ZXN=build/zxntest_end/simcity.nex', 'ZXN_ENTROPY=target/zxn/entropy_test.asm',
+                           'ZXN_FLAGS=-Ca-DZXN_TEST_ENTROPY=4660 -DSCENARIO_YEARS_TEST', 'build/zxntest_end/simcity.nex'], cwd=ROOT, capture_output=True, text=True)
+    if made.returncode != 0 or not os.path.exists(end_nex):
+        print('FAIL  the scenario end test build: ' + made.stdout[-400:] + made.stderr[-400:])
+        return 1
+
     # Rio's extracted scenario text goes on past its description into the win and lose messages (774 bytes); the NEX record has the description, wrapped to 16 columns,
     # and must retain all of it rather than silently clipping the ending.
     scenario_dir = os.path.join(ROOT, 'build', 'zxn', 'scenarios')
@@ -100,6 +108,9 @@ def main():
     rio_meta = 5 * record_size + meta_at
     rio_text_len = records[rio_meta + 4] | (records[rio_meta + 5] << 8)
     rio_text = bytes(records[rio_meta + 64:rio_meta + 64 + rio_text_len])
+    # the time allowed and the goal of each scenario (metadata bytes 7 and 31), in the picker's order
+    limits = [(records[i * record_size + meta_at + 7], records[i * record_size + meta_at + 31]) for i in range(8)]
+    check('the scenarios have their years and goals', limits == [(10, 2), (5, 1), (10, 3), (30, 4), (5, 1), (10, 1), (5, 1), (5, 1)], str(limits))
     rio_words = json.load(open(os.path.join(ROOT, 'assets', 'amiga_scenarios', 'Rio_De_Janerio.json')))['description'].split("You're A Winner!")[0].split()
     check('the NEX scenario record keeps Rio’s complete extracted text, wrapped to 16 columns',
           rio_text_len % 16 == 0 and b''.join(rio_text.split()) == ''.join(rio_words).encode('ascii', 'replace'), str(rio_text_len))
@@ -234,6 +245,12 @@ def main():
     loaded_scenario = run([(69, '4'), (110, 'right'), (150, 'enter')], 900)
     check('a selected scenario launches into its city map', distinct(loaded_scenario, (0, 56, 256, 192)) >= 4,
           str(distinct(loaded_scenario, (0, 56, 256, 192))))
+    # (the first tick of a 120x100 city takes about 2000 frames)
+    ended = run([(69, '4'), (110, 'right'), (150, 'enter')], 3000, nex=end_nex)
+    check('a scenario whose time is up shows its message', lit(ended, (0, 0, 256, 192)) > 300 and distinct(ended, (0, 56, 256, 192)) <= 3,
+          f'{lit(ended, (0, 0, 256, 192))} {distinct(ended, (0, 56, 256, 192))}')
+    carried_on = run([(69, '4'), (110, 'right'), (150, 'enter'), (3000, 'enter')], 3300, nex=end_nex)
+    check('the city is still there after the message', distinct(carried_on, (0, 56, 256, 192)) >= 4, str(distinct(carried_on, (0, 56, 256, 192))))
     sf_keys = [(69, '4')] + [(90 + 20 * i, 'right') for i in range(6)] + [(230, 'enter'), (700, 'm')]
     sf_minimap = run(sf_keys, 1000)
     check('San Francisco loads as a converted city across the minimap', distinct(sf_minimap, (0, 0, 192, 192)) > 4 and

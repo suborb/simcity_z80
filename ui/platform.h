@@ -150,10 +150,14 @@ extern void     plat_flush(void);               /* end of frame: show what was d
      plat_scenario_choose()                  shows them (a picture of each, its title and text) and returns the number chosen, or 0xff for none
      plat_scenario_load(n)                   puts scenario n's map in levelmap and returns its year
      plat_scenario_restore_state(n)          after the engine has been reset for it (sim_loaded): puts back what it keeps in the minimaps (power, traffic) and returns the disaster to start (V_disaster_option: 0 none)
+     plat_scenario_rules()                   after plat_scenario_load: the years allowed (high byte) and the goal (low byte: 1 city score above 500, 2 traffic below 80, 3 crime below 60, 4 city class 4)
+     plat_scenario_message(won)              a modal screen with the win or the lose message; returns 1 for CMD_QUIT
      plat_scenario_preview_row(y, x, pixels) draws a row of the picture of a scenario: one colour a tile */
 extern uint8_t  plat_scenario_choose(void);
 extern uint16_t plat_scenario_load(uint8_t index);
 extern uint8_t  plat_scenario_restore_state(uint8_t index);
+extern uint16_t plat_scenario_rules(void);
+extern uint8_t  plat_scenario_message(uint8_t won);
 extern void     plat_scenario_preview_row(uint8_t y, uint8_t x, const uint8_t *pixels);
 #endif
 

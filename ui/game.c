@@ -49,6 +49,8 @@
 
 #ifdef HAVE_SCENARIOS
 static uint8_t selected_scenario = 0xff;
+static uint16_t scenario_end;           /* the year the time of the scenario in play is up (0: none, or its end has been shown) */
+static uint8_t scenario_goal;
 #endif
 
 /* Frames between simulation ticks, indexed by V_simulation_speed. */
@@ -1480,8 +1482,8 @@ static uint8_t disaster_taken, crash_was, melt_was;
 
 static void jump_xy(const uint8_t *xy)
 {
-    cur_x = xy[0];
-    cur_y = xy[1];
+    cur_x = xy[0] < MAP_W ? xy[0] : MAP_W - 1;      /* (the plane starts at the right edge, one column past the map) */
+    cur_y = xy[1] < MAP_H ? xy[1] : MAP_H - 1;
     jump_to();
 }
 
@@ -1672,6 +1674,31 @@ static void game_evaluation(void)
 #define game_evaluation()
 #endif
 
+#ifdef HAVE_SCENARIOS
+/* The end of a scenario's time: the goal is checked once, and the win or the lose message is shown.  The city is never taken away, win or lose. */
+static void game_scenario_end(void)
+{
+    struct evaluation e;
+    uint8_t won;
+
+    scenario_end = 0;
+    evaluate(&e);
+    switch (scenario_goal) {
+    case 2:  won = V_TrafficAverage < 80; break;
+    case 3:  won = V_concern_crime < 60; break;
+    case 4:  won = e.city_class >= 4; break;
+    default: won = e.score > 500; break;
+    }
+#ifdef HAVE_MOUSE_POINTER
+    plat_mouse_pointer_erase();
+#endif
+    if (plat_scenario_message(won))
+        quit = 1;
+    else
+        redraw |= REDRAW_TEXT;
+}
+#endif
+
 #ifdef HAVE_FILES
 #ifdef HAVE_TEXT_LAYER
 #define file_done() text_screen_end()       /* the dialogue was a box on the text layer */
@@ -1700,6 +1727,9 @@ static void game_load(void)
     } else if (r == CITY_BROKEN) {
         restart = quit = 1;                 /* the map was half read: a new city */
     } else if (r == CITY_LOADED) {
+#ifdef HAVE_SCENARIOS
+        scenario_end = 0;                   /* (a scenario's time is not saved) */
+#endif
 #ifdef HAVE_TEXT_LAYER
         plat_text_screen(0);
 #endif
@@ -2128,11 +2158,20 @@ static void play_city(void)
     SMC_tax_rate = 7;
     SMC_transport_percent = SMC_police_percent = SMC_fire_percent = 100;
 #ifdef HAVE_SCENARIOS
+    scenario_end = 0;
     if (selected_scenario != 0xff) {
         uint16_t year = plat_scenario_load(selected_scenario);
         sim_loaded();
         V_disaster_option = plat_scenario_restore_state(selected_scenario);     /* (the engine starts it a few frames on) */
         V_year = year;
+        {
+            uint16_t rules = plat_scenario_rules();
+#ifdef SCENARIO_YEARS_TEST
+            rules &= 0xff;                  /* (the test build: the time is up at once) */
+#endif
+            scenario_end = year + (rules >> 8);
+            scenario_goal = (uint8_t)rules;
+        }
         V_month = 0;
         V_money[0] = 0x20;
         V_money[1] = 0x4e;
@@ -2239,6 +2278,10 @@ static void play_city(void)
                     if (full) {
 #ifdef HAVE_EVALUATION
                         eval_unpowered = V_unPwrdZCnt;      /* the tick's own count, whole at last */
+#endif
+#ifdef HAVE_SCENARIOS
+                        if (scenario_end && V_year >= scenario_end)
+                            game_scenario_end();
 #endif
                         ticking = 0;
                         countdown = tick_frames[V_simulation_speed];

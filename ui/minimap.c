@@ -13,7 +13,7 @@
 #define MM_FIRE_OFFSET      MM_FIRE_AT
 #define MM_POLICE_OFFSET    MM_POLICE_AT
 #define MM_TRAFFIC_OFFSET   MM_TRAFFIC_AT
-#define MM_POWER_OFFSET     MM_POWER_AT
+#define MM_POWER_OFFSET     MM_POWER_SHOWN_AT
 
 extern const uint8_t D_tile_flags[];
 

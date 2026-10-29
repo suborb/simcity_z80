@@ -16,6 +16,8 @@ card (esxDOS files, in the current folder).
 The map is 120 x 100 squares, bigger than the Spectrum game's 96 x 96, and the
 title screen has the Amiga game's eight scenarios (4 on the title screen: choose
 one with the left and right cursor keys, up and down for its text, Enter to play).
+Each has a time limit (in its text) and a goal: when the time is up the game
+says whether you won or lost, and then carries on in the same city.
 The mini map shows 96 x 96 of the city and scrolls with the cursor keys.
 
 Keys
@@ -34,3 +36,17 @@ Keys
   X               the game menu: new city, options, disasters, sound
   Break, Edit     (Caps Shift with Space, or with 1) leave a screen
   Delete          (Caps Shift with 0) rubs out a letter of a file name
+
+The pointer and the mouse
+-------------------------
+There is one arrow on the screen, and it is the cursor.  The keys move it
+(the keys above: shifted, it moves faster) and a Kempston mouse moves it too, so
+either can be used at any time.
+  Space, Enter    the left button: build with the tool, choose in a menu
+                  or on the tool icons, jump on the mini map
+  right button    the same as Esc/X: the game menu, and out of a screen
+  at the edge     the map scrolls when the arrow is at the edge of it
+In the menus, the budget, the evaluation and the file and scenario screens
+the mouse works as the cursor keys (a few pixels of movement is a key).
+A Kempston mouse cannot be detected, so it is read only when GAME OPTIONS
+has MOUSE: ON (the default is off; the arrow and the keys work either way).

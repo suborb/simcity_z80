@@ -12,6 +12,7 @@ import argparse
 import glob
 import json
 import os
+import re
 import struct
 import sys
 import textwrap
@@ -147,6 +148,19 @@ def disaster_of(event):
     return next((n for word, n in DISASTERS if word in event.lower()), 0)
 
 
+# The goal at the end of the time (the game's own): 1 city score above 500, 2 traffic average below 80, 3 crime below 60, 4 a Metropolis (city class 4)
+GOALS = (('traffic', 2), ('crime', 3), ('boredom', 4))
+
+
+def goal_of(event):
+    return next((n for word, n in GOALS if word in event.lower()), 1)
+
+
+def years_of(description):
+    """The time allowed: "You have 10 years" (Dullsville: "... a Metropolis within 30 years")."""
+    return int(re.search(r'(\d+) years', description).group(1))
+
+
 def make_meta(info):
     title = ascii_text(info['title'])[:23]
     event = ascii_text(info['event'])[:31]
@@ -158,6 +172,8 @@ def make_meta(info):
     out = bytearray(META_BYTES)
     struct.pack_into('<HBBH', out, 0, info['year'], len(title), len(event), len(desc))
     out[6] = disaster_of(info['event'])
+    out[7] = years_of(text)
+    out[31] = goal_of(info['event'])                # (the title takes 8 to 30)
     out[8:8 + len(title)] = title
     out[32:32 + len(event)] = event
     out[64:64 + len(desc)] = desc

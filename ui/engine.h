@@ -25,7 +25,13 @@
 #define MM_POLLUTION_AT (2 * MM25_SIZE)
 #define MM_TRAFFIC_AT   (2 * MM25_SIZE + MM50_SIZE)
 #define MM_POWER_AT     (2 * MM25_SIZE + 2 * MM50_SIZE)
+#ifdef POWER_SHOWN                      /* a second power map, which the mini map draws from (engine/mapsize.inc) */
+#define MM_POWER_SHOWN_AT (MM_POWER_AT + MM_POWER_ROW * MAP_H)
+#define MM_BYTES        (MM_POWER_SHOWN_AT + MM_POWER_ROW * MAP_H)
+#else
+#define MM_POWER_SHOWN_AT MM_POWER_AT
 #define MM_BYTES        (MM_POWER_AT + MM_POWER_ROW * MAP_H)
+#endif
 
 /* ---- calls ---- */
 extern void sim_new_city(void);     /* new random city from V_InitialSeed */

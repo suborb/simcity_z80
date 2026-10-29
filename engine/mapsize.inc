@@ -27,7 +27,15 @@
         defc    MMO_POLLUTION = 2 * MM25_SIZE
         defc    MMO_TRAFFIC = 2 * MM25_SIZE + MM50_SIZE
         defc    MMO_POWER = 2 * MM25_SIZE + 2 * MM50_SIZE
+; POWER_SHOWN: a second power map, the one the UI draws from.  The engine clears the first and makes it again every tick, over several frames, so a mini map
+; of it would show a half made one; the engine copies it to the second when it is whole (generate_power_map).
+        IFDEF   POWER_SHOWN
+        defc    MMO_POWER_SHOWN = MMO_POWER + MMO_POWER_SIZE
+        defc    MM_BYTES = MMO_POWER_SHOWN + MMO_POWER_SIZE
+        ELSE
+        defc    MMO_POWER_SHOWN = MMO_POWER
         defc    MM_BYTES = MMO_POWER + MMO_POWER_SIZE      ; the minimaps' bytes (6,912 at 96x96)
+        ENDIF
 
 ; The original map's power search was sized for 16 stations and 128 queued coordinate pairs. Portable builds share the power map as their
 ; visited bitmap and can refill a bounded queue from powered conductors. The Next's larger map can contain one station per 4x4 block, so reserve

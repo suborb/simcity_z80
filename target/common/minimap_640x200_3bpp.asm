@@ -35,7 +35,7 @@
         defc    OFF_POLICE = MMO_POLICE
         defc    OFF_POLLUTION = MMO_POLLUTION
         defc    OFF_TRAFFIC = MMO_TRAFFIC
-        defc    OFF_POWER = MMO_POWER
+        defc    OFF_POWER = MMO_POWER_SHOWN
 
         IN_BSS
         IFDEF   HAVE_MINIMAP_SQUARE
