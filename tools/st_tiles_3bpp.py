@@ -40,8 +40,8 @@ two), which is the one place to change the look.  The art belongs to the game (s
                 the palette when omitted, and may be stated explicitly for a 4-bit palette whose entries happen all to be 0..7.
   --zxn DIR    the pictures for the ZX Spectrum Next's Layer 2 (256x192, a byte a pixel, the palette entry of each): head.bin (the 208
                 palette entries as the Next's two bytes each: the ST's 16 for the interface, the art's 64, the art's inverted, the Amiga's 64 for the
-                tool icons; the 8 attribute colours' entries; the 64 greys of a dimmed icon's colours) and icons.bin (the 14 Amiga tool icons, --amiga-icons, 22x20 a byte a pixel),
-                atlas0.bin and atlas1.bin (the pictures, 64 bytes each: 256 of them in the first 16 KB bank, the rest in the second)
+                tool icons; the 8 attribute colours' entries; the 64 greys of a dimmed icon's colours; the animations), atlas0.bin, atlas1.bin and atlas2.bin (the pictures,
+                64 bytes each: 256 of them in each 16 KB bank; the last bank's second 8 KB page has the 14 Amiga tool icons, --amiga-icons, 22x20 a byte a pixel)
   --sam FILE    the pictures for the SAM Coupe's mode 4 (256x192, 16 colours, 4 bits a pixel, the left pixel in the high nibble):
                 the palette (16 bytes, the nearest of the SAM's 128 colours to each of the game's), the palette entry nearest each of the
                 eight attribute colours (8 bytes: bit 0 blue, 1 red, 2 green), the icons (--icons) if there are any, and then 32 bytes a picture
@@ -138,7 +138,7 @@ def st_piece(p):
 ANIMATED = {2: [2, 4, 2, 4],                    # open water
             711: (832, 8),                      # the airport's radar
             40: (840, 4),                       # the park's fountain
-            621: (852, 4), 649: (892, 4), 650: (896, 4), 676: (900, 4), 677: (904, 4), 686: (908, 4), 689: (912, 4),   # the smoke of the industrial zones' chimneys
+            621: (852, 8), 641: (884, 4), 649: (892, 4), 650: (896, 4), 676: (900, 4), 677: (904, 4), 686: (908, 4), 689: (912, 4),   # the smoke of the industrial zones' chimneys (the Amiga animates 644 too, with four copies of itself)
             747: (916, 4), 748: (920, 4), 751: (924, 4), 752: (928, 4),         # the coal power plant's
             820: (952, 4),                      # the nuclear plant's swirl
             56: (56, 4)}                        # fire (engine tile 69)
@@ -471,11 +471,12 @@ def main():
         pics = b''.join(zxn_frame(n) for n in framed)
         levels = palette_levels(ui, 3) + art + [(7 - r, 7 - g, 7 - b) for r, g, b in art] + icon_levels
         open(os.path.join(a.zxn, 'head.bin'), 'wb').write(zxn_palette(levels) + attr_colours(ui, 3) + dim + amap + b''.join(struct.pack('<HB', first, n - 1) for first, n in entries))
-        open(os.path.join(a.zxn, 'icons.bin'), 'wb').write(icons)
-        open(os.path.join(a.zxn, 'atlas0.bin'), 'wb').write(pics[:16384])
-        if len(pics) > 32768:
-            sys.exit(f'{len(pics)} bytes of pictures: the two banks of the Next atlas hold 512')
-        open(os.path.join(a.zxn, 'atlas1.bin'), 'wb').write(pics[16384:].ljust(16384, b'\0'))
+        # the atlas is in banks 20, 21 and 22 (8 KB pages 40 to 44: 128 pictures a page); the icons are in the last bank's second page (45)
+        if len(pics) > 5 * 8192:
+            sys.exit(f'{len(pics)} bytes of pictures: the Next atlas holds 640 (pages 40 to 44)')
+        open(os.path.join(a.zxn, 'atlas0.bin'), 'wb').write(pics[:16384].ljust(16384, b'\0'))
+        open(os.path.join(a.zxn, 'atlas1.bin'), 'wb').write(pics[16384:32768].ljust(16384, b'\0'))
+        open(os.path.join(a.zxn, 'atlas2.bin'), 'wb').write(pics[32768:].ljust(8192, b'\0') + icons.ljust(8192, b'\0'))
         print(f'{len(framed)} pictures of 64 bytes ({len(pics)} bytes: {len(extra)} are the frames of {len(entries)} animations), the palette, and the 14 icons -> {a.zxn}/')
     if a.sheet:
         sheet(a.sheet, table, palette, bits, pictures, a.original)

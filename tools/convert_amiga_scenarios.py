@@ -48,12 +48,21 @@ ZONE_CANDIDATES.append((795, 36, 4))
 # Micropolis saves every R/C/I growth stage, while this engine has four art
 # stages per kind.  Recognize all source stages and render the nearest stage
 # the engine supports instead of turning those buildings into rubble.
-for first, count, source0, piece0, stages in (
-        (261, 16, 261, 136, (3, 7, 11, 15)),
-        (432, 20, 432, 172, (3, 7, 11, 17)),
-        (621, 8, 621, 208, (1, 3, 5, 7))):
+# With the engine's FINE_ZONE_LEVELS (--fine) the pictures are the CPC game's: eight residential, ten commercial and eight industrial stages, from the Amiga's sixteen,
+# twenty and eight (every second one of the first two, the odd levels, as tools/st_tiles_3bpp.py draws them) in the CPC's numbering of the pieces.
+FINE = '--fine' in sys.argv
+if FINE:
+    sys.argv.remove('--fine')
+    ZONE_KINDS = ((261, 16, 261, 136, tuple(range(1, 16, 2))),
+                  (432, 20, 432, 208, tuple(range(1, 20, 2))),
+                  (621, 8, 621, 298, tuple(range(8))))
+else:
+    ZONE_KINDS = ((261, 16, 261, 136, (3, 7, 11, 15)),
+                  (432, 20, 432, 172, (3, 7, 11, 17)),
+                  (621, 8, 621, 208, (1, 3, 5, 7)))
+for first, count, source0, piece0, stages in ZONE_KINDS:
     for level in range(count):
-        stage = min(range(4), key=lambda i: abs(level - stages[i]))
+        stage = min(range(len(stages)), key=lambda i: abs(level - stages[i]))
         ZONE_CANDIDATES.append((source0 + level * 9, piece0 + stage * 9, 3))
 
 # Micropolis shoreline and road/path variants without direct TILE entries.

@@ -2,7 +2,7 @@
 ;
 ; Layer 2 is in 8 KB pages from ZXN_SCREEN_PAGE, 32 lines of 256 bytes to a page, so the 8 lines of a character cell (and a line
 ; of any width up to 256) are in one page.  The page is mapped into the MMU's slot 7 ($E000-$FFFF, NextReg $57) for as long as a
-; routine draws, and the baked pictures (the atlas, in two 16 KB banks, 8 KB pages ZXN_ATLAS_PAGE up) into slot 6 ($C000, NextReg
+; routine draws, and the baked pictures (the atlas, in three 16 KB banks, 8 KB pages ZXN_ATLAS_PAGE up) into slot 6 ($C000, NextReg
 ; $56).  The game's own RAM is there normally: the program is at $0000 (slots 0 to 4: the low 16 KB in a bank
 ; appmake's loader maps), then the stack and the uninitialised data from $A400, so these two windows are over the big arrays (the
 ; maps), which nothing reads while a routine here draws; the routines put the pages back (PAGE_SLOT6, 7) before they return.  What they use (the
@@ -14,7 +14,7 @@
         SECTION code_user
 
         defc    ZXN_SCREEN_PAGE = 18   ; Layer 2's first 8 KB page (16 KB bank 9, where NextReg $12 puts it by default)
-        defc    ZXN_ATLAS_PAGE = 40    ; the pictures: the first 16 KB bank is bank 20, the second 21 (the Makefile's BANK_20 and BANK_21)
+        defc    ZXN_ATLAS_PAGE = 40    ; the pictures: the first 16 KB bank is bank 20, the second 21 and the third 22 (zxn_data.asm), 128 pictures to each of the 8 KB pages 40 to 44
         defc    REG_ATLAS = $56                 ; slot 6, the atlas window, at $C000
         defc    REG_SCREEN = $57                ; slot 7, the screen window, at $E000
         defc    PAGE_SLOT6 = 0                  ; what the loader maps in slots 6 and 7: 8 KB pages 0 and 1 (bank 0), the uninitialised data's

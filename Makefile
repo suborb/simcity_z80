@@ -213,7 +213,9 @@ $(SAM): $(DEPS) build/sam/tiles.bin build/sam/anim.inc
 
 # The ZX Spectrum Next: Layer 2 (256x192, a byte a pixel), the Atari ST's art in its 16 colours, as the SAM Coupe.  The program is linked at
 # $0000 (z88dk's zxn crt with CRT_ORG_CODE 0: target/zxn/zpragma.inc) and the stack and the uninitialised data are at
-# ZXN_BSS; appmake makes the NEX file, with the program in a bank of its own and a loader that maps it (z88dk's zx-util.c).
+# ZXN_BSS; appmake makes the NEX file, with the program in a bank of its own and a loader that maps it (z88dk's zx-util.c: this needs z88dk's commit
+# 81ee7e6dcc, "(zxn) Support .nex files starting at 0", which is also in the crt's CRT_ORG_CODE=0 mode).  The simulation, the pictures and the scenarios are
+# `SECTION BANK_n` data that appmake merges into the NEX.
 # The layout: the program (below $8000) is the code and the tables, in the lowest 16 KB (the crt, what the simulation calls: its hooks, the sound, the
 # cooperative switch, the map drawing's tables) and in $4000 to $7FFF, where the NEX loader puts bank 5 and the game runs from; the simulation's code is in a bank of
 # its own (BANK_6, linked at $4000, mapped over bank 5 while the simulation runs: engine/sections.asm); the data starts at $8000 (the image is padded to it:
@@ -232,6 +234,16 @@ ZXN_SCENARIO_C = target/zxn/scenarios.c
 else ifneq ($(ZXN_MAP),96x96)
 $(error ZXN_MAP must be 120x100 (the default) or 96x96)
 endif
+# The Next has a picture for every growth level of a zone (the engine's FINE_ZONE_LEVELS: the CPC game's 471 pictures, made from the Amiga's art; the scenarios' zones
+# are converted to them); ZXN_FINE=0 makes the Spectrum's 345
+ZXN_FINE ?= 1
+ifeq ($(ZXN_FINE),1)
+ZXN_FINE_FLAGS = -DFINE_ZONE_LEVELS -Ca-DFINE_ZONE_LEVELS
+ZXN_NUMBERING = cpc
+ZXN_SCENARIO_FINE = --fine
+else
+ZXN_NUMBERING = ours
+endif
 ZXN_FLAGS =                    # (-DZXN_NO_SCROLL: no scrolling by the DMA; -DZXN_PACE=2: 25 frames a second)
 ZXN_ENTROPY = $(ENTROPY)       # (target/zxn/entropy_test.asm: the build test/zxn/run.py runs, which makes the same city each time)
 ZXN_ASM = target/zxn/plat_zxn.asm target/zxn/plat_sound.asm target/zxn/zxn_boot.asm target/zxn/zxn_data.asm
@@ -242,7 +254,7 @@ ZXN_PLATFORM += $(ZXN_SCENARIO_C)
 
 # (the build's options are in a file that changes with them, so that the NEX is made again when they do)
 $(ZXN:.nex=.flags): FORCE
-	@mkdir -p $(@D); echo '$(ZXN_FLAGS) $(ZXN_MAPFLAGS) $(ZXN_ENTROPY)' | cmp -s - $@ || echo '$(ZXN_FLAGS) $(ZXN_MAPFLAGS) $(ZXN_ENTROPY)' > $@
+	@mkdir -p $(@D); echo '$(ZXN_FLAGS) $(ZXN_MAPFLAGS) $(ZXN_FINE_FLAGS) $(ZXN_ENTROPY)' | cmp -s - $@ || echo '$(ZXN_FLAGS) $(ZXN_MAPFLAGS) $(ZXN_FINE_FLAGS) $(ZXN_ENTROPY)' > $@
 FORCE:
 
 $(ZXN): $(DEPS) build/zxn/head.bin $(ZXN:.nex=.flags) target/zxn/zxn_pad.asm $(ZXN_SCENARIO_ASM)
@@ -251,7 +263,7 @@ $(ZXN): $(DEPS) build/zxn/head.bin $(ZXN:.nex=.flags) target/zxn/zxn_pad.asm $(Z
 	@pad=0; for pass in 1 2 3; do \
 	    $(ZCC) +zxn -clib=classic -lesxdos -subtype=nex -pragma-include:target/zxn/zpragma.inc -pragma-define:CRT_ORG_BSS=$(ZXN_BSS) -pragma-define:REGISTER_SP=$(ZXN_BSS) \
 	        -pragma-define:CRT_ORG_BANK_6=0x4000 -Ca-DENGINE_BANK -Ca-DRODATA_IN_RAM -Ca-DZXN_PAD=$$pad -Ca-Itarget/zxn \
-	        -Itarget/zxn -DTARGET_ZXN $(ZXN_FLAGS) $(ZXN_MAPFLAGS) -Ca-DTARGET_ZXN -Ca-DFMT_WIDTH=32 -Ca-DHAVE_MINIMAP_SQUARE -Ca-DHAVE_SOUND -Ca-DAY_ISR -Ca-DAY_PORT16 -Ca-DAY_SCALE -Ca-DAY_DOWN -Ca-DAY_ADDR_PORT=65533 -Ca-DAY_DATA_PORT=49149 $(COMMON) \
+	        -Itarget/zxn -DTARGET_ZXN $(ZXN_FLAGS) $(ZXN_MAPFLAGS) $(ZXN_FINE_FLAGS) -Ca-DTARGET_ZXN -Ca-DFMT_WIDTH=32 -Ca-DHAVE_MINIMAP_SQUARE -Ca-DHAVE_SOUND -Ca-DAY_ISR -Ca-DAY_PORT16 -Ca-DAY_SCALE -Ca-DAY_DOWN -Ca-DAY_ADDR_PORT=65533 -Ca-DAY_DATA_PORT=49149 $(COMMON) \
 	        $(ZXN_LOW) $(GAME) $(ZXN_ENTROPY) $(MENU) $(FIELDS) $(MMNATIVE) $(LINEEDIT) $(ZXN_ASM) target/zxn/zxn_pad.asm $(ZXN_PLATFORM) -create-app -o $(@D)/simcity.bin || exit 1; \
 	    head=$$(sed -n 's/^__DATA_head *= \$$\([0-9A-F]*\).*/\1/p' $(@D)/simcity.map); \
 	    need=$$(( $(ZXN_DATA) - 0x$$head )); \
@@ -267,15 +279,15 @@ $(ZXN): $(DEPS) build/zxn/head.bin $(ZXN:.nex=.flags) target/zxn/zxn_pad.asm $(Z
 # The tool icons: the 1 Meg Amiga's (assets/amiga_1meg_icons.bin, tools/extract_amiga_1meg_icons.py); ZXN_ICONS=assets/amiga_icons.bin makes them the 512K's.
 ZXN_TILES ?= assets/amiga_1meg_tiles.bin
 ZXN_ICONS ?= assets/amiga_1meg_icons.bin
-build/zxn/head.bin: $(ZXN_TILES) $(ZXN_ICONS) tools/st_tiles_3bpp.py
+build/zxn/head.bin: $(ZXN_TILES) $(ZXN_ICONS) tools/st_tiles_3bpp.py $(ZXN:.nex=.flags)
 	@mkdir -p $(@D)
-	python3 tools/st_tiles_3bpp.py $(ZXN_TILES) --amiga-icons $(ZXN_ICONS) --zxn $(@D)
+	python3 tools/st_tiles_3bpp.py $(ZXN_TILES) --amiga-icons $(ZXN_ICONS) --numbering $(ZXN_NUMBERING) --zxn $(@D)
 
 # The scenarios (the 120x100 build): the eight Amiga SimCity maps and texts in assets/amiga_scenarios, extracted once from the 1 Meg disk and kept with the other art assets,
 # converted to the Next's tiles and packed into NEX banks.  `make amiga-scenarios` extracts them again from the disk image (simclassics_scc_1meg.adf, which is not in the repository).
-build/zxn/scenarios/scenarios.asm: $(wildcard assets/amiga_scenarios/*) assets/amiga_1meg_tiles.bin tools/convert_amiga_scenarios.py tools/st_tiles_3bpp.py
+build/zxn/scenarios/scenarios.asm: $(wildcard assets/amiga_scenarios/*) assets/amiga_1meg_tiles.bin tools/convert_amiga_scenarios.py tools/st_tiles_3bpp.py $(ZXN:.nex=.flags)
 	@mkdir -p $(@D)
-	python3 tools/convert_amiga_scenarios.py assets/amiga_scenarios $(@D)
+	python3 tools/convert_amiga_scenarios.py $(ZXN_SCENARIO_FINE) assets/amiga_scenarios $(@D)
 
 amiga-scenarios: simclassics_scc_1meg.adf tools/extract_amiga_adf.py tools/extract_amiga_scenarios.py
 	python3 tools/extract_amiga_adf.py simclassics_scc_1meg.adf --outdir build/amiga_1meg_adf

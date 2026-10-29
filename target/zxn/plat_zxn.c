@@ -40,10 +40,14 @@ extern const uint8_t zxn_head[];               /* 208 palette entries (2 bytes e
 #define PALETTE_ENTRIES 208
 #define ATTRS       (zxn_head + 2 * PALETTE_ENTRIES)
 #define DIM         (ATTRS + 8)                 /* what each of the icons' 64 colours is, dimmed: an absolute palette entry */
+#ifdef FINE_ZONE_LEVELS
+#define PICTURES    471                         /* the engine's pictures: the CPC game's, a picture for each growth level of a zone (the animations' frames come after them) */
+#else
 #define PICTURES    345                         /* the engine's pictures (the animations' frames come after them) */
+#endif
 #define ANIM_MAP    (DIM + 64)                  /* a byte a picture: its animation (from 1), or 0 */
 #define ANIM_TAB    (ANIM_MAP + PICTURES)       /* an animation: the first frame's picture (a word) and the frames less one, 3 bytes (tools/st_tiles_3bpp.py ANIMATED) */
-#define ICON_PAGE   44                          /* the icons: 14 of 22x20 bytes, a palette index (0 to 63) a pixel, in the 8 KB page 44 (bank 22, zxn_data.asm) */
+#define ICON_PAGE   45                          /* the icons: 14 of 22x20 bytes, a palette index (0 to 63) a pixel, in the 8 KB page 45 (the second half of bank 22, zxn_data.asm) */
 #define ICON_W      22                          /* the tool icons: the Amiga's, 22x20 pixels of 6 bits */
 #define ICON_H      20
 #define ICON_BYTES  (ICON_W * ICON_H)
