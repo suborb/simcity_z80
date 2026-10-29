@@ -9,7 +9,7 @@
 #   make clean
 #
 
-VERSION ?= 1.1.0
+VERSION ?= 1.2.0
 
 # 80cc with a frame pointer makes the smallest code, which the Z88's 32 KB ROM and the Spectrum need.
 ZCC ?= zcc -compiler=80cc -fframe-pointer
