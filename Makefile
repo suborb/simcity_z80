@@ -56,6 +56,7 @@ ZX     = build/zx/simcity.tap
 MULTI8 = build/multi8/simcity.cas
 PC88   = build/pc88/simcity.d88
 X1     = build/x1/simcity.d88
+SPC1000 = build/spc1000/simcity.spc
 SAM    = build/sam/simcity.mgt
 ZXN   = build/zxn/simcity.nex
 TEST   = build/test/simcity.bin
@@ -69,7 +70,7 @@ TESTK  = build/testnative/simcity.bin
 TESTA  = build/testart/simcity.bin
 TESTSC = build/testscroll/simcity.bin
 
-.PHONY: all dist aqplus z88rom zx multi8 pc88 x1 sam zxn amiga-scenarios test testpanel testmodal testnarrow testsprites testoverlay testhires testnative testart testscroll check golden uitest tiletest z88test deadcode clean
+.PHONY: all dist aqplus z88rom zx multi8 pc88 x1 spc1000 sam zxn amiga-scenarios test testpanel testmodal testnarrow testsprites testoverlay testhires testnative testart testscroll check golden uitest tiletest z88test deadcode clean
 
 all: aqplus z88rom zx multi8 pc88 x1 sam zxn
 
@@ -83,6 +84,7 @@ zx:     $(ZX)
 multi8: $(MULTI8)
 pc88:   $(PC88)
 x1:     $(X1)
+spc1000: $(SPC1000)
 sam:    $(SAM)
 zxn:   $(ZXN)
 test:   $(TEST)
@@ -192,6 +194,24 @@ $(X1): $(DEPS) build/common/tiles_640x200_3bpp.bin
 	$(ZCC) +x1 -create-app $(COMMON) -pragma-include:target/x1/zpragma.inc \
 	    -Itarget/x1 -DTARGET_X1 -Ca-DTARGET_X1 -Ca-DHAVE_MINIMAP_SQUARE -Ca-DHAVE_SOUND -Ca-DAY_PORT16 -Ca-DAY_ADDR_PORT=0x1C00 -Ca-DAY_DATA_PORT=0x1B00 $(GAME) $(ENTROPY) $(MENU) target/x1/plat_sound.asm target/common/ay_hooks.asm target/common/ay_sfx.asm $(FIELDS) $(MMNATIVE) $(LINEEDIT) $(X1_PLATFORM) -o $(@D)/simcity.bin
 	@size=`sed -n 's/^__tail *= \$$\([0-9A-Fa-f]*\).*/\1/p' $(@D)/simcity.map`; echo "x1: image and uninitialised data end at $$size (the stack is the top of memory)"
+
+# The Samsung SPC-1000 (z88dk +spc1000 -subtype=allram: BASIC loads a ZX0 packed program with a bootstrap that unpacks it at $0000 and takes the machine).
+# The screen is the MC6847's 256x192 mode of one bit a pixel behind I/O ports, so the pictures are the engine's own 1 bit art and the icons the
+# Spectrum's (the first 448 bytes of assets/udgs.bin), with no colour.  The uninitialised data follows the image and the stack is at the top of memory.
+SPC1000_STACK_ROOM = 0x0800     # (the stack gets what is above the uninitialised data: at least this much)
+SPC1000_PLATFORM = target/spc1000/plat_spc1000.asm target/spc1000/plat_spc1000.c target/spc1000/plat_sound.asm
+
+build/spc1000/icons.bin: assets/udgs.bin
+	@mkdir -p $(@D)
+	head -c 448 $< > $@
+
+$(SPC1000): $(DEPS) build/spc1000/icons.bin
+	@mkdir -p $(@D)
+	$(ZCC) +spc1000 -subtype=allram -create-app $(COMMON) -pragma-include:target/spc1000/zpragma.inc \
+	    -Itarget/spc1000 -DTARGET_SPC1000 -Ca-DTARGET_SPC1000 -Ca-DFMT_WIDTH=32 -Ca-DHAVE_SOUND -Ca-DAY_ISR -Ca-DAY_PORT16 -Ca-DAY_ADDR_PORT=0x4000 -Ca-DAY_DATA_PORT=0x4001 \
+	    $(GAME) $(ENTROPY) $(MENU) target/common/ay_hooks.asm target/common/ay_sfx.asm $(FIELDS) $(SPC1000_PLATFORM) -o $(@D)/simcity.bin
+	@tail=`sed -n 's/^__BSS_END_tail *= \$$\([0-9A-Fa-f]*\).*/\1/p' $(@D)/simcity.map`; echo "spc1000: the program and its uninitialised data end at $$(printf '%04X' $$(( 0x$$tail )))"; \
+	    [ $$(( 0x$$tail + $(SPC1000_STACK_ROOM) )) -le 65536 ] || { echo "the uninitialised data leaves no room for the stack"; rm -f $@; exit 1; }
 
 # The MGT SAM Coupe in its all RAM mode, screen mode 4 (256x192, 16 colours): the program, its data and its stack in the low 32 KB, the
 # uninitialised data in the next 32 KB (which the startup code pages in over $8000-$FFFF), and the baked pictures in the 32 KB after that,
