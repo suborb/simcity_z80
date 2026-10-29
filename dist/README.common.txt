@@ -5,14 +5,14 @@ version @VERSION@
 This is an unofficial port of SimCity (1989) to the @TITLE@.  The
 simulation is the game's own: it comes from a disassembly of the ZX
 Spectrum version, kept as it was, with the screen, keyboard, sound and
-files of each machine written new.  The Atari ST and Amstrad CPC
+files of each machine written afresh. The Amiga, Atari ST and Amstrad CPC
 versions supplied the pictures and sound effects used on some machines.
 
 SimCity is (C) 1989 Maxis Software.  The Spectrum version is by Probe
 Software, published by Infogrames.  The ports are built with z88dk.  The
 source is at https://github.com/suborb/simcity_z80 .
 
-This is a preservation and hobby project, given as it is, with no
+This is a preservation and hobby project, given as is, with no
 warranty.
 
 What is in this zip

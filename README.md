@@ -8,6 +8,8 @@ This disassembly was started back in 2000 with the aim of porting the whole
 game to the z88. Sufficient information has been determined to allow porting
 of the engine to other z80 machines.
 
+
+
 ## Analysis
 
 As can be seen with the NES version (and presumably others as well), the
@@ -16,9 +18,24 @@ game consists of two processes:
 * A UI process, responsible for handling user input and rendering the display
 * A simulation process
 
-This separation should make it possible to retarget the engine to run on any
-Z80 based computer.
+On the Spectrum this is achieved by im2 based task swapping.
 
+This clear separation has made it possible to retarget the engine to run on multiple z80 based computers.
+
+## Comparison with CPC z80 engine
+
+The CPC also had a port of SimCity. Small changes were made to the simulation engine as a result
+of more memory being available:
+
+* ZX had 4/4/4 evolution points for RIC zones, CPC had 8/8/10
+* As a result ZX had 345 8x8 glyps, and CPC had 471
+* Warning thresholds are different: 
+    * Pollution 40 on the CPC against 60 on the ZX
+    * Crime 30 against 20
+    * Traffic 42 against 60. 
+    * The "need" (more zones) message is sent 25 zone imbalance against 19.
+* Pollution average: This is calculated differently 
+* Other changes in growth logic
 
 ## Rebuild
 
@@ -35,16 +52,16 @@ is not available.
 | `engine/` | The simulation and tool logic extracted from it as a platform-independent engine (`engine/PLATFORM_INTERFACE.md`). |
 | `ui/` | The shared game user interface, in C, written against the small platform API in `ui/platform.h`. |
 | `target/zx-original/` | The original Spectrum build, assembled from the engine and original UI code; byte-identical to the disassembly. |
-| `platform/console/` | NC200 z88dk console and keyboard front end. |
+| `platform/common/` | Settings and hooks the engine needs, for C programs. |
+| `platform/console/` | z88dk console and keyboard front end. |
 | `target/aqplus/` | Aquarius+-specific platform implementation: bitmap renderer, AY sound, capabilities and AQX CRT settings. |
+| `target/common/` | Code shared between targets: the AY/SAA sound-effect player and hooks, line editor, mini map, icon and chart drawing. |
 | `target/multi8/` | Mitsubishi Multi 8: planar bitmap renderer, PSG sound, tape (.cas) image. |
 | `target/pc88/` | NEC PC-8801: ALU/bank-switched renderer, D88 disk image. |
 | `target/sam/` | SAM Coupe: allram layout with paged data, SAA 1099 sound, MGT disk image with save/load. |
-| `target/zxn/` | ZX Spectrum Next: the program at $0000 with its own start-up and NEX packaging, Layer 2 graphics in the ST art's 16 colours, AY sound from the frame interrupt, esxDOS save/load. |
-| `target/common/` | Code shared between targets: the AY/SAA sound-effect player and hooks, line editor, mini map, icon and chart drawing. |
-| `target/zx/` | Spectrum-specific platform implementation: bitmap renderer, capabilities and CRT settings. |
 | `target/z88/` | Z88-specific implementation: OZ integration (the menus and their `<>` shortcuts, a framed 7-row text window), tool icons (greyed out when unaffordable), demand bars, sound and ROM CRT settings. |
-| `platform/common/` | Settings and hooks the engine needs, for C programs. |
+| `target/zx/` | Spectrum-specific platform implementation: bitmap renderer, capabilities and CRT settings. |
+| `target/zxn/` | ZX Spectrum Next: the program at $0000 with its own start-up and NEX packaging, Layer 2 graphics in the ST art's 16 colours, AY sound from the frame interrupt, esxDOS save/load. |
 | `target/test/` | Headless assembly platform used by the golden-master tests. |
 | `target/test_ui/` | Headless C platform used by the UI tests. |
 | `assets/` | Binary art and sound data used by the targets (tiles, icons, `st_sounds.bin`). |
