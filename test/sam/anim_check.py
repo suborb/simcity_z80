@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The SAM Coupe's animation routine (mp_anim in target/sam/plat_sam.asm) under z88dk-ticks: for every one of the engine's 345 pictures and a set of values of the game's
+"""The SAM Coupe's animation routine (mp_anim in target/sam/plat_sam.asm) under z88dk-ticks: for every one of the engine's pictures (345, or 471 with FINE_ZONE_LEVELS) and a set of values of the game's
 frame counter, the art it returns is the picture's own if it is not animated, and else the art of the frame the tables (build/sam/anim.inc, which tools/st_tiles_3bpp.py
 --sam-anim makes) and the counter say: the first frame plus (the counter / 16) masked by the number of frames less one.  Needs no emulator of the SAM.
 
@@ -15,6 +15,17 @@ sys.path.insert(0, os.path.join(ROOT, 'tools'))
 import st_tiles_3bpp as T      # noqa: E402
 
 ART, TICK = 0x2000, 0xF000
+
+
+def pictures_built():
+    """The number of pictures the tables were made for (345 of the engine's, or the CPC's 471 with FINE_ZONE_LEVELS) and the numbering that makes."""
+    text = open(os.path.join(ROOT, 'build/sam/anim.inc')).read()
+    body = text[text.index('mp_animmap:'):text.index('mp_animtab:')]
+    n = sum(len(line.split('defb')[1].split(',')) for line in body.splitlines() if 'defb' in line)
+    return (n, T.st_picture_cpc) if n == T.CPC_COUNT else (n, T.st_picture_ours)
+
+
+COUNT, PICTURE = pictures_built()
 TICKS = (0, 15, 16, 31, 32, 48, 64, 80, 255)
 
 
@@ -23,7 +34,7 @@ def main():
         subprocess.run(['make', '-s', 'build/sam/anim.inc'], cwd=ROOT, check=True)
     src = open(os.path.join(ROOT, 'target/sam/plat_sam.asm')).read()
     routine = src[src.index('mp_anim:'):src.index('        INCLUDE "build/sam/anim.inc"')]
-    cases = [(n, t) for n in range(T.OURS) for t in TICKS]
+    cases = [(n, t) for n in range(COUNT) for t in TICKS]
     asm = f'''        org 0
         defc _view_tile_art = {ART}
         defc _V_view_tick = {TICK}
@@ -73,7 +84,7 @@ cases:
         subprocess.run(['z88dk-ticks', f'{tmp}/h.bin', '-end', hex(sym('done')), '-counter', '30000000', '-output', f'{tmp}/h.dump'], capture_output=True)
         d = open(f'{tmp}/h.dump', 'rb').read()
     res = sym('results')
-    extra, amap, entries = T.animation([T.st_picture_ours(i) for i in range(T.OURS)])
+    extra, amap, entries = T.animation([PICTURE(i) for i in range(COUNT)])
     bad = 0
     for k, (n, t) in enumerate(cases):
         got = d[res + 2 * k] | (d[res + 2 * k + 1] << 8)

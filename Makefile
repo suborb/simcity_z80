@@ -185,10 +185,18 @@ $(PC88): $(DEPS) build/common/tiles_640x200_3bpp.bin
 # where the placer pages them in a picture at a time (the screen is paged over the data window to draw).  The disk image is that
 # one file, padded to a block boundary, so the loader's pages follow each other.
 SAM_TEST =              # (-DSOUND_TEST -Ca-DSOUND_TEST: the build of test/sam/sound_check.py, which calls the sound hooks itself)
+# The SAM has a picture for every growth level of a zone (the engine's FINE_ZONE_LEVELS: the CPC game's 471 pictures, made from the ST's art); SAM_FINE=0 makes the Spectrum's 345
+SAM_FINE ?= 1
+ifeq ($(SAM_FINE),1)
+SAM_FINE_FLAG = -Ca-DFINE_ZONE_LEVELS
+SAM_NUMBERING = cpc
+else
+SAM_NUMBERING = ours
+endif
 $(SAM): $(DEPS) build/sam/tiles.bin build/sam/anim.inc
 	@mkdir -p $(@D)
 	$(ZCC) +sam -subtype=allram $(COMMON) -pragma-include:target/sam/zpragma.inc \
-	    -pragma-define:MMAP=-1 -Itarget/sam -Ca-Itarget/sam -DTARGET_SAM -DHAVE_MOUSE -DHAVE_POINTER -DHAVE_MOUSE_POINTER -Ca-DTARGET_SAM -Ca-DENGINE_SIM_SECTION -Ca-DFMT_WIDTH=32 -Ca-DHAVE_MINIMAP_SQUARE -Ca-DHAVE_SOUND -Ca-DAY_SAA -Ca-DAY_ISR $(SAM_TEST) target/sam/plat_sam_files.asm $(GAME) $(ENTROPY) $(MENU) target/sam/plat_sound.asm target/common/ay_hooks.asm target/common/ay_sfx.asm $(FIELDS) $(MMNATIVE) $(LINEEDIT) $(SAM_PLATFORM_NOFILES) -o $(@D)/simcity.bin
+	    -pragma-define:MMAP=-1 -Itarget/sam -Ca-Itarget/sam -DTARGET_SAM -DHAVE_MOUSE -DHAVE_POINTER -DHAVE_MOUSE_POINTER -Ca-DTARGET_SAM $(SAM_FINE_FLAG) -Ca-DENGINE_SIM_SECTION -Ca-DFMT_WIDTH=32 -Ca-DHAVE_MINIMAP_SQUARE -Ca-DHAVE_SOUND -Ca-DAY_SAA -Ca-DAY_ISR $(SAM_TEST) target/sam/plat_sam_files.asm $(GAME) $(ENTROPY) $(MENU) target/sam/plat_sound.asm target/common/ay_hooks.asm target/common/ay_sfx.asm $(FIELDS) $(MMNATIVE) $(LINEEDIT) $(SAM_PLATFORM_NOFILES) -o $(@D)/simcity.bin
 	@size=`wc -c < $(@D)/simcity.bin`; echo "sam image: $$size bytes (BSS trimmed from the disk image)"; \
 	    [ $$size -le 65536 ] || { echo "the initialized image exceeds the 64 KB program window"; rm -f $@; exit 1; }
 	@# Screen-dependent routines must stay below $8000; mp_screen_end marks the start of the low code_driver section.
@@ -275,7 +283,7 @@ amiga-scenarios: simclassics_scc_1meg.adf tools/extract_amiga_adf.py tools/extra
 
 build/sam/tiles.bin build/sam/anim.inc: assets/st_tiles.bin assets/st_icons.bin tools/st_tiles_3bpp.py
 	@mkdir -p $(@D)
-	python3 tools/st_tiles_3bpp.py assets/st_tiles.bin --icons assets/st_icons.bin --sam build/sam/tiles.bin --sam-anim build/sam/anim.inc
+	python3 tools/st_tiles_3bpp.py assets/st_tiles.bin --icons assets/st_icons.bin --numbering $(SAM_NUMBERING) --sam build/sam/tiles.bin --sam-anim build/sam/anim.inc
 
 # Headless: a scripted keyboard and a screen in RAM instead of the console, run under z88dk-ticks.
 $(TEST): $(DEPS)

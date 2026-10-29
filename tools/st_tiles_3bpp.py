@@ -138,7 +138,7 @@ def st_piece(p):
 ANIMATED = {2: [2, 4, 2, 4],                    # open water
             711: (832, 8),                      # the airport's radar
             40: (840, 4),                       # the park's fountain
-            649: (892, 4), 650: (896, 4), 686: (908, 4), 689: (912, 4),         # the smoke of the industrial zones' chimneys
+            621: (852, 4), 649: (892, 4), 650: (896, 4), 676: (900, 4), 677: (904, 4), 686: (908, 4), 689: (912, 4),   # the smoke of the industrial zones' chimneys
             747: (916, 4), 748: (920, 4), 751: (924, 4), 752: (928, 4),         # the coal power plant's
             820: (952, 4),                      # the nuclear plant's swirl
             56: (56, 4)}                        # fire (engine tile 69)
@@ -427,7 +427,7 @@ def main():
     else:
         pictures = [st_picture_cpc(i) for i in range(CPC_COUNT)]
     baked = [planes(to8(pixels(table[n * PIC:n * PIC + PIC]))) for n in pictures]
-    if a.numbering == 'ours':                       # (the SAM and the Next also have the animations' frames, after the pictures)
+    if a.sam or a.zxn:                              # (the SAM and the Next also have the animations' frames, after the pictures)
         extra, amap, entries = animation(pictures)
         if near_identical(table, PICSIZE, pixels6 if depth6 else pixels):
             extra = [WATER_SHIFT if n == 4 else n for n in extra]
