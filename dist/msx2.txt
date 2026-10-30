@@ -1,0 +1,58 @@
+Running it
+----------
+This is for an MSX2 (or better) running MSX-DOS 2, with a memory mapper
+(which MSX-DOS 2 needs anyway).  It will not run under MSX-DOS 1.
+
+Two ways to get it onto a machine:
+
+  simcity.dsk     a disk image (720 KB) with everything on it.  Boot
+                  MSX-DOS 2 and run it from the disk, or copy the files
+                  over.
+
+  SIMCITY.COM  SIMCITY.UI  SIMCITY.SIM  SIMCITY.HI  TILES.DAT
+                  the same files one by one, with the names in capitals,
+                  for copying onto a disk or an image of your own, or
+                  a directory that an emulator mounts as a drive.  All
+                  five must be in the same place.
+
+Start MSX-DOS 2, change to that drive and type SIMCITY.
+
+SIMCITY.COM is the program: it finds the mapper through the extended
+BIOS, loads SIMCITY.UI and SIMCITY.SIM into two segments of its own and
+SIMCITY.HI above $C000, and draws from TILES.DAT, the pictures, which it
+puts into the video RAM.  The game uses screen 5 (256 x 192, 16 colours),
+the PSG for the sound effects, and the keyboard or a mouse in a joystick
+connector.  Cities are saved to and loaded from DOS files (names of up to
+eight letters).  It runs at 50 frames a second on a 50 Hz machine; on a
+60 Hz machine it waits an extra frame now and then to run at the same
+speed (this is untested).
+
+Keys
+----
+  Cursor keys     move the cursor one square (shifted: eight)
+  O P Q A         left, right, up, down
+  Space, Enter    build with the tool
+  , .             the previous and next tool
+  0 - 9           choose a tool by its number
+  H               pause or run
+  + -             faster, slower
+  M               the next mini map (X goes back to the city)
+  B               the budget            V   the evaluation
+  S               save the city         L   load a city
+  X               the game menu: new city, options, disasters, sound
+  Esc, Stop       the same as the right mouse button
+
+The mouse
+---------
+A mouse in either joystick connector works; the game looks for it when it
+starts.  The arrow on the screen is the cursor.  The keys move it too, so
+you can use either, or both, whenever you like.
+
+  Left button     (Space or Enter on the keyboard) builds with the
+                  current tool, picks a tool from the icons, chooses an
+                  item in a menu, and on a mini map jumps to that spot
+  Right button    (Esc) opens the game menu, and leaves a screen
+  Screen edge     the map scrolls when the arrow reaches the edge
+
+In the menus and on the budget and evaluation screens, moving the mouse
+works like pressing the cursor keys.

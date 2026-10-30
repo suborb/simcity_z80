@@ -32,10 +32,14 @@
         defc    AY_SKIP = 0
         ENDIF
 
+        IFDEF   AY_CODE_HI
+        SECTION CODE_HI                 ; the MSX2's page 3 (target/msx2/msx_banks.asm): always mapped, and the resident part below $8000 is full
+        ELSE
         IFDEF   ENGINE_BANK
         SECTION code_home               ; the Next's engine bank (engine/sections.asm): this is called while the bank is mapped, so it is in the lowest 16 KB
         ELSE
         SECTION code_user
+        ENDIF
         ENDIF
 
 ; The data
@@ -79,6 +83,10 @@ ay_start:
         ld      hl,_ay_sfx_data
         add     hl,de
         ld      a,(hl)                  ; the mixer
+        IFDEF   AY_MSX
+        and     $3F                     ; the MSX's joystick ports are on the chip's I/O: bit 6 clear (port A in), bit 7 set (port B out)
+        or      $80
+        ENDIF
         inc     hl
         ld      c,(hl)                  ; the length of the volume stream
         inc     hl

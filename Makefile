@@ -57,6 +57,7 @@ MULTI8 = build/multi8/simcity.cas
 PC88   = build/pc88/simcity.d88
 X1     = build/x1/simcity.d88
 SPC1000 = build/spc1000/simcity.spc
+MSX2   = build/msx2/simcity.img
 SAM    = build/sam/simcity.mgt
 ZXN   = build/zxn/simcity.nex
 TEST   = build/test/simcity.bin
@@ -70,12 +71,12 @@ TESTK  = build/testnative/simcity.bin
 TESTA  = build/testart/simcity.bin
 TESTSC = build/testscroll/simcity.bin
 
-.PHONY: all dist aqplus z88rom zx multi8 pc88 x1 spc1000 sam zxn amiga-scenarios test testpanel testmodal testnarrow testsprites testoverlay testhires testnative testart testscroll check golden uitest tiletest z88test deadcode clean
+.PHONY: all dist aqplus z88rom zx multi8 pc88 x1 spc1000 msx2 sam zxn amiga-scenarios test testpanel testmodal testnarrow testsprites testoverlay testhires testnative testart testscroll check golden uitest tiletest z88test deadcode clean
 
-all: aqplus z88rom zx multi8 pc88 x1 spc1000 sam zxn
+all: aqplus z88rom zx multi8 pc88 x1 spc1000 msx2 sam zxn
 
 # The zip files for distribution, one for each machine (build/dist/; tools/make_dist.py)
-dist: aqplus z88rom multi8 pc88 x1 spc1000 sam zxn
+dist: aqplus z88rom multi8 pc88 x1 spc1000 msx2 sam zxn
 	python3 tools/make_dist.py
 
 aqplus: $(AQPLUS)
@@ -85,6 +86,7 @@ multi8: $(MULTI8)
 pc88:   $(PC88)
 x1:     $(X1)
 spc1000: $(SPC1000)
+msx2:   $(MSX2)
 sam:    $(SAM)
 zxn:   $(ZXN)
 test:   $(TEST)
@@ -212,6 +214,47 @@ $(SPC1000): $(DEPS) build/spc1000/icons.bin
 	    $(GAME) $(ENTROPY) $(MENU) target/common/ay_hooks.asm target/common/ay_sfx.asm $(FIELDS) $(MMNATIVE) $(LINEEDIT) $(SPC1000_PLATFORM) -o $(@D)/simcity.bin
 	@tail=`sed -n 's/^__BSS_END_tail *= \$$\([0-9A-Fa-f]*\).*/\1/p' $(@D)/simcity.map`; echo "spc1000: the program and its uninitialised data end at $$(printf '%04X' $$(( 0x$$tail )))"; \
 	    [ $$(( 0x$$tail + $(SPC1000_STACK_ROOM) )) -le 65536 ] || { echo "the uninitialised data leaves no room for the stack"; rm -f $@; exit 1; }
+
+# The MSX2 under MSX-DOS 2 (z88dk +msx -subtype=msxdos2: a .COM at $0100, with the picture atlas beside it).  Screen 5 (256x192, 16 colours), the Atari ST's art as the SAM
+# Coupe's: the atlas (TILES.DAT) is loaded into the video RAM and the VDP copies the map's tiles out of it (target/msx2/plat_msx2.asm).
+# The code is in two 16 KB mapper segments, loaded from SIMCITY.UI and SIMCITY.SIM and mapped into page 2 ($8000-$BFFF) by turns (target/msx2/engine_bank.inc, msx_bank.asm): the
+# UI's C code (zcc --codeseg BANK_UI) and the simulation's.  What is resident is below $8000 (the glue, the sound, the tables, all the data): the stack is in page 3.
+# A picture for every growth level of a zone (the engine's FINE_ZONE_LEVELS: the CPC game's 471 pictures); MSX2_FINE=0 has the Spectrum's 345 instead
+MSX2_FINE ?= 1
+ifeq ($(MSX2_FINE),1)
+MSX2_FINE_FLAGS = -DFINE_ZONE_LEVELS -Ca-DFINE_ZONE_LEVELS
+MSX2_NUMBERING = cpc
+else
+MSX2_NUMBERING = ours
+endif
+# (MSX2_SOUND=0 leaves the PSG out)
+MSX2_SOUND ?= 1
+ifeq ($(MSX2_SOUND),1)
+MSX2_SOUND_FILES = target/msx2/plat_sound.asm target/common/ay_hooks.asm target/common/ay_sfx.asm
+MSX2_SOUND_FLAGS = -Ca-DHAVE_SOUND -Ca-DAY_ISR -Ca-DAY_CODE_HI -Ca-DAY_MSX -Ca-DAY_SCALE -Ca-DAY_DOWN -Ca-DAY_ADDR_PORT=0xA0 -Ca-DAY_DATA_PORT=0xA1
+else
+MSX2_SOUND_FILES = $(NOSOUND)
+MSX2_SOUND_FLAGS = -DMSX2_NO_SOUND
+endif
+MSX2_GAME = $(filter-out ui/main.c,$(GAME))         # (main() is in msx_bank.asm)
+MSX2_PLATFORM = target/msx2/msx_banks.asm target/msx2/msx_bank.asm target/common/minimap_key.c target/msx2/pointer_res.c target/msx2/msx_pointer.c target/msx2/plat_msx2.c target/msx2/plat_msx2.asm target/msx2/msx2_data.asm $(MSX2_SOUND_FILES)
+
+build/msx2/TILES.DAT build/msx2/msx2.inc build/msx2/msx2.h: assets/st_tiles.bin assets/st_icons.bin tools/st_tiles_3bpp.py
+	@mkdir -p $(@D)
+	python3 tools/st_tiles_3bpp.py assets/st_tiles.bin --icons assets/st_icons.bin --numbering $(MSX2_NUMBERING) --msx2 $(@D)
+
+$(MSX2): $(DEPS) build/msx2/TILES.DAT build/msx2/msx2.inc build/msx2/msx2.h
+	@mkdir -p $(@D)
+	$(ZCC) +msx -subtype=msxdos2 -lmsx2 -lmsxbios $(COMMON) -pragma-include:target/msx2/zpragma.inc --codeseg BANK_UI \
+	    -Itarget/msx2 -Ibuild/msx2 -Ca-Itarget/msx2 -Ca-Ibuild/msx2 -DTARGET_MSX2 -Ca-DTARGET_MSX2 -Ca-DENGINE_BANK $(MSX2_FINE_FLAGS) -Ca-DFMT_WIDTH=32 -Ca-DHAVE_MINIMAP_SQUARE \
+	    $(MSX2_SOUND_FLAGS) \
+	    $(MSX2_PLATFORM) $(MSX2_GAME) $(ENTROPY) $(MENU) $(FIELDS) $(MMNATIVE) $(LINEEDIT) -create-app -Cz"-a build/msx2/TILES.DAT:TILES.DAT" -Cz"-a build/msx2/simcity_BANK_UI.bin:SIMCITY.UI" -Cz"-a build/msx2/simcity_BANK_SIM.bin:SIMCITY.SIM" -Cz"-a build/msx2/simcity_CODE_HI.bin:SIMCITY.HI" -o $(@D)/simcity
+	@# a directory with the files, for an emulator that mounts one as a drive (openMSX's diskX with a directory)
+	@mkdir -p $(@D)/disk && cp $(@D)/simcity $(@D)/disk/SIMCITY.COM && cp build/msx2/TILES.DAT $(@D)/disk/TILES.DAT && cp $(@D)/simcity_BANK_UI.bin $(@D)/disk/SIMCITY.UI && cp $(@D)/simcity_BANK_SIM.bin $(@D)/disk/SIMCITY.SIM && cp $(@D)/simcity_CODE_HI.bin $(@D)/disk/SIMCITY.HI
+	@cp $@ $(@:.img=.dsk)
+	@tail=`sed -n 's/^__BSS_END_tail *= \$$\([0-9A-Fa-f]*\).*/\1/p' $(@D)/simcity.map`; ui=`wc -c < $(@D)/simcity_BANK_UI.bin`; sim=`wc -c < $(@D)/simcity_BANK_SIM.bin`; hi=`wc -c < $(@D)/simcity_CODE_HI.bin`; \
+	    echo "msx2: the resident program and its uninitialised data end at $$(printf '%04X' $$(( 0x$$tail ))); the UI's bank is $$ui bytes, the simulation's $$sim of 16384, and the code in page 3 $$hi (up to 4096)"; \
+	    [ $$(( 0x$$tail )) -le $$(( 0x8000 )) ] && [ $$ui -le 16384 ] && [ $$sim -le 16384 ] && [ $$hi -le 4096 ] || { echo "the resident part must end below \$$8000, each bank fit 16 KB and the code in page 3 4 KB (the stack is under the DOS entry)"; rm -f $@; exit 1; }
 
 # The MGT SAM Coupe in its all RAM mode, screen mode 4 (256x192, 16 colours): the program, its data and its stack in the low 32 KB, the
 # uninitialised data in the next 32 KB (which the startup code pages in over $8000-$FFFF), and the baked pictures in the 32 KB after that,

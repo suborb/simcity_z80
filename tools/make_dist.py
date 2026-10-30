@@ -16,7 +16,7 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 
 # What may go in a zip: the files a person runs, and nothing the build leaves beside them (maps, listings, objects, the pieces
 # a disk image is made of).  Each machine's files are named below, and checked against this and, afterwards, against the zip.
-RUNNABLE = {'.aqx', '.bin', '.epr', '.app', '.ap0', '.ap1', '.a5p', '.cas', '.d88', '.spc', '.mgt', '.nex'}
+RUNNABLE = {'.aqx', '.bin', '.epr', '.app', '.ap0', '.ap1', '.a5p', '.cas', '.d88', '.spc', '.mgt', '.nex', '.dsk', '.com', '.ui', '.sim', '.hi', '.dat'}
 
 # machine: (name for the people, [files in build/ to include])
 MACHINES = {
@@ -26,6 +26,7 @@ MACHINES = {
     'pc88': ('NEC PC-8801', ['pc88/simcity.d88']),
     'x1': ('Sharp X1', ['x1/simcity.d88']),
     'spc1000': ('Samsung SPC-1000', ['spc1000/simcity.spc']),
+    'msx2': ('MSX2 (MSX-DOS 2)', ['msx2/simcity.dsk', 'msx2/disk/SIMCITY.COM', 'msx2/disk/SIMCITY.UI', 'msx2/disk/SIMCITY.SIM', 'msx2/disk/SIMCITY.HI', 'msx2/disk/TILES.DAT']),
     'sam': ('SAM Coupe', ['sam/simcity.mgt']),
     'zxn': ('ZX Spectrum Next', ['zxn/simcity.nex']),
 }
@@ -55,7 +56,7 @@ def main():
     status = 0
     for machine in wanted:
         title, files = MACHINES[machine]
-        odd = [f for f in files if os.path.splitext(f)[1] not in RUNNABLE or f.endswith(('_BSS.bin', '_BOOTSTRAP.bin', '.map', '.63'))]
+        odd = [f for f in files if os.path.splitext(f)[1].lower() not in RUNNABLE or f.endswith(('_BSS.bin', '_BOOTSTRAP.bin', '.map', '.63'))]
         if odd:
             sys.exit(f'{machine}: {", ".join(odd)} is not something to hand out')
         missing = [f for f in files if not os.path.exists(os.path.join(ROOT, 'build', f))]

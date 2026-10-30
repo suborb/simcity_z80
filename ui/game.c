@@ -1180,8 +1180,6 @@ static void draw_map_sidebar(void)
     side_number(3, 0, V_display_population);
 #ifdef HAVE_MINIMAP_SCROLL
     side_puts(4, "PAN MAP");
-#else
-    side_puts(4, "ARROWS");
 #endif
     side_puts(5, sidebar_names[map_view]);
     plat_minimap_key(map_view);
