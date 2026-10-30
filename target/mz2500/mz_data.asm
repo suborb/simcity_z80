@@ -3,6 +3,6 @@
         SECTION rodata_user
         INCLUDE "mz2500.inc"
 
-        SECTION BANK_22
+        SECTION RODATA_22
         BINARY  "TILES.BIN"
         SECTION code_user

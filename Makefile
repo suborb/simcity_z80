@@ -261,7 +261,7 @@ $(MSX2): $(DEPS) build/msx2/TILES.DAT build/msx2/msx2.inc build/msx2/msx2.h
 # The Sharp MZ-2500 (z88dk +mz2500: a boot disk the IPL loads page by page).  320x200 in 16 colours, planar video RAM; the Atari ST's art in a planar atlas (pages 22-24), 32 x 24 cells
 # of 8x8.  The program is linked at $0000 (RAM pages 16-17, started by the crt's BOOTSTRAP stub), the UI and the simulation are 16 KB banks at $4000 mapped into windows 2 and 3 by turns, the data is at
 # $8000: see docs/MZ2500-layout.md.  MZ2500_MAP=120x100 is for later (the data does not fit yet).
-MZ2500_PLATFORM = target/mz2500/mz_banks.asm target/mz2500/mz_boot.asm target/mz2500/mz_data.asm target/mz2500/plat_mz2500.asm target/mz2500/plat_mz2500.c target/mz2500/mz_pointer.c target/mz2500/pointer_res.c target/mz2500/plat_sound.asm target/mz2500/mz_files.c $(LINEEDIT) target/common/minimap_key.c
+MZ2500_PLATFORM = target/mz2500/mz_boot.asm target/mz2500/mz_data.asm target/mz2500/plat_mz2500.asm target/mz2500/plat_mz2500.c target/mz2500/mz_pointer.c target/mz2500/pointer_res.c target/mz2500/plat_sound.asm target/mz2500/mz_files.c $(LINEEDIT) target/common/minimap_key.c
 MZ2500_GAME = $(filter-out ui/main.c,$(GAME))         # (main() is in mz_boot.asm)
 
 build/mz2500/TILES.BIN build/mz2500/mz2500.inc build/mz2500/mz2500.h: assets/st_tiles.bin assets/st_icons.bin tools/st_tiles_3bpp.py
@@ -270,7 +270,7 @@ build/mz2500/TILES.BIN build/mz2500/mz2500.inc build/mz2500/mz2500.h: assets/st_
 
 $(MZ2500): $(DEPS) build/mz2500/TILES.BIN build/mz2500/mz2500.inc build/mz2500/mz2500.h
 	@mkdir -p $(@D)
-	$(ZCC) +mz2500 $(COMMON) -pragma-include:target/mz2500/zpragma.inc --codeseg BANK_18 \
+	$(ZCC) +mz2500 $(COMMON) -pragma-include:target/mz2500/zpragma.inc --codeseg CODE_18 \
 	    -Itarget/mz2500 -Ibuild/mz2500 -Ca-Itarget/mz2500 -Ca-Ibuild/mz2500 -DTARGET_MZ2500 -Ca-DTARGET_MZ2500 -Ca-DENGINE_BANK -DFINE_ZONE_LEVELS -Ca-DFINE_ZONE_LEVELS \
 	    -Ca-DFMT_WIDTH=32 -Ca-DHAVE_MINIMAP_SQUARE -Ca-DHAVE_SOUND -Ca-DAY_SCALE -Ca-DAY_DIV2 -Ca-DAY_OPN -Ca-DAY_ADDR_PORT=0xC8 -Ca-DAY_DATA_PORT=0xC9 \
 	    $(MZ2500_PLATFORM) $(MZ2500_GAME) $(ENTROPY) $(MENU) $(FIELDS) $(MMNATIVE) target/common/ay_hooks.asm target/common/ay_sfx.asm -create-app -o $(@D)/simcity

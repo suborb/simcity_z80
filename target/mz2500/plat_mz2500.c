@@ -41,7 +41,7 @@ extern const uint8_t mz_animbits[];             /* ... a bit a picture that has 
 extern const uint8_t mz_animlist[];             /* ... and those (the picture, a word, and the animation from 1), */
 extern const uint8_t mz_animtab[];              /* ... an animation: the first frame's picture (a word) and the frames less one, 3 bytes (tools/st_tiles_3bpp.py ANIMATED) */
 
-#pragma codeseg BANK_12                         /* (RAM page 12's code area: always mapped, beside the program: the UI bank is full) */
+#pragma codeseg CODE_12                         /* (RAM page 12's code area: always mapped, beside the program: the UI bank is full) */
 
 #define COLS        32
 #define XB0         4                           /* the byte column of the map's column 0 (plat_mz2500.asm) */

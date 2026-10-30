@@ -8,7 +8,7 @@
 #include "engine.h"
 #include "ptr_driver.h"
 
-#pragma codeseg BANK_12
+#pragma codeseg CODE_12
 
 #ifdef HAVE_MOUSE
 
