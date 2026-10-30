@@ -1622,6 +1622,26 @@ static void set_tool(uint8_t t)
         tool = t;
 }
 
+#if defined(HAVE_MINIMAP_4BPP) && !defined(HAVE_TEXT_LAYER)
+/* A full screen of text is drawn in the city's video mode, and a mini map is a mode of its own: go back to the city for it, and to the mini map after
+   (which is drawn as it was opened: a pending full redraw would clear it without the mode's ground, so the flags are as they were) */
+static uint8_t modal_screen(uint8_t (*screen)(void))
+{
+    uint8_t v = map_view, r = redraw, quit_it;
+
+    set_map_view(0);
+    quit_it = screen();
+    redraw |= REDRAW_TEXT;
+    if (v) {
+        set_map_view(v);
+        redraw = r;
+    }
+    return quit_it;
+}
+#else
+#define modal_screen(f) f()
+#endif
+
 #ifdef HAVE_BUDGET
 /* The budget screen, modal.  The engine asks for it once a year (sim_step returns 2 and the main loop calls
    this, the simulation parked); the player can also look at it, and change the rates, any time. */
@@ -1637,7 +1657,7 @@ void game_budget(void)
     else
         text_screen_end();                  /* (the picture is as it was) */
 #else
-    if (budget_screen())
+    if (modal_screen(budget_screen))
         quit = 1;
     else
         redraw |= REDRAW_TEXT;              /* it used the text area */
@@ -1662,7 +1682,7 @@ static void game_evaluation(void)
     else
         text_screen_end();
 #else
-    if (evaluation_screen())
+    if (modal_screen(evaluation_screen))
         quit = 1;
     else
         redraw |= REDRAW_TEXT;

@@ -10,7 +10,6 @@
 ; The pictures are the engine's own 1 bit art (the Spectrum's, with no colour): plat_put_tile draws the 8 bytes it is given.
 
         SECTION code_user
-        EXTERN  _font_8x8_bbc_system
         EXTERN  in_keytranstbl, in_GetKey, _in_KeyDebounce, _in_KeyStartRepeat, _in_KeyRepeatPeriod
         IFDEF   HAVE_SOUND
         EXTERN  snd_init, _plat_frames
@@ -225,12 +224,21 @@ mp_char:
         jp      mp_cell8
 mp_ch_font:
         and     $7F
+        cp      'a'
+        jr      c,mp_ch_glyph
+        cp      '{'
+        jr      c,mp_ch_fold
+        ld      a,' '                   ; (the font stops at the backquote: { | } ~ and DEL are blank)
+        jr      mp_ch_glyph
+mp_ch_fold:
+        sub     32                      ; a lower case letter is its capital
+mp_ch_glyph:
         ld      l,a
         ld      h,0
         add     hl,hl
         add     hl,hl
         add     hl,hl                   ; ch * 8
-        ld      de,_font_8x8_bbc_system - 32 * 8
+        ld      de,mp_font8 - 32 * 8
         add     hl,de
         ex      de,hl                   ; de = its glyph
         ld      h,0
@@ -383,6 +391,8 @@ mp_cg_px:
         SECTION rodata_user
 mp_font3:
         INCLUDE "font3x5.inc"
+mp_font8:
+        INCLUDE "font8x8.inc"
         SECTION code_user
 
 ; void plat_put_raw(uint8_t col, uint8_t row, const uint8_t *eight): a cell as it is: eight bytes, a byte a line (a CG6 cell is one byte wide)
