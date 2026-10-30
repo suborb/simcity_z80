@@ -1,9 +1,9 @@
-/* MZ-2500: the pointer's own parts (the rest is target/common/pointer.c, with ptr_driver.h).  The mouse is on the SIO's channel B: the YM2203's port A bit 3 selects it and DTR
-   going low makes it send three bytes (the buttons and overflow bits, then the x and y movements: Takeda's mouse.cpp), which are collected here a frame at a time.  The
+/* MZ-2500: the pointer's own parts (the rest is target/common/pointer.c, with ptr_driver.h).  The mouse itself is z88dk's (in_MouseMZ2500, on the SIO's channel B).  The
    arrow is drawn in the second graphics screen (mode $14: screen B over A, where the pixel value 0 is transparent), so it never touches the map or the cell cache: it is
    cleared where it was and drawn where it is.  The keys that move it are Q A O P and the cursor keys, Space or Enter its button, Shift for fast.  Resident code. */
 #include <stdint.h>
 #include <string.h>
+#include <arch/mz2500.h>
 #include "platform.h"
 #include "engine.h"
 #include "ptr_driver.h"
@@ -15,17 +15,11 @@
 extern void pointer_start(void);                /* (target/common/pointer.c) */
 extern void mz_arrow(uint8_t y, uint8_t xb, const uint8_t *buf) __smallc;
 extern void mz_clearb(void);
-extern void mz_mouse_init(void);
-extern uint8_t mz_sio_ready(void);
-extern uint8_t mz_sio_data(void);
-extern void mz_sio_trigger(void);
 extern uint8_t mz_keycol(uint8_t column) __smallc;
 extern void mz_pit_init(void);
 extern uint16_t mz_pit_read(void);
 
 #define XB0     4                               /* the byte column of the map's column 0 (plat_mz2500.asm) */
-#define MAXX    255                             /* the game's 256 x 192 pixels */
-#define MAXY    191
 
 /* A count of the frames, from the timer's 31250 Hz clock (520 ticks a frame at 60 Hz): the elapsed ticks are added up and counted off.  Called at least every two seconds.
    A "frame" here is two display frames (1040 ticks): the pointer's step of 2 pixels a frame would otherwise be 120 pixels a second, which jumps cells on a slow pass. */
@@ -47,9 +41,6 @@ uint8_t plat_frames(void)
     return frame_count;
 }
 
-static int16_t mx, my;                          /* the mouse's position */
-static uint8_t mbtn;
-static uint8_t mbuf[3], mcnt;
 static int16_t shown_x = -1, shown_y;           /* where the arrow is drawn, or -1 if it is not */
 static uint16_t rows[16];                       /* the arrow's rows, bit 0 the leftmost pixel */
 static uint16_t outline[16];
@@ -71,57 +62,14 @@ static uint16_t reverse16(uint16_t v)
     return r;
 }
 
-/* The mouse's bytes of the frames that have gone by, added to the position (a packet is three bytes: if fewer are there at the next look they are dropped). */
-static void mouse_poll(void)
-{
-    uint8_t got = 0;
-    int16_t dx, dy;
-
-    while (mz_sio_ready()) {
-        mbuf[mcnt++] = mz_sio_data();
-        got = 1;
-        if (mcnt == 3) {
-            mcnt = 0;
-            dx = (int8_t)mbuf[1];
-            dy = (int8_t)mbuf[2];
-            if (mbuf[0] & 0x10)
-                dx = 127;
-            else if (mbuf[0] & 0x20)
-                dx = -128;
-            if (mbuf[0] & 0x40)
-                dy = 127;
-            else if (mbuf[0] & 0x80)
-                dy = -128;
-            mx += dx;
-            my += dy;
-            mbtn = mbuf[0] & 3;
-        }
-    }
-    if (!got)
-        mcnt = 0;
-    mz_sio_trigger();                           /* the next movement, for the next look */
-    if (mx < 0)
-        mx = 0;
-    if (mx > MAXX)
-        mx = MAXX;
-    if (my < 0)
-        my = 0;
-    if (my > MAXY)
-        my = MAXY;
-}
-
 void mz_mouse_read(uint8_t *buttons, uint16_t *x, uint16_t *y)
 {
-    mouse_poll();
-    *buttons = mbtn;
-    *x = (uint16_t)mx;
-    *y = (uint16_t)my;
+    in_MouseMZ2500(buttons, x, y);                /* (z88dk's: the bytes since the last look, once a frame or so) */
 }
 
 void mz_mouse_setpos(uint16_t x, uint16_t y)
 {
-    mx = (int16_t)x;
-    my = (int16_t)y;
+    in_MouseMZ2500SetPos(x, y);
 }
 
 /* Starts the mouse, puts the pointer in the middle of the map and makes the arrow: its rows with the bits turned round for the planes, and the outline of it (the rows and the
@@ -133,7 +81,7 @@ void plat_mouse_init(void)
 
     mz_pit_init();
     last_t = mz_pit_read();
-    mz_mouse_init();
+    in_MouseMZ2500Init();
     mz_clearb();
     memset(rows, 0, sizeof(rows));
     for (r = 0; r < 14; ++r)

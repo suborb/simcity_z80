@@ -15,7 +15,7 @@
         defc    PAGE_PLANE0 = $20
 
         PUBLIC  mz_w2, mz_w3
-        PUBLIC  _mz_pit_init, _mz_pit_read, _mz_arrow, _mz_clearb, _mz_mouse_init, _mz_sio_ready, _mz_sio_data, _mz_sio_trigger, _mz_pal4096, _mz_keyinit, _mz_keycol, _mz_cleartext, _mz_tile, _mz_glyph, _mz_glyphr, _mz_overlay, _mz_xorcell, _mz_fillb, _mz_maskb, _mz_recolour, _mz_wrline, _mz_shift, _mz_icon, _mz_setup, _mz_clear
+        PUBLIC  _mz_pit_init, _mz_pit_read, _mz_arrow, _mz_clearb, _mz_pal4096, _mz_keyinit, _mz_keycol, _mz_cleartext, _mz_tile, _mz_glyph, _mz_glyphr, _mz_overlay, _mz_xorcell, _mz_fillb, _mz_maskb, _mz_recolour, _mz_wrline, _mz_shift, _mz_icon, _mz_setup, _mz_clear
 
 ; ---- helpers ------------------------------------------------------------------------------------------------------------------
 
@@ -1170,57 +1170,6 @@ cb_plane:
         cp      4
         jr      nz,cb_plane
         jp      restore
-
-; ---- the mouse (Takeda: the SIO channel B at $A2 data, $A3 control, whose DTR going low sends three bytes: the buttons and the overflow bits, the x movement and the y movement; the
-; YM2203's port A bit 3 selects the mouse) ---------------------------------------------------------------------------------------------------------------------------------
-_mz_mouse_init:
-        ld      a,$0e                   ; the mouse select
-        out     ($c8),a
-        in      a,($c9)
-        or      8
-        out     ($c9),a
-        ld      a,$18                   ; channel B reset
-        out     ($a3),a
-        ld      a,4                     ; WR4: x16 clock, 1 stop bit, no parity
-        out     ($a3),a
-        ld      a,$44
-        out     ($a3),a
-        ld      a,3                     ; WR3: 8 bits, receiver on
-        out     ($a3),a
-        ld      a,$c1
-        out     ($a3),a
-        ld      a,5                     ; WR5: 8 bits, DTR off
-        out     ($a3),a
-        ld      a,$60
-        out     ($a3),a
-        ret
-
-; uint8_t mz_sio_ready(void): a byte has been received
-_mz_sio_ready:
-        in      a,($a3)
-        and     1
-        ld      l,a
-        ld      h,0
-        ret
-
-; uint8_t mz_sio_data(void)
-_mz_sio_data:
-        in      a,($a2)
-        ld      l,a
-        ld      h,0
-        ret
-
-; void mz_sio_trigger(void): DTR off and on again: the mouse sends its next movement
-_mz_sio_trigger:
-        ld      a,5
-        out     ($a3),a
-        ld      a,$60
-        out     ($a3),a
-        ld      a,5
-        out     ($a3),a
-        ld      a,$e0
-        out     ($a3),a
-        ret
 
 ; ---- void mz_pal4096(void): the YM2203's port A bit 2 (register $0E) low, which is what makes the CRTC use the 4096 colour palette ($AE) rather than the fixed digital 16 colours (the IPL
 ; sets it); a read-modify-write as the IPL's own code does it, so the floppy and mouse bits stay ------------------------------------------------------------------------------------
