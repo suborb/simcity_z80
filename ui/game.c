@@ -170,7 +170,7 @@ static const struct menu_item main_menu[] = {
 #endif
     { "DISASTERS", MENU_DISASTERS },
     { "NEW CITY", MENU_NEW_CITY },
-#ifndef TARGET_AQPLUS
+#if !defined(TARGET_AQPLUS) && !defined(NO_QUIT)    /* (NO_QUIT, plat_config.h: nothing to quit to) */
     { "QUIT", CMD_QUIT }
 #endif
 };

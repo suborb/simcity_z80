@@ -1,0 +1,47 @@
+Running it
+----------
+This is for a Sharp MZ-2500 (or an emulator of one, such as EmuZ-2500).
+
+  simcity.dsk     a disk image (2 sides, 40 tracks, 16 sectors of 256
+                  bytes).  Boot the machine from it in drive 1.
+
+The game uses the 320 x 200 screen in 16 colours, the YM2203 for the
+sound effects, and the keyboard or the mouse.  The map is 96 x 96; there
+are no scenarios.
+
+Saving: a city is saved to one of eight slots kept in the last ten
+cylinders of the boot disk itself (the disk must not be write protected;
+with an emulator the image file is written to).  Give a name of up to
+twelve letters; saving to a name that is already there replaces that
+city, and the ninth name does not fit.  There is no list of the names,
+so remember them.  Loading asks for the name.  This is untested on real
+hardware.
+
+Keys
+----
+  Cursor keys     move the cursor one square (shifted: eight)
+  O P Q A         left, right, up, down
+  Space, Enter    build with the tool
+  , .             the previous and next tool
+  0 - 9           choose a tool by its number
+  H               pause or run
+  + -             faster, slower
+  M               the next mini map (X goes back to the city)
+  B               the budget            V   the evaluation
+  S               save the city         L   load a city
+  X               the game menu: new city, options, disasters, sound
+  Esc             the same as the right mouse button
+
+The mouse
+---------
+The arrow on the screen is the cursor.  The keys move it too, so you can
+use either, or both, whenever you like.
+
+  Left button     (Space or Enter on the keyboard) builds with the
+                  current tool, picks a tool from the icons, chooses an
+                  item in a menu, and on a mini map jumps to that spot
+  Right button    (Esc) opens the game menu, and leaves a screen
+  Screen edge     the map scrolls when the arrow reaches the edge
+
+In the menus and on the budget and evaluation screens, moving the mouse
+works like pressing the cursor keys.

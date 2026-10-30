@@ -20,7 +20,7 @@
         MODULE  ay_sfx
 
         PUBLIC  _ay_play, _ay_tick, _ay_stop, ay_start, ay_busy, ay_tick, ay_stop
-        PUBLIC  _ay_sfx_data
+        PUBLIC  _ay_sfx_data, ay_active
 
         IFNDEF  AY_ADDR_PORT
         defc    AY_ADDR_PORT = $F7
@@ -257,6 +257,13 @@ ay_nset:
         jp      ay_write
 
         IFDEF   AY_SCALE
+        IFDEF   AY_DIV2
+; hl := hl / 2: the periods are the ST's, whose chip runs at 2 MHz, for a chip at 1 MHz (the YM2203's SSG on the MZ-2500).
+ay_scale:
+        srl     h
+        rr      l
+        ret
+        ELSE
         IFDEF   AY_DOWN
 ; hl := hl * 0.8828 (1 - 1/8 + 1/128): the periods are the ST's, whose chip runs at 2 MHz, for a chip at 1.7734475 MHz (a factor of
 ; 0.8867: the ZX Spectrum 128's and the Next's).  Uses bc, de.
@@ -313,6 +320,7 @@ ay_scale_lp:
         ret
         ENDIF
         ENDIF
+        ENDIF
 
         IFNDEF  AY_SAA
 ; Register C of the chip := A.  Keeps hl, de, b.
@@ -329,6 +337,22 @@ ay_write:                               ; (the ports are decoded from all 16 bit
         pop     bc
         ret
         ELSE
+        IFDEF   AY_OPN
+ay_write:                               ; (the YM2203's: bits 6 and 7 of register 7 make ports A and B outputs, which the machine uses: the mixer keeps them set)
+        push    af
+        ld      a,c
+        out     (AY_ADDR_PORT),a
+        cp      7
+        jr      nz,ay_w_plain
+        pop     af
+        or      $c0
+        out     (AY_DATA_PORT),a
+        ret
+ay_w_plain:
+        pop     af
+        out     (AY_DATA_PORT),a
+        ret
+        ELSE
 ay_write:
         push    af
         ld      a,c
@@ -336,6 +360,7 @@ ay_write:
         pop     af
         out     (AY_DATA_PORT),a
         ret
+        ENDIF
         ENDIF
         ELSE
 

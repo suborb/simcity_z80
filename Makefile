@@ -58,6 +58,7 @@ PC88   = build/pc88/simcity.d88
 X1     = build/x1/simcity.d88
 SPC1000 = build/spc1000/simcity.spc
 MSX2   = build/msx2/simcity.img
+MZ2500 = build/mz2500/simcity.dsk
 SAM    = build/sam/simcity.mgt
 ZXN   = build/zxn/simcity.nex
 TEST   = build/test/simcity.bin
@@ -71,12 +72,12 @@ TESTK  = build/testnative/simcity.bin
 TESTA  = build/testart/simcity.bin
 TESTSC = build/testscroll/simcity.bin
 
-.PHONY: all dist aqplus z88rom zx multi8 pc88 x1 spc1000 msx2 sam zxn amiga-scenarios test testpanel testmodal testnarrow testsprites testoverlay testhires testnative testart testscroll check golden uitest tiletest z88test deadcode clean
+.PHONY: all dist aqplus z88rom zx multi8 pc88 x1 spc1000 msx2 mz2500 sam zxn amiga-scenarios test testpanel testmodal testnarrow testsprites testoverlay testhires testnative testart testscroll check golden uitest tiletest z88test deadcode clean
 
-all: aqplus z88rom zx multi8 pc88 x1 spc1000 msx2 sam zxn
+all: aqplus z88rom zx multi8 pc88 x1 spc1000 msx2 mz2500 sam zxn
 
 # The zip files for distribution, one for each machine (build/dist/; tools/make_dist.py)
-dist: aqplus z88rom multi8 pc88 x1 spc1000 msx2 sam zxn
+dist: aqplus z88rom multi8 pc88 x1 spc1000 msx2 mz2500 sam zxn
 	python3 tools/make_dist.py
 
 aqplus: $(AQPLUS)
@@ -87,6 +88,7 @@ pc88:   $(PC88)
 x1:     $(X1)
 spc1000: $(SPC1000)
 msx2:   $(MSX2)
+mz2500: $(MZ2500)
 sam:    $(SAM)
 zxn:   $(ZXN)
 test:   $(TEST)
@@ -255,6 +257,25 @@ $(MSX2): $(DEPS) build/msx2/TILES.DAT build/msx2/msx2.inc build/msx2/msx2.h
 	@tail=`sed -n 's/^__BSS_END_tail *= \$$\([0-9A-Fa-f]*\).*/\1/p' $(@D)/simcity.map`; ui=`wc -c < $(@D)/simcity_BANK_UI.bin`; sim=`wc -c < $(@D)/simcity_BANK_SIM.bin`; hi=`wc -c < $(@D)/simcity_CODE_HI.bin`; \
 	    echo "msx2: the resident program and its uninitialised data end at $$(printf '%04X' $$(( 0x$$tail ))); the UI's bank is $$ui bytes, the simulation's $$sim of 16384, and the code in page 3 $$hi (up to 4096)"; \
 	    [ $$(( 0x$$tail )) -le $$(( 0x8000 )) ] && [ $$ui -le 16384 ] && [ $$sim -le 16384 ] && [ $$hi -le 4096 ] || { echo "the resident part must end below \$$8000, each bank fit 16 KB and the code in page 3 4 KB (the stack is under the DOS entry)"; rm -f $@; exit 1; }
+
+# The Sharp MZ-2500 (z88dk +mz2500: a boot disk the IPL loads page by page).  320x200 in 16 colours, planar video RAM; the Atari ST's art in a planar atlas (pages 22-24), 32 x 24 cells
+# of 8x8.  The program is linked at $0000 (RAM pages 16-17, started by the crt's BOOTSTRAP stub), the UI and the simulation are 16 KB banks at $4000 mapped into windows 2 and 3 by turns, the data is at
+# $8000: see docs/MZ2500-layout.md.  MZ2500_MAP=120x100 is for later (the data does not fit yet).
+MZ2500_PLATFORM = target/mz2500/mz_banks.asm target/mz2500/mz_boot.asm target/mz2500/mz_data.asm target/mz2500/plat_mz2500.asm target/mz2500/plat_mz2500.c target/mz2500/mz_pointer.c target/mz2500/pointer_res.c target/mz2500/plat_sound.asm target/mz2500/mz_files.c $(LINEEDIT) target/common/minimap_key.c
+MZ2500_GAME = $(filter-out ui/main.c,$(GAME))         # (main() is in mz_boot.asm)
+
+build/mz2500/TILES.BIN build/mz2500/mz2500.inc build/mz2500/mz2500.h: assets/st_tiles.bin assets/st_icons.bin tools/st_tiles_3bpp.py
+	@mkdir -p $(@D)
+	python3 tools/st_tiles_3bpp.py assets/st_tiles.bin --icons assets/st_icons.bin --numbering cpc --mz2500 $(@D)
+
+$(MZ2500): $(DEPS) build/mz2500/TILES.BIN build/mz2500/mz2500.inc build/mz2500/mz2500.h
+	@mkdir -p $(@D)
+	$(ZCC) +mz2500 $(COMMON) -pragma-include:target/mz2500/zpragma.inc --codeseg BANK_18 \
+	    -Itarget/mz2500 -Ibuild/mz2500 -Ca-Itarget/mz2500 -Ca-Ibuild/mz2500 -DTARGET_MZ2500 -Ca-DTARGET_MZ2500 -Ca-DENGINE_BANK -DFINE_ZONE_LEVELS -Ca-DFINE_ZONE_LEVELS \
+	    -Ca-DFMT_WIDTH=32 -Ca-DHAVE_MINIMAP_SQUARE -Ca-DHAVE_SOUND -Ca-DAY_SCALE -Ca-DAY_DIV2 -Ca-DAY_OPN -Ca-DAY_ADDR_PORT=0xC8 -Ca-DAY_DATA_PORT=0xC9 \
+	    $(MZ2500_PLATFORM) $(MZ2500_GAME) $(ENTROPY) $(MENU) $(FIELDS) $(MMNATIVE) target/common/ay_hooks.asm target/common/ay_sfx.asm -create-app -o $(@D)/simcity
+	@ls -l $(@D)/simcity $(@D)/simcity_BANK_*.bin
+
 
 # The MGT SAM Coupe in its all RAM mode, screen mode 4 (256x192, 16 colours): the program, its data and its stack in the low 32 KB, the
 # uninitialised data in the next 32 KB (which the startup code pages in over $8000-$FFFF), and the baked pictures in the 32 KB after that,
