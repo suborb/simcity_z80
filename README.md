@@ -60,6 +60,7 @@ is not available.
 | `target/pc88/` | NEC PC-8801: ALU/bank-switched renderer, D88 disk image. |
 | `target/sam/` | SAM Coupe: allram layout with paged data, SAA 1099 sound, MGT disk image with save/load. |
 | `target/z88/` | Z88-specific implementation: OZ integration (the menus and their `<>` shortcuts, a framed 7-row text window), tool icons (greyed out when unaffordable), demand bars, sound and ROM CRT settings. |
+| `target/spc1000/` | Samsung SPC-1000: MC6847 256x192 mono and 128x192 colour (mini maps) through I/O ports, AY sound, cassette save/load in the ROM's format (z88dk's tape_save/tape_load_to), a packed program with a bootstrap that unpacks it. |
 | `target/x1/` | Sharp X1: the 320x200 colour screen behind I/O ports, PSG sound, keyboard from the sub CPU's interrupt, 2D disk image with save/load (z88dk's x1_disk_read/x1_disk_write). |
 | `target/zx/` | Spectrum-specific platform implementation: bitmap renderer, capabilities and CRT settings. |
 | `target/zxn/` | ZX Spectrum Next: the program at $0000 with its own start-up and NEX packaging, Layer 2 graphics in the ST art's 16 colours, AY sound from the frame interrupt, esxDOS save/load. |
@@ -81,6 +82,7 @@ Needs [z88dk](https://z88dk.org).
     make multi8     # Multi 8     -> build/multi8/simcity.cas
     make pc88       # PC-8801     -> build/pc88/simcity.d88
     make x1         # Sharp X1   -> build/x1/simcity.d88
+    make spc1000    # Samsung SPC-1000 -> build/spc1000/simcity.spc
     make sam        # SAM Coupe   -> build/sam/simcity.mgt
     make zxn       # ZX Spectrum Next -> build/zxn/simcity.nex
     make check      # golden master, tile drawing, UI tests, all builds

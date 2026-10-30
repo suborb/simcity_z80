@@ -1,0 +1,28 @@
+Running it
+----------
+simcity.spc is a program file for the Samsung SPC-1000 (built with
+z88dk).  Load it from BASIC (an emulator that loads .spc files, or the
+tape); it draws a bar across the screen while it unpacks itself and then
+starts.  It needs the machine's 64 KB of RAM.
+
+The game uses the MC6847's 256 x 192 black and white mode and, for the
+mini maps, its 128 x 192 four colour mode.  Sound is on the AY.
+
+Saving a city writes it to the cassette in the machine's own format (so
+BASIC can read it), and loading reads it back: press RECORD and PLAY (or
+PLAY), then a key; Shift+Break stops a tape operation.  This is untested
+on real hardware.
+
+Keys
+----
+  Cursor keys     move the cursor one square (shifted: eight)
+  O P Q A         left, right, up, down
+  Space, Enter    build with the tool
+  , .             the previous and next tool
+  0 - 9           choose a tool by its number
+  H               pause or run
+  + -             faster, slower
+  M               the next mini map (X goes back to the city)
+  B               the budget            V   the evaluation
+  S               save the city         L   load a city
+  X               the game menu: new city, options, disasters

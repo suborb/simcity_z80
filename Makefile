@@ -72,10 +72,10 @@ TESTSC = build/testscroll/simcity.bin
 
 .PHONY: all dist aqplus z88rom zx multi8 pc88 x1 spc1000 sam zxn amiga-scenarios test testpanel testmodal testnarrow testsprites testoverlay testhires testnative testart testscroll check golden uitest tiletest z88test deadcode clean
 
-all: aqplus z88rom zx multi8 pc88 x1 sam zxn
+all: aqplus z88rom zx multi8 pc88 x1 spc1000 sam zxn
 
 # The zip files for distribution, one for each machine (build/dist/; tools/make_dist.py)
-dist: aqplus z88rom multi8 pc88 x1 sam zxn
+dist: aqplus z88rom multi8 pc88 x1 spc1000 sam zxn
 	python3 tools/make_dist.py
 
 aqplus: $(AQPLUS)
@@ -208,8 +208,8 @@ build/spc1000/icons.bin: assets/udgs.bin
 $(SPC1000): $(DEPS) build/spc1000/icons.bin
 	@mkdir -p $(@D)
 	$(ZCC) +spc1000 -subtype=allram -create-app $(COMMON) -pragma-include:target/spc1000/zpragma.inc \
-	    -Itarget/spc1000 -DTARGET_SPC1000 -Ca-DTARGET_SPC1000 -Ca-DFMT_WIDTH=32 -Ca-DHAVE_SOUND -Ca-DAY_ISR -Ca-DAY_PORT16 -Ca-DAY_ADDR_PORT=0x4000 -Ca-DAY_DATA_PORT=0x4001 \
-	    $(GAME) $(ENTROPY) $(MENU) target/common/ay_hooks.asm target/common/ay_sfx.asm $(FIELDS) $(SPC1000_PLATFORM) -o $(@D)/simcity.bin
+	    -Itarget/spc1000 -DTARGET_SPC1000 -Ca-DTARGET_SPC1000 -Ca-DFMT_WIDTH=32 -Ca-DHAVE_MINIMAP_SQUARE -Ca-DHAVE_SOUND -Ca-DAY_ISR -Ca-DAY_PORT16 -Ca-DAY_ADDR_PORT=0x4000 -Ca-DAY_DATA_PORT=0x4001 \
+	    $(GAME) $(ENTROPY) $(MENU) target/common/ay_hooks.asm target/common/ay_sfx.asm $(FIELDS) $(MMNATIVE) $(LINEEDIT) $(SPC1000_PLATFORM) -o $(@D)/simcity.bin
 	@tail=`sed -n 's/^__BSS_END_tail *= \$$\([0-9A-Fa-f]*\).*/\1/p' $(@D)/simcity.map`; echo "spc1000: the program and its uninitialised data end at $$(printf '%04X' $$(( 0x$$tail )))"; \
 	    [ $$(( 0x$$tail + $(SPC1000_STACK_ROOM) )) -le 65536 ] || { echo "the uninitialised data leaves no room for the stack"; rm -f $@; exit 1; }
 

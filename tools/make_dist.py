@@ -16,7 +16,7 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 
 # What may go in a zip: the files a person runs, and nothing the build leaves beside them (maps, listings, objects, the pieces
 # a disk image is made of).  Each machine's files are named below, and checked against this and, afterwards, against the zip.
-RUNNABLE = {'.aqx', '.bin', '.epr', '.app', '.ap0', '.ap1', '.a5p', '.cas', '.d88', '.mgt', '.nex'}
+RUNNABLE = {'.aqx', '.bin', '.epr', '.app', '.ap0', '.ap1', '.a5p', '.cas', '.d88', '.spc', '.mgt', '.nex'}
 
 # machine: (name for the people, [files in build/ to include])
 MACHINES = {
@@ -25,6 +25,7 @@ MACHINES = {
     'multi8': ('Mitsubishi Multi 8', ['multi8/simcity.cas']),
     'pc88': ('NEC PC-8801', ['pc88/simcity.d88']),
     'x1': ('Sharp X1', ['x1/simcity.d88']),
+    'spc1000': ('Samsung SPC-1000', ['spc1000/simcity.spc']),
     'sam': ('SAM Coupe', ['sam/simcity.mgt']),
     'zxn': ('ZX Spectrum Next', ['zxn/simcity.nex']),
 }
