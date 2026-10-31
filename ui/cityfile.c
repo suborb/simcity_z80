@@ -12,10 +12,22 @@
 
 static uint8_t header[CITY_HEADER];
 
+/* 1: a name is in `name`; 0: cancelled; 2: quit.  A platform that can list its files lets the player pick one. */
+static uint8_t ask_name(const char *title, uint8_t add, char *name)
+{
+#ifdef HAVE_FILE_LIST
+    uint8_t r = prompt_pick(title, add, name);
+
+    if (r != 3)
+        return r;
+#endif
+    return prompt_ask(title, "FILE NAME:", name, NAME_MAX, 0);
+}
+
 uint8_t city_save(void)
 {
     char name[NAME_MAX + 2];
-    uint8_t r = prompt_ask("SAVE THIS CITY", "FILE NAME:", name, NAME_MAX, 0);
+    uint8_t r = ask_name("SAVE THIS CITY", 1, name);
 
     if (r == 2)
         return CITY_QUIT;
@@ -36,7 +48,7 @@ uint8_t city_save(void)
 uint8_t city_load(void)
 {
     char name[NAME_MAX + 2];
-    uint8_t r = prompt_ask("LOAD A CITY", "FILE NAME:", name, NAME_MAX, 0);
+    uint8_t r = ask_name("LOAD A CITY", 0, name);
 
     if (r == 2)
         return CITY_QUIT;

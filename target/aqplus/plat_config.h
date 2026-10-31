@@ -6,6 +6,8 @@
 #define HAVE_BITMAP
 #define HAVE_POPUP_MENU     /* shared box + message selector over the bitmap console */
 #define HAVE_FILES          /* Aquarius+ ESP filesystem */
+#define HAVE_FILE_LIST      /* the files of the directory that are a city's size (target/aqplus/aq_files.asm) */
+#define FILE_LIST_ENTRY 25  /* ... with names up to FILE_NAME_MAX (24) characters: aq_files.asm has the 25 too */
 #define HAVE_BUDGET
 #define HAVE_EVALUATION
 #define MODAL_ROWS 24          /* budget and evaluation use the full 40x24 text area */

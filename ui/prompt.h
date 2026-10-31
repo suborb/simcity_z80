@@ -14,6 +14,12 @@ extern char city_name[CITY_NAME_LEN + 1];   /* the city's name, not padded */
    Returns 1 for a name, 0 if cancelled or empty, 2 if the platform asked to quit. */
 extern uint8_t prompt_ask(const char *title, const char *label, char *name, uint8_t max, uint8_t spaces);
 
+/* With HAVE_FILE_LIST: choose from the files on the disk in a box.  `add` puts "<NEW FILE>" first (for a save).  Returns 1 for a
+   file (its name is in name), 3 for the new file entry (the caller asks for a name), 0 if cancelled or there are none, 2 to quit. */
+#ifdef HAVE_FILE_LIST
+extern uint8_t prompt_pick(const char *title, uint8_t add, char *name);
+#endif
+
 /* After a name is entered, show what is happening ("SAVING...") in the dialogue's last line, where the keys were.  Only
    the shared pop-up boxes do this; the other platforms' prompt screens are left as they are. */
 #ifdef HAVE_POPUP_MENU

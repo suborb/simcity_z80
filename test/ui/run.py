@@ -501,13 +501,28 @@ def main():
           f'box rows {top}..{bottom}')
     mem = run(hbin, hsyms, [LEVEL_MEDIUM, PAUSE, KEY_ESC, KEY_DOWN, KEY_DOWN, 13] + [0] * 8)
     scr, (top, bottom) = box_rows(mem, 'SAVE THIS CITY')
+    check('save: the dialogue first lists the files, with <NEW FILE> (and no other file yet)',
+          top is not None and bottom - top == 4 and any('><NEW FILE>' in r for r in scr), '\n'.join(scr[6:24]))
+    mem = run(hbin, hsyms, [LEVEL_MEDIUM, PAUSE, KEY_ESC, KEY_DOWN, KEY_DOWN, 13, 13] + [0] * 8)
+    scr, (top, bottom) = box_rows(mem, 'SAVE THIS CITY')
     check('save: the dialogue is a box in the map asking for the file name',
           top is not None and bottom - top == 6 and top >= 6 and abs((top - 6) - (24 - bottom)) <= 1 and any('SAVE THIS CITY' in r for r in scr)
           and any('FILE NAME:' in r for r in scr), f'box rows {top}..{bottom}')
     check('save: the dialogue leaves the status panel alone', any('FUNDS' in r for r in scr[:6]), '\n'.join(scr[:6]))
-    mem = run(hbin, hsyms, [LEVEL_MEDIUM, PAUSE, KEY_ESC, KEY_DOWN, KEY_DOWN, 13, ord('a'), ord('b'), 13, 13] + [0] * 8)
+    mem = run(hbin, hsyms, [LEVEL_MEDIUM, PAUSE, KEY_ESC, KEY_DOWN, KEY_DOWN, 13, 13, ord('a'), ord('b'), 13, 13] + [0] * 8)
     name = bytes(mem[hsyms['_test_file_name']:hsyms['_test_file_name'] + 3])
     check('save: the file is written under the typed name', name == b'ab\0', repr(name))
+    save_ab = [LEVEL_MEDIUM, PAUSE, KEY_ESC, KEY_DOWN, KEY_DOWN, 13, 13, ord('a'), ord('b'), 13, 13]
+    mem = run(hbin, hsyms, save_ab + [KEY_ESC, KEY_DOWN, KEY_DOWN, KEY_DOWN, 13] + [0] * 8)
+    scr, (top, bottom) = box_rows(mem, 'LOAD A CITY')
+    check('load: the dialogue lists the saved file (and no <NEW FILE>)',
+          top is not None and bottom - top == 4 and any('>ab' in r for r in scr) and not any('NEW FILE' in r for r in scr), '\n'.join(scr[6:24]))
+    mem = run(hbin, hsyms, save_ab + [KEY_ESC, KEY_DOWN, KEY_DOWN, KEY_DOWN, 13, 13] + [0] * 8)
+    check('load: choosing the file loads it', mem[hsyms['_test_done']] == 1 and not any('COULD NOT' in r for r in box_rows(mem)[0]))
+    mem = run(hbin, hsyms, save_ab + [KEY_ESC, KEY_DOWN, KEY_DOWN, 13, KEY_DOWN, 13] + [0] * 8)
+    scr = box_rows(mem)[0]
+    check('save: a listed file is chosen to save over it (no name is asked)', any('SAVED' in r for r in scr) and not any('FILE NAME' in r for r in scr),
+          '\n'.join(scr[6:24]))
     # --- 6c. the colour a tile mini map (the Multi 8's reserve mode): the whole city, every other row ---
     nbin, nsyms = build_native_minimap()
 

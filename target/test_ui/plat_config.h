@@ -54,6 +54,7 @@
 #define HAVE_ICONS_TOP
 #ifndef TEST_NATIVE_MINIMAP
 #define HAVE_FILES              /* the dialogues of a pop-up menu platform (ui/prompt.c) */
+#define HAVE_FILE_LIST          /* ... which list the files (the one in memory) */
 #endif
 #define MODAL_ROWS 24
 #define MINIMAP_CELLS_H 19

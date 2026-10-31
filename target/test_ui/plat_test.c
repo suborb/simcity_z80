@@ -246,6 +246,19 @@ uint8_t plat_file_load(const char *name, uint8_t *a, uint16_t alen, uint8_t *b, 
         b[i] = test_file[alen + i - KEEP_FROM];
     return test_file_len < alen + blen ? 2 : 0;
 }
+#ifdef HAVE_FILE_LIST
+uint8_t plat_file_list(char *names)             /* the file in memory, if it has been saved */
+{
+    uint8_t i;
+
+    if (!test_file_name[0])
+        return 0;
+    for (i = 0; i < 12 && test_file_name[i]; ++i)
+        names[i] = test_file_name[i];
+    names[i] = 0;
+    return 1;
+}
+#endif
 #endif
 
 #if defined(HAVE_BITMAP) || defined(HAVE_TILES)

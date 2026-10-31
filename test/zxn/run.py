@@ -35,7 +35,7 @@ def check(name, ok, detail=''):
     print(('PASS  ' if ok else 'FAIL  ') + name + ('' if ok else '  ' + detail))
 
 
-def run(keys, frame, sd=None, wav=None, nex=None):
+def run(keys, frame, sd=None, wav=None, nex=None, root=None):
     """Run the game, press keys, and return the screenshot (a 256x192 image) at the frame."""
     shot = os.path.join(TMP, 'shot.png')
     if os.path.exists(shot):
@@ -44,6 +44,8 @@ def run(keys, frame, sd=None, wav=None, nex=None):
            '--delayed-automatic-exit-frames', str(frame + 10)]
     if sd:
         cmd += ['--sd-card', sd]
+    if root:                                    # a folder the game's files go to (the stub's directory calls need one: the list of cities)
+        cmd += ['--esxdos-stub-root', root, '--esxdos-stub-writable']
     if wav:
         cmd += ['--wav-record', wav]
     for f, k in keys:
@@ -334,11 +336,14 @@ def main():
     check('the evaluation screen', lit(ev, (0, 0, 256, 192)) > 1000)
 
     # a city saved and loaded back: build a road, save it as `ab`, build two more, load it: the funds are as they were when it was saved
-    first = [S] + LAND + [(820, 'space'), (860, 's'), (920, 'a'), (980, 'b'), (1040, 'enter')]
-    saved = run(first, 1140, sd=sd)
+    # (the save and load dialogues are a list of the files first: <NEW FILE> is the one to choose for a name; load chooses `ab` from the list)
+    first = [S] + LAND + [(820, 'space'), (860, 's'), (920, 'enter'), (980, 'a'), (1040, 'b'), (1100, 'enter')]
+    root = os.path.join(TMP, 'root')
+    os.makedirs(root, exist_ok=True)
+    saved = run(first, 1200, sd=sd, root=root)
     check('the city is saved', lit(saved, (16, 70, 240, 110)) > 200)
-    back = run(first + [(1120, 'space'), (1180, 'right'), (1220, 'space'), (1260, 'right'), (1300, 'space'),
-                        (1360, 'l'), (1420, 'a'), (1480, 'b'), (1560, 'enter')], 1900, sd=sd)
+    back = run(first + [(1180, 'space'), (1240, 'right'), (1280, 'space'), (1320, 'right'), (1360, 'space'),
+                        (1420, 'l'), (1500, 'enter')], 1900, sd=sd, root=root)
     # (the funds' first digits, "$1999": 19990 or a little less; with two more roads and no load they would be "$1997")
     check('the city is loaded back: the funds are as they were saved', not differs(saved, back, (72, 0, 112, 8)))
 

@@ -21,8 +21,11 @@
 extern void zxn_bank_read(uint8_t *dst, uint8_t page, uint16_t off, uint16_t len);
 
 static uint8_t metadata[META_BYTES];
-static uint8_t rowbuf[MAP_W];
-static uint8_t mapbuf[MAP_CHUNK];
+/* a row of the preview, or a chunk of the map: one at a time, so they share a buffer, which target/zxn/zxn_files.asm uses too (for the
+   current directory's path) while the game is going: it is only in use while a scenario is read */
+uint8_t zxn_scratch[256];
+#define rowbuf zxn_scratch
+#define mapbuf zxn_scratch
 
 static void scenario_read(uint32_t offset, uint8_t *dst, uint16_t len)
 {

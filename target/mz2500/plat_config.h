@@ -13,6 +13,7 @@
 #define BOX_SIDE   "\6                            \6"
 #define HAVE_SOUND              /* the Atari ST game's effects on the YM2203's SSG (target/common/ay_sfx.asm, ay_hooks.asm, target/mz2500/plat_sound.asm) */
 #define HAVE_FILES              /* save and load: raw slots on the boot disk (target/mz2500/mz_files.c) */
+#define HAVE_FILE_LIST          /* the slots in the directory are listed (plat_file_list), so the player picks one */
 #define FILE_NAME_MAX 12
 #define NO_QUIT                 /* the menu has no QUIT: there is nothing to quit to */
 #define HAVE_BUDGET

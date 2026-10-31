@@ -11,6 +11,7 @@
 #define BOX_BOTTOM "\3\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\4"
 #define BOX_SIDE   "\6                            \6"
 #define HAVE_FILES          /* saving and loading a city on the disk */
+#define HAVE_FILE_LIST      /* the slots on the disk are listed (plat_file_list), so the player picks one */
 #define HAVE_BUDGET
 #define HAVE_EVALUATION
 #define MODAL_ROWS 24          /* budget and evaluation use the full 40x24 text area */

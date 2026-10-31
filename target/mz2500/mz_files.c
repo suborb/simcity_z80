@@ -42,6 +42,21 @@ static uint8_t find(const char *name)           /* the slot called name, 255 if 
     return 255;
 }
 
+/* the names of the used slots, 13 bytes each (plat_file_list: ui/platform.h) */
+uint8_t plat_file_list(char *names)
+{
+    uint8_t i, n = 0;
+
+    if (!read_dir())
+        for (i = 0; i < SLOTS; ++i)
+            if (secbuf[i * ENTRY]) {
+                memcpy(names + n * (NAME_LEN + 1), secbuf + i * ENTRY, NAME_LEN);
+                names[n++ * (NAME_LEN + 1) + NAME_LEN] = 0;
+            }
+    mz2500_disk_off();
+    return n;
+}
+
 uint8_t plat_file_save(const char *name, const uint8_t *a, uint16_t alen, const uint8_t *b, uint16_t blen)
 {
     uint16_t total = alen + blen, pos, c, k, first;

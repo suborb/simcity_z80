@@ -26,8 +26,9 @@ R_SRC2, R_OUT2, R_OUT3, R_OUT4 = 0xE800, 0xEC00, 0xF000, 0xF400
 FILES = '''        SECTION code_user
         org     $0100
         PUBLIC  asm_pc88_disk_regs
-        EXTERN  _plat_file_save, _plat_file_load
+        EXTERN  _plat_file_save, _plat_file_load, _plat_file_list
         defc    DISK = $4000
+        defc    LIST = $3C00
 start:  ld      sp,$FF00
         ld      hl,DISK
         ld      de,DISK + 1
@@ -37,7 +38,7 @@ start:  ld      sp,$FF00
         ld      ix,calls
 next:   ld      a,(ix+0)
         cp      255
-        jr      z,done
+        jr      z,lister
         ld      l,(ix+1)
         ld      h,(ix+2)
         push    hl                      ; name
@@ -73,7 +74,14 @@ called: ld      a,l
         ld      de,12
         add     ix,de
         jr      next
+lister: ld      hl,LIST
+        push    hl
+        call    _plat_file_list
+        pop     de
+        ld      a,l
+        ld      (lcount),a
 done:   halt
+lcount: defb    0
 tmp:    defb    0
 results: defs   32
 st_mode: defb   0
@@ -315,6 +323,13 @@ def files_run(calls, expect, check, title):
                 ok = False
                 msgs.append(f'{what} is not as wanted')
         sector = lambda track, sec: mem[DISK + ((track - 16) * 16 + sec - 1) * 256:DISK + ((track - 16) * 16 + sec) * 256]
+        if 'list' in check:
+            want = check['list']
+            n = mem[syms['lcount']]
+            got = [bytes(mem[0x3C00 + 13 * i:0x3C00 + 13 * i + 13]).split(b'\0')[0].decode() for i in range(n)]
+            if got != want:
+                ok = False
+                msgs.append(f'list {got}, wanted {want}')
         for what, track, sec, want in check.get('disk', []):
             if sector(track, sec) != want:
                 ok = False
@@ -349,7 +364,8 @@ def files_tests():
                       ('the header of slot 1 (BETA)', 19, 1, hdr2 + bytes(223) + b'SC'),
                       ('the first sector of slot 0\'s map', 16, 2, map2[0:256]),
                       ('the part sector after it (the second save is 600 bytes)', 16, 4, map2[512:600] + bytes(256 - 88)),
-                      ('the last sector of slot 1\'s map (a part sector)', 19, 5, map2[768:1000] + bytes(256 - 232))]}
+                      ('the last sector of slot 1\'s map (a part sector)', 19, 5, map2[768:1000] + bytes(256 - 232))],
+             'list': ['ALPHA', 'BETA']}
     # (slot 0's data came back from the second save: its map is map2's first 600 bytes at sectors 2 and 3, the part sector at 4)
     ok &= files_run(calls, [0, 0, 0, 0, 1, 1, 0, 0, 0], check, 'save two cities, load them, a missing name, a full disk, a name saved again')
 

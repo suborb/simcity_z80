@@ -16,6 +16,7 @@
         SECTION code_user
         PUBLIC  _plat_file_save
         PUBLIC  _plat_file_load
+        PUBLIC  _plat_file_list
         EXTERN  asm_x1_disk_regs
 
         defc    SLOT_TRACK0 = 24
@@ -164,6 +165,64 @@ ld_ok:
         ret
 fl_fail2:
         ld      hl,2
+        ret
+
+; uint8_t plat_file_list(char *names) __smallc: the names of the marked slots, 13 bytes each (blanks at the end cut, NUL), in slot order; returns how many
+_plat_file_list:
+        ld      hl,2
+        add     hl,sp
+        ld      e,(hl)
+        inc     hl
+        ld      d,(hl)
+        ld      (f_name),de             ; (f_name is the next entry's place here)
+        xor     a
+        ld      (f_found),a             ; the count
+        ld      (f_s),a
+fn_next:
+        ld      a,(f_s)
+        call    fl_slot_track
+        ld      d,a
+        ld      c,1
+        ld      hl,f_sector
+        xor     a
+        call    fl_io1
+        jr      nz,fn_skip
+        ld      a,(f_sector + 254)
+        cp      'S'
+        jr      nz,fn_skip
+        ld      a,(f_sector + 255)
+        cp      'C'
+        jr      nz,fn_skip
+        ld      hl,f_sector
+        ld      de,(f_name)
+        ld      bc,KEY
+        ldir
+        xor     a
+        ld      (de),a                  ; the NUL
+fn_trim:
+        dec     de
+        ld      a,(de)
+        cp      ' '
+        jr      nz,fn_cut
+        xor     a
+        ld      (de),a
+        jr      fn_trim
+fn_cut:
+        ld      hl,(f_name)
+        ld      de,KEY + 1
+        add     hl,de
+        ld      (f_name),hl
+        ld      hl,f_found
+        inc     (hl)
+fn_skip:
+        ld      a,(f_s)
+        inc     a
+        ld      (f_s),a
+        cp      SLOTS
+        jr      nz,fn_next
+        ld      a,(f_found)
+        ld      l,a
+        ld      h,0
         ret
 
 ; The disk: a = the mode (0 read, 1 write), c = the first sector, hl = the buffer; b = the sectors and the track f_t0 (fl_io), or one sector

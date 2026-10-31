@@ -12,6 +12,7 @@
 #define BOX_SIDE   "\6                            \6"
 #define HAVE_SOUND              /* the Atari ST game's effects on the AY (target/common/ay_sfx.asm, target/zxn/plat_sound.asm) */
 #define HAVE_FILES          /* saving and loading a city as a file (esxDOS, through z88dk's open, read and write) */
+#define HAVE_FILE_LIST      /* the files of the directory that are as long as a city (plat_file_list), so the player picks one */
 #define FILE_NAME_MAX 24
 #define HAVE_BUDGET
 #define HAVE_EVALUATION

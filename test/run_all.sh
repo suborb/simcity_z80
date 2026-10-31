@@ -29,6 +29,7 @@ python3 test/aqplus/run.py
 python3 test/aqplus/minirow.py
 python3 test/aqplus/text4.py
 python3 test/aqplus/mouse.py
+python3 test/aqplus/files.py
 echo
 echo "== AY sound effect player"
 python3 test/ay_sfx/run.py

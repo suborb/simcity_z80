@@ -12,6 +12,7 @@
 #define BOX_SIDE   "\6                            \6"
 #define HAVE_SOUND              /* the Atari ST game's effects on the SAA 1099 (target/common/ay_sfx.asm, target/sam/plat_sound.asm) */
 #define HAVE_FILES          /* saving and loading a city as a SAMDOS file */
+#define HAVE_FILE_LIST      /* the disk's directory is read (plat_file_list), so the player picks a file */
 #define FILE_NAME_MAX 10    /* SAMDOS names are 10 characters */
 #define HAVE_BUDGET
 #define HAVE_EVALUATION

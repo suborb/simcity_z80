@@ -391,6 +391,18 @@ extern uint8_t  sound_enabled;          /* the player's choice: 1 for sound, 0 f
    partly overwritten). */
 extern uint8_t  plat_file_save(const char *name, const uint8_t *a, uint16_t alen, const uint8_t *b, uint16_t blen);
 extern uint8_t  plat_file_load(const char *name, uint8_t *a, uint16_t alen, uint8_t *b, uint16_t blen);
+
+#ifdef HAVE_FILE_LIST
+/* HAVE_FILE_LIST (with HAVE_POPUP_MENU): the platform can list its saved cities, so the player chooses a slot.  plat_file_list()
+   fills names with up to FILE_LIST_MAX entries of FILE_LIST_ENTRY bytes (the name, NUL terminated: trailing blanks removed,
+   at most FILE_NAME_MAX or 12 characters) and returns how many.  A name it gives must be accepted by plat_file_load(). */
+#define FILE_LIST_MAX   8
+#define FILE_LIST_NONE  255             /* what plat_file_list() returns if it cannot list at all: the player types the name */
+#ifndef FILE_LIST_ENTRY
+#define FILE_LIST_ENTRY 13
+#endif
+extern uint8_t  plat_file_list(char *names);
+#endif
 #endif
 
 #endif

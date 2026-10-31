@@ -1,4 +1,5 @@
 #!/bin/sh
+# (The dialogues list the files: save chooses <NEW FILE> first; load chooses `test` from the list.)
 # Save a city (with a road built in it) as the file "test" on a copy of the disk, then load it into a fresh game from the copy:
 # the two screens must show the same map and the same funds (MAME, test/sam/go.sh).  Usage: test/sam/roundtrip.sh
 D=$(cd "$(dirname "$0")" && pwd)
@@ -8,10 +9,10 @@ typ() { K=""; f=$1; shift; for k in "$@"; do K="$K,$f|${k}|24"; f=$((f+60)); don
 SNAP=${SAM_MAME:-$HOME/emu/mame0283-arm64}/snap/samcoupe
 # the cursor may start on water, where nothing can be built: a row of cells is tried
 B=""; f=1500; for i in 1 2 3 4 5 6 7 8 9 10 11 12; do B="$B,$f|kbd_7|Space|8,$((f+40))|kbd_8|Cursor Right|8"; f=$((f+80)); done
-K1="700|kbd_3|1  !|10$B,2600|kbd_1|s  S|8$(typ 2800 'kbd_2|t  T  ]' 'kbd_2|e  E' 'kbd_1|s  S' 'kbd_2|t  T  ]' 'kbd_6|Enter')"
+K1="700|kbd_3|1  !|10$B,2600|kbd_1|s  S|8$(typ 2800 'kbd_6|Enter' 'kbd_2|t  T  ]' 'kbd_2|e  E' 'kbd_1|s  S' 'kbd_2|t  T  ]' 'kbd_6|Enter')"
 MAPADDR=$(sed -n 's/^_levelmap *= \$\([0-9A-Fa-f]*\).*/\1/p' build/sam/simcity.map)
 SAMDUMP="$MAPADDR:9216:$W/map_saved.bin" SAMDUMPAT=2590 SAMDISK=$W/disk.mgt $D/go.sh "$K1" "2560,3450" 3500 >/dev/null; cp $SNAP/0000.png $W/saved_city.png; cp $SNAP/0001.png $W/after_save.png
-K2="700|kbd_3|1  !|10,1800|kbd_6|l  L  £|8$(typ 2000 'kbd_2|t  T  ]' 'kbd_2|e  E' 'kbd_1|s  S' 'kbd_2|t  T  ]' 'kbd_6|Enter')"
+K2="700|kbd_3|1  !|10,1800|kbd_6|l  L  £|8$(typ 2000 'kbd_6|Enter')"
 SAMDUMP="$MAPADDR:9216:$W/map_loaded.bin" SAMDUMPAT=2750 SAMPEEK="$PEEK" SAMDISK=$W/disk.mgt $D/go.sh "$K2" "1760,2700" ${END2:-2800} | grep peek; cp $SNAP/0000.png $W/fresh_city.png; cp $SNAP/0001.png $W/after_load.png
 python3 - $W <<'PY'
 import sys

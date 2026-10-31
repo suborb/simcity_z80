@@ -23,6 +23,7 @@
         SECTION code_user
         PUBLIC  _plat_file_save
         PUBLIC  _plat_file_load
+        PUBLIC  _plat_file_list
         EXTERN  l_dcal
         EXTERN  mp_screen
 
@@ -34,6 +35,9 @@
         defc    HLOAD = $82
         defc    HSAVE = $84
         defc    HERAZ = $A6
+        defc    HRSAD = $A0
+        defc    CITY_LEN = 31 + 96 * 96 ; a city file's length: the header block and the map (it is 96 x 96 here)
+        defc    LIST_MAX = 8
         defc    FILE_CODE = 19
         defc    NAME = 10
         defc    DIFA = 80               ; the header the DOS passes back: this far above the UIFA
@@ -44,6 +48,7 @@
         defc    FS_SP = $C0F0
         defc    FS_LMPR_BASIC = $C0F2
         defc    FS_LMPR_OURS = $C0F3
+        defc    FS_ARGA = $C0F4         ; what the hook gets in a (HRSAD: the drive)
         defc    FS_STACK = $C100        ; (32 bytes)
         defc    FS_UIFA = $C200         ; the UIFA (48 bytes) and, 80 above it, the DIFA the DOS makes
         defc    FS_CHUNK = 128
@@ -76,6 +81,149 @@ fs_exit:
         call    mp_screen               ; (the ROM resets the palette)
         pop     hl
         pop     ix
+        ret
+
+; uint8_t plat_file_list(char *names) __smallc: the CODE files of a city's length in the disk's directory (up to LIST_MAX, in the order they are
+; kept), as names of 13 bytes, the blanks at the end cut and a NUL.  The directory is the 40 sectors of tracks 0 to 3 of drive 1, two 256
+; byte entries each, read with HRSAD into the spare page; it stops at the second sector in a row that is empty (nothing is kept after
+; that).  Returns how many; the names are collected in fs_buf and copied to the game's data at the end.
+_plat_file_list:
+        ld      hl,2
+        add     hl,sp
+        ld      e,(hl)
+        inc     hl
+        ld      d,(hl)
+        ld      (f_name),de             ; where the names go
+        push    ix
+        in      a,(HMPR)
+        and     31
+        ld      (fs_dpage),a
+        call    fs_prepare
+        xor     a
+        ld      (fl_n),a
+        ld      (fl_count),a
+        ld      (fl_gap),a
+fn_sector:
+        ld      a,FS_PAGE
+        out     (HMPR),a
+        ld      a,1
+        ld      (FS_ARGA),a             ; drive 1
+        ld      a,(fl_n)
+        ld      d,0
+fn_div: cp      10
+        jr      c,fn_ts
+        sub     10
+        inc     d
+        jr      fn_div
+fn_ts:  inc     a
+        ld      e,a                     ; d = the track, e = the sector
+        ld      hl,FS_WINDOW
+        ld      a,HRSAD
+        call    fs_dos
+        ld      a,h
+        or      l
+        jr      nz,fn_end
+        ld      a,FS_PAGE
+        out     (HMPR),a
+        xor     a
+        ld      (fl_blank),a
+        ld      hl,FS_WINDOW
+        call    fn_entry
+        ld      hl,FS_WINDOW + 256
+        call    fn_entry
+        ld      a,(fl_blank)
+        cp      2
+        ld      a,(fl_gap)
+        jr      nz,fn_nogap
+        inc     a
+        cp      2
+        jr      z,fn_end                ; two empty sectors: the end of the directory
+        jr      fn_gap
+fn_nogap:
+        xor     a
+fn_gap: ld      (fl_gap),a
+        ld      a,(fl_count)
+        cp      LIST_MAX
+        jr      nc,fn_end
+        ld      hl,fl_n
+        inc     (hl)
+        ld      a,(hl)
+        cp      40
+        jr      c,fn_sector
+fn_end:
+        ld      a,(fs_dpage)
+        out     (HMPR),a
+        ld      hl,fs_buf
+        ld      de,(f_name)
+        ld      bc,LIST_MAX * 13
+        ldir
+        ld      a,(fl_count)
+        ld      l,a
+        ld      h,0
+        jp      fs_exit
+
+; hl = a directory entry (in the spare page): a CODE file of a city's length is added to the list
+fn_entry:
+        ld      a,(hl)
+        or      a
+        jr      nz,fe_used
+        ld      a,(fl_blank)
+        inc     a
+        ld      (fl_blank),a
+        ret
+fe_used:
+        and     $3F
+        cp      FILE_CODE
+        ret     nz
+        push    hl
+        ld      de,239
+        add     hl,de
+        ld      a,(hl)                  ; the pages
+        inc     hl
+        ld      e,(hl)
+        inc     hl
+        ld      d,(hl)                  ; the length modulo 16 KB
+        pop     hl
+        or      a
+        ret     nz
+        push    hl
+        ld      hl,CITY_LEN
+        or      a
+        sbc     hl,de
+        pop     hl
+        ret     nz
+        ld      a,(fl_count)
+        cp      LIST_MAX
+        ret     nc
+        ld      e,a                     ; de = fs_buf + 13 * count
+        add     a,a
+        add     a,e
+        add     a,a
+        add     a,a
+        add     a,e
+        ld      e,a
+        ld      d,0
+        push    hl
+        ld      hl,fs_buf
+        add     hl,de
+        ex      de,hl
+        pop     hl
+        inc     hl                      ; the name
+        ld      bc,NAME
+        ldir
+        xor     a
+        ld      (de),a
+fe_trim:
+        dec     de
+        ld      a,(de)
+        cp      ' '
+        jr      nz,fe_done
+        xor     a
+        ld      (de),a
+        jr      fe_trim
+fe_done:
+        ld      hl,fl_count
+        inc     (hl)
         ret
 
 ; Note the page the game's data is in, and copy the name (it is in the data, which will not be there) to fs_name, padded with spaces
@@ -260,6 +408,7 @@ fs_prepare:
         ldir
         ld      a,(LMPR_BASIC)
         ld      (FS_LMPR_BASIC),a
+        ld      (FS_ARGA),a             ; (a hook that wants nothing in a gets what it always did)
         in      a,(LMPR)
         ld      (FS_LMPR_OURS),a
         ; fall into fs_mkuifa
@@ -321,6 +470,7 @@ fs_stub_src:
         ld      hl,FS_STUB + fs_after - fs_stub_src
         ld      (DOSER),hl              ; "return from DOS": the ROM jumps here when the hook has run, a = 0 or the error
         pop     hl
+        ld      a,(FS_ARGA)
         rst     8
 fs_hook:
         defb    0
@@ -346,4 +496,8 @@ fs_dpage: defb  0
 fs_src:  defw   0
 fs_dst:  defw   0
 fs_len:  defw   0
+fl_n:    defb   0
+fl_count: defb  0
+fl_gap:  defb   0
+fl_blank: defb  0
 fs_buf:  defs   FS_CHUNK
