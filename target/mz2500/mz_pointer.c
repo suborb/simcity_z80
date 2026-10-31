@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <arch/mz2500.h>
+#include <input.h>
 #include "platform.h"
 #include "engine.h"
 #include "ptr_driver.h"
@@ -15,7 +16,6 @@
 extern void pointer_start(void);                /* (target/common/pointer.c) */
 extern void mz_arrow(uint8_t y, uint8_t xb, const uint8_t *buf) __smallc;
 extern void mz_clearb(void);
-extern uint8_t mz_keycol(uint8_t column) __smallc;
 extern void mz_pit_init(void);
 extern uint16_t mz_pit_read(void);
 
@@ -144,24 +144,29 @@ uint8_t plat_mouse_icon_hit(void)
 }
 
 /* The keys that move the arrow, as target/common/pointer.c wants them: 1 left (O, or the cursor key), 2 right (P), 4 up (Q), 8 down (A), 16 fire (Space or Enter), 32 fast (Shift).
-   The matrix: column 3 has Space (bit 1), Enter (2) and the cursor keys (up 3, down 4, left 5, right 6), column 4 has A (1), column 5 O (7), column 6 P (0) and Q (1), column 11 Shift (2);
-   a key that is down is a 0 bit. */
+   z88dk's scan codes: the column, and the key's bit above it (the matrix is in in_keytranstbl.asm).  Shift is held for fast, so a key counts with it down too (bit 7 of the scan code). */
+#define SC(col, bit)    ((col) | (1 << (bit)) << 8)
+
+static uint8_t down(uint16_t sc)
+{
+    return in_KeyPressed(sc) || in_KeyPressed(sc | 0x80);
+}
+
 uint8_t plat_pointer_keys(void)
 {
-    uint8_t c3 = (uint8_t)~mz_keycol(3), c4 = (uint8_t)~mz_keycol(4), c5 = (uint8_t)~mz_keycol(5), c6 = (uint8_t)~mz_keycol(6), c11 = (uint8_t)~mz_keycol(11);
     uint8_t k = 0;
 
-    if ((c5 & 0x80) || (c3 & 0x20))
+    if (down(SC(5, 7)) || down(SC(3, 5)))               /* O, left */
         k |= 1;
-    if ((c6 & 0x01) || (c3 & 0x40))
+    if (down(SC(6, 0)) || down(SC(3, 6)))               /* P, right */
         k |= 2;
-    if ((c6 & 0x02) || (c3 & 0x08))
+    if (down(SC(6, 1)) || down(SC(3, 3)))               /* Q, up */
         k |= 4;
-    if ((c4 & 0x02) || (c3 & 0x10))
+    if (down(SC(4, 1)) || down(SC(3, 4)))               /* A, down */
         k |= 8;
-    if (c3 & 0x06)
+    if (down(SC(3, 1)) || down(SC(3, 2)))               /* Space, Enter */
         k |= 16;
-    if (c11 & 0x04)
+    if (in_KeyPressed(IN_KEY_SCANCODE_SHIFT))
         k |= 32;
     return k;
 }

@@ -15,7 +15,7 @@
         defc    PAGE_PLANE0 = $20
 
         PUBLIC  mz_w2, mz_w3
-        PUBLIC  _mz_pit_init, _mz_pit_read, _mz_arrow, _mz_clearb, _mz_pal4096, _mz_keyinit, _mz_keycol, _mz_cleartext, _mz_tile, _mz_glyph, _mz_glyphr, _mz_overlay, _mz_xorcell, _mz_fillb, _mz_maskb, _mz_recolour, _mz_wrline, _mz_shift, _mz_icon, _mz_setup, _mz_clear
+        PUBLIC  _mz_pit_init, _mz_pit_read, _mz_arrow, _mz_clearb, _mz_pal4096, _mz_cleartext, _mz_tile, _mz_glyph, _mz_glyphr, _mz_overlay, _mz_xorcell, _mz_fillb, _mz_maskb, _mz_recolour, _mz_wrline, _mz_shift, _mz_icon, _mz_setup, _mz_clear
 
 ; ---- helpers ------------------------------------------------------------------------------------------------------------------
 
@@ -1179,31 +1179,6 @@ _mz_pal4096:
         in      a,($c9)
         and     $fb
         out     ($c9),a
-        ret
-
-; ---- the keyboard: the Z80 PIO (port A data $E8 takes the column in bits 0-3 with bit 4 set, port B data $EA gives that column's keys, a down key a 0 bit; the bits 5-7 of port A are the
-; text screen's column size and the memory's, which are kept; control ports $E9 and $EB) ------------------------------------------------------------------------------------------
-; void mz_keyinit(void): port A output, port B input
-_mz_keyinit:
-        ld      a,$0f
-        out     ($e9),a
-        ld      a,$4f
-        out     ($eb),a
-        ret
-
-; uint8_t mz_keycol(uint8_t column) __smallc
-_mz_keycol:
-        ld      hl,2
-        add     hl,sp
-        ld      c,(hl)
-        in      a,($e8)
-        and     $e0
-        or      $10
-        or      c
-        out     ($e8),a
-        in      a,($ea)
-        ld      l,a
-        ld      h,0
         ret
 
 ; ---- void mz_cleartext(void): the text screen's video RAM (page $38, 6 KB) cleared, so the IPL's messages are gone (window 3, put back) ----------------------------------------

@@ -276,7 +276,6 @@ $(MZ2500): $(DEPS) build/mz2500/TILES.BIN build/mz2500/mz2500.inc build/mz2500/m
 	    $(MZ2500_PLATFORM) $(MZ2500_GAME) $(ENTROPY) $(MENU) $(FIELDS) $(MMNATIVE) target/common/ay_hooks.asm target/common/ay_sfx.asm -create-app -o $(@D)/simcity
 	@ls -l $(@D)/simcity $(@D)/simcity_BANK_*.bin
 
-
 # The MGT SAM Coupe in its all RAM mode, screen mode 4 (256x192, 16 colours): the program, its data and its stack in the low 32 KB, the
 # uninitialised data in the next 32 KB (which the startup code pages in over $8000-$FFFF), and the baked pictures in the 32 KB after that,
 # where the placer pages them in a picture at a time (the screen is paged over the data window to draw).  The disk image is that

@@ -6,6 +6,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <arch/mz2500.h>
+#include <input.h>
 #include "platform.h"
 #include "engine.h"
 #include "mz2500.h"
@@ -26,9 +27,7 @@ extern void mz_setup(void);
 extern void mz_snd_init(void);
 extern void ay_poll(void);                      /* a tick of the sound if a frame has begun */
 #endif
-extern void mz_keyinit(void);
 extern void mz_pal4096(void);
-extern uint8_t mz_keycol(uint8_t column) __smallc;
 extern void mz_cleartext(void);
 extern void mz_clear(void);
 
@@ -262,7 +261,6 @@ void plat_init(void)
 #ifdef HAVE_SOUND
     mz_snd_init();
 #endif
-    mz_keyinit();
     mz_cleartext();
     plat_clear();
 }
@@ -439,48 +437,29 @@ void plat_put_minirow(uint8_t ty, const uint8_t *colours, const uint8_t *base, u
 }
 
 /* ---- the keyboard ------------------------------------------------------------------------------------------------------------- */
-/* The matrix (as Takeda's source has it): 12 columns of 8 keys read through the Z80 PIO, a key down is a 0 bit (bit 0 first).  Column 11 has SHIFT (bit 2). */
-static const uint8_t keys[11][8] = {
-    { 0, 0, 0, 0, 0, 0, 0, 0 },                         /* F1 to F8 */
-    { 0, 0, 0, 0, 0, 0, 0, 0 },                         /* F9, F10 and the keypad */
-    { 0, 0, 0, 0, 0, 0, 0, 0 },
-    { 0, ' ', KEY_ENTER, KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT, 0 },
-    { '/', 'a', 'b', 'c', 'd', 'e', 'f', 'g' },
-    { 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o' },
-    { 'p', 'q', 'r', 's', 't', 'u', 'v', 'w' },
-    { 'x', 'y', 'z', '\'', '\\', 0, '.', ',' },
-    { '0', '1', '2', '3', '4', '5', '6', '7' },
-    { '8', '9', ';', '=', '-', '`', '[', 0 },
-    { ']', 0, 0, 127, 127, KEY_ESC, '*', '/' }
-};
-
+/* The keys are z88dk's (in_Inkey: the codes of its table, which is the keyboard's own layout; a key with no code gives 0). */
 static uint8_t held;                            /* the code of the key that is down, or 0 */
 static uint8_t held_for;                        /* the looks it has been down for */
 
-/* The key down now (the first in the matrix), as the game's code: letters lower case, a capital with SHIFT, SHIFT with a cursor key the eight cell move. */
+/* The key down now (the first in the matrix), as the game's code: letters lower case, a capital with SHIFT, SHIFT with a cursor key the eight cell move.  BREAK, TAB, the function keys
+   and the like have no code here. */
 static uint8_t scan(void)
 {
-    uint8_t col, bits, bit, k = 0, shift;
+    uint8_t k = (uint8_t)in_Inkey();
 
-    shift = !(mz_keycol(11) & 4);
-    for (col = 0; col < 11 && !k; ++col) {
-        bits = (uint8_t)~mz_keycol(col);
-        for (bit = 0; bit < 8 && !k; ++bit)
-            if (bits & (1 << bit))
-                k = keys[col][bit];
-    }
-    if (!k)
+    if (k == 12)                                        /* BACKSPACE (z88dk's 12) */
+        k = 127;
+    if (k < 32 && k != KEY_LEFT && k != KEY_RIGHT && k != KEY_UP && k != KEY_DOWN && k != KEY_ENTER && k != KEY_ESC)
         return 0;
-    if (shift) {
+    if (k > 127)
+        return 0;
+    if (k >= KEY_LEFT && k <= KEY_UP && in_KeyPressed(IN_KEY_SCANCODE_SHIFT)) {
         switch (k) {
         case KEY_LEFT: return KEY_FAR_LEFT;
         case KEY_RIGHT: return KEY_FAR_RIGHT;
         case KEY_UP: return KEY_FAR_UP;
         case KEY_DOWN: return KEY_FAR_DOWN;
-        case '=': return '+';
         }
-        if (k >= 'a' && k <= 'z')
-            k = (uint8_t)(k - 32);
     }
     return k;
 }
