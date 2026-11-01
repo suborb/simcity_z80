@@ -70,6 +70,9 @@ python3 test/ui/run.py | grep -E "^(PASS|FAIL)|passed|FAILED"
 echo
 echo "== builds"
 status=0
+echo "== MZ-2500 graphics and primitives against the Lua-owned memory model"
+python3 test/mz2500/gfx.py || status=1
+python3 test/mz2500/prims.py || status=1
 for t in aqplus z88rom zx multi8; do
     if make -s $t >/dev/null 2>&1; then echo "built $t"; else echo "FAIL  build $t"; status=1; fi
 done
@@ -87,6 +90,8 @@ echo "== portable power distribution: connectivity and plant capacity on both ma
 python3 test/power_scan/run.py || status=1
 echo "== SAM Coupe: the animations' routine (mp_anim) against its tables, under z88dk-ticks"
 python3 test/sam/anim_check.py || status=1
+echo "== SAM Coupe: LMPR/HMPR pages, ROM overlays and reads/writes under z88dk-ticks"
+python3 test/sam/memory_check.py || status=1
 if [ -n "$SAM_MAME" ]; then
     echo "== SAM Coupe: save a city as a SAMDOS file and load it back (MAME in \$SAM_MAME; make sam first)"
     test/sam/roundtrip.sh || status=1

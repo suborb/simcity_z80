@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """The Z88's sound routines (target/z88/plat_sound.asm) play the Spectrum's effects through the COM register.
 
-Each routine is run under z88dk-ticks with its trace on, from which every byte written to port $B0 (the COM
-register) is read.  What is checked:
+Each routine is run under z88dk-ticks with Lua capturing every byte written to port $B0 (the COM register). What is checked:
   * the speaker is bit 6 and SRUN (bit 7) is left clear while a sound plays;
   * COM is put back as OZ had it (its copy at $04B0) at the end;
   * the number of writes is what the Spectrum's loops make: soundfx1 writes once for every step of 200 where
@@ -62,18 +61,21 @@ stop:   jp      stop
     image[syms['_sound_enabled']] = enabled
     path = os.path.join(tmp, 'driver.img')
     open(path, 'wb').write(image)
-    # -trace prints the registers before each instruction: the value written by OUT ($B0),A is A in the block above it
-    p = subprocess.Popen(['z88dk-ticks', '-trace', '-pc', '100', '-end', f'{syms["stop"]:x}', '-counter', '2000000000', path],
-                         stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, errors='replace')
-    out = bytearray()
-    a = 0
-    for line in p.stdout:
-        if line.startswith('pc='):
-            a = int(line[line.index('af=') + 3:line.index('af=') + 5], 16)
-        elif 'out       ($b0),a' in line:
-            out.append(a)
-    p.wait()
-    return bytes(out)
+    lua = """local writes = assert(io.open("writes.bin", "wb"))
+function io_out(port, value, cycles)
+    if (port & 0xff) == 0xb0 then
+        writes:write(string.char(value))
+        return 0
+    end
+    return -1
+end
+"""
+    open(os.path.join(tmp, 'device.lua'), 'w').write(lua)
+    p = subprocess.run(['z88dk-ticks', '-lua', 'device.lua', '-pc', '100', '-end', f'{syms["stop"]:x}', '-counter', '2000000000', path],
+                       cwd=tmp, capture_output=True, text=True)
+    if p.returncode:
+        raise RuntimeError(p.stdout + p.stderr)
+    return open(os.path.join(tmp, 'writes.bin'), 'rb').read()
 
 
 def main():

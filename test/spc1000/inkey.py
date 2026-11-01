@@ -1,15 +1,23 @@
 #!/usr/bin/env python3
-"""Host test of z88dk's SPC-1000 in_Inkey (libsrc/target/spc1000/input/in_Inkey.asm) under z88dk-ticks: the routine is assembled with its port reads
-(IN A,(C) with B = $80) turned into memory reads of a fake matrix at $8000 to $8009 (a clear bit is a key down), and each case is run.
+"""Host test of z88dk's SPC-1000 in_Inkey (libsrc/target/spc1000/input/in_Inkey.asm) under z88dk-ticks: Lua models port reads from the keyboard matrix at $8000 to $8009 (a clear bit is a key down), and each case is run.
 usage: test/spc1000/inkey.py"""
 import os, re, subprocess, sys, tempfile
-Z = os.path.expanduser('~/z88dk/libsrc/target/spc1000/input')
+Z88DK_ROOT = os.path.abspath(os.path.join(os.environ.get('ZCCCFG', os.path.expanduser('~/z88dk/lib/config')), '../..'))
+Z = os.path.join(Z88DK_ROOT, 'libsrc/target/spc1000/input')
+
+LUA = '''local rows = {%ROWS%}
+function io_in(port, cycles)
+    local row = port & 0xff
+    if row < #rows then return rows[row + 1] end
+    return -1
+end
+'''
+TICKS = 'z88dk-ticks'
 
 def main():
     tbl = open(os.path.join(Z, 'in_keytranstbl.asm')).read()
     src = open(os.path.join(Z, 'in_Inkey.asm')).read()
     assert re.search(r'in\s+a,\s*\(c\)', src)
-    src = re.sub(r'in\s+a,\s*\(c\)', 'ld a,(bc)', src)
     work = tempfile.mkdtemp()
     # the codes of the unshifted table, row r, bit b
     codes = {}
@@ -46,14 +54,16 @@ carry:  defb 0
         """pressed: list of (row, bit) down in rows 1-9; returns (hl, carry)"""
         mem = bytearray(65536)
         mem[0x2000:0x2000 + len(code)] = code
-        for i in range(10):
-            mem[0x8000 + i] = 0xFF
+        rows = [0xFF] * 10
         for r, b in pressed:
-            mem[0x8000 + r] &= ~(1 << b) & 0xFF
-        if shift: mem[0x8000] &= ~0x02 & 0xFF
-        if ctrl: mem[0x8000] &= ~0x04 & 0xFF
+            rows[r] &= ~(1 << b) & 0xFF
+        if shift: rows[0] &= ~0x02 & 0xFF
+        if ctrl: rows[0] &= ~0x04 & 0xFF
         open(os.path.join(work, 'i.bin'), 'wb').write(mem)
-        subprocess.run(['z88dk-ticks', '-pc', '2000', '-end', format(sym('done'), 'x'), '-output', os.path.join(work, 'o.bin'), os.path.join(work, 'i.bin')], capture_output=True)
+        open(os.path.join(work, 'device.lua'), 'w').write(LUA.replace('%ROWS%', ','.join(map(str, rows))))
+        run = subprocess.run([TICKS, '-pc', '2000', '-end', format(sym('done'), 'x'), '-lua', 'device.lua', '-output', os.path.join(work, 'o.bin'), os.path.join(work, 'i.bin')], cwd=work, capture_output=True, text=True)
+        if run.returncode:
+            raise RuntimeError(run.stdout + run.stderr)
         o = open(os.path.join(work, 'o.bin'), 'rb').read()
         return o[sym('result')] | o[sym('result') + 1] << 8, o[sym('carry')]
 

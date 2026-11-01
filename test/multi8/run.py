@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
-"""The Multi 8 placer (target/multi8/plat_multi8.asm) under z88dk-ticks, with the machine's video paging modelled.
+"""Test the Multi 8 placer with its Lua-backed ticks memory model.
 
-z88dk-ticks has flat memory, so the placer runs with its instruction trace on and this script replays the trace
-against a model of the machine: port $2A (bits 0-3 active low: blue, red, green and the text page are paged over
-$8000-$BFFF; bit 4 clear is the plain RAM underneath), where a read is the AND of the pages paged in and a write
-goes to each.  The model is the same as MAME's (src/mame/mitsubishi/multi8.cpp).
+The model at z88dk/lib/ticks/memory/multi8.lua implements port $2A paging for blue, red, green and text planes in
+$8000-$BFFF. Python compares exported planes with expected output and checks the stack and final machine state.
 
 The placer is called the way the game's C code calls it (five words on the stack, smallc) for corner, edge and random
 cells in every colour combination, plain and inverse, and for text; then plat_init and plat_clear.  Each plane of the
@@ -14,7 +12,6 @@ behind, and that the placer touched nothing in $8000-$BFFF while a plane was pag
   usage: test/multi8/run.py
 """
 import os
-import shutil
 import random
 import re
 import subprocess
@@ -24,6 +21,9 @@ import tempfile
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 Z80ASM = 'z88dk-z80asm'
 TICKS = 'z88dk-ticks'
+Z88DK = os.environ.get('Z88DK', os.path.expanduser('~/z88dk'))
+os.environ.setdefault('ZCCCFG', os.path.join(Z88DK, 'lib', 'config'))
+LUA_MODEL = 'multi8.lua'
 ROWS, COLS = 25, 40
 IDLE = 0x2F
 
@@ -212,86 +212,44 @@ cases:
 
 
 class Machine:
-    """The video memory behind $8000-$BFFF and the port that pages it."""
+    """Results exported by the Lua model after the harness runs."""
 
     def __init__(self):
         self.port = IDLE
-        self.planes = [bytearray(0x4000) for _ in range(4)]     # blue, red, green, text
-        self.wram_writes = 0                                    # stores to the RAM underneath
-        self.stray = []                                         # accesses a placer must not make while paged in
-        self.ports = {}
+        self.planes = []
+        self.wram_writes = 0
+        self.ports = []
         self.snapshot = None
-        self.low = {}                                           # the stores to the low RAM that a block copy to the screen reads
 
-    def paged(self):
-        return bool(self.port & 0x10)
-
-    def write(self, addr, val):
-        off = addr - 0x8000
-        if not self.paged():
-            self.wram_writes += 1
-            return
-        for p in range(4):
-            if not self.port & (1 << p):
-                self.planes[p][off] = val
-
-    def read(self, addr):
-        off = addr - 0x8000
-        if not self.paged():
-            return 0
-        res = 0xFF
-        for p in range(4):
-            if not self.port & (1 << p):
-                res &= self.planes[p][off]
-        return res
+    def load_lua(self, tmp, snapshot=False):
+        raw = open(os.path.join(tmp, 'planes.bin'), 'rb').read()
+        self.planes = [bytearray(raw[i * 0x4000:(i + 1) * 0x4000]) for i in range(4)]
+        if snapshot:
+            raw = open(os.path.join(tmp, 'snapshot.bin'), 'rb').read()
+            self.snapshot = [bytearray(raw[i * 0x4000:(i + 1) * 0x4000]) for i in range(4)]
+        fields = dict(line.strip().split('=') for line in open(os.path.join(tmp, 'model.txt')))
+        self.port = int(fields['port'])
+        self.wram_writes = int(fields['wram_writes'])
+        with open(os.path.join(tmp, 'ports.txt')) as f:
+            self.ports = [(int(a), int(b)) for a, b in (line.split() for line in f)]
 
 
-def replay(trace_path, m, snap_pc):
-    """Replay the trace: only the instructions that write to the screen or the port matter."""
-    regs = {}
-    or_mask = None
-    reg_re = re.compile(r'pc=(\w+), \[pc\]=\w+,\s+bc=(\w+),\s+de=(\w+),\s+hl=(\w+),\s+af=(\w+)')
-    ins_re = re.compile(r'^\s+(\S.*?)\s+;\[(\w+)\]')
-    out_log = []
-    n = 0
-    with open(trace_path, errors='replace') as f:
-        for line in f:
-            if line.startswith('pc='):
-                g = reg_re.match(line)
-                regs = {'pc': int(g.group(1), 16), 'bc': int(g.group(2), 16), 'de': int(g.group(3), 16), 'hl': int(g.group(4), 16),
-                        'a': int(g.group(5), 16) >> 8}
-                continue
-            if not line.startswith(' '):
-                continue
-            g = ins_re.match(line)
-            if not g:
-                continue
-            n += 1
-            if regs['pc'] == snap_pc and m.snapshot is None:
-                m.snapshot = [bytearray(pl) for pl in m.planes]      # the screen before plat_clear
-            text = re.sub(r'\s+', ' ', g.group(1))
-            hl, de, a = regs['hl'], regs['de'], regs['a']
-            if text.startswith('out ('):
-                port = int(text[5:text.index(')')].replace('$', ''), 16)
-                if port == 0x2A:
-                    m.port = a
-                else:
-                    out_log.append((port, a))
-            elif text == 'or (hl)' and m.paged() and 0x8000 <= hl < 0xC000:
-                or_mask = a                                  # the flat memory the tracer runs in has no planes: a is worked out here
-            elif text == 'ld (hl),a' and hl >= 0x8000 and hl < 0xC000:
-                m.write(hl, a if or_mask is None else or_mask | m.read(hl))
-                or_mask = None
-            elif text == 'ld (hl),a' and hl < 0x8000:
-                m.low[hl] = a
-            elif text.startswith('ld (hl),$') and 0x8000 <= hl < 0xC000:
-                m.write(hl, int(text[len('ld (hl),$'):], 16))
-            elif text == 'ldir':
-                if 0x8000 <= de < 0xC000:
-                    m.write(de, m.read(hl) if 0x8000 <= hl < 0xC000 else m.low.get(hl, 0))
-            elif m.paged() and re.search(r'\((?:hl|de|bc)\)', text) and 0x8000 <= (hl if '(hl)' in text else de) < 0xC000:
-                pass
-    return out_log, n
+def instrument(src, snapshot=False):
+    if snapshot:
+        src = src.replace('textdone:\n        call    _plat_clear',
+                          'textdone:\n        ld      a,1\n        out     ($FE),a\n        call    _plat_clear')
+    return src.replace('fin:    halt', '        ld      a,2\n        out     ($FE),a\nfin:    halt')
+
+
+def run_ticks(tmp, syms, snapshot=False, counter='400000000'):
+    result = subprocess.run([TICKS, '-b', 'lua', '-lua', LUA_MODEL, '-pc', '100', '-end', f'{syms["fin"]:x}',
+                             '-counter', counter, '-output', 'mem.out', 'img.bin'],
+                            cwd=tmp, capture_output=True, text=True)
+    if result.returncode:
+        raise RuntimeError(f'z88dk-ticks failed: {result.stdout}{result.stderr}')
+    m = Machine()
+    m.load_lua(tmp, snapshot)
+    return open(os.path.join(tmp, 'mem.out'), 'rb').read(), m
 
 
 def main():
@@ -352,6 +310,7 @@ def main():
     ov = ''.join(f'        defb {c},{r}\n        defw art+{a * 8}\n' for c, r, a in overlays) + '        defb 255\n'
     bk = lambda cs: ''.join(f'        defb {c},{r}\n        defw _view_tile_art+{n * 8}\n        defb 0,{iv}\n' for c, r, n, iv in cs) + '        defb 255\n'
     src = HARNESS.replace('CELLREC', str(CELLREC)).replace('        CASES2\n', c2).replace('        OVERLAYS\n', ov).replace('        BCASES2\n', bk(baked2)).replace('        BCASES\n', bk(baked)).replace('        BITMAPS\n', bspec).replace('        TEXTS\n', tspec)
+    src = instrument(src, snapshot=True)
     for col, row, a, attr, inv in spec:
         src += f'        defb {col},{row}\n        defw art+{a * 8}\n        defb {attr},{inv}\n'
     src += '        defb 255\nart:\n'
@@ -437,16 +396,10 @@ def main():
         if syms.get('__code_user_head', 0x100) != 0x100:
             print('FAIL  the harness is not at $0100'); return 1
         open(os.path.join(tmp, 'img.bin'), 'wb').write(img)
-        with open(os.path.join(tmp, 'trace.txt'), 'w') as tf:
-            subprocess.run([TICKS, '-pc', '100', '-end', f'{syms["fin"]:x}', '-counter', '400000000', '-trace',
-                            '-output', 'mem.out', 'img.bin'], cwd=tmp, stdout=tf, stderr=subprocess.DEVNULL)
+        mem, m = run_ticks(tmp, syms, snapshot=True)
         if os.environ.get('MP_SYMS'):
             print({k: hex(v) for k, v in syms.items() if k in ('mp_tiles', 'mp_cache', 'mp_pix3', 'mp_scr', '_view_tile_art', '__data_fcntl_head', '__data_user_head', '__bss_user_head', '__code_user_head', '__rodata_user_head', 'start', 'art', 'cases', 'bcases')})
-        if os.environ.get('MP_KEEP'):
-            shutil.copy(os.path.join(tmp, 'trace.txt'), os.environ['MP_KEEP'])
-        mem = open(os.path.join(tmp, 'mem.out'), 'rb').read()
-        m = Machine()
-        ports, count = replay(os.path.join(tmp, 'trace.txt'), m, syms['textdone'])
+        ports = [(p, v) for p, v in m.ports if p != 0xfe]
 
     before_clear = [bytearray(pl) for pl in model]
     # plat_clear: all three planes are 0, then the one cell drawn after it
@@ -487,7 +440,7 @@ def main():
     want = [(0x29, 0x45), (0x1C, 6), (0x1D, 25), (0x1C, 9), (0x1D, 7)]
     print(('PASS' if ports == want else 'FAIL') + f'  plat_init sets the colour 80 column display and the CRT controller {[(hex(a), hex(b)) for a, b in ports]}')
     ok &= ports == want
-    print(f'      ({count} instructions replayed, {m.wram_writes} stores went to the RAM under the screen)')
+    print(f'      ({m.wram_writes} stores went to the RAM under the screen)')
     ok &= minirow_test()
     ok &= minirow_art_test()
     return 0 if ok else 1
@@ -548,7 +501,7 @@ nextrow:
         cp      255
         jr      z,rowsdone
         ld      e,(ix+1)
-        ld      d,(ix+2)                ; the row's data: into mm_row a byte at a time (the replay sees only these stores)
+        ld      d,(ix+2)                ; the row's source data
         ld      hl,_mm_row
         ld      bc,432
 fill:   ld      a,(de)
@@ -590,6 +543,7 @@ def minirow_art_test():
     data = [bytes(rng.randrange(256) for _ in range(432)) for _ in sel]
     src = HARNESS_ART.replace('        ROWS\n', ''.join(f'        defb {sy}\n        defw d{i}\n' for i, sy in enumerate(sel)) + '        defb 255\n'
                               + ''.join(f'd{i}:     defb {",".join(str(c) for c in d)}\n' for i, d in enumerate(data)))
+    src = instrument(src)
     model = [bytearray(0x4000) for _ in range(3)]
     for sy, d in zip(sel, data):
         for k in range(3):
@@ -623,12 +577,7 @@ def minirow_art_test():
             b = open(first, 'rb').read()
             img[0x100:0x100 + len(b)] = b
         open(os.path.join(tmp, 'img.bin'), 'wb').write(img)
-        with open(os.path.join(tmp, 'trace.txt'), 'w') as tf:
-            subprocess.run([TICKS, '-pc', '100', '-end', f'{syms["fin"]:x}', '-counter', '400000000', '-trace',
-                            '-output', 'mem.out', 'img.bin'], cwd=tmp, stdout=tf, stderr=subprocess.DEVNULL)
-        mem = open(os.path.join(tmp, 'mem.out'), 'rb').read()
-        m = Machine()
-        replay(os.path.join(tmp, 'trace.txt'), m, -1)
+        mem, m = run_ticks(tmp, syms)
     bad = [(p, i) for p in range(3) for i in range(80 * 200) if m.planes[p][i] != model[p][i]]
     sp = mem[syms['sp_end']] | mem[syms['sp_end'] + 1] << 8
     ok = not bad and sp == 0x7000 and m.port == IDLE
@@ -648,6 +597,7 @@ def minirow_test():
     data[8] = [x ^ 7 for x in data[7]]                              # (colour bit 3 is a tile of the base map: a checker)
     src = HARNESS_ROWS.replace('        ROWS\n', ''.join(f'        defb {sy}\n        defw d{i}\n' for i, sy in enumerate(sel)) + '        defb 255\n'
                                 + ''.join(f'd{i}:     defb {",".join(str(c) for c in d)}\n' for i, d in enumerate(data)))
+    src = instrument(src)
     model = [bytearray(0x4000) for _ in range(3)]
     for sy, d in zip(sel, data):
         for x, c in enumerate(d):
@@ -684,12 +634,7 @@ def minirow_test():
             b = open(first, 'rb').read()
             img[0x100:0x100 + len(b)] = b
         open(os.path.join(tmp, 'img.bin'), 'wb').write(img)
-        with open(os.path.join(tmp, 'trace.txt'), 'w') as tf:
-            subprocess.run([TICKS, '-pc', '100', '-end', f'{syms["fin"]:x}', '-counter', '400000000', '-trace',
-                            '-output', 'mem.out', 'img.bin'], cwd=tmp, stdout=tf, stderr=subprocess.DEVNULL)
-        mem = open(os.path.join(tmp, 'mem.out'), 'rb').read()
-        m = Machine()
-        replay(os.path.join(tmp, 'trace.txt'), m, -1)
+        mem, m = run_ticks(tmp, syms)
         top = mem[syms['mm_msk'] - 1:syms['mm_msk']]               # (the buffer's variables are in the low RAM: no check needed)
     bad = [(p, i) for p in range(3) for i in range(80 * 200) if m.planes[p][i] != model[p][i]]
     sp = mem[syms['sp_end']] | mem[syms['sp_end'] + 1] << 8

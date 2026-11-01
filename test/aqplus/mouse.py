@@ -2,25 +2,27 @@
 """z88dk's Aquarius+ mouse (in_MouseAQPlus and its SetPos, libsrc/target/aquarius/input) under z88dk-ticks, with the ESP32's answers scripted.
 
 The ESP32 answers GETMOUSE with its own position, or an error: the driver must keep a position of its own that the mouse's movement is added to, limited to
-0..319 by 0..199, that SetPos can move, and with no mouse must give no buttons and leave the position alone.  The two ESP routines are stubs here that
-hand out the bytes of the script.
+0..319 by 0..199, that SetPos can move, and with no mouse must give no buttons and leave the position alone.  The test assembles the real ESP port routines; Lua models the ESP32 control and data ports.
 
   usage: test/aqplus/mouse.py
 """
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
-Z88DK = os.environ.get('ZCCCFG', os.path.expanduser('~/z88dk/lib/config')) + '/../../libsrc/target/aquarius/input'
+Z88DK_ROOT = os.path.abspath(os.path.join(os.environ.get('ZCCCFG', os.path.expanduser('~/z88dk/lib/config')), '../..'))
+Z88DK = os.path.join(Z88DK_ROOT, 'libsrc/target/aquarius/input')
+ESP = os.path.join(Z88DK_ROOT, 'libsrc/target/aquarius/fcntl/esp.asm')
+Z88DK_LIB = os.path.join(Z88DK_ROOT, 'lib')
 FILES = ['INMouseAQPlus.asm', 'in_MouseAQPlus_callee.asm', 'in_MouseAQPlusInit.asm', 'in_MouseAQPlusSetPos_callee.asm']
 
 HARNESS = '''        SECTION code_user
         org     $2000
         EXTERN  in_MouseAQPlus_callee, in_MouseAQPlusInit, in_MouseAQPlusSetPos_callee
-        PUBLIC  __esp_send_cmd, __esp_read_byte
 start:  ld      sp,$7000
         ld      ix,ops
         ld      iy,results
@@ -63,25 +65,35 @@ read:   ld      hl,buttons
         add     iy,de
         jr      next
 fin:    halt
-__esp_send_cmd:
-        ret
-__esp_read_byte:
-        push    hl
-        ld      hl,(script)
-        ld      a,(hl)
-        inc     hl
-        ld      (script),hl
-        pop     hl
-        ret
-script: defw    stream
 buttons: defb   0
 xcoord: defw    0
 ycoord: defw    0
 ops:    %OPS%
         defb    255
-stream: %STREAM%
-        defs    16
 results: defs   200
+'''
+
+
+LUA = '''local stream = {%STREAM%}
+local next_byte = 1
+
+function io_in(port, cycles)
+    port = port & 0xff
+    if port == 0xf4 then return 1 end -- ESP ready for writes and reads
+    if port == 0xf5 then
+        local value = stream[next_byte]
+        assert(value ~= nil, "ESP data read past scripted answer")
+        next_byte = next_byte + 1
+        return value
+    end
+    return -1
+end
+
+function io_out(port, value, cycles)
+    port = port & 0xff
+    if port == 0xf4 or port == 0xf5 then return 0 end
+    return -1
+end
 '''
 
 READ, INIT, SETPOS = 0, 1, 2
@@ -120,11 +132,21 @@ def main():
             stream += arg
         if op == READ:
             expect.append(want)
-    src = HARNESS.replace('%OPS%', '\n        '.join(ops)).replace('%STREAM%', 'defb ' + ','.join(map(str, stream)) if stream else '')
+    src = HARNESS.replace('%OPS%', '\n        '.join(ops))
+    lua = LUA.replace('%STREAM%', ','.join(map(str, stream)))
     ok = True
     with tempfile.TemporaryDirectory() as tmp:
         open(os.path.join(tmp, 'h.asm'), 'w').write(src)
-        out = subprocess.run(['z88dk-z80asm', '-b', '-m', 'h.asm'] + [os.path.join(Z88DK, f) for f in FILES],
+        open(os.path.join(tmp, 'device.lua'), 'w').write(lua)
+        sources = []
+        for name in FILES:
+            dest = os.path.join(tmp, name)
+            shutil.copyfile(os.path.join(Z88DK, name), dest)
+            sources.append(dest)
+        esp = os.path.join(tmp, 'esp.asm')
+        shutil.copyfile(ESP, esp)
+        sources.append(esp)
+        out = subprocess.run(['z88dk-z80asm', '-b', '-m', '-I' + Z88DK_LIB, 'h.asm'] + sources,
                              cwd=tmp, capture_output=True, text=True)
         if out.returncode or out.stderr.strip():
             print(out.stdout + out.stderr)
@@ -139,8 +161,12 @@ def main():
         img = bytearray(65536)
         img[0x2000:0x2000 + len(code)] = code
         open(os.path.join(tmp, 'img.bin'), 'wb').write(img)
-        subprocess.run(['z88dk-ticks', '-pc', '2000', '-end', f'{syms["fin"]:x}', '-counter', '10000000', '-output', 'mem.out', 'img.bin'],
-                       cwd=tmp, capture_output=True)
+        ticks = subprocess.run(['z88dk-ticks', '-pc', '2000', '-end', f'{syms["fin"]:x}', '-counter', '10000000', '-lua', 'device.lua', '-output', 'mem.out', 'img.bin'],
+                               cwd=tmp, capture_output=True, text=True)
+        if ticks.returncode:
+            print(ticks.stdout + ticks.stderr)
+            print('FAIL  ticks could not run the Lua ESP model')
+            return 1
         mem = open(os.path.join(tmp, 'mem.out'), 'rb').read()
     base = syms['results']
     for i, want in enumerate(expect):

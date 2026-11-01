@@ -1,19 +1,22 @@
 #!/usr/bin/env python3
 """The Aquarius+ file lister (target/aqplus/aq_files.asm) under z88dk-ticks, with the ESP32's answers scripted.
 
-The ESP routines are stubs: they log the commands and bytes sent, and hand out the bytes of the script (the answers to OPENDIR, READDIR... as
-the firmware gives them: the result, date, time, attributes, a 32 bit size and the NUL terminated name).  Python then looks at the names, the
-count and what was sent.
+The test assembles the real ESP port routines. Lua models the ESP32 control and data ports, logs writes, and hands out the scripted answers to OPENDIR, READDIR... as
+the firmware gives them: result, date, time, attributes, a 32 bit size and a NUL-terminated name. Python checks the names, count and sent bytes.
 
   usage: test/aqplus/files.py
 """
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+Z88DK_ROOT = os.path.abspath(os.path.join(os.environ.get('ZCCCFG', os.path.expanduser('~/z88dk/lib/config')), '../..'))
+ESP = os.path.join(Z88DK_ROOT, 'libsrc/target/aquarius/fcntl/esp.asm')
+Z88DK_LIB = os.path.join(Z88DK_ROOT, 'lib')
 CITY = 31 + 96 * 96
 ENTRY = 25
 NAMES = 0x6000
@@ -21,7 +24,6 @@ NAMES = 0x6000
 HARNESS = '''        SECTION code_user
         org     $2000
         EXTERN  _plat_file_list
-        PUBLIC  __esp_send_cmd, __esp_send_byte, __esp_read_byte
 start:  ld      sp,$7000
         ld      hl,%NAMES%
         push    hl
@@ -29,42 +31,43 @@ start:  ld      sp,$7000
         pop     de
         ld      (count),hl
 fin:    halt
-__esp_send_cmd:
-        push    hl
-        ld      hl,(lp)
-        ld      (hl),$C0
-        inc     hl
-        ld      (hl),a
-        inc     hl
-        ld      (lp),hl
-        pop     hl
-        ret
-__esp_send_byte:
-        push    hl
-        ld      hl,(lp)
-        ld      (hl),$B0
-        inc     hl
-        ld      (hl),a
-        inc     hl
-        ld      (lp),hl
-        pop     hl
-        ret
-__esp_read_byte:
-        push    hl
-        ld      hl,(script)
-        ld      a,(hl)
-        inc     hl
-        ld      (script),hl
-        pop     hl
-        ret
-lp:     defw    log
-script: defw    stream
 count:  defw    0
-stream: %STREAM%
-        defs    16
-log:    defs    256
 '''
 
+
+LUA = '''local stream = {%STREAM%}
+local next_byte = 1
+local command = false
+local log = assert(io.open("io.log", "w"))
+
+function io_in(port, cycles)
+    port = port & 0xff
+    if port == 0xf4 then return 1 end -- ESP ready for writes and reads
+    if port == 0xf5 then
+        local value = stream[next_byte]
+        assert(value ~= nil, "ESP data read past scripted answer")
+        next_byte = next_byte + 1
+        return value
+    end
+    return -1
+end
+
+function io_out(port, value, cycles)
+    port = port & 0xff
+    if port == 0xf4 then
+        assert(value == 0x83, "unexpected ESP control write")
+        command = true
+        return 0
+    end
+    if port == 0xf5 then
+        log:write(command and "cmd " or "byte ", value, "\\n")
+        log:flush()
+        command = false
+        return 0
+    end
+    return -1
+end
+'''
 
 def entry(name, size=CITY, attr=0):
     return [0, 1, 2, 3, 4, attr] + list(size.to_bytes(4, 'little')) + list(name.encode()) + [0]
@@ -76,9 +79,15 @@ def run(title, files, want, extra_sent=None):
         stream += entry(*f) if isinstance(f, tuple) else entry(f)
     stream += [0xFC, 0]                               # ERR_EOF, and the answer to CLOSEDIR
     with tempfile.TemporaryDirectory() as tmp:
-        src = HARNESS.replace('%NAMES%', str(NAMES)).replace('%STREAM%', 'defb ' + ','.join(map(str, stream)))
+        src = HARNESS.replace('%NAMES%', str(NAMES))
+        lua = LUA.replace('%STREAM%', ','.join(map(str, stream)))
         open(os.path.join(tmp, 'h.asm'), 'w').write(src)
-        out = subprocess.run(['z88dk-z80asm', '-b', '-m', 'h.asm', os.path.join(ROOT, 'target/aqplus/aq_files.asm')], cwd=tmp, capture_output=True, text=True)
+        open(os.path.join(tmp, 'device.lua'), 'w').write(lua)
+        aq_files = os.path.join(tmp, 'aq_files.asm')
+        esp = os.path.join(tmp, 'esp.asm')
+        shutil.copyfile(os.path.join(ROOT, 'target/aqplus/aq_files.asm'), aq_files)
+        shutil.copyfile(ESP, esp)
+        out = subprocess.run(['z88dk-z80asm', '-b', '-m', '-I' + Z88DK_LIB, 'h.asm', aq_files, esp], cwd=tmp, capture_output=True, text=True)
         if out.returncode or out.stderr.strip():
             print(out.stdout + out.stderr)
             print('FAIL  ' + title + ': does not assemble')
@@ -93,16 +102,17 @@ def run(title, files, want, extra_sent=None):
             b = open(os.path.join(tmp, f'h_{sec}.bin'), 'rb').read()
             img[syms[f'__{sec}_head']:syms[f'__{sec}_head'] + len(b)] = b
         open(os.path.join(tmp, 'img.bin'), 'wb').write(img)
-        subprocess.run(['z88dk-ticks', '-pc', '2000', '-end', f'{syms["fin"]:x}', '-counter', '10000000', '-output', 'mem.out', 'img.bin'],
-                       cwd=tmp, capture_output=True)
+        ticks = subprocess.run(['z88dk-ticks', '-pc', '2000', '-end', f'{syms["fin"]:x}', '-counter', '10000000', '-lua', 'device.lua', '-output', 'mem.out', 'img.bin'],
+                               cwd=tmp, capture_output=True, text=True)
+        if ticks.returncode:
+            print(ticks.stdout + ticks.stderr)
+            print('FAIL  ' + title + ': ticks could not run the Lua ESP model')
+            return False
         mem = open(os.path.join(tmp, 'mem.out'), 'rb').read()
+        io_log = open(os.path.join(tmp, 'io.log')).read().splitlines()
     n = mem[syms['count']]
     got = [bytes(mem[NAMES + ENTRY * i:NAMES + ENTRY * (i + 1)]).split(b'\0')[0].decode() for i in range(n)]
-    log = mem[syms['log']:syms['log'] + 64]
-    sent = []
-    for i in range(0, 64, 2):
-        if log[i] in (0xC0, 0xB0):
-            sent.append(('cmd' if log[i] == 0xC0 else 'byte', log[i + 1]))
+    sent = [(kind, int(value)) for kind, value in (line.split() for line in io_log)]
     ok = got == want
     msgs = [] if ok else [f'listed {got}, wanted {want}']
     if sent[:3] != [('cmd', 0x16), ('byte', 0), ('cmd', 0x18)] or ('cmd', 0x17) not in sent:

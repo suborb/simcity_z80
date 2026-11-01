@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """The AY sound effect player (target/common/ay_sfx.asm) under z88dk-ticks.
 
-Every effect in assets/st_sounds.bin is started and ticked until it has finished and a little more; the writes to the chip's ports (found in
-the instruction trace) are compared tick by tick with what tools/extract_st_sounds.py's own decoder says the packed effect holds: the three
+Every effect in assets/st_sounds.bin is started and ticked until it has finished and a little more; Lua captures the writes to the chip's ports, which are compared tick by tick with what tools/extract_st_sounds.py's own decoder says the packed effect holds: the three
 registers set at the start, then for each tick channel C's tone (two registers), its noise and its volume, then silence.  Also with the
 frame skip that makes 50 Hz of a 60 Hz display (AY_SKIP) and with the Multi 8's ports.
 
@@ -21,6 +20,24 @@ import extract_st_sounds as st                      # (its packer and its decode
 
 Z80ASM = 'z88dk-z80asm'
 TICKS = 'z88dk-ticks'
+
+IO_LUA = """local addr_port = %ADDR%
+local data_port = %DATA%
+local full_decode = %FULL%
+local log = assert(io.open("io.bin", "wb"))
+local function matches(port, wanted)
+    if full_decode then return port == wanted end
+    return (port & 0xff) == wanted
+end
+function io_out(port, value, cycles)
+    local low = port & 0xff
+    if low == 0xfd then log:write(string.char(0, value)); return 0 end
+    if low == 0xfe then log:write(string.char(1, value)); return 0 end
+    if matches(port, addr_port) then log:write(string.char(2, value)); return 0 end
+    if matches(port, data_port) then log:write(string.char(3, value)); return 0 end
+    return -1
+end
+"""
 
 HARNESS = '''        SECTION code_user
         org     $2000
@@ -48,7 +65,7 @@ PLAN
 '''
 
 
-def run_trace(effects_ticks, defines, addr_port, data_port):
+def run_io(effects_ticks, defines, addr_port, data_port):
     with tempfile.TemporaryDirectory() as tmp:
         plan = ''.join(f'        defb {e},{t}\n' for e, t in effects_ticks) + '        defb 255\n'
         open(os.path.join(tmp, 'h.asm'), 'w').write(HARNESS.replace('PLAN\n', plan))
@@ -66,39 +83,27 @@ def run_trace(effects_ticks, defines, addr_port, data_port):
         img = bytearray(65536)
         img[0x2000:0x2000 + len(code)] = code
         open(os.path.join(tmp, 'img.bin'), 'wb').write(img)
-        with open(os.path.join(tmp, 'trace.txt'), 'w') as tf:
-            subprocess.run([TICKS, '-pc', '2000', '-end', f'{syms["fin"]:x}', '-counter', '400000000', '-trace', 'img.bin'],
-                           cwd=tmp, stdout=tf, stderr=subprocess.DEVNULL)
-        reg_re = re.compile(r'pc=(\w+), \[pc\]=\w+,\s+bc=(\w+),\s+de=(\w+),\s+hl=(\w+),\s+af=(\w+)')
-        ins_re = re.compile(r'^\s+out\s+\(\$([0-9a-fA-F]+)\),a\s+;\[(\w+)\]')
-        outc_re = re.compile(r'^\s+out\s+\(c\),([ad])\s+;\[(\w+)\]')
-        a = d = bc = 0
+        lua = IO_LUA.replace('%ADDR%', str(addr_port)).replace('%DATA%', str(data_port))
+        lua = lua.replace('%FULL%', 'true' if addr_port > 0xff or data_port > 0xff else 'false')
+        open(os.path.join(tmp, 'device.lua'), 'w').write(lua)
+        result = subprocess.run([TICKS, '-pc', '2000', '-end', f'{syms["fin"]:x}', '-counter', '400000000',
+                                 '-lua', 'device.lua', '-output', 'mem.out', 'img.bin'],
+                                cwd=tmp, capture_output=True, text=True)
+        if result.returncode:
+            print(result.stdout + result.stderr)
+            return None
+        raw = open(os.path.join(tmp, 'io.bin'), 'rb').read()
         effects, reg = [], 0
-        for line in open(os.path.join(tmp, 'trace.txt'), errors='replace'):
-            if line.startswith('pc='):
-                g = reg_re.match(line)
-                a = int(g.group(5), 16) >> 8
-                d = int(g.group(3), 16) >> 8
-                bc = int(g.group(2), 16)
-                continue
-            g = ins_re.match(line)
-            if g:
-                port = int(g.group(1), 16)
-            else:
-                g = outc_re.match(line)
-                if not g:
-                    continue
-                port = bc                            # (the SAA's ports are 16 bit: out (c),r with b = 1 for the address)
-                if g.group(1) == 'd':
-                    a = d
-            if port == 0xFD:
-                effects.append({'effect': a, 'start': [], 'ticks': []})
-            elif port == 0xFE:
+        for i in range(0, len(raw), 2):
+            event, value = raw[i], raw[i + 1]
+            if event == 0:
+                effects.append({'effect': value, 'start': [], 'ticks': []})
+            elif event == 1:
                 effects[-1]['ticks'].append([])
-            elif port == addr_port:
-                reg = a
-            elif port == data_port:
-                (effects[-1]['ticks'][-1] if effects[-1]['ticks'] else effects[-1]['start']).append((reg, a))
+            elif event == 2:
+                reg = value
+            elif event == 3:
+                (effects[-1]['ticks'][-1] if effects[-1]['ticks'] else effects[-1]['start']).append((reg, value))
         return effects
 
 
@@ -261,20 +266,20 @@ def check_multi8_clock():
         img = bytearray(65536)
         img[0x2000:0x2000 + len(code)] = code
         open(os.path.join(tmp, 'img.bin'), 'wb').write(img)
-        with open(os.path.join(tmp, 'trace.txt'), 'w') as tf:
-            subprocess.run([TICKS, '-pc', '2000', '-end', f'{syms["fin"]:x}', '-counter', '400000000', '-trace', 'img.bin'],
-                           cwd=tmp, stdout=tf, stderr=subprocess.DEVNULL)
-        reg_re = re.compile(r'pc=(\w+), \[pc\]=\w+,\s+bc=(\w+),\s+de=(\w+),\s+hl=(\w+),\s+af=(\w+)')
-        ins_re = re.compile(r'^\s+out\s+\(\$([0-9a-fA-F]+)\),a\s+;\[(\w+)\]')
-        a, got = 0, []
-        for line in open(os.path.join(tmp, 'trace.txt'), errors='replace'):
-            if line.startswith('pc='):
-                g = reg_re.match(line)
-                a = int(g.group(5), 16) >> 8
-                continue
-            g = ins_re.match(line)
-            if g and int(g.group(1), 16) == 0xFE:
-                got.append(a)
+        lua = """local log = assert(io.open("frames.bin", "wb"))
+function io_out(port, value, cycles)
+    if (port & 0xff) == 0xfe then log:write(string.char(value)); return 0 end
+    return -1
+end
+"""
+        open(os.path.join(tmp, 'device.lua'), 'w').write(lua)
+        result = subprocess.run([TICKS, '-pc', '2000', '-end', f'{syms["fin"]:x}', '-counter', '400000000',
+                                 '-lua', 'device.lua', '-output', 'mem.out', 'img.bin'],
+                                cwd=tmp, capture_output=True, text=True)
+        if result.returncode:
+            print(result.stdout + result.stderr)
+            return False
+        got = list(open(os.path.join(tmp, 'frames.bin'), 'rb').read())
     want = clock_model(values, calls)
     ok = got == want
     frames = sum(want)
@@ -296,7 +301,7 @@ def main():
                                             ('Multi 8 as built: its ports, 3.58 MHz chip', ['-DAY_ADDR_PORT=24', '-DAY_DATA_PORT=25', '-DAY_SCALE'], 24, 25, 0),
                                             ('SAM Coupe SAA 1099', ['-DAY_SAA'], 0x1FF, 0xFF, 0)):
         plan = [(k, min(255, int(lengths[k] * (1.25 if skip else 1)) + 4)) for k in range(count)]
-        got = run_trace(plan, defines, addr, data)
+        got = run_io(plan, defines, addr, data)
         if got is None:
             print('FAIL  the player does not assemble')
             return 1

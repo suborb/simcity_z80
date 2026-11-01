@@ -21,6 +21,9 @@ import make_aq_assets
 
 TICKS = 'z88dk-ticks'
 Z80ASM = 'z88dk-z80asm'
+Z88DK = os.environ.get('Z88DK', os.path.expanduser('~/z88dk'))
+os.environ.setdefault('ZCCCFG', os.path.join(Z88DK, 'lib', 'config'))
+LUA_MODEL = 'aqplus.lua'
 ROWS, COLS = 25, 40
 
 HARNESS = '''        SECTION code_user
@@ -118,6 +121,9 @@ textadvance:
         add     ix,de
         jr      nexttext
 textdone:
+        ld      a,1
+        out     ($EE),a
+before_clear:
         call    _plat_clear             ; the screen is cleared ...
         ld      hl,2
         push    hl                      ; col
@@ -134,7 +140,9 @@ textdone:
         add     hl,sp
         ld      sp,hl
         ld      (sp_end),sp
-        halt
+        ld      a,2
+        out     ($EE),a
+fin:    halt
 set_default_palette:
         ret
 _font_8x8_bbc_system:
@@ -252,14 +260,19 @@ def main():
         img = bytearray(65536)
         img[0x2000:0x2000 + len(code)] = code
         open(os.path.join(tmp, 'img.bin'), 'wb').write(img)
-        # first up to the clear (everything the cells and the text drew), then on through it and the one cell after it
-        subprocess.run([TICKS, '-pc', '2000', '-end', f'{syms["textdone"]:x}', '-counter', '400000000',
-                        '-output', 'mem0.out', 'img.bin'], cwd=tmp, capture_output=True)
+        # Capture pages before the clear, then run through it and capture again.
+        before_run = subprocess.run([TICKS, '-b', 'lua', '-lua', LUA_MODEL, '-pc', '2000', '-end', f'{syms["before_clear"]:x}',
+                                     '-counter', '400000000', '-output', 'mem0.out', 'img.bin'], cwd=tmp, capture_output=True, text=True)
+        if before_run.returncode:
+            print('FAIL  ticks before clear:', before_run.stdout, before_run.stderr); return 1
         mem0 = open(os.path.join(tmp, 'mem0.out'), 'rb').read()
-        subprocess.run([TICKS, '-pc', '2000', '-end', f'{syms["textdone"] + 4:x}', '-counter', '400000000',
-                        '-output', 'mem.out', 'img.bin'], cwd=tmp, capture_output=True)
+        before = open(os.path.join(tmp, 'aq-page20.bin'), 'rb').read()
+        final_run = subprocess.run([TICKS, '-b', 'lua', '-lua', LUA_MODEL, '-pc', '2000', '-end', f'{syms["fin"]:x}',
+                                    '-counter', '400000000', '-output', 'mem.out', 'img.bin'], cwd=tmp, capture_output=True, text=True)
+        if final_run.returncode:
+            print('FAIL  ticks after clear:', final_run.stdout, final_run.stderr); return 1
         mem = open(os.path.join(tmp, 'mem.out'), 'rb').read()
-    before = bytes(bank)
+        actual_video = open(os.path.join(tmp, 'aq-page20.bin'), 'rb').read()
 
     # plat_clear: the bitmap (8000 bytes) is 0 and the colour RAM (1000 bytes) white on black; the rest of the page
     # is left alone (so what was drawn there, beyond the cells, stays), then the one cell drawn after it
@@ -276,7 +289,7 @@ def main():
     print(('PASS' if not bad0 else 'FAIL') + f'  the cells and the text (and the frame pieces) as drawn, before the clear: bitmap and colour RAM equal the model'
           + (f' ({len(bad0)} bytes differ, first at ${0xC000 + bad0[0]:04X})' if bad0 else ''))
     ok &= not bad0
-    bad = [i for i in range(0x4000) if mem[0xC000 + i] != bank[i]]
+    bad = [i for i in range(0x4000) if actual_video[i] != bank[i]]
     print(('PASS' if not bad else 'FAIL') + f'  {len(spec)} cells (corners, edges, random; inverse and plain) and text through plat_puts and plat_aq_printc, then plat_clear and one more cell: '
           f'bitmap and colour RAM equal the model' + (f' ({len(bad)} bytes differ, first at ${0xC000 + bad[0]:04X})' if bad else ''))
     ok &= not bad
