@@ -3,7 +3,7 @@
         SECTION code_user
 
         PUBLIC  _einstein_screen5, _einstein_wait_frame, _einstein_getkey
-        PUBLIC  _einstein_fatal
+        PUBLIC  _v9938_fatal
         PUBLIC  _einstein_dos_fail
         EXTERN  __Exit
 
@@ -65,8 +65,8 @@ _einstein_getkey:
         pop     ix
         ret
 
-; Print a '$'-terminated message and return to CP/M.
-_einstein_fatal:
+; void v9938_fatal(const char *s) __smallc: print a '$'-terminated message and return to CP/M (the platform's fatal error: the atlas or an overlay is missing).
+_v9938_fatal:
         ld      hl,2
         add     hl,sp
         ld      e,(hl)

@@ -9,8 +9,6 @@ extern void v9938_vreg(uint8_t reg, uint8_t value);
 extern void v9938_pal(const uint8_t *entries);
 extern void msx_psg15(uint8_t value);
 extern uint8_t msx_keyrow(uint8_t row);
-extern void msx_print(const char *dollar_string);
-extern void msx_bye(void);                      /* (msx_bank.asm) page 2 back as DOS had it, and out */
 
 #define JIFFY       (*(volatile uint16_t *)0xFC9E)  /* the MSX BIOS's frame counter */
 #define CLIKSW      (*(volatile uint8_t *)0xF3DB)   /* the BIOS's key click switch: its interrupt scans the keyboard and clicks for a key */
@@ -27,12 +25,6 @@ static const uint8_t bios_palette[32] = {
     0x00, 0, 0x00, 0, 0x11, 6, 0x33, 7, 0x17, 1, 0x27, 3, 0x51, 1, 0x27, 6,
     0x71, 1, 0x73, 3, 0x61, 6, 0x64, 6, 0x11, 4, 0x65, 2, 0x55, 5, 0x77, 7
 };
-
-void v9938_fatal(const char *dollar_string)
-{
-    msx_print(dollar_string);                   /* DOS function 9 */
-    msx_bye();
-}
 
 void v9938_screen5(void)
 {

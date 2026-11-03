@@ -5,17 +5,11 @@
 extern void v9938_vreg(uint8_t reg, uint8_t value);
 extern void einstein_screen5(void);
 extern void einstein_wait_frame(void);
-extern void einstein_fatal(const char *message);
 extern uint8_t einstein_getkey(void);
 extern void einstein_dos_quiet(void);           /* (einstein_dos.c) */
 extern void einstein_dos_loud(void);
 
 static uint16_t clock_count;
-
-void v9938_fatal(const char *dollar_string)
-{
-    einstein_fatal(dollar_string);
-}
 
 void v9938_screen5(void)
 {

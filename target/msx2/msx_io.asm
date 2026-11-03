@@ -21,22 +21,19 @@ _msx_keyrow:
         ld      h,0
         ret
 
-; void msx_print(const char *s) __smallc
-; DOS function 9: the string, ended by a $, on the console.
-        PUBLIC  _msx_print
-_msx_print:
+; void v9938_fatal(const char *s) __smallc
+; The V9938 platform's fatal error (target/common/v9938/plat_v9938.c: the atlas is missing): the string, ended by a $, on the console (DOS function 9), then back to DOS.
+        PUBLIC  _v9938_fatal
+        EXTERN  _msx_bye
+_v9938_fatal:
         ld      hl,2
         add     hl,sp
         ld      e,(hl)
         inc     hl
         ld      d,(hl)
-        push    ix
-        push    iy
         ld      c,9
         call    5
-        pop     iy
-        pop     ix
-        ret
+        jp      _msx_bye                ; (does not come back)
 
 ; void msx_getc(void): DOS function 1, a key from the console
         PUBLIC  _msx_getc
