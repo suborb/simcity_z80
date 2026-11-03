@@ -220,7 +220,7 @@ $(SPC1000): $(DEPS) build/spc1000/icons.bin
 	    [ $$(( 0x$$tail + $(SPC1000_STACK_ROOM) )) -le 65536 ] || { echo "the uninitialised data leaves no room for the stack"; rm -f $@; exit 1; }
 
 # The MSX2 under MSX-DOS 2 (z88dk +msx -subtype=msxdos2: a .COM at $0100, with the picture atlas beside it).  Screen 5 (256x192, 16 colours), the Atari ST's art as the SAM
-# Coupe's: the atlas (TILES.DAT) is loaded into the video RAM and the VDP copies the map's tiles out of it (target/msx2/plat_msx2.asm).
+# Coupe's: the atlas (TILES.DAT) is loaded into the video RAM and the VDP copies the map's tiles out of it (target/common/v9938/plat_v9938.asm).
 # The code is in two 16 KB mapper segments, loaded from SIMCITY.UI and SIMCITY.SIM and mapped into page 2 ($8000-$BFFF) by turns (target/msx2/engine_bank.inc, msx_bank.asm): the
 # UI's C code (zcc --codeseg BANK_UI) and the simulation's.  What is resident is below $8000 (the glue, the sound, the tables, all the data): the stack is in page 3.
 # A picture for every growth level of a zone (the engine's FINE_ZONE_LEVELS: the CPC game's 471 pictures); MSX2_FINE=0 has the Spectrum's 345 instead
@@ -241,7 +241,7 @@ MSX2_SOUND_FILES = $(NOSOUND)
 MSX2_SOUND_FLAGS = -DMSX2_NO_SOUND
 endif
 MSX2_GAME = $(filter-out ui/main.c,$(GAME))         # (main() is in msx_bank.asm)
-MSX2_PLATFORM = target/msx2/msx_banks.asm target/msx2/msx_bank.asm target/common/minimap_key.c target/msx2/pointer_res.c target/msx2/msx_pointer.c target/msx2/plat_msx2.c target/msx2/plat_msx2.asm target/msx2/msx2_data.asm $(MSX2_SOUND_FILES)
+MSX2_PLATFORM = target/msx2/msx_banks.asm target/msx2/msx_bank.asm target/common/minimap_key.c target/msx2/pointer_res.c target/msx2/msx_pointer.c target/common/v9938/plat_v9938.c target/common/v9938/plat_v9938.asm target/common/v9938/v9938_data.asm $(MSX2_SOUND_FILES)
 
 build/msx2/TILES.DAT build/msx2/msx2.inc build/msx2/msx2.h: assets/st_tiles.bin assets/st_icons.bin tools/st_tiles_3bpp.py
 	@mkdir -p $(@D)
@@ -260,10 +260,10 @@ $(MSX2): $(DEPS) build/msx2/TILES.DAT build/msx2/msx2.inc build/msx2/msx2.h
 	    echo "msx2: the resident program and its uninitialised data end at $$(printf '%04X' $$(( 0x$$tail ))); the UI's bank is $$ui bytes, the simulation's $$sim of 16384, and the code in page 3 $$hi (up to 4096)"; \
 	    [ $$(( 0x$$tail )) -le $$(( 0x8000 )) ] && [ $$ui -le 16384 ] && [ $$sim -le 16384 ] && [ $$hi -le 4096 ] || { echo "the resident part must end below \$$8000, each bank fit 16 KB and the code in page 3 4 KB (the stack is under the DOS entry)"; rm -f $@; exit 1; }
 
-# The Tatung Einstein 256: CP/M, V9938 screen 5 and the MSX2 drawing core.
+# The Tatung Einstein 256: CP/M, V9938 screen 5 and the V9938 drawing core it shares with the MSX2 (target/common/v9938).
 # One CP/M COM in the standard classic map (under 32 KB: the DOS will not load a bigger one); the two UI overlays are separate files that the start-up reads into
 # a window above the BSS and keeps in the unused part of the screen page's VRAM, and copies back as needed.  See docs/EINSTEIN256-layout.md.
-EINSTEIN256_PLATFORM = target/einstein256/einstein_boot.asm target/einstein256/einstein_io.asm target/einstein256/einstein_loader.c target/common/minimap_key.c target/msx2/plat_msx2.c target/msx2/plat_msx2.asm target/msx2/msx2_data.asm platform/common/nosound.asm
+EINSTEIN256_PLATFORM = target/einstein256/einstein_boot.asm target/einstein256/einstein_io.asm target/einstein256/einstein_loader.c target/einstein256/einstein_dos.c target/common/minimap_key.c target/common/v9938/plat_v9938.c target/common/v9938/plat_v9938.asm target/common/v9938/v9938_data.asm platform/common/nosound.asm
 EINSTEIN256_GAME = $(filter-out ui/main.c,$(GAME))
 EINSTEIN256_TPA_TOP = E000          # the BDOS entry (the word at address 6) on the machine; the check script uses it
 
@@ -274,7 +274,7 @@ build/einstein256/TILES.DAT build/einstein256/msx2.inc build/einstein256/msx2.h:
 $(EINSTEIN256): $(DEPS) tools/check_einstein_layout.py target/einstein256/mmap.inc build/einstein256/TILES.DAT build/einstein256/msx2.inc build/einstein256/msx2.h
 	@mkdir -p $(@D)
 	$(ZCC) +cpm -subtype=einstein256 $(COMMON) -pragma-include:target/einstein256/zpragma.inc -pragma-define:MMAP=-1 \
-	    -Itarget/einstein256 -Itarget/msx2 -Ibuild/einstein256 -Ca-Itarget/einstein256 -Ca-Itarget/msx2 -Ca-Ibuild/einstein256 \
+	    -Itarget/einstein256 -Ibuild/einstein256 -Ca-Itarget/einstein256 -Ca-Ibuild/einstein256 \
 	    -DTARGET_EINSTEIN256 -Ca-DTARGET_EINSTEIN256 -Ca-DVDP_DATA=8 -Ca-DVDP_CMD=9 -Ca-DVDP_PAL=10 -Ca-DVDP_IND=11 -Ca-DFMT_WIDTH=32 -Ca-DHAVE_MINIMAP_SQUARE \
 	    $(EINSTEIN256_PLATFORM) $(EINSTEIN256_GAME) $(ENTROPY) $(MENU) $(FIELDS) $(MMNATIVE) $(LINEEDIT) -o $(@D)/simcity
 	python3 tools/check_einstein_layout.py $(@D)/simcity.map $(EINSTEIN256_TPA_TOP)

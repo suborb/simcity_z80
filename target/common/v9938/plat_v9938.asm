@@ -7,7 +7,7 @@
 ; cleans up).  The BIOS's frame interrupt stays on (it counts JIFFY, which plat_idle waits for): nothing here reads status register 0 (that would eat the
 ; frame flag), and the two byte VDP sequences (a register, an address) are inside DI.
 
-        MODULE  plat_msx2
+        MODULE  plat_v9938
         SECTION code_user
 
         IFNDEF  VDP_DATA

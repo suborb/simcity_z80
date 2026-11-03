@@ -1,6 +1,6 @@
 /* Moves a rectangle of the video RAM's first page by whole cells with one VDP copy (HMMM): what plat_scroll does to the screen and to the cell cache.  The
    rectangle is (x, y, w, h) in pixels; its content moves by (-mx, -my) pixels, and what comes into view at the far edges is left as it was.  The copy runs in the
-   direction an overlapping one needs: from the far end when the content moves right or down.  Needs msx_command and msx_dir (plat_msx2.asm). */
+   direction an overlapping one needs: from the far end when the content moves right or down.  Needs msx_command and msx_dir (plat_v9938.asm). */
 extern void msx_dir(uint8_t arg);
 
 static void shift_rect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, int16_t mx, int16_t my)

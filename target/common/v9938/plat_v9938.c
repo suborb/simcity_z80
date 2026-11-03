@@ -1,5 +1,5 @@
-/* MSX2 platform (MSX-DOS 2): screen 5, 256x192 pixels of 4 bits, used as 32 x 24 cells of 8x8, the Atari ST's art in its 16 colours as the SAM Coupe's.  The
-   drawing primitives (a cell from the picture atlas in the video RAM, a glyph, a line of pixels, a VDP command) are in plat_msx2.asm; this has what is made from
+/* V9938 platform, for the MSX2 (MSX-DOS 2) and the Einstein 256 (CP/M; TARGET_EINSTEIN256): screen 5, 256x192 pixels of 4 bits, used as 32 x 24 cells of 8x8, the Atari ST's art in
+   its 16 colours as the SAM Coupe's.  The drawing primitives (a cell from the picture atlas in the video RAM, a glyph, a line of pixels, a VDP command) are in plat_v9938.asm; this has what is made from
    them: text, the tool icons, the demand and bar charts, the mini map's rows, the keyboard and the files.  The palette is the ST's 16 (entry 0 black and 15 white);
    tools/st_tiles_3bpp.py --msx2 makes the atlas (TILES.DAT, which the program loads into the video RAM's second page) and the tables (msx2.inc, msx2.h). */
 #include <stdint.h>
@@ -57,8 +57,8 @@ extern void einstein_screen5(void);
 extern void einstein_wait_frame(void);
 extern void einstein_fatal(const char *message);
 extern uint8_t einstein_getkey(void);
-extern void einstein_dos_fail(void);
-extern uint16_t einstein_dos_exit, einstein_dos_ret, einstein_dos_top, einstein_dos_slot;
+extern void einstein_dos_quiet(void);           /* (einstein_dos.c) */
+extern void einstein_dos_loud(void);
 #endif
 
 /* VDP commands (the high nibble of R#46; a logical command's operation is its low nibble) */
@@ -75,7 +75,7 @@ static uint8_t saved_click;
 static uint8_t pace;                            /* the passes since the 60 Hz display's extra frame */
 
 /* ---- VDP commands ------------------------------------------------------------------------------------------------------------ */
-extern void msx_command(uint16_t sx, uint16_t sy, uint16_t dx, uint16_t dy, uint16_t nx, uint16_t ny, uint8_t clr, uint8_t cmd);       /* (plat_msx2.asm) */
+extern void msx_command(uint16_t sx, uint16_t sy, uint16_t dx, uint16_t dy, uint16_t nx, uint16_t ny, uint8_t clr, uint8_t cmd);       /* (plat_v9938.asm) */
 
 #include "shift_rect.h"
 
@@ -250,71 +250,6 @@ static const uint8_t bios_palette[32] = {
 };
 #endif
 
-#ifdef TARGET_EINSTEIN256
-/* The Einstein DOS asks "Try Again(Y/N)?" (in its own text mode, over our screen) when a disc operation fails, and N is a warm boot.  Its BDOS, which starts at the
-   word at address 6, keeps the handlers for the errors in a table of seven words in RAM just after its entry jump.  Point them at einstein_dos_fail, which ends the
-   BDOS call with an error, so the game's own "could not" message is shown.  The code at the BDOS entry is checked first and gives the addresses the handler needs (the
-   offsets of the pieces differ between DOS80 V1.0 and XtalDOS 2.05, the shape is the same); a BDOS that does not look like that is left alone.  plat_exit puts the
-   vectors back. */
-#define W(p) (*(uint16_t *)(p))
-static uint16_t dos_vectors[7];
-static uint8_t dos_patched;
-
-/* (these two run at start-up and at the end, when the game overlay is in its window: they are in it, not in the COM, which has to stay under 32 KB) */
-PLAT_CODE_FILE_OVERLAY
-
-static void einstein_dos_quiet(void)
-{
-    uint8_t *b = (uint8_t *)W(6);
-    uint8_t *p, *end;
-    uint16_t i;
-
-    /* jp entry; ld (save),sp; ld sp,top; ld hl,exit; push hl */
-    if (b[0] != 0xC3 || b[0x14] != 0xED || b[0x15] != 0x73 || b[0x18] != 0x31 || b[0x1B] != 0x21 || b[0x1E] != 0xE5)
-        return;
-    einstein_dos_top = W(b + 0x19);
-    einstein_dos_exit = W(b + 0x1C);
-    p = (uint8_t *)einstein_dos_exit;
-    if (p[0] != 0xED || p[1] != 0x7B || W(p + 2) != W(b + 0x16))        /* exit: ld sp,(save) */
-        return;
-    end = b + 0x70;                                                     /* ld hl,return; ex (sp),hl */
-    for (p = b + 0x1F; p < end && (p[0] != 0x21 || p[3] != 0xE3); ++p)
-        ;
-    if (p >= end)
-        return;
-    einstein_dos_ret = W(p + 1);
-    p = (uint8_t *)einstein_dos_ret;                                    /* its end: ld hl,(result); ld a,l; ld b,h; ret */
-    end = p + 0x50;
-    for (; p < end && (p[0] != 0x2A || p[3] != 0x7D || p[4] != 0x44 || p[5] != 0xC9); ++p)
-        ;
-    if (p >= end)
-        return;
-    einstein_dos_slot = W(p + 1);
-    end = b + 0xE0;                                                     /* the dispatcher: dec a; ld hl,vectors */
-    for (p = b + 0x80; p < end && (p[0] != 0x3D || p[1] != 0x21 || W(p + 2) != (uint16_t)(b + 3)); ++p)
-        ;
-    if (p >= end)
-        return;
-    for (i = 0; i < 7; ++i) {
-        dos_vectors[i] = W(b + 3 + i * 2);
-        W(b + 3 + i * 2) = (uint16_t)einstein_dos_fail;
-    }
-    dos_patched = 1;
-}
-
-static void einstein_dos_loud(void)
-{
-    if (dos_patched) {
-        uint8_t *b = (uint8_t *)W(6);
-        uint16_t i;
-
-        for (i = 0; i < 7; ++i)
-            W(b + 3 + i * 2) = dos_vectors[i];
-        dos_patched = 0;
-    }
-}
-PLAT_CODE_HOME
-#endif
 
 static const char no_atlas[] = "TILES.DAT is not here.\r\n$";
 extern void msx_print(const char *dollar_string);

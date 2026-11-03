@@ -1,5 +1,5 @@
 /* MSX2 (MSX-DOS 2) capabilities for the shared game UI: screen 5, 256x192 pixels of 4 bits, used as 32 columns of 8x8 cells
-   (target/msx2/plat_msx2.c, plat_msx2.asm): the Atari ST's art and 16 colours as the SAM Coupe's, in the picture atlas in the video RAM's second page,
+   (target/common/v9938/plat_v9938.c, plat_v9938.asm): the Atari ST's art and 16 colours as the SAM Coupe's, in the picture atlas in the video RAM's second page,
    which the VDP copies a tile at a time (HMMM). */
 #ifndef PLAT_CONFIG_H
 #define PLAT_CONFIG_H
@@ -7,7 +7,7 @@
 #define HAVE_TILES
 #define HAVE_BITMAP
 #define HAVE_POPUP_MENU     /* shared box + message selector over the bitmap */
-/* the box's frame in the placer's line pieces (plat_msx2.c): 1 and 2 the top corners, 3 and 4 the bottom ones, 5 across, 6 down */
+/* the box's frame in the placer's line pieces (plat_v9938.c): 1 and 2 the top corners, 3 and 4 the bottom ones, 5 across, 6 down */
 #define BOX_TOP    "\1\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\2"
 #define BOX_BOTTOM "\3\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\4"
 #define BOX_SIDE   "\6                            \6"

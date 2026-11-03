@@ -88,7 +88,7 @@ _einstein_fatal:
         defc    _einstein_game_size = __EINSTEIN_GAME_OVL_size
         defc    _einstein_modal_size = __EINSTEIN_MODAL_OVL_size
 
-; The DOS's error handler (einstein_dos_quiet in plat_msx2.c points its vectors here).  The BDOS runs on a stack of its own, with the
+; The DOS's error handler (einstein_dos_quiet in einstein_dos.c points its vectors here).  The BDOS runs on a stack of its own, with the
 ; address of the routine that finishes a call (restores IX and IY, loads HL from the result slot) and under that the address of the
 ; exit routine that reloads the caller's stack: rebuild those two words, set the result to $FF and finish the call from here, whatever
 ; the BDOS was in the middle of.  The addresses are found by einstein_dos_quiet.
