@@ -3,6 +3,8 @@
 #include "engine.h"
 #include "platform.h"
 #include "prompt.h"
+PLAT_CODE_GAME_OVERLAY
+PLAT_CONST_GAME_OVERLAY
 #include "textfmt.h"
 #include "menu.h"
 #if defined(HAVE_FILES) || defined(HAVE_APPNAME)

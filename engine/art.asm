@@ -26,6 +26,9 @@
         IFDEF   TARGET_SAM
         defc    ART_UNREAD = 1
         ENDIF
+        IFDEF   TARGET_EINSTEIN256
+        defc    ART_UNREAD = 1
+        ENDIF
         IFDEF   TARGET_PC88
         defc    ART_UNREAD = 1
         ENDIF

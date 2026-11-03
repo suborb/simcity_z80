@@ -17,6 +17,8 @@
 #include "budget.h"
 #include "textfmt.h"
 #ifdef HAVE_BUDGET
+PLAT_CODE_MODAL_OVERLAY
+PLAT_CONST_MODAL_OVERLAY
 #define MAX_TAX 20
 #define ROWS    MODAL_ROWS
 /* The compact design is an eight-row grid.  On an intermediate-height screen spread it over the available rows. */

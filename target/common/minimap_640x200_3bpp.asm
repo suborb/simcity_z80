@@ -61,7 +61,11 @@ mm_na:  defs    9                       ; the nibbles of a pair of tiles' left t
 mm_nb:  defs    9                       ; ... and of the right
         ENDIF
 
+        IFDEF   TARGET_EINSTEIN256
+        SECTION EINSTEIN_GAME_OVL
+        ELSE
         IN_CODE
+        ENDIF
 _minimap_fast:
         push    ix
         ld      hl,4                    ; the return address and IX are on the stack
@@ -402,7 +406,11 @@ mm_t4:  inc     ix
         djnz    mm_t1
         jp      mm_done
 
+        IFDEF   TARGET_EINSTEIN256
+        SECTION EINSTEIN_GAME_OVL
+        ELSE
         IN_RODATA
+        ENDIF
 mm_unpowered:                           ; by colour: a zone or a service is red, water stays, the rest dirt
         defb    C_DIRT, C_WATER, C_FIRE, C_FIRE, C_DIRT, C_FIRE, C_FIRE, C_DIRT
 mm_tilecol:                             ; the engine's ordinary tiles 0..93: 0..5 water, 6 trees, 7..55 roads, rails and wires,
@@ -423,7 +431,11 @@ mm_tilecol:                             ; the engine's ordinary tiles 0..93: 0..
 
         IFDEF   HAVE_MINIMAP_ART
         PUBLIC  _minimap_tiles, _mm_row
+        IFDEF   TARGET_EINSTEIN256
+        SECTION EINSTEIN_GAME_OVL
+        ELSE
         IN_CODE
+        ENDIF
 _mm_row: defs   432                     ; (in the low RAM, where a platform with paged video memory can read it)
 
 ; void minimap_tiles(uint8_t sy) __smallc: build row sy from the levels already in mm_col
@@ -825,7 +837,11 @@ mm_p2_2:
         ld      (de),a
         ret
         
+        IFDEF   TARGET_EINSTEIN256
+        SECTION EINSTEIN_GAME_OVL
+        ELSE
         IN_RODATA
+        ENDIF
 mm_mini:                                ; the pictures at a quarter of the size, 5 bytes each (tools/extract_cpc_tiles.py --mini)
         BINARY  "build/common/minitiles_640x200_3bpp.bin"
         ENDIF

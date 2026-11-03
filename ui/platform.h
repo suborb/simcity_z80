@@ -7,6 +7,37 @@
 #include <stdint.h>
 #include "plat_config.h"       /* the platform's own: what it can do, and which features it has */
 
+#ifndef PLAT_CODE_GAME_OVERLAY
+#define PLAT_CODE_GAME_OVERLAY
+#endif
+#ifndef PLAT_CONST_GAME_OVERLAY
+#define PLAT_CONST_GAME_OVERLAY
+#endif
+#ifndef PLAT_CODE_MODAL_OVERLAY
+#define PLAT_CODE_MODAL_OVERLAY
+#endif
+#ifndef PLAT_CONST_MODAL_OVERLAY
+#define PLAT_CONST_MODAL_OVERLAY
+#endif
+#ifndef PLAT_CODE_HIGH
+#define PLAT_CODE_HIGH
+#endif
+#ifndef PLAT_CODE_FILE_OVERLAY
+#define PLAT_CODE_FILE_OVERLAY
+#endif
+#ifndef PLAT_CODE_HOME
+#define PLAT_CODE_HOME
+#endif
+
+#ifdef HAVE_OVERLAY_UI
+extern void plat_overlay_load(uint8_t overlay);
+#define PLAT_OVERLAY_GAME()  plat_overlay_load(0)
+#define PLAT_OVERLAY_MODAL() plat_overlay_load(1)
+#else
+#define PLAT_OVERLAY_GAME()  ((void)0)
+#define PLAT_OVERLAY_MODAL() ((void)0)
+#endif
+
 /* HAVE_DATA_PAGING (plat_config.h): the target banks the application's data, and plat_page_data() selects the data page (the UI calls it before it touches
    its variables again after the display code has run).  Flat-memory targets compile it away. */
 #ifdef HAVE_DATA_PAGING

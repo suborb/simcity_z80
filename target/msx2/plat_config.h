@@ -43,4 +43,8 @@
 #define MAX_VIEW_W 32
 #define MAX_VIEW_H 17
 
+/* High UI code is loaded separately from the resident home image. */
+#define PLAT_CODE_HIGH _Pragma("codeseg CODE_HI")
+#define PLAT_CODE_FILE_OVERLAY _Pragma("codeseg CODE_HI")
+
 #endif

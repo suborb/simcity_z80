@@ -58,6 +58,7 @@ PC88   = build/pc88/simcity.d88
 X1     = build/x1/simcity.d88
 SPC1000 = build/spc1000/simcity.spc
 MSX2   = build/msx2/simcity.img
+EINSTEIN256 = build/einstein256/simcity.com
 MZ2500 = build/mz2500/simcity.dsk
 SAM    = build/sam/simcity.mgt
 ZXN   = build/zxn/simcity.nex
@@ -72,7 +73,7 @@ TESTK  = build/testnative/simcity.bin
 TESTA  = build/testart/simcity.bin
 TESTSC = build/testscroll/simcity.bin
 
-.PHONY: all dist aqplus z88rom zx multi8 pc88 x1 spc1000 msx2 mz2500 sam zxn amiga-scenarios test testpanel testmodal testnarrow testsprites testoverlay testhires testnative testart testscroll check golden uitest tiletest z88test deadcode clean
+.PHONY: all dist aqplus z88rom zx multi8 pc88 x1 spc1000 msx2 einstein256 mz2500 sam zxn amiga-scenarios test testpanel testmodal testnarrow testsprites testoverlay testhires testnative testart testscroll check golden uitest tiletest z88test deadcode clean
 
 all: aqplus z88rom zx multi8 pc88 x1 spc1000 msx2 mz2500 sam zxn
 
@@ -88,6 +89,7 @@ pc88:   $(PC88)
 x1:     $(X1)
 spc1000: $(SPC1000)
 msx2:   $(MSX2)
+einstein256: $(EINSTEIN256)
 mz2500: $(MZ2500)
 sam:    $(SAM)
 zxn:   $(ZXN)
@@ -257,6 +259,33 @@ $(MSX2): $(DEPS) build/msx2/TILES.DAT build/msx2/msx2.inc build/msx2/msx2.h
 	@tail=`sed -n 's/^__BSS_END_tail *= \$$\([0-9A-Fa-f]*\).*/\1/p' $(@D)/simcity.map`; ui=`wc -c < $(@D)/simcity_BANK_UI.bin`; sim=`wc -c < $(@D)/simcity_BANK_SIM.bin`; hi=`wc -c < $(@D)/simcity_CODE_HI.bin`; \
 	    echo "msx2: the resident program and its uninitialised data end at $$(printf '%04X' $$(( 0x$$tail ))); the UI's bank is $$ui bytes, the simulation's $$sim of 16384, and the code in page 3 $$hi (up to 4096)"; \
 	    [ $$(( 0x$$tail )) -le $$(( 0x8000 )) ] && [ $$ui -le 16384 ] && [ $$sim -le 16384 ] && [ $$hi -le 4096 ] || { echo "the resident part must end below \$$8000, each bank fit 16 KB and the code in page 3 4 KB (the stack is under the DOS entry)"; rm -f $@; exit 1; }
+
+# The Tatung Einstein 256: CP/M, V9938 screen 5 and the MSX2 drawing core.
+# One CP/M COM in the standard classic map (under 32 KB: the DOS will not load a bigger one); the two UI overlays are separate files that the start-up reads into
+# a window above the BSS and keeps in the unused part of the screen page's VRAM, and copies back as needed.  See docs/EINSTEIN256-layout.md.
+EINSTEIN256_PLATFORM = target/einstein256/einstein_boot.asm target/einstein256/einstein_io.asm target/einstein256/einstein_loader.c target/common/minimap_key.c target/msx2/plat_msx2.c target/msx2/plat_msx2.asm target/msx2/msx2_data.asm platform/common/nosound.asm
+EINSTEIN256_GAME = $(filter-out ui/main.c,$(GAME))
+EINSTEIN256_TPA_TOP = E000          # the BDOS entry (the word at address 6) on the machine; the check script uses it
+
+build/einstein256/TILES.DAT build/einstein256/msx2.inc build/einstein256/msx2.h: assets/st_tiles.bin assets/st_icons.bin tools/st_tiles_3bpp.py
+	@mkdir -p $(@D)
+	python3 tools/st_tiles_3bpp.py assets/st_tiles.bin --icons assets/st_icons.bin --numbering cpc --msx2 $(@D)
+
+$(EINSTEIN256): $(DEPS) tools/check_einstein_layout.py target/einstein256/mmap.inc build/einstein256/TILES.DAT build/einstein256/msx2.inc build/einstein256/msx2.h
+	@mkdir -p $(@D)
+	$(ZCC) +cpm -subtype=einstein256 $(COMMON) -pragma-include:target/einstein256/zpragma.inc -pragma-define:MMAP=-1 \
+	    -Itarget/einstein256 -Itarget/msx2 -Ibuild/einstein256 -Ca-Itarget/einstein256 -Ca-Itarget/msx2 -Ca-Ibuild/einstein256 \
+	    -DTARGET_EINSTEIN256 -Ca-DTARGET_EINSTEIN256 -Ca-DVDP_DATA=8 -Ca-DVDP_CMD=9 -Ca-DVDP_PAL=10 -Ca-DVDP_IND=11 -Ca-DFMT_WIDTH=32 -Ca-DHAVE_MINIMAP_SQUARE \
+	    $(EINSTEIN256_PLATFORM) $(EINSTEIN256_GAME) $(ENTROPY) $(MENU) $(FIELDS) $(MMNATIVE) $(LINEEDIT) -o $(@D)/simcity
+	python3 tools/check_einstein_layout.py $(@D)/simcity.map $(EINSTEIN256_TPA_TOP)
+	@# appmake copies the CP/M name into the directory as is: it must be the 11-byte FCB form.  It also writes a
+	@# zero record count for the last entry of a file that is an exact multiple of 16 KB, so TILES.DAT gets one spare record.
+	(cat build/einstein256/TILES.DAT; head -c 128 /dev/zero) > build/einstein256/TILES.PAD
+	z88dk-appmake +cpmdisk -f einstein -b $(@D)/simcity -o $(@D)/simcity.dsk \
+	    -a build/einstein256/TILES.PAD:'TILES   DAT' \
+	    -a build/einstein256/simcity_EINSTEIN_GAME_OVL.bin:'SIMCITY GAM' \
+	    -a build/einstein256/simcity_EINSTEIN_MODAL_OVL.bin:'SIMCITY MOD'
+	@echo "einstein256: COM and overlay files packaged in $(@D)/simcity.dsk"
 
 # The Sharp MZ-2500 (z88dk +mz2500: a boot disk the IPL loads page by page).  320x200 in 16 colours, planar video RAM; the Atari ST's art in a planar atlas (pages 22-24), 32 x 24 cells
 # of 8x8.  The program is linked at $0000 (RAM pages 16-17, started by the crt's BOOTSTRAP stub), the UI and the simulation are 16 KB banks at $4000 mapped into windows 2 and 3 by turns, the data is at

@@ -18,6 +18,8 @@
 #include "textfmt.h"
 #include "evaluation.h"
 #ifdef HAVE_EVALUATION
+PLAT_CODE_MODAL_OVERLAY
+PLAT_CONST_MODAL_OVERLAY
 #define EVAL_ROW(n)  (((n) * (MODAL_ROWS - 1) + 3) / 7)
 uint16_t eval_unpowered;
 

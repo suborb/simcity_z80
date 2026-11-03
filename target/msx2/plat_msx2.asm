@@ -10,10 +10,18 @@
         MODULE  plat_msx2
         SECTION code_user
 
+        IFNDEF  VDP_DATA
         defc    VDP_DATA = $98
+        ENDIF
+        IFNDEF  VDP_CMD
         defc    VDP_CMD = $99
+        ENDIF
+        IFNDEF  VDP_PAL
         defc    VDP_PAL = $9A
+        ENDIF
+        IFNDEF  VDP_IND
         defc    VDP_IND = $9B
+        ENDIF
 
 ; Waits for the VDP to finish a command (status register 2, bit 0), leaving R#15 at 0.  Interrupts must be off.  Uses a.
 vdp_wait_di:
@@ -452,6 +460,7 @@ _msx_pal:
         ei
         ret
 
+        IFNDEF  TARGET_EINSTEIN256
 ; uint8_t msx_keyrow(uint8_t row) __smallc
 ; The keyboard matrix row (0 to 10) from the PPI: a bit is 0 for a key that is down.
         PUBLIC  _msx_keyrow
@@ -497,6 +506,7 @@ _msx_getc:
         pop     iy
         pop     ix
         ret
+        ENDIF
 
 ; void vram_read(uint16_t addr, uint8_t *dst, uint16_t len) __smallc
 ; len bytes (1 to 256) of raw video RAM from addr.
@@ -630,6 +640,7 @@ _msx_sync:
         ei
         ret
 
+        IFNDEF  TARGET_EINSTEIN256
 ; void msx_psg15(uint8_t value) __smallc
 ; PSG register 15 (the joystick connectors' output: the mouse's strobe and the connector select): the BIOS leaves it at $CF.
         PUBLIC  _msx_psg15
@@ -644,3 +655,4 @@ _msx_psg15:
         out     ($A1),a
         ei
         ret
+        ENDIF

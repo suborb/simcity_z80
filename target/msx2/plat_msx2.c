@@ -47,10 +47,19 @@ extern const uint8_t msx_animtab[];             /* ... an animation: the first f
 #define MAP_ROWS    (24 - MAP_ROW)
 #define BLACK       0
 #define WHITE       15
-#define JIFFY       (*(volatile uint16_t *)0xFC9E)  /* the BIOS's frame counter */
+#ifndef TARGET_EINSTEIN256
+#define JIFFY       (*(volatile uint16_t *)0xFC9E)  /* the MSX BIOS's frame counter */
 #define CLIKSW      (*(volatile uint8_t *)0xF3DB)   /* the BIOS's key click switch: its interrupt scans the keyboard and clicks for a key */
 #define RG8SAV      (*(volatile uint8_t *)0xFFE7)   /* the BIOS's copies of VDP registers 8 and 9 */
 #define RG9SAV      (*(volatile uint8_t *)0xFFE8)
+#else
+extern void einstein_screen5(void);
+extern void einstein_wait_frame(void);
+extern void einstein_fatal(const char *message);
+extern uint8_t einstein_getkey(void);
+extern void einstein_dos_fail(void);
+extern uint16_t einstein_dos_exit, einstein_dos_ret, einstein_dos_top, einstein_dos_slot;
+#endif
 
 /* VDP commands (the high nibble of R#46; a logical command's operation is its low nibble) */
 #define CMD_LMMV    0x80
@@ -233,11 +242,79 @@ void plat_scroll(uint8_t row, uint8_t rows, int8_t dx, int8_t dy)
 }
 #endif
 
+#ifndef TARGET_EINSTEIN256
 /* The MSX2 BIOS's palette, for the text screen DOS comes back to (red and blue, then green) */
 static const uint8_t bios_palette[32] = {
     0x00, 0, 0x00, 0, 0x11, 6, 0x33, 7, 0x17, 1, 0x27, 3, 0x51, 1, 0x27, 6,
     0x71, 1, 0x73, 3, 0x61, 6, 0x64, 6, 0x11, 4, 0x65, 2, 0x55, 5, 0x77, 7
 };
+#endif
+
+#ifdef TARGET_EINSTEIN256
+/* The Einstein DOS asks "Try Again(Y/N)?" (in its own text mode, over our screen) when a disc operation fails, and N is a warm boot.  Its BDOS, which starts at the
+   word at address 6, keeps the handlers for the errors in a table of seven words in RAM just after its entry jump.  Point them at einstein_dos_fail, which ends the
+   BDOS call with an error, so the game's own "could not" message is shown.  The code at the BDOS entry is checked first and gives the addresses the handler needs (the
+   offsets of the pieces differ between DOS80 V1.0 and XtalDOS 2.05, the shape is the same); a BDOS that does not look like that is left alone.  plat_exit puts the
+   vectors back. */
+#define W(p) (*(uint16_t *)(p))
+static uint16_t dos_vectors[7];
+static uint8_t dos_patched;
+
+/* (these two run at start-up and at the end, when the game overlay is in its window: they are in it, not in the COM, which has to stay under 32 KB) */
+PLAT_CODE_FILE_OVERLAY
+
+static void einstein_dos_quiet(void)
+{
+    uint8_t *b = (uint8_t *)W(6);
+    uint8_t *p, *end;
+    uint16_t i;
+
+    /* jp entry; ld (save),sp; ld sp,top; ld hl,exit; push hl */
+    if (b[0] != 0xC3 || b[0x14] != 0xED || b[0x15] != 0x73 || b[0x18] != 0x31 || b[0x1B] != 0x21 || b[0x1E] != 0xE5)
+        return;
+    einstein_dos_top = W(b + 0x19);
+    einstein_dos_exit = W(b + 0x1C);
+    p = (uint8_t *)einstein_dos_exit;
+    if (p[0] != 0xED || p[1] != 0x7B || W(p + 2) != W(b + 0x16))        /* exit: ld sp,(save) */
+        return;
+    end = b + 0x70;                                                     /* ld hl,return; ex (sp),hl */
+    for (p = b + 0x1F; p < end && (p[0] != 0x21 || p[3] != 0xE3); ++p)
+        ;
+    if (p >= end)
+        return;
+    einstein_dos_ret = W(p + 1);
+    p = (uint8_t *)einstein_dos_ret;                                    /* its end: ld hl,(result); ld a,l; ld b,h; ret */
+    end = p + 0x50;
+    for (; p < end && (p[0] != 0x2A || p[3] != 0x7D || p[4] != 0x44 || p[5] != 0xC9); ++p)
+        ;
+    if (p >= end)
+        return;
+    einstein_dos_slot = W(p + 1);
+    end = b + 0xE0;                                                     /* the dispatcher: dec a; ld hl,vectors */
+    for (p = b + 0x80; p < end && (p[0] != 0x3D || p[1] != 0x21 || W(p + 2) != (uint16_t)(b + 3)); ++p)
+        ;
+    if (p >= end)
+        return;
+    for (i = 0; i < 7; ++i) {
+        dos_vectors[i] = W(b + 3 + i * 2);
+        W(b + 3 + i * 2) = (uint16_t)einstein_dos_fail;
+    }
+    dos_patched = 1;
+}
+
+static void einstein_dos_loud(void)
+{
+    if (dos_patched) {
+        uint8_t *b = (uint8_t *)W(6);
+        uint16_t i;
+
+        for (i = 0; i < 7; ++i)
+            W(b + 3 + i * 2) = dos_vectors[i];
+        dos_patched = 0;
+    }
+}
+PLAT_CODE_HOME
+#endif
 
 static const char no_atlas[] = "TILES.DAT is not here.\r\n$";
 extern void msx_print(const char *dollar_string);
@@ -250,15 +327,30 @@ void plat_init(void)
     int fd = open("TILES.DAT", O_RDONLY, 0);
 
     if (fd < 0) {
+#ifdef TARGET_EINSTEIN256
+        einstein_fatal(no_atlas);
+#else
         msx_print(no_atlas);
         msx_bye();
+#endif
     }
+#ifdef TARGET_EINSTEIN256
+    einstein_dos_quiet();
+    saved_r9 = 0;
+    einstein_screen5();
+#else
     saved_r9 = RG9SAV;
     saved_click = CLIKSW;
     CLIKSW = 0;                                 /* (the game reads the keys itself) */
     msx_screen(5);
+#endif
+#ifdef TARGET_EINSTEIN256
+    msx_vreg(9, 0);                             /* 192 lines */
+    msx_vreg(8, 0x0A);                          /* V9938: sprites disabled */
+#else
     msx_vreg(9, (uint8_t)(RG9SAV & 0x7F));      /* 192 lines (and PAL or NTSC as the machine has it) */
     msx_vreg(8, (uint8_t)(RG8SAV | 2));         /* no sprites */
+#endif
     msx_vreg(7, 0);                             /* a black border (the BIOS's colour 4 is red in the ST's palette) */
     msx_pal(msx_palette);
     plat_clear();
@@ -273,15 +365,20 @@ void plat_init(void)
 
 void plat_exit(void)
 {
+#ifdef TARGET_EINSTEIN256
+    einstein_dos_loud();
+#endif
     snd_exit();
 #ifdef HAVE_MOUSE
     msx_psg15(0xCF);                            /* (the mouse's strobe low, port 1, as the BIOS has it) */
 #endif
+#ifndef TARGET_EINSTEIN256
     CLIKSW = saved_click;
     msx_vreg(14, 0);
     msx_vreg(9, saved_r9);
     msx_pal(bios_palette);
     msx_screen(0);
+#endif
 }
 
 uint16_t plat_clock(void) { return clock_count; }
@@ -289,6 +386,10 @@ uint16_t plat_clock(void) { return clock_count; }
    display (R#9's NT bit clear) every fifth pass waits a second frame, which makes 5 passes in 6 frames, 50 a second. */
 void plat_idle(void)
 {
+#ifdef TARGET_EINSTEIN256
+    ++clock_count;
+    einstein_wait_frame();
+#else
     uint16_t j = JIFFY;
 
     ++clock_count;
@@ -300,6 +401,7 @@ void plat_idle(void)
         while (JIFFY == j)
             ;
     }
+#endif
 }
 void plat_flush(void) {}
 
@@ -442,7 +544,7 @@ void plat_icons(uint8_t selected)
 
 /* From here on the code is resident, in page 3 ($C000 up, SIMCITY.HI): the UI's bank, which --codeseg BANK_UI fills with the C code, holds 16 KB.  It runs while the
    bank is mapped, so it may call the bank's functions. */
-#pragma codeseg CODE_HI
+PLAT_CODE_HIGH
 
 /* ---- the mini maps ------------------------------------------------------------------------------------------------------------- */
 /* The palette entry of each of the eight colours the builder makes, a view to a line (views 1 to 8: the city, pollution, police cover, fire
@@ -483,6 +585,7 @@ void plat_put_minirow(uint8_t ty, const uint8_t *colours, const uint8_t *base, u
 
 /* ---- the keyboard ------------------------------------------------------------------------------------------------------------- */
 /* The MSX matrix: PPI row 0 to 8, a key down is a 0 bit (bit 0 first).  Row 6 has SHIFT (bit 0), CTRL, GRAPH, CAPS, CODE and F1 to F3. */
+#ifndef TARGET_EINSTEIN256
 static const uint8_t keys[9][8] = {
     { '0', '1', '2', '3', '4', '5', '6', '7' },
     { '8', '9', '-', '=', '\\', '[', ']', ';' },
@@ -552,9 +655,25 @@ uint8_t plat_key(void)
     held_for = 12;
     return 0;
 }
+#else
+/* CP/M direct console input; Einstein keys are read as ASCII through BDOS. */
+uint8_t plat_key(void)
+{
+    uint8_t k = einstein_getkey();
+
+    if (k >= 'A' && k <= 'Z')
+        k = (uint8_t)(k + ('a' - 'A'));
+    if (k == 13)
+        return KEY_ENTER;
+    if (k == 27)
+        return KEY_ESC;
+    return k;
+}
+#endif
 
 /* ---- files --------------------------------------------------------------------------------------------------------------------- */
 /* The city to and from a DOS file (z88dk's open, read and write on DOS 2's handles). */
+PLAT_CODE_FILE_OVERLAY
 uint8_t plat_file_save(const char *name, const uint8_t *a, uint16_t alen, const uint8_t *b, uint16_t blen)
 {
     int fd = open(name, O_WRONLY | O_CREAT | O_TRUNC, 0);

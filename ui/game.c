@@ -663,6 +663,9 @@ static void draw_view(uint8_t full, uint8_t dirty)
     last_phase = phase;
 }
 
+/* The Einstein gameplay overlay holds the minimap implementation; the game
+   loop remains resident and calls these fixed overlay entry points. */
+PLAT_CODE_GAME_OVERLAY
 #ifdef HAVE_MINIMAP
 /* ---- the mini maps ---------------------------------------------------------------
    The city mini map is shown at two pixels a tile (see ui/minimap.h).  The compact default is the
@@ -965,6 +968,7 @@ static void set_map_view(uint8_t v)
 #define draw_minimap(full) 0
 #define set_map_view(v)
 #endif
+PLAT_CODE_HOME
 
 /* "R   |## " : a letter, three cells for shortfall, a bar, three cells for demand: the seven bars for -3..3 */
 #ifndef HAVE_DEMAND_BARS
@@ -1647,6 +1651,7 @@ static uint8_t modal_screen(uint8_t (*screen)(void))
    this, the simulation parked); the player can also look at it, and change the rates, any time. */
 void game_budget(void)
 {
+    PLAT_OVERLAY_MODAL();
 #ifdef HAVE_MOUSE_POINTER
     plat_mouse_pointer_erase();
 #endif
@@ -1662,6 +1667,7 @@ void game_budget(void)
     else
         redraw |= REDRAW_TEXT;              /* it used the text area */
 #endif
+    PLAT_OVERLAY_GAME();
 }
 
 #else
@@ -1672,6 +1678,7 @@ void game_budget(void)
 /* The evaluation screen, modal. */
 static void game_evaluation(void)
 {
+    PLAT_OVERLAY_MODAL();
 #ifdef HAVE_MOUSE_POINTER
     plat_mouse_pointer_erase();
 #endif
@@ -1687,6 +1694,7 @@ static void game_evaluation(void)
     else
         redraw |= REDRAW_TEXT;
 #endif
+    PLAT_OVERLAY_GAME();
 }
 #else
 #define game_evaluation()

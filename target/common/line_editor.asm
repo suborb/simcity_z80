@@ -7,7 +7,11 @@
 ; back; a printable character is added (a space only if `spaces`), up to `max`.  buf is always a string.  Keeps IX.
 
         MODULE  line_editor
+        IFDEF   TARGET_EINSTEIN256
+        SECTION EINSTEIN_GAME_OVL
+        ELSE
         SECTION code_user
+        ENDIF
         PUBLIC  _plat_text_input
         EXTERN  _plat_key
         EXTERN  _plat_idle

@@ -3,6 +3,8 @@
 #include <stdint.h>
 #include "platform.h"
 #include "menu.h"
+PLAT_CODE_GAME_OVERLAY
+PLAT_CONST_GAME_OVERLAY
 
 #ifdef HAVE_POPUP_MENU
 #ifdef HAVE_TEXT_LAYER

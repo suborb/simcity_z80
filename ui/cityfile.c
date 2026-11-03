@@ -3,6 +3,8 @@
 #include "engine.h"
 #include "platform.h"
 #include "cityfile.h"
+PLAT_CODE_GAME_OVERLAY
+PLAT_CONST_GAME_OVERLAY
 #include "prompt.h"
 #ifdef HAVE_FILES
 #ifndef FILE_NAME_MAX                       /* the longest file name the platform can keep (plat_config.h) */

@@ -3,6 +3,7 @@
    entries each target's mini map table gives each view's eight. */
 #include <stdint.h>
 #include "platform.h"
+PLAT_CONST_GAME_OVERLAY
 
 #ifdef HAVE_MINIMAP_SQUARE
 /* The key to a mini map's colours, in the sidebar's rows 6 to 14 (columns 24 to 31): a swatch of the colour and what it is.  The colours
