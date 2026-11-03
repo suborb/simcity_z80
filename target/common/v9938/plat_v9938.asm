@@ -84,10 +84,10 @@ va_line:
         ld      e,a
         ret
 
-; void msx_cmd(const uint8_t *regs) __smallc
+; void v9938_cmd(const uint8_t *regs) __smallc
 ; Starts a VDP command from 15 bytes for registers 32 to 46 (SX, SY, DX, DY, NX, NY as words, then CLR, ARG, CMD).
-        PUBLIC  _msx_cmd
-_msx_cmd:
+        PUBLIC  _v9938_cmd
+_v9938_cmd:
         ld      hl,2
         add     hl,sp
         ld      e,(hl)
@@ -107,10 +107,10 @@ mc_go:
         ei
         ret
 
-; void msx_tile(uint8_t col, uint8_t row, uint16_t n) __smallc
+; void v9938_tile(uint8_t col, uint8_t row, uint16_t n) __smallc
 ; Picture n of the atlas to cell (col, row) (HMMM of 8x8 pixels).
-        PUBLIC  _msx_tile
-_msx_tile:
+        PUBLIC  _v9938_tile
+_v9938_tile:
         ld      hl,2
         add     hl,sp
         ld      e,(hl)                  ; n
@@ -155,10 +155,10 @@ _msx_tile:
         jr      mc_go
 mt_blk: defb    0,0, 0,1, 0,0, 0,0, 8,0, 8,0, 0,0,$D0
 
-; void msx_wr(uint8_t y, uint8_t x, const uint8_t *src, uint16_t len) __smallc
+; void v9938_wr(uint8_t y, uint8_t x, const uint8_t *src, uint16_t len) __smallc
 ; len pixels (even, each a byte of 0 to 15) from src to pixel line y from column x (even).
-        PUBLIC  _msx_wr
-_msx_wr:
+        PUBLIC  _v9938_wr
+_v9938_wr:
         ld      hl,2
         add     hl,sp
         ld      c,(hl)                  ; len
@@ -202,10 +202,10 @@ mw_loop:
         ei
         ret
 
-; void msx_rd(uint8_t y, uint8_t x, uint8_t *dst, uint16_t len) __smallc
+; void v9938_rd(uint8_t y, uint8_t x, uint8_t *dst, uint16_t len) __smallc
 ; len pixels of pixel line y from column x to dst, a byte each.
-        PUBLIC  _msx_rd
-_msx_rd:
+        PUBLIC  _v9938_rd
+_v9938_rd:
         ld      hl,2
         add     hl,sp
         ld      c,(hl)
@@ -288,10 +288,10 @@ vwr_loop:
         ei
         ret
 
-; void msx_glyph(uint8_t col, uint8_t row, const uint8_t *art, uint8_t ink, uint8_t paper) __smallc
+; void v9938_glyph(uint8_t col, uint8_t row, const uint8_t *art, uint8_t ink, uint8_t paper) __smallc
 ; The 8 bytes of 1 bit art (bit 7 on the left) in cell (col, row), set pixels in colour ink and the others paper.
-        PUBLIC  _msx_glyph
-_msx_glyph:
+        PUBLIC  _v9938_glyph
+_v9938_glyph:
         ld      hl,2
         add     hl,sp
         ld      a,(hl)                  ; paper
@@ -422,9 +422,9 @@ gl_ap:  defw    0
 gl_va:  defw    0
 gl_n:   defb    0
 
-; void msx_vreg(uint8_t reg, uint8_t value) __smallc
-        PUBLIC  _msx_vreg
-_msx_vreg:
+; void v9938_vreg(uint8_t reg, uint8_t value) __smallc
+        PUBLIC  _v9938_vreg
+_v9938_vreg:
         ld      hl,2
         add     hl,sp
         ld      a,(hl)                  ; value
@@ -439,10 +439,10 @@ _msx_vreg:
         ei
         ret
 
-; void msx_pal(const uint8_t *entries) __smallc
+; void v9938_pal(const uint8_t *entries) __smallc
 ; The 16 colours of the palette from 32 bytes (red * 16 + blue, then green, each 0 to 7).
-        PUBLIC  _msx_pal
-_msx_pal:
+        PUBLIC  _v9938_pal
+_v9938_pal:
         ld      hl,2
         add     hl,sp
         ld      e,(hl)
@@ -543,10 +543,10 @@ vr_loop:
         ei
         ret
 
-; uint16_t msx_cget(uint16_t addr) __smallc
+; uint16_t v9938_cget(uint16_t addr) __smallc
 ; A word of the video RAM, without waiting for the VDP's command (the CPU's access shares the memory with it): the cache of the cells.
-        PUBLIC  _msx_cget
-_msx_cget:
+        PUBLIC  _v9938_cget
+_v9938_cget:
         ld      hl,2
         add     hl,sp
         ld      e,(hl)
@@ -561,9 +561,9 @@ _msx_cget:
         ei
         ret
 
-; void msx_cset(uint16_t addr, uint16_t value) __smallc
-        PUBLIC  _msx_cset
-_msx_cset:
+; void v9938_cset(uint16_t addr, uint16_t value) __smallc
+        PUBLIC  _v9938_cset
+_v9938_cset:
         ld      hl,2
         add     hl,sp
         ld      c,(hl)
@@ -582,10 +582,10 @@ _msx_cset:
         ei
         ret
 
-; void msx_command(uint16_t sx, uint16_t sy, uint16_t dx, uint16_t dy, uint16_t nx, uint16_t ny, uint8_t clr, uint8_t cmd) __smallc
+; void v9938_command(uint16_t sx, uint16_t sy, uint16_t dx, uint16_t dy, uint16_t nx, uint16_t ny, uint8_t clr, uint8_t cmd) __smallc
 ; Starts a VDP command from its parameters (the argument for the command, R#45, is 0).
-        PUBLIC  _msx_command
-_msx_command:
+        PUBLIC  _v9938_command
+_v9938_command:
         ld      hl,17
         add     hl,sp                   ; the high byte of sx, the first argument
         ld      de,cm_blk
@@ -607,7 +607,7 @@ cm_word:
         ld      a,(hl)                  ; clr
         ld      (de),a
         inc     de
-        ld      a,(cm_arg)              ; arg: what msx_dir said for this command (the directions of a copy), then 0 again
+        ld      a,(cm_arg)              ; arg: what v9938_dir said for this command (the directions of a copy), then 0 again
         ld      (de),a
         inc     de
         xor     a
@@ -621,20 +621,20 @@ cm_word:
 cm_blk: defs    15
 cm_arg: defb    0
 
-; void msx_dir(uint8_t arg) __smallc
-; The argument register (R#45) of the next msx_command: bit 2 is DIX (copy towards the left), bit 3 DIY (towards the top), as an overlapping copy needs.
-        PUBLIC  _msx_dir
-_msx_dir:
+; void v9938_dir(uint8_t arg) __smallc
+; The argument register (R#45) of the next v9938_command: bit 2 is DIX (copy towards the left), bit 3 DIY (towards the top), as an overlapping copy needs.
+        PUBLIC  _v9938_dir
+_v9938_dir:
         ld      hl,2
         add     hl,sp
         ld      a,(hl)
         ld      (cm_arg),a
         ret
 
-; void msx_sync(void)
+; void v9938_sync(void)
 ; Waits for the VDP's command to finish (the cache is read without waiting: after a scroll, which moves it by VDP commands, this makes it whole).
-        PUBLIC  _msx_sync
-_msx_sync:
+        PUBLIC  _v9938_sync
+_v9938_sync:
         di
         call    vdp_wait_di
         ei

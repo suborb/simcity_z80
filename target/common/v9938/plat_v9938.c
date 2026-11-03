@@ -12,18 +12,18 @@
 #include "engine.h"
 #include "msx2.h"
 
-extern void msx_tile(uint8_t col, uint8_t row, uint16_t n);
-extern void msx_wr(uint8_t y, uint8_t x, const uint8_t *src, uint16_t len);
-extern void msx_rd(uint8_t y, uint8_t x, uint8_t *dst, uint16_t len);
-extern void msx_sync(void);
+extern void v9938_tile(uint8_t col, uint8_t row, uint16_t n);
+extern void v9938_wr(uint8_t y, uint8_t x, const uint8_t *src, uint16_t len);
+extern void v9938_rd(uint8_t y, uint8_t x, uint8_t *dst, uint16_t len);
+extern void v9938_sync(void);
 extern void msx_psg15(uint8_t value);
 extern void vram_read(uint16_t addr, uint8_t *dst, uint16_t len);
-extern uint16_t msx_cget(uint16_t addr);
-extern void msx_cset(uint16_t addr, uint16_t value);
+extern uint16_t v9938_cget(uint16_t addr);
+extern void v9938_cset(uint16_t addr, uint16_t value);
 extern void vram_write(uint16_t addr, const uint8_t *src, uint16_t len);
-extern void msx_glyph(uint8_t col, uint8_t row, const uint8_t *art, uint8_t ink, uint8_t paper);
-extern void msx_vreg(uint8_t reg, uint8_t value);
-extern void msx_pal(const uint8_t *entries);
+extern void v9938_glyph(uint8_t col, uint8_t row, const uint8_t *art, uint8_t ink, uint8_t paper);
+extern void v9938_vreg(uint8_t reg, uint8_t value);
+extern void v9938_pal(const uint8_t *entries);
 extern uint8_t msx_keyrow(uint8_t row);
 #ifdef HAVE_SOUND
 extern void snd_init(void);
@@ -36,11 +36,11 @@ extern void snd_exit(void);
 extern const uint8_t font_8x8_bbc_system[];     /* 96 glyphs, from space */
 extern const uint8_t view_tile_art[];           /* picture n is at 8 * n from it */
 extern uint8_t V_view_tick;                     /* the game's frame counter: the animations' clock */
-extern const uint8_t msx_palette[];             /* msx2.inc: 16 colours, 2 bytes each */
-extern const uint8_t msx_attrs[];               /* ... the palette entry nearest each of the 8 attribute colours */
-extern const uint8_t msx_animbits[];            /* ... a bit a picture that has an animation, */
-extern const uint8_t msx_animlist[];            /* ... and those (the picture, a word, and the animation from 1), */
-extern const uint8_t msx_animtab[];             /* ... an animation: the first frame's picture (a word) and the frames less one, 3 bytes (tools/st_tiles_3bpp.py ANIMATED) */
+extern const uint8_t v9938_palette[];             /* msx2.inc: 16 colours, 2 bytes each */
+extern const uint8_t v9938_attrs[];               /* ... the palette entry nearest each of the 8 attribute colours */
+extern const uint8_t v9938_animbits[];            /* ... a bit a picture that has an animation, */
+extern const uint8_t v9938_animlist[];            /* ... and those (the picture, a word, and the animation from 1), */
+extern const uint8_t v9938_animtab[];             /* ... an animation: the first frame's picture (a word) and the frames less one, 3 bytes (tools/st_tiles_3bpp.py ANIMATED) */
 
 #define COLS        32
 #define MAP_ROW     7                           /* the map's cell rows: the only ones with a cache entry (after the panel: ui/game.c) */
@@ -75,25 +75,25 @@ static uint8_t saved_click;
 static uint8_t pace;                            /* the passes since the 60 Hz display's extra frame */
 
 /* ---- VDP commands ------------------------------------------------------------------------------------------------------------ */
-extern void msx_command(uint16_t sx, uint16_t sy, uint16_t dx, uint16_t dy, uint16_t nx, uint16_t ny, uint8_t clr, uint8_t cmd);       /* (plat_v9938.asm) */
+extern void v9938_command(uint16_t sx, uint16_t sy, uint16_t dx, uint16_t dy, uint16_t nx, uint16_t ny, uint8_t clr, uint8_t cmd);       /* (plat_v9938.asm) */
 
 #include "shift_rect.h"
 
 /* A rectangle of pixels in one colour (x and nx even for the high speed fill; the pixel exact one is for the frames) */
 static void vfill(uint8_t y, uint8_t x, uint16_t nx, uint8_t ny, uint8_t colour)
 {
-    msx_command(0, 0, x, y, nx, ny, (uint8_t)(colour * 17), CMD_HMMV);
+    v9938_command(0, 0, x, y, nx, ny, (uint8_t)(colour * 17), CMD_HMMV);
 }
 
 /* ---- the cache ------------------------------------------------------------------------------------------------------------- */
-/* what each map cell shows (its picture and the inverse flag, or $FFFF) is in the video RAM, from MSX_CACHE: a word a cell, a line of 128 bytes (a cell is 4 pixels wide:
+/* what each map cell shows (its picture and the inverse flag, or $FFFF) is in the video RAM, from V9938_CACHE: a word a cell, a line of 128 bytes (a cell is 4 pixels wide:
    the cache is an image that a VDP copy can move as the map is scrolled) */
-#define CACHE_Y     (256 + 216)                 /* its first line, in the pixels of the second page (MSX_CACHE is the same place, as an address) */
+#define CACHE_Y     (256 + 216)                 /* its first line, in the pixels of the second page (V9938_CACHE is the same place, as an address) */
 
 static uint16_t entry(uint8_t col, uint8_t row)         /* the address of the cell's word, or 0 outside the map */
 {
     row -= MAP_ROW;
-    return row < MAP_ROWS ? MSX_CACHE + (uint16_t)row * 128 + col * 2 : 0;
+    return row < MAP_ROWS ? V9938_CACHE + (uint16_t)row * 128 + col * 2 : 0;
 }
 
 static void forget(uint8_t col, uint8_t row)
@@ -101,12 +101,12 @@ static void forget(uint8_t col, uint8_t row)
     uint16_t e = entry(col, row);
 
     if (e)
-        msx_cset(e, 0xFFFF);
+        v9938_cset(e, 0xFFFF);
 }
 
 static void forget_rect(uint16_t cx, uint16_t cy, uint16_t cw, uint16_t ch)    /* cells of the cache (cell columns, map rows) */
 {
-    msx_command(0, 0, cx * 4, CACHE_Y + cy, cw * 4, ch, 0xFF, CMD_HMMV);
+    v9938_command(0, 0, cx * 4, CACHE_Y + cy, cw * 4, ch, 0xFF, CMD_HMMV);
 }
 
 static void forget_all(void)
@@ -119,13 +119,13 @@ static void forget_all(void)
    frames, which are pictures after the engine's, changing every 16 ticks of the frame counter. */
 static uint16_t shown(uint16_t n)
 {
-    const uint8_t *e = msx_animlist;
+    const uint8_t *e = v9938_animlist;
 
-    if (n >= MSX_ANIMATED || !(msx_animbits[n >> 3] & (1 << (n & 7))))
+    if (n >= V9938_ANIMATED || !(v9938_animbits[n >> 3] & (1 << (n & 7))))
         return n;
     while ((uint16_t)(e[0] | (e[1] << 8)) != n)
         e += 3;
-    e = msx_animtab + (uint16_t)(e[2] - 1) * 3;
+    e = v9938_animtab + (uint16_t)(e[2] - 1) * 3;
     return (uint16_t)(e[0] | (e[1] << 8)) + ((V_view_tick >> 4) & e[2]);
 }
 
@@ -137,13 +137,13 @@ void plat_put_tile(uint8_t col, uint8_t row, const uint8_t *art, uint8_t attr, u
 
     (void)attr;
     if (e) {
-        if (msx_cget(e) == key)
+        if (v9938_cget(e) == key)
             return;
-        msx_cset(e, key);
+        v9938_cset(e, key);
     }
-    msx_tile(col, row, n);
+    v9938_tile(col, row, n);
     if (inverse)                                /* the cursor: the pixels' colours complemented */
-        msx_command(0, 0, (uint16_t)col * 8, (uint16_t)row * 8, 8, 8, 15, CMD_LMMV | OP_XOR);
+        v9938_command(0, 0, (uint16_t)col * 8, (uint16_t)row * 8, 8, 8, 15, CMD_LMMV | OP_XOR);
 }
 
 void plat_put_overlay(uint8_t col, uint8_t row, const uint8_t *art)
@@ -152,18 +152,18 @@ void plat_put_overlay(uint8_t col, uint8_t row, const uint8_t *art)
 
     forget(col, row);
     for (k = 0; k < 8; ++k) {
-        msx_rd((uint8_t)(row * 8 + k), (uint8_t)(col * 8), buf, 8);
+        v9938_rd((uint8_t)(row * 8 + k), (uint8_t)(col * 8), buf, 8);
         for (i = 0; i < 8; ++i)
             if (art[k] & (0x80 >> i))
                 buf[i] = WHITE;
-        msx_wr((uint8_t)(row * 8 + k), (uint8_t)(col * 8), buf, 8);
+        v9938_wr((uint8_t)(row * 8 + k), (uint8_t)(col * 8), buf, 8);
     }
 }
 
 void plat_put_bitmap(uint8_t col, uint8_t row, const uint8_t *art)
 {
     forget(col, row);
-    msx_glyph(col, row, art, WHITE, BLACK);
+    v9938_glyph(col, row, art, WHITE, BLACK);
 }
 
 /* The line pieces of the boxes' frames, pipes two pixels thick with rounded corners: 1 top left, 2 top right, 3 bottom left, 4 bottom
@@ -181,9 +181,9 @@ void plat_put(uint8_t col, uint8_t row, uint8_t ch)
 {
     forget(col, row);
     if (ch < 32)
-        msx_glyph(col, row, box[ch - 1], WHITE, BLACK);
+        v9938_glyph(col, row, box[ch - 1], WHITE, BLACK);
     else
-        msx_glyph(col, row, font_8x8_bbc_system + (uint16_t)(ch - 32) * 8, WHITE, BLACK);
+        v9938_glyph(col, row, font_8x8_bbc_system + (uint16_t)(ch - 32) * 8, WHITE, BLACK);
 }
 
 void plat_puts(uint8_t col, uint8_t row, const char *s)
@@ -226,7 +226,7 @@ void plat_scroll(uint8_t row, uint8_t rows, int8_t dx, int8_t dy)
     shift_rect(0, (uint16_t)row * 8, 256, (uint16_t)rows * 8, dx * 8, dy * 8);
     if (row != MAP_ROW || rows != MAP_ROWS) {   /* (not the rows the cache is for) */
         forget_all();
-        msx_sync();
+        v9938_sync();
         return;
     }
     shift_rect(0, CACHE_Y, COLS * 4, MAP_ROWS, dx * 4, dy);
@@ -238,7 +238,7 @@ void plat_scroll(uint8_t row, uint8_t rows, int8_t dx, int8_t dy)
         forget_rect(COLS - dx, 0, dx, MAP_ROWS);
     else if (dx < 0)
         forget_rect(0, 0, -dx, MAP_ROWS);
-    msx_sync();                                 /* (the cache is read without waiting for the VDP) */
+    v9938_sync();                                 /* (the cache is read without waiting for the VDP) */
 }
 #endif
 
@@ -280,14 +280,14 @@ void plat_init(void)
     msx_screen(5);
 #endif
 #ifdef TARGET_EINSTEIN256
-    msx_vreg(9, 0);                             /* 192 lines */
-    msx_vreg(8, 0x0A);                          /* V9938: sprites disabled */
+    v9938_vreg(9, 0);                             /* 192 lines */
+    v9938_vreg(8, 0x0A);                          /* V9938: sprites disabled */
 #else
-    msx_vreg(9, (uint8_t)(RG9SAV & 0x7F));      /* 192 lines (and PAL or NTSC as the machine has it) */
-    msx_vreg(8, (uint8_t)(RG8SAV | 2));         /* no sprites */
+    v9938_vreg(9, (uint8_t)(RG9SAV & 0x7F));      /* 192 lines (and PAL or NTSC as the machine has it) */
+    v9938_vreg(8, (uint8_t)(RG8SAV | 2));         /* no sprites */
 #endif
-    msx_vreg(7, 0);                             /* a black border (the BIOS's colour 4 is red in the ST's palette) */
-    msx_pal(msx_palette);
+    v9938_vreg(7, 0);                             /* a black border (the BIOS's colour 4 is red in the ST's palette) */
+    v9938_pal(v9938_palette);
     plat_clear();
     snd_init();                                 /* (the sound's frame hook) */
     for (line = 0; line < 256; ++line) {        /* the atlas, in the second page */
@@ -309,9 +309,9 @@ void plat_exit(void)
 #endif
 #ifndef TARGET_EINSTEIN256
     CLIKSW = saved_click;
-    msx_vreg(14, 0);
-    msx_vreg(9, saved_r9);
-    msx_pal(bios_palette);
+    v9938_vreg(14, 0);
+    v9938_vreg(9, saved_r9);
+    v9938_pal(bios_palette);
     msx_screen(0);
 #endif
 }
@@ -350,9 +350,9 @@ static void rect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint8_t colour)
     if (!w)
         return;
     if ((x | w) & 1)
-        msx_command(0, 0, x, y, w, h, colour, CMD_LMMV | OP_IMP);
+        v9938_command(0, 0, x, y, w, h, colour, CMD_LMMV | OP_IMP);
     else
-        msx_command(0, 0, x, y, w, h, (uint8_t)(colour * 17), CMD_HMMV);
+        v9938_command(0, 0, x, y, w, h, (uint8_t)(colour * 17), CMD_HMMV);
 }
 
 static void forget_cells(uint8_t col, uint8_t row, uint8_t n)
@@ -402,8 +402,8 @@ void plat_demand(uint8_t col, uint8_t row, char name, int8_t level)
 }
 
 /* The colours of an attribute (the Spectrum's: ink in bits 0-2, paper in 3-5), as palette entries. */
-static uint8_t ink_of(uint8_t attr) { return msx_attrs[attr & 7]; }
-static uint8_t paper_of(uint8_t attr) { return msx_attrs[(attr >> 3) & 7]; }
+static uint8_t ink_of(uint8_t attr) { return v9938_attrs[attr & 7]; }
+static uint8_t paper_of(uint8_t attr) { return v9938_attrs[(attr >> 3) & 7]; }
 
 /* Recolours n cells of text already drawn (white on black): the set pixels take the ink and the others the paper, which two VDP logic commands do for the whole run:
    AND with ink xor paper (white stays that, black stays black), then XOR with paper. */
@@ -412,8 +412,8 @@ void plat_text_attr(uint8_t col, uint8_t row, uint8_t n, uint8_t attr)
     uint8_t ink = ink_of(attr), paper = paper_of(attr);
 
     forget_cells(col, row, n);
-    msx_command(0, 0, (uint16_t)col * 8, (uint16_t)row * 8, (uint16_t)n * 8, 8, ink ^ paper, CMD_LMMV | OP_AND);
-    msx_command(0, 0, (uint16_t)col * 8, (uint16_t)row * 8, (uint16_t)n * 8, 8, paper, CMD_LMMV | OP_XOR);
+    v9938_command(0, 0, (uint16_t)col * 8, (uint16_t)row * 8, (uint16_t)n * 8, 8, ink ^ paper, CMD_LMMV | OP_AND);
+    v9938_command(0, 0, (uint16_t)col * 8, (uint16_t)row * 8, (uint16_t)n * 8, 8, paper, CMD_LMMV | OP_XOR);
 }
 
 /* A horizontal bar chart `cells` cells wide: the first `fill` pixels (0 to 8 * cells) in the ink of the attribute, the rest in its paper
@@ -444,15 +444,15 @@ void plat_afford(uint16_t mask)
 
 static void icon_one(uint8_t i)
 {
-    uint16_t sx = (uint16_t)(i % 7) * 24, sy = 256 + ((afford_mask >> i) & 1 ? MSX_ICON_Y : MSX_DIM_Y) + (uint16_t)(i / 7) * 14;
+    uint16_t sx = (uint16_t)(i % 7) * 24, sy = 256 + ((afford_mask >> i) & 1 ? V9938_ICON_Y : V9938_DIM_Y) + (uint16_t)(i / 7) * 14;
     uint8_t y = (uint8_t)(8 + 16 * (i / 7));
 
     if (i == icon_sel) {                        /* the frame, yellow, over the button's edge */
         vfill(y, (uint8_t)sx, 24, 16, 14);
-        msx_command(sx + 1, sy, sx + 1, y + 1, 22, 14, 0, CMD_LMMM | OP_IMP);
+        v9938_command(sx + 1, sy, sx + 1, y + 1, 22, 14, 0, CMD_LMMM | OP_IMP);
     } else {
         vfill(y, (uint8_t)sx, 24, 16, BLACK);
-        msx_command(sx, sy, sx, y + 1, 24, 14, 0, 0xD0);
+        v9938_command(sx, sy, sx, y + 1, 24, 14, 0, 0xD0);
     }
 }
 
@@ -514,8 +514,8 @@ void plat_put_minirow(uint8_t ty, const uint8_t *colours, const uint8_t *base, u
         line[x * 2] = c;
         line[x * 2 + 1] = c;
     }
-    msx_wr((uint8_t)(ty * 2), 0, line, MAP_W * 2);
-    msx_wr((uint8_t)(ty * 2 + 1), 0, line, MAP_W * 2);
+    v9938_wr((uint8_t)(ty * 2), 0, line, MAP_W * 2);
+    v9938_wr((uint8_t)(ty * 2 + 1), 0, line, MAP_W * 2);
 }
 
 /* ---- the keyboard ------------------------------------------------------------------------------------------------------------- */

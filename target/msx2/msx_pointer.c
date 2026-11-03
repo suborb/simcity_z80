@@ -14,7 +14,7 @@
 
 extern void pointer_start(void);                /* (target/common/pointer.c) */
 extern void vram_write(uint16_t addr, const uint8_t *src, uint16_t len);
-extern void msx_vreg(uint8_t reg, uint8_t value);
+extern void v9938_vreg(uint8_t reg, uint8_t value);
 extern uint8_t msx_keyrow(uint8_t row);
 
 #define RG1SAV      (*(volatile uint8_t *)0xF3E0)       /* the BIOS's copies of VDP registers 1 and 8 */
@@ -68,11 +68,11 @@ static void sprite_define(void)
     attr[0] = attr[4] = attr[8] = 216;          /* (216 ends the list: none shown) */
     attr[6] = 4;
     vram_write(SAT, attr, 12);
-    msx_vreg(5, 0xEF);                          /* where the tables are (the BIOS's values for screen 5) */
-    msx_vreg(11, 0);
-    msx_vreg(6, 0x0F);
-    msx_vreg(1, (uint8_t)((RG1SAV & ~3) | 2));  /* 16x16 sprites, not magnified */
-    msx_vreg(8, (uint8_t)((RG8SAV & ~2) | 0x20));       /* sprites on, and colour 0 drawn */
+    v9938_vreg(5, 0xEF);                          /* where the tables are (the BIOS's values for screen 5) */
+    v9938_vreg(11, 0);
+    v9938_vreg(6, 0x0F);
+    v9938_vreg(1, (uint8_t)((RG1SAV & ~3) | 2));  /* 16x16 sprites, not magnified */
+    v9938_vreg(8, (uint8_t)((RG8SAV & ~2) | 0x20));       /* sprites on, and colour 0 drawn */
 }
 
 static void sprite_at(int16_t x, int16_t y)

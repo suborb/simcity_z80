@@ -383,27 +383,27 @@ def msx2_files(a, palette, bits, table, framed, amap, entries):
     pal = msx2_palette(palette, bits)
     with open(os.path.join(a.msx2, 'msx2.inc'), 'w') as f:
         f.write('; made by tools/st_tiles_3bpp.py --msx2: the V9938 palette (red and blue, green: 2 bytes a colour), the 8 attribute colours (palette entries), the animations\n')
-        f.write('        PUBLIC  _msx_palette, _msx_attrs, _msx_animbits, _msx_animlist, _msx_animtab\n_msx_palette:\n')
+        f.write('        PUBLIC  _v9938_palette, _v9938_attrs, _v9938_animbits, _v9938_animlist, _v9938_animtab\n_v9938_palette:\n')
         for k in range(0, 32, 8):
             f.write('        defb    ' + ','.join(str(v) for v in pal[k:k + 8]) + '\n')
-        f.write('_msx_attrs:\n        defb    ' + ','.join(str(v) for v in attr_colours(palette, bits)) + '\n')
+        f.write('_v9938_attrs:\n        defb    ' + ','.join(str(v) for v in attr_colours(palette, bits)) + '\n')
         # the animations: a bit for each picture that has one, the list of those (the picture, a word, and its animation from 1), and the animations (the first frame's picture, a word, and the frames less one)
         amap = list(amap)
         bits = [sum(1 << j for j in range(8) if k * 8 + j < len(amap) and amap[k * 8 + j]) for k in range((len(amap) + 7) // 8)]
-        f.write('_msx_animbits:\n')
+        f.write('_v9938_animbits:\n')
         for k in range(0, len(bits), 16):
             f.write('        defb    ' + ','.join(str(v) for v in bits[k:k + 16]) + '\n')
-        f.write('_msx_animlist:\n')
+        f.write('_v9938_animlist:\n')
         for n, v in enumerate(amap):
             if v:
                 f.write(f'        defw    {n}\n        defb    {v}\n')
-        f.write('_msx_animtab:\n')
+        f.write('_v9938_animtab:\n')
         for first, n in entries:
             f.write(f'        defw    {first}\n        defb    {n - 1}\n')
     with open(os.path.join(a.msx2, 'msx2.h'), 'w') as f:
-        f.write(f'/* made by tools/st_tiles_3bpp.py --msx2 */\n#define MSX_ANIMATED {len(amap)}          /* (the pictures that may be animated; the frames, after them, are not) */\n#define MSX_PICTURES {len(framed)}          /* (the animations\' frames are among them) */\n'
-                f'#define MSX_ICON_Y {icon_y}               /* the atlas\'s line of the first icon: 14 of 24x14 pixels in two rows of seven */\n#define MSX_DIM_Y {dim_y}                /* ... and of the dimmed ones */\n'
-                f'#define MSX_FONT {0x8000 + 208 * 128}u            /* the font in the video RAM: 96 glyphs of 8 bytes */\n#define MSX_CACHE {0x8000 + 216 * 128}u           /* the room for the cell cache: 17 lines of 128 bytes (32 words used, to line 232) */\n')
+        f.write(f'/* made by tools/st_tiles_3bpp.py --msx2 */\n#define V9938_ANIMATED {len(amap)}          /* (the pictures that may be animated; the frames, after them, are not) */\n#define V9938_PICTURES {len(framed)}          /* (the animations\' frames are among them) */\n'
+                f'#define V9938_ICON_Y {icon_y}               /* the atlas\'s line of the first icon: 14 of 24x14 pixels in two rows of seven */\n#define V9938_DIM_Y {dim_y}                /* ... and of the dimmed ones */\n'
+                f'#define V9938_FONT {0x8000 + 208 * 128}u            /* the font in the video RAM: 96 glyphs of 8 bytes */\n#define V9938_CACHE {0x8000 + 216 * 128}u           /* the room for the cell cache: 17 lines of 128 bytes (32 words used, to line 232) */\n')
     print(f'{len(framed)} pictures, 14 icons and their dimmed copies -> {a.msx2}/TILES.DAT; the palette, attributes and animations -> {a.msx2}/msx2.inc, msx2.h')
 
 # ---- the MZ-2500 -----------------------------------------------------------------------------------------------------------
