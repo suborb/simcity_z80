@@ -12,6 +12,7 @@
 extern uint8_t einstein_overlay[];      /* the window's address, and the two sizes (as the addresses of symbols) */
 extern uint8_t einstein_game_size, einstein_modal_size;
 
+extern void einstein_fatal(const char *message);        /* (einstein_io.asm: prints the $-terminated string and exits) */
 extern void vram_write(uint16_t address, const uint8_t *source, uint16_t length);
 extern void vram_read(uint16_t address, uint8_t *destination, uint16_t length);
 
@@ -40,8 +41,8 @@ static void stage(const char *name, uint16_t vram, uint16_t length)
     int fd = open(name, O_RDONLY, 0);
     uint16_t total = 0;
 
-    if (fd < 0)
-        exit(1);
+    if (fd < 0)                                 /* (the files are on the default drive: log on to the game's disc first) */
+        einstein_fatal("SIMCITY.GAM/MOD not found: log on to the game disc (1:) first\r\n$");
     memset(einstein_overlay, 0, length);
     while (total < length) {
         int16_t count = (int16_t)read(fd, einstein_overlay + total, length - total);

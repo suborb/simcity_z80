@@ -699,11 +699,20 @@ uint8_t plat_file_load(const char *name, uint8_t *a, uint16_t alen, uint8_t *b, 
     else if (read(fd, b, blen) != (int)blen)
         r = 2;
     else {
+#ifdef TARGET_EINSTEIN256
+        char extra[128];
+
+        /* A 96x96 city is a valid prefix of a larger file.  CP/M keeps a file in whole 128 byte records, so what is left of the last record reads back as padding:
+           up to 127 bytes of it belong to this size of city, more means a bigger map. */
+        if (read(fd, extra, 128) > 127)
+            r = 2;
+#else
         char extra;
 
         /* A 96x96 city is a valid prefix of a larger file.  Do not silently accept it (or any other file with the wrong map size). */
         if (read(fd, &extra, 1) > 0)           /* (at the end of the file DOS 2 gives its end of file error, which z88dk's read makes -1) */
             r = 2;
+#endif
     }
     close(fd);
     return r;
