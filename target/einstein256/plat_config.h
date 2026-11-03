@@ -10,6 +10,7 @@
 #define HAVE_FILES
 #define HAVE_OVERLAY_UI
 #define FILE_NAME_MAX 12
+#define FILE_RECORD 128                 /* CP/M keeps a file in whole 128 byte records (plat_v9938.c: the padding after a city) */
 #define HAVE_BUDGET
 #define HAVE_EVALUATION
 #define HAVE_MINIMAP

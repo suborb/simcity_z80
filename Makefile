@@ -241,7 +241,7 @@ MSX2_SOUND_FILES = $(NOSOUND)
 MSX2_SOUND_FLAGS = -DMSX2_NO_SOUND
 endif
 MSX2_GAME = $(filter-out ui/main.c,$(GAME))         # (main() is in msx_bank.asm)
-MSX2_PLATFORM = target/msx2/msx_banks.asm target/msx2/msx_bank.asm target/common/minimap_key.c target/msx2/pointer_res.c target/msx2/msx_pointer.c target/common/v9938/plat_v9938.c target/common/v9938/plat_v9938.asm target/common/v9938/v9938_data.asm $(MSX2_SOUND_FILES)
+MSX2_PLATFORM = target/msx2/msx_banks.asm target/msx2/msx_bank.asm target/common/minimap_key.c target/msx2/pointer_res.c target/msx2/msx_pointer.c target/msx2/plat_msx2.c target/msx2/msx_io.asm target/common/v9938/plat_v9938.c target/common/v9938/plat_v9938.asm target/common/v9938/v9938_data.asm $(MSX2_SOUND_FILES)
 
 build/msx2/TILES.DAT build/msx2/msx2.inc build/msx2/msx2.h: assets/st_tiles.bin assets/st_icons.bin tools/st_tiles_3bpp.py
 	@mkdir -p $(@D)
@@ -263,7 +263,7 @@ $(MSX2): $(DEPS) build/msx2/TILES.DAT build/msx2/msx2.inc build/msx2/msx2.h
 # The Tatung Einstein 256: CP/M, V9938 screen 5 and the V9938 drawing core it shares with the MSX2 (target/common/v9938).
 # One CP/M COM in the standard classic map (under 32 KB: the DOS will not load a bigger one); the two UI overlays are separate files that the start-up reads into
 # a window above the BSS and keeps in the unused part of the screen page's VRAM, and copies back as needed.  See docs/EINSTEIN256-layout.md.
-EINSTEIN256_PLATFORM = target/einstein256/einstein_boot.asm target/einstein256/einstein_io.asm target/einstein256/einstein_loader.c target/einstein256/einstein_dos.c target/common/minimap_key.c target/common/v9938/plat_v9938.c target/common/v9938/plat_v9938.asm target/common/v9938/v9938_data.asm platform/common/nosound.asm
+EINSTEIN256_PLATFORM = target/einstein256/einstein_boot.asm target/einstein256/einstein_io.asm target/einstein256/einstein_loader.c target/einstein256/einstein_dos.c target/einstein256/plat_einstein256.c target/common/minimap_key.c target/common/v9938/plat_v9938.c target/common/v9938/plat_v9938.asm target/common/v9938/v9938_data.asm platform/common/nosound.asm
 EINSTEIN256_GAME = $(filter-out ui/main.c,$(GAME))
 EINSTEIN256_TPA_TOP = E000          # the BDOS entry (the word at address 6) on the machine; the check script uses it
 

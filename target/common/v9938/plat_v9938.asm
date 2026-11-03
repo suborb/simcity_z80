@@ -460,54 +460,6 @@ _v9938_pal:
         ei
         ret
 
-        IFNDEF  TARGET_EINSTEIN256
-; uint8_t msx_keyrow(uint8_t row) __smallc
-; The keyboard matrix row (0 to 10) from the PPI: a bit is 0 for a key that is down.
-        PUBLIC  _msx_keyrow
-_msx_keyrow:
-        ld      hl,2
-        add     hl,sp
-        ld      c,(hl)
-        di
-        in      a,($AA)
-        and     $F0
-        or      c
-        out     ($AA),a
-        in      a,($A9)
-        ei
-        ld      l,a
-        ld      h,0
-        ret
-
-; void msx_print(const char *s) __smallc
-; DOS function 9: the string, ended by a $, on the console.
-        PUBLIC  _msx_print
-_msx_print:
-        ld      hl,2
-        add     hl,sp
-        ld      e,(hl)
-        inc     hl
-        ld      d,(hl)
-        push    ix
-        push    iy
-        ld      c,9
-        call    5
-        pop     iy
-        pop     ix
-        ret
-
-; void msx_getc(void): DOS function 1, a key from the console
-        PUBLIC  _msx_getc
-_msx_getc:
-        push    ix
-        push    iy
-        ld      c,1
-        call    5
-        pop     iy
-        pop     ix
-        ret
-        ENDIF
-
 ; void vram_read(uint16_t addr, uint8_t *dst, uint16_t len) __smallc
 ; len bytes (1 to 256) of raw video RAM from addr.
         PUBLIC  _vram_read
@@ -640,19 +592,3 @@ _v9938_sync:
         ei
         ret
 
-        IFNDEF  TARGET_EINSTEIN256
-; void msx_psg15(uint8_t value) __smallc
-; PSG register 15 (the joystick connectors' output: the mouse's strobe and the connector select): the BIOS leaves it at $CF.
-        PUBLIC  _msx_psg15
-_msx_psg15:
-        ld      hl,2
-        add     hl,sp
-        ld      c,(hl)
-        di
-        ld      a,15
-        out     ($A0),a
-        ld      a,c
-        out     ($A1),a
-        ei
-        ret
-        ENDIF

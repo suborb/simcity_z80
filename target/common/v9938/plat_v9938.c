@@ -1,13 +1,12 @@
-/* V9938 platform, for the MSX2 (MSX-DOS 2) and the Einstein 256 (CP/M; TARGET_EINSTEIN256): screen 5, 256x192 pixels of 4 bits, used as 32 x 24 cells of 8x8, the Atari ST's art in
+/* V9938 platform, for the MSX2 (MSX-DOS 2) and the Einstein 256 (CP/M): screen 5, 256x192 pixels of 4 bits, used as 32 x 24 cells of 8x8, the Atari ST's art in
    its 16 colours as the SAM Coupe's.  The drawing primitives (a cell from the picture atlas in the video RAM, a glyph, a line of pixels, a VDP command) are in plat_v9938.asm; this has what is made from
-   them: text, the tool icons, the demand and bar charts, the mini map's rows, the keyboard and the files.  The palette is the ST's 16 (entry 0 black and 15 white);
+   them: text, the tool icons, the demand and bar charts, the mini map's rows and the files.  The palette is the ST's 16 (entry 0 black and 15 white);
    tools/st_tiles_3bpp.py --msx2 makes the atlas (TILES.DAT, which the program loads into the video RAM's second page) and the tables (msx2.inc, msx2.h). */
 #include <stdint.h>
 #include <string.h>
 #include <stdlib.h>
 #include <fcntl.h>
 #include <unistd.h>
-#include <msx.h>
 #include "platform.h"
 #include "engine.h"
 #include "msx2.h"
@@ -16,7 +15,6 @@ extern void v9938_tile(uint8_t col, uint8_t row, uint16_t n);
 extern void v9938_wr(uint8_t y, uint8_t x, const uint8_t *src, uint16_t len);
 extern void v9938_rd(uint8_t y, uint8_t x, uint8_t *dst, uint16_t len);
 extern void v9938_sync(void);
-extern void msx_psg15(uint8_t value);
 extern void vram_read(uint16_t addr, uint8_t *dst, uint16_t len);
 extern uint16_t v9938_cget(uint16_t addr);
 extern void v9938_cset(uint16_t addr, uint16_t value);
@@ -24,7 +22,6 @@ extern void vram_write(uint16_t addr, const uint8_t *src, uint16_t len);
 extern void v9938_glyph(uint8_t col, uint8_t row, const uint8_t *art, uint8_t ink, uint8_t paper);
 extern void v9938_vreg(uint8_t reg, uint8_t value);
 extern void v9938_pal(const uint8_t *entries);
-extern uint8_t msx_keyrow(uint8_t row);
 #ifdef HAVE_SOUND
 extern void snd_init(void);
 extern void snd_exit(void);
@@ -47,19 +44,6 @@ extern const uint8_t v9938_animtab[];             /* ... an animation: the first
 #define MAP_ROWS    (24 - MAP_ROW)
 #define BLACK       0
 #define WHITE       15
-#ifndef TARGET_EINSTEIN256
-#define JIFFY       (*(volatile uint16_t *)0xFC9E)  /* the MSX BIOS's frame counter */
-#define CLIKSW      (*(volatile uint8_t *)0xF3DB)   /* the BIOS's key click switch: its interrupt scans the keyboard and clicks for a key */
-#define RG8SAV      (*(volatile uint8_t *)0xFFE7)   /* the BIOS's copies of VDP registers 8 and 9 */
-#define RG9SAV      (*(volatile uint8_t *)0xFFE8)
-#else
-extern void einstein_screen5(void);
-extern void einstein_wait_frame(void);
-extern void einstein_fatal(const char *message);
-extern uint8_t einstein_getkey(void);
-extern void einstein_dos_quiet(void);           /* (einstein_dos.c) */
-extern void einstein_dos_loud(void);
-#endif
 
 /* VDP commands (the high nibble of R#46; a logical command's operation is its low nibble) */
 #define CMD_LMMV    0x80
@@ -68,11 +52,6 @@ extern void einstein_dos_loud(void);
 #define OP_IMP      0
 #define OP_AND      1
 #define OP_XOR      3
-
-static uint16_t clock_count;
-static uint8_t saved_r9;
-static uint8_t saved_click;
-static uint8_t pace;                            /* the passes since the 60 Hz display's extra frame */
 
 /* ---- VDP commands ------------------------------------------------------------------------------------------------------------ */
 extern void v9938_command(uint16_t sx, uint16_t sy, uint16_t dx, uint16_t dy, uint16_t nx, uint16_t ny, uint8_t clr, uint8_t cmd);       /* (plat_v9938.asm) */
@@ -242,18 +221,15 @@ void plat_scroll(uint8_t row, uint8_t rows, int8_t dx, int8_t dy)
 }
 #endif
 
-#ifndef TARGET_EINSTEIN256
-/* The MSX2 BIOS's palette, for the text screen DOS comes back to (red and blue, then green) */
-static const uint8_t bios_palette[32] = {
-    0x00, 0, 0x00, 0, 0x11, 6, 0x33, 7, 0x17, 1, 0x27, 3, 0x51, 1, 0x27, 6,
-    0x71, 1, 0x73, 3, 0x61, 6, 0x64, 6, 0x11, 4, 0x65, 2, 0x55, 5, 0x77, 7
-};
-#endif
 
 
 static const char no_atlas[] = "TILES.DAT is not here.\r\n$";
-extern void msx_print(const char *dollar_string);
-extern void msx_bye(void);                      /* (msx_bank.asm) page 2 back as DOS had it, and out */       /* DOS function 9 */
+
+/* What the target does (target/msx2/plat_msx2.c, target/einstein256/plat_einstein256.c): print a $-terminated message and leave; put the display in screen 5 with 192 lines and no
+   sprites; and give it back when the game ends (after the sound has stopped). */
+extern void v9938_fatal(const char *dollar_string);
+extern void v9938_screen5(void);
+extern void v9938_leave(void);
 
 void plat_init(void)
 {
@@ -261,32 +237,10 @@ void plat_init(void)
     uint16_t line;
     int fd = open("TILES.DAT", O_RDONLY, 0);
 
-    if (fd < 0) {
-#ifdef TARGET_EINSTEIN256
-        einstein_fatal(no_atlas);
-#else
-        msx_print(no_atlas);
-        msx_bye();
-#endif
-    }
-#ifdef TARGET_EINSTEIN256
-    einstein_dos_quiet();
-    saved_r9 = 0;
-    einstein_screen5();
-#else
-    saved_r9 = RG9SAV;
-    saved_click = CLIKSW;
-    CLIKSW = 0;                                 /* (the game reads the keys itself) */
-    msx_screen(5);
-#endif
-#ifdef TARGET_EINSTEIN256
-    v9938_vreg(9, 0);                             /* 192 lines */
-    v9938_vreg(8, 0x0A);                          /* V9938: sprites disabled */
-#else
-    v9938_vreg(9, (uint8_t)(RG9SAV & 0x7F));      /* 192 lines (and PAL or NTSC as the machine has it) */
-    v9938_vreg(8, (uint8_t)(RG8SAV | 2));         /* no sprites */
-#endif
-    v9938_vreg(7, 0);                             /* a black border (the BIOS's colour 4 is red in the ST's palette) */
+    if (fd < 0)
+        v9938_fatal(no_atlas);
+    v9938_screen5();
+    v9938_vreg(7, 0);                           /* a black border (the BIOS's colour 4 is red in the ST's palette) */
     v9938_pal(v9938_palette);
     plat_clear();
     snd_init();                                 /* (the sound's frame hook) */
@@ -300,45 +254,9 @@ void plat_init(void)
 
 void plat_exit(void)
 {
-#ifdef TARGET_EINSTEIN256
-    einstein_dos_loud();
-#endif
     snd_exit();
-#ifdef HAVE_MOUSE
-    msx_psg15(0xCF);                            /* (the mouse's strobe low, port 1, as the BIOS has it) */
-#endif
-#ifndef TARGET_EINSTEIN256
-    CLIKSW = saved_click;
-    v9938_vreg(14, 0);
-    v9938_vreg(9, saved_r9);
-    v9938_pal(bios_palette);
-    msx_screen(0);
-#endif
+    v9938_leave();
 }
-
-uint16_t plat_clock(void) { return clock_count; }
-/* Once a pass of the game's loop, which waits for the next frame interrupt (the BIOS counts them in JIFFY).  The game is timed for 50 frames a second: on a 60 Hz
-   display (R#9's NT bit clear) every fifth pass waits a second frame, which makes 5 passes in 6 frames, 50 a second. */
-void plat_idle(void)
-{
-#ifdef TARGET_EINSTEIN256
-    ++clock_count;
-    einstein_wait_frame();
-#else
-    uint16_t j = JIFFY;
-
-    ++clock_count;
-    while (JIFFY == j)
-        ;
-    if (!(saved_r9 & 2) && ++pace == 5) {
-        pace = 0;
-        j = JIFFY;
-        while (JIFFY == j)
-            ;
-    }
-#endif
-}
-void plat_flush(void) {}
 
 /* The bars, the recolouring and the tool icons are resident too, below $8000 (with the data: the low area has room, and page 3 is for the rest) */
 #pragma codeseg code_compiler
@@ -518,94 +436,6 @@ void plat_put_minirow(uint8_t ty, const uint8_t *colours, const uint8_t *base, u
     v9938_wr((uint8_t)(ty * 2 + 1), 0, line, MAP_W * 2);
 }
 
-/* ---- the keyboard ------------------------------------------------------------------------------------------------------------- */
-/* The MSX matrix: PPI row 0 to 8, a key down is a 0 bit (bit 0 first).  Row 6 has SHIFT (bit 0), CTRL, GRAPH, CAPS, CODE and F1 to F3. */
-#ifndef TARGET_EINSTEIN256
-static const uint8_t keys[9][8] = {
-    { '0', '1', '2', '3', '4', '5', '6', '7' },
-    { '8', '9', '-', '=', '\\', '[', ']', ';' },
-    { '\'', '`', ',', '.', '/', 0, 'a', 'b' },
-    { 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j' },
-    { 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r' },
-    { 's', 't', 'u', 'v', 'w', 'x', 'y', 'z' },
-    { 0, 0, 0, 0, 0, 0, 0, 0 },
-    { 0, 0, KEY_ESC, 0, KEY_ESC, 127, 0, KEY_ENTER },
-    { ' ', 0, 0, 127, KEY_LEFT, KEY_UP, KEY_DOWN, KEY_RIGHT }
-};
-
-static uint8_t held;                            /* the code of the key that is down, or 0 */
-static uint8_t held_for;                        /* the looks it has been down for */
-
-/* The key down now (the first in the matrix), as the game's code: letters lower case, a capital with SHIFT, SHIFT with a cursor key the eight cell move. */
-static uint8_t scan(void)
-{
-    uint8_t row, bits, col, k = 0, shift;
-
-    shift = !(msx_keyrow(6) & 1);
-    for (row = 0; row < 9 && !k; ++row) {
-        if (row == 6)
-            continue;
-        bits = (uint8_t)~msx_keyrow(row);
-        for (col = 0; col < 8 && !k; ++col)
-            if (bits & (1 << col))
-                k = keys[row][col];
-    }
-    if (!k)
-        return 0;
-    if (shift) {
-        switch (k) {
-        case KEY_LEFT: return KEY_FAR_LEFT;
-        case KEY_RIGHT: return KEY_FAR_RIGHT;
-        case KEY_UP: return KEY_FAR_UP;
-        case KEY_DOWN: return KEY_FAR_DOWN;
-        case '=': return '+';
-        }
-        if (k >= 'a' && k <= 'z')
-            k = (uint8_t)(k - 32);
-    }
-    return k;
-}
-
-/* A key registers when it goes down; a cursor key (or Q, A, O or P) repeats after 12 looks, then every 3 */
-#ifdef HAVE_POINTER
-uint8_t plat_keyboard_key(void)                 /* (target/common/pointer.c makes plat_key and plat_key_game of it) */
-#else
-uint8_t plat_key(void)
-#endif
-{
-    uint8_t k = scan();
-
-    if (k != held) {
-        held = k;
-        held_for = 0;
-        return k;
-    }
-    if (!k || ++held_for < 12)
-        return 0;
-    if (k == KEY_LEFT || k == KEY_RIGHT || k == KEY_UP || k == KEY_DOWN || k == KEY_FAR_LEFT || k == KEY_FAR_RIGHT || k == KEY_FAR_UP || k == KEY_FAR_DOWN ||
-        k == 'q' || k == 'a' || k == 'o' || k == 'p' || k == 'Q' || k == 'A' || k == 'O' || k == 'P') {
-        held_for = 9;
-        return k;
-    }
-    held_for = 12;
-    return 0;
-}
-#else
-/* CP/M direct console input; Einstein keys are read as ASCII through BDOS. */
-uint8_t plat_key(void)
-{
-    uint8_t k = einstein_getkey();
-
-    if (k >= 'A' && k <= 'Z')
-        k = (uint8_t)(k + ('a' - 'A'));
-    if (k == 13)
-        return KEY_ENTER;
-    if (k == 27)
-        return KEY_ESC;
-    return k;
-}
-#endif
-
 /* ---- files --------------------------------------------------------------------------------------------------------------------- */
 /* The city to and from a DOS file (z88dk's open, read and write on DOS 2's handles). */
 PLAT_CODE_FILE_OVERLAY
@@ -634,12 +464,12 @@ uint8_t plat_file_load(const char *name, uint8_t *a, uint16_t alen, uint8_t *b, 
     else if (read(fd, b, blen) != (int)blen)
         r = 2;
     else {
-#ifdef TARGET_EINSTEIN256
-        char extra[128];
+#ifdef FILE_RECORD
+        char extra[FILE_RECORD];
 
-        /* A 96x96 city is a valid prefix of a larger file.  CP/M keeps a file in whole 128 byte records, so what is left of the last record reads back as padding:
-           up to 127 bytes of it belong to this size of city, more means a bigger map. */
-        if (read(fd, extra, 128) > 127)
+        /* A 96x96 city is a valid prefix of a larger file.  A file system that keeps files in whole records (CP/M: FILE_RECORD, plat_config.h) reads what is left of the last record
+           back as padding: up to FILE_RECORD - 1 bytes of it belong to this size of city, more means a bigger map. */
+        if (read(fd, extra, FILE_RECORD) > FILE_RECORD - 1)
             r = 2;
 #else
         char extra;
