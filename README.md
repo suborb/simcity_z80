@@ -43,6 +43,22 @@ The rebuild utilises the original simulation engine and assets. Instead of being
 simulation and UI cooperatively multitask which allows porting to hardware where an interrupt source
 is not available.
 
+The following targets are available:
+
+* Aquarius+
+* Cambridge z88
+* Mitsubishi Multi8
+* MSX
+* NEC PC-88
+* Sam Coupe
+* Samsung SPC-1000
+* Sharp MZ-2500
+* Sharp X1
+* Tatung Einstein 256
+* ZX Spectrum Next
+
+
+
 
 ### Layout
 

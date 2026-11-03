@@ -27,6 +27,7 @@ MACHINES = {
     'x1': ('Sharp X1', ['x1/simcity.d88']),
     'spc1000': ('Samsung SPC-1000', ['spc1000/simcity.spc']),
     'msx2': ('MSX2 (MSX-DOS 2)', ['msx2/simcity.dsk', 'msx2/disk/SIMCITY.COM', 'msx2/disk/SIMCITY.UI', 'msx2/disk/SIMCITY.SIM', 'msx2/disk/SIMCITY.HI', 'msx2/disk/TILES.DAT']),
+    'einstein256': ('Tatung Einstein 256', ['einstein256/simcity.dsk']),
     'mz2500': ('Sharp MZ-2500', ['mz2500/simcity.dsk']),
     'sam': ('SAM Coupe', ['sam/simcity.mgt']),
     'zxn': ('ZX Spectrum Next', ['zxn/simcity.nex']),

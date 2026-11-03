@@ -78,7 +78,7 @@ TESTSC = build/testscroll/simcity.bin
 all: aqplus z88rom zx multi8 pc88 x1 spc1000 msx2 mz2500 sam zxn
 
 # The zip files for distribution, one for each machine (build/dist/; tools/make_dist.py)
-dist: aqplus z88rom multi8 pc88 x1 spc1000 msx2 mz2500 sam zxn
+dist: aqplus z88rom multi8 pc88 x1 spc1000 msx2 einstein256 mz2500 sam zxn
 	python3 tools/make_dist.py
 
 aqplus: $(AQPLUS)

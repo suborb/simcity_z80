@@ -1,0 +1,34 @@
+Running it
+----------
+This is for a Tatung Einstein 256 (or an emulator of one) with its disk
+DOS, which is CP/M compatible.
+
+  simcity.dsk     a disk image with the four game files on it:
+                  SIMCITY.COM, SIMCITY.GAM, SIMCITY.MOD, SIMCITY.SND
+                  and TILES.DAT.  The image has no DOS on it: boot the
+                  DOS from its own disk, then change to the drive that
+                  has this one (or copy the files to a DOS disk).
+
+Type SIMCITY.  All the files must be on the same disk.
+
+SIMCITY.COM is the program.  It reads SIMCITY.GAM and SIMCITY.MOD, the
+game's screens, and SIMCITY.SND, the sound effects, and keeps them in the
+video RAM, and it draws from TILES.DAT, the pictures.  The game uses
+screen 5 of the V9938 (256 x 192, 16 colours), the AY-3-8910 for the
+sound effects, and the keyboard.  Cities are saved to and loaded from DOS
+files (names of up to eight letters).  There is no way out of the game
+but resetting the machine.
+
+Keys
+----
+  O P Q A         left, right, up, down
+  Space, Enter    build with the tool
+  , .             the previous and next tool
+  0 - 9           choose a tool by its number
+  H               pause or run
+  + -             faster, slower
+  M               the next mini map (X goes back to the city)
+  B               the budget            V   the evaluation
+  S               save the city         L   load a city
+  X               the game menu: new city, options, disasters, sound
+  Esc             leaves a screen and opens the game menu
