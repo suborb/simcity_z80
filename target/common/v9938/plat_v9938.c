@@ -1,7 +1,7 @@
 /* V9938 platform, for the MSX2 (MSX-DOS 2) and the Einstein 256 (CP/M): screen 5, 256x192 pixels of 4 bits, used as 32 x 24 cells of 8x8, the Atari ST's art in
    its 16 colours as the SAM Coupe's.  The drawing primitives (a cell from the picture atlas in the video RAM, a glyph, a line of pixels, a VDP command) are in plat_v9938.asm; this has what is made from
    them: text, the tool icons, the demand and bar charts, the mini map's rows and the files.  The palette is the ST's 16 (entry 0 black and 15 white);
-   tools/st_tiles_3bpp.py --msx2 makes the atlas (TILES.DAT, which the program loads into the video RAM's second page) and the tables (msx2.inc, msx2.h). */
+   tools/st_tiles_3bpp.py --v9938 makes the atlas (TILES.DAT, which the program loads into the video RAM's second page) and the tables (v9938.inc, v9938.h). */
 #include <stdint.h>
 #include <string.h>
 #include <stdlib.h>
@@ -9,7 +9,7 @@
 #include <unistd.h>
 #include "platform.h"
 #include "engine.h"
-#include "msx2.h"
+#include "v9938.h"
 
 extern void v9938_tile(uint8_t col, uint8_t row, uint16_t n);
 extern void v9938_wr(uint8_t y, uint8_t x, const uint8_t *src, uint16_t len);
@@ -33,7 +33,7 @@ extern void snd_exit(void);
 extern const uint8_t font_8x8_bbc_system[];     /* 96 glyphs, from space */
 extern const uint8_t view_tile_art[];           /* picture n is at 8 * n from it */
 extern uint8_t V_view_tick;                     /* the game's frame counter: the animations' clock */
-extern const uint8_t v9938_palette[];             /* msx2.inc: 16 colours, 2 bytes each */
+extern const uint8_t v9938_palette[];             /* v9938.inc: 16 colours, 2 bytes each */
 extern const uint8_t v9938_attrs[];               /* ... the palette entry nearest each of the 8 attribute colours */
 extern const uint8_t v9938_animbits[];            /* ... a bit a picture that has an animation, */
 extern const uint8_t v9938_animlist[];            /* ... and those (the picture, a word, and the animation from 1), */

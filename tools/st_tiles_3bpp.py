@@ -337,7 +337,7 @@ def sam_anim(amap, entries):
 
 # ---- the MSX2 ------------------------------------------------------------------------------------------------------------
 # The atlas is page 1 of the VRAM in screen 5 (256 lines of 128 bytes, 32 KB; the program loads TILES.DAT there): picture n at pixel ((n & 31) * 8, (n >> 5) * 8),
-# then the 14 icons (24x14) in two rows of seven, then the same dimmed (no money for the tool): their lines are in msx2.inc
+# then the 14 icons (24x14) in two rows of seven, then the same dimmed (no money for the tool): their lines are in v9938.inc
 MSX2_DIM = (0, 0, 0, 0, 0, 0, 0, 8, 0, 7, 7, 7, 7, 7, 7, 7)       # (the SAM's: plat_sam.asm mp_dim16)
 
 
@@ -350,9 +350,9 @@ def msx2_palette(palette, bits):
 
 
 def msx2_files(a, palette, bits, table, framed, amap, entries):
-    """TILES.DAT (the 32 KB the program loads into VRAM page 1: the pictures, then the icons and their dimmed copies) and msx2.inc (the
+    """TILES.DAT (the 32 KB the program loads into VRAM page 1: the pictures, then the icons and their dimmed copies) and v9938.inc (the
     palette, the attribute colours and the animations' tables: assembler source)."""
-    os.makedirs(a.msx2, exist_ok=True)
+    os.makedirs(a.v9938, exist_ok=True)
     icon_y = (len(framed) + 31) // 32 * 8
     dim_y = icon_y + 28
     if dim_y + 28 > 256:
@@ -367,7 +367,7 @@ def msx2_files(a, palette, bits, table, framed, amap, entries):
         put((k & 31) * 8, (k >> 5) * 8, shift_water(rows) if n == WATER_SHIFT else rows)
     icons = open(a.icons, 'rb').read() if a.icons else b''
     if len(icons) != 14 * 14 * 12:
-        sys.exit('--msx2 needs --icons (14 icons of 24x14 pixels)')
+        sys.exit('--v9938 needs --icons (14 icons of 24x14 pixels)')
     for i in range(14):
         rows = [[v for b in icons[i * 168 + r * 12:i * 168 + r * 12 + 12] for v in (b >> 4, b & 15)] for r in range(14)]
         x, y = (i % 7) * 24, (i // 7) * 14
@@ -379,10 +379,10 @@ def msx2_files(a, palette, bits, table, framed, amap, entries):
     if len(font) != 768 or dim_y + 28 > 208:
         sys.exit('the font is not 96 glyphs, or the pictures reach its place')
     atlas[208 * 128:208 * 128 + 768] = font
-    open(os.path.join(a.msx2, 'TILES.DAT'), 'wb').write(atlas)
+    open(os.path.join(a.v9938, 'TILES.DAT'), 'wb').write(atlas)
     pal = msx2_palette(palette, bits)
-    with open(os.path.join(a.msx2, 'msx2.inc'), 'w') as f:
-        f.write('; made by tools/st_tiles_3bpp.py --msx2: the V9938 palette (red and blue, green: 2 bytes a colour), the 8 attribute colours (palette entries), the animations\n')
+    with open(os.path.join(a.v9938, 'v9938.inc'), 'w') as f:
+        f.write('; made by tools/st_tiles_3bpp.py --v9938: the V9938 palette (red and blue, green: 2 bytes a colour), the 8 attribute colours (palette entries), the animations\n')
         f.write('        PUBLIC  _v9938_palette, _v9938_attrs, _v9938_animbits, _v9938_animlist, _v9938_animtab\n_v9938_palette:\n')
         for k in range(0, 32, 8):
             f.write('        defb    ' + ','.join(str(v) for v in pal[k:k + 8]) + '\n')
@@ -400,11 +400,11 @@ def msx2_files(a, palette, bits, table, framed, amap, entries):
         f.write('_v9938_animtab:\n')
         for first, n in entries:
             f.write(f'        defw    {first}\n        defb    {n - 1}\n')
-    with open(os.path.join(a.msx2, 'msx2.h'), 'w') as f:
-        f.write(f'/* made by tools/st_tiles_3bpp.py --msx2 */\n#define V9938_ANIMATED {len(amap)}          /* (the pictures that may be animated; the frames, after them, are not) */\n#define V9938_PICTURES {len(framed)}          /* (the animations\' frames are among them) */\n'
+    with open(os.path.join(a.v9938, 'v9938.h'), 'w') as f:
+        f.write(f'/* made by tools/st_tiles_3bpp.py --v9938 */\n#define V9938_ANIMATED {len(amap)}          /* (the pictures that may be animated; the frames, after them, are not) */\n#define V9938_PICTURES {len(framed)}          /* (the animations\' frames are among them) */\n'
                 f'#define V9938_ICON_Y {icon_y}               /* the atlas\'s line of the first icon: 14 of 24x14 pixels in two rows of seven */\n#define V9938_DIM_Y {dim_y}                /* ... and of the dimmed ones */\n'
                 f'#define V9938_FONT {0x8000 + 208 * 128}u            /* the font in the video RAM: 96 glyphs of 8 bytes */\n#define V9938_CACHE {0x8000 + 216 * 128}u           /* the room for the cell cache: 17 lines of 128 bytes (32 words used, to line 232) */\n')
-    print(f'{len(framed)} pictures, 14 icons and their dimmed copies -> {a.msx2}/TILES.DAT; the palette, attributes and animations -> {a.msx2}/msx2.inc, msx2.h')
+    print(f'{len(framed)} pictures, 14 icons and their dimmed copies -> {a.v9938}/TILES.DAT; the palette, attributes and animations -> {a.v9938}/v9938.inc, v9938.h')
 
 # ---- the MZ-2500 -----------------------------------------------------------------------------------------------------------
 # The atlas is planar like the video RAM (320x200 mode: four planes B, R, G, I, pixel value = B | R << 1 | G << 2 | I << 3, bit 0 of a byte the LEFTMOST pixel): picture n is
@@ -544,7 +544,7 @@ def main():
     ap.add_argument('--sheet')
     ap.add_argument('--sam')
     ap.add_argument('--zxn')
-    ap.add_argument('--msx2')
+    ap.add_argument('--v9938')
     ap.add_argument('--mz2500')
     ap.add_argument('--sam-anim', help='with --sam: the assembler source of the animations\' tables (plat_sam.asm includes it)')
     ap.add_argument('--amiga-icons', help='with --zxn: the tool icons (tools/extract_amiga_icons.py), with their palette, the first 32 bytes of amiga_tiles.bin beside them')
@@ -560,7 +560,7 @@ def main():
     COLOUR = PRESETS[a.colours]
     depth6 = os.path.getsize(a.table) == AMIGA_1MEG
     if depth6:                                  # the Amiga 1 Meg game's art: 32 colours and their halves, 6 bitplanes: only the Next's atlas is made from it
-        if not a.zxn or a.planes or a.mini or a.sam or a.msx2 or a.mz2500 or a.sheet:
+        if not a.zxn or a.planes or a.mini or a.sam or a.v9938 or a.mz2500 or a.sheet:
             sys.exit(f'{a.table}: the 1 Meg art has 64 colours: it makes only --zxn')
         raw = open(a.table, 'rb').read()
         words = struct.unpack('>32H', raw[:64])
@@ -578,7 +578,7 @@ def main():
     else:
         pictures = [st_picture_cpc(i) for i in range(CPC_COUNT)]
     baked = [planes(to8(pixels(table[n * PIC:n * PIC + PIC]))) for n in pictures]
-    if a.sam or a.zxn or a.msx2 or a.mz2500:        # (the SAM, the MSX2, the MZ-2500 and the Next also have the animations' frames, after the pictures)
+    if a.sam or a.zxn or a.v9938 or a.mz2500:        # (the SAM, the MSX2, the MZ-2500 and the Next also have the animations' frames, after the pictures)
         extra, amap, entries = animation(pictures)
         if near_identical(table, PICSIZE, pixels6 if depth6 else pixels):
             extra = [WATER_SHIFT if n == 4 else n for n in extra]
@@ -601,7 +601,7 @@ def main():
         print(f'{len(framed)} pictures, {len(icons)} bytes of icons, a 16 byte palette, 8 attribute colours and {len(framed) * 32} bytes of mode 4 pictures -> {a.sam}')
         if a.sam_anim:
             open(a.sam_anim, 'w').write(sam_anim(amap, entries))
-    if a.msx2:
+    if a.v9938:
         msx2_files(a, palette, bits, table, framed, amap, entries)
     if a.mz2500:
         mz2500_files(a, palette, bits, table, framed, amap, entries)

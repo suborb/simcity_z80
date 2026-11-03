@@ -223,14 +223,8 @@ $(SPC1000): $(DEPS) build/spc1000/icons.bin
 # Coupe's: the atlas (TILES.DAT) is loaded into the video RAM and the VDP copies the map's tiles out of it (target/common/v9938/plat_v9938.asm).
 # The code is in two 16 KB mapper segments, loaded from SIMCITY.UI and SIMCITY.SIM and mapped into page 2 ($8000-$BFFF) by turns (target/msx2/engine_bank.inc, msx_bank.asm): the
 # UI's C code (zcc --codeseg BANK_UI) and the simulation's.  What is resident is below $8000 (the glue, the sound, the tables, all the data): the stack is in page 3.
-# A picture for every growth level of a zone (the engine's FINE_ZONE_LEVELS: the CPC game's 471 pictures); MSX2_FINE=0 has the Spectrum's 345 instead
-MSX2_FINE ?= 1
-ifeq ($(MSX2_FINE),1)
+# A picture for every growth level of a zone (the engine's FINE_ZONE_LEVELS: the CPC game's 471 pictures)
 MSX2_FINE_FLAGS = -DFINE_ZONE_LEVELS -Ca-DFINE_ZONE_LEVELS
-MSX2_NUMBERING = cpc
-else
-MSX2_NUMBERING = ours
-endif
 # (MSX2_SOUND=0 leaves the PSG out)
 MSX2_SOUND ?= 1
 ifeq ($(MSX2_SOUND),1)
@@ -243,18 +237,20 @@ endif
 MSX2_GAME = $(filter-out ui/main.c,$(GAME))         # (main() is in msx_bank.asm)
 MSX2_PLATFORM = target/msx2/msx_banks.asm target/msx2/msx_bank.asm target/common/minimap_key.c target/msx2/pointer_res.c target/msx2/msx_pointer.c target/msx2/plat_msx2.c target/msx2/msx_io.asm target/common/v9938/plat_v9938.c target/common/v9938/plat_v9938.asm target/common/v9938/v9938_data.asm $(MSX2_SOUND_FILES)
 
-build/msx2/TILES.DAT build/msx2/msx2.inc build/msx2/msx2.h: assets/st_tiles.bin assets/st_icons.bin tools/st_tiles_3bpp.py
+# The picture atlas and tables the V9938 targets (the MSX2 and the Einstein 256) share: the Atari ST's art in the CPC game's numbering (tools/st_tiles_3bpp.py --v9938)
+V9938_ASSETS = build/v9938/TILES.DAT build/v9938/v9938.inc build/v9938/v9938.h
+$(V9938_ASSETS): assets/st_tiles.bin assets/st_icons.bin tools/st_tiles_3bpp.py
 	@mkdir -p $(@D)
-	python3 tools/st_tiles_3bpp.py assets/st_tiles.bin --icons assets/st_icons.bin --numbering $(MSX2_NUMBERING) --msx2 $(@D)
+	python3 tools/st_tiles_3bpp.py assets/st_tiles.bin --icons assets/st_icons.bin --numbering cpc --v9938 $(@D)
 
-$(MSX2): $(DEPS) build/msx2/TILES.DAT build/msx2/msx2.inc build/msx2/msx2.h
+$(MSX2): $(DEPS) $(V9938_ASSETS)
 	@mkdir -p $(@D)
 	$(ZCC) +msx -subtype=msxdos2 -lmsx2 -lmsxbios $(COMMON) -pragma-include:target/msx2/zpragma.inc --codeseg BANK_UI \
-	    -Itarget/msx2 -Ibuild/msx2 -Ca-Itarget/msx2 -Ca-Ibuild/msx2 -DTARGET_MSX2 -Ca-DTARGET_MSX2 -Ca-DENGINE_BANK $(MSX2_FINE_FLAGS) -Ca-DFMT_WIDTH=32 -Ca-DHAVE_MINIMAP_SQUARE \
+	    -Itarget/msx2 -Ibuild/v9938 -Ca-Itarget/msx2 -Ca-Ibuild/v9938 -DTARGET_MSX2 -Ca-DTARGET_MSX2 -Ca-DENGINE_BANK $(MSX2_FINE_FLAGS) -Ca-DFMT_WIDTH=32 -Ca-DHAVE_MINIMAP_SQUARE \
 	    $(MSX2_SOUND_FLAGS) \
-	    $(MSX2_PLATFORM) $(MSX2_GAME) $(ENTROPY) $(MENU) $(FIELDS) $(MMNATIVE) $(LINEEDIT) -create-app -Cz"-a build/msx2/TILES.DAT:TILES.DAT" -Cz"-a build/msx2/simcity_BANK_UI.bin:SIMCITY.UI" -Cz"-a build/msx2/simcity_BANK_SIM.bin:SIMCITY.SIM" -Cz"-a build/msx2/simcity_CODE_HI.bin:SIMCITY.HI" -o $(@D)/simcity
+	    $(MSX2_PLATFORM) $(MSX2_GAME) $(ENTROPY) $(MENU) $(FIELDS) $(MMNATIVE) $(LINEEDIT) -create-app -Cz"-a build/v9938/TILES.DAT:TILES.DAT" -Cz"-a build/msx2/simcity_BANK_UI.bin:SIMCITY.UI" -Cz"-a build/msx2/simcity_BANK_SIM.bin:SIMCITY.SIM" -Cz"-a build/msx2/simcity_CODE_HI.bin:SIMCITY.HI" -o $(@D)/simcity
 	@# a directory with the files, for an emulator that mounts one as a drive (openMSX's diskX with a directory)
-	@mkdir -p $(@D)/disk && cp $(@D)/simcity $(@D)/disk/SIMCITY.COM && cp build/msx2/TILES.DAT $(@D)/disk/TILES.DAT && cp $(@D)/simcity_BANK_UI.bin $(@D)/disk/SIMCITY.UI && cp $(@D)/simcity_BANK_SIM.bin $(@D)/disk/SIMCITY.SIM && cp $(@D)/simcity_CODE_HI.bin $(@D)/disk/SIMCITY.HI
+	@mkdir -p $(@D)/disk && cp $(@D)/simcity $(@D)/disk/SIMCITY.COM && cp build/v9938/TILES.DAT $(@D)/disk/TILES.DAT && cp $(@D)/simcity_BANK_UI.bin $(@D)/disk/SIMCITY.UI && cp $(@D)/simcity_BANK_SIM.bin $(@D)/disk/SIMCITY.SIM && cp $(@D)/simcity_CODE_HI.bin $(@D)/disk/SIMCITY.HI
 	@cp $@ $(@:.img=.dsk)
 	@tail=`sed -n 's/^__BSS_END_tail *= \$$\([0-9A-Fa-f]*\).*/\1/p' $(@D)/simcity.map`; ui=`wc -c < $(@D)/simcity_BANK_UI.bin`; sim=`wc -c < $(@D)/simcity_BANK_SIM.bin`; hi=`wc -c < $(@D)/simcity_CODE_HI.bin`; \
 	    echo "msx2: the resident program and its uninitialised data end at $$(printf '%04X' $$(( 0x$$tail ))); the UI's bank is $$ui bytes, the simulation's $$sim of 16384, and the code in page 3 $$hi (up to 4096)"; \
@@ -267,20 +263,16 @@ EINSTEIN256_PLATFORM = target/einstein256/einstein_boot.asm target/einstein256/e
 EINSTEIN256_GAME = $(filter-out ui/main.c,$(GAME))
 EINSTEIN256_TPA_TOP = E000          # the BDOS entry (the word at address 6) on the machine; the check script uses it
 
-build/einstein256/TILES.DAT build/einstein256/msx2.inc build/einstein256/msx2.h: assets/st_tiles.bin assets/st_icons.bin tools/st_tiles_3bpp.py
-	@mkdir -p $(@D)
-	python3 tools/st_tiles_3bpp.py assets/st_tiles.bin --icons assets/st_icons.bin --numbering cpc --msx2 $(@D)
-
-$(EINSTEIN256): $(DEPS) tools/check_einstein_layout.py target/einstein256/mmap.inc build/einstein256/TILES.DAT build/einstein256/msx2.inc build/einstein256/msx2.h
+$(EINSTEIN256): $(DEPS) tools/check_einstein_layout.py target/einstein256/mmap.inc $(V9938_ASSETS)
 	@mkdir -p $(@D)
 	$(ZCC) +cpm -subtype=einstein256 $(COMMON) -pragma-include:target/einstein256/zpragma.inc -pragma-define:MMAP=-1 \
-	    -Itarget/einstein256 -Ibuild/einstein256 -Ca-Itarget/einstein256 -Ca-Ibuild/einstein256 \
+	    -Itarget/einstein256 -Ibuild/v9938 -Ca-Itarget/einstein256 -Ca-Ibuild/v9938 \
 	    -DTARGET_EINSTEIN256 -Ca-DTARGET_EINSTEIN256 -Ca-DVDP_DATA=8 -Ca-DVDP_CMD=9 -Ca-DVDP_PAL=10 -Ca-DVDP_IND=11 -Ca-DFMT_WIDTH=32 -Ca-DHAVE_MINIMAP_SQUARE \
 	    $(EINSTEIN256_PLATFORM) $(EINSTEIN256_GAME) $(ENTROPY) $(MENU) $(FIELDS) $(MMNATIVE) $(LINEEDIT) -o $(@D)/simcity
 	python3 tools/check_einstein_layout.py $(@D)/simcity.map $(EINSTEIN256_TPA_TOP)
 	@# appmake copies the CP/M name into the directory as is: it must be the 11-byte FCB form.  It also writes a
 	@# zero record count for the last entry of a file that is an exact multiple of 16 KB, so TILES.DAT gets one spare record.
-	(cat build/einstein256/TILES.DAT; head -c 128 /dev/zero) > build/einstein256/TILES.PAD
+	(cat build/v9938/TILES.DAT; head -c 128 /dev/zero) > build/einstein256/TILES.PAD
 	z88dk-appmake +cpmdisk -f einstein -b $(@D)/simcity -o $(@D)/simcity.dsk \
 	    -a build/einstein256/TILES.PAD:'TILES   DAT' \
 	    -a build/einstein256/simcity_EINSTEIN_GAME_OVL.bin:'SIMCITY GAM' \

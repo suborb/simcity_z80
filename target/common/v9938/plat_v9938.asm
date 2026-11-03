@@ -1,7 +1,7 @@
 ; MSX2 platform, the VDP's side: screen 5 (256x192, 4 bits a pixel, a byte two pixels, the left one in the high nibble, a line 128 bytes).  The video RAM
 ; is addressed with 17 bits: the low 14 through the port and the rest by R#14, which every address set here writes, so any address up to $FFFF is fine.
 ;     page 0, $0000-$5FFF   the screen: the game's 32 x 24 cells of 8x8 pixels, a cell's first byte at row * 1024 + col * 4
-;     page 1, $8000-$FFFF   the picture atlas (TILES.DAT, tools/st_tiles_3bpp.py --msx2): picture n at pixel ((n & 31) * 8, 256 + (n >> 5) * 8)
+;     page 1, $8000-$FFFF   the picture atlas (TILES.DAT, tools/st_tiles_3bpp.py --v9938): picture n at pixel ((n & 31) * 8, 256 + (n >> 5) * 8)
 ; A map cell is one VDP command, HMMM (copy a rectangle of the video RAM), which the VDP runs while the Z80 goes on; every routine here that touches the video RAM
 ; waits for the last command first.  The routines take their arguments the way the game's C code passes them (smallc: first argument first, the caller
 ; cleans up).  The BIOS's frame interrupt stays on (it counts JIFFY, which plat_idle waits for): nothing here reads status register 0 (that would eat the
