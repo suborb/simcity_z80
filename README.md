@@ -45,6 +45,7 @@ is not available.
 
 The following targets are available:
 
+* Amstrad PCW
 * Aquarius+
 * Cambridge z88
 * Mitsubishi Multi8
