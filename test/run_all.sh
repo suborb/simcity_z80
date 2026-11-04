@@ -31,6 +31,9 @@ python3 test/aqplus/text4.py
 python3 test/aqplus/mouse.py
 python3 test/aqplus/files.py
 echo
+echo "== Amstrad PCW screen code: row table, cell blit, invert, clear, and the doubled tiles and text"
+python3 test/pcw/run.py
+echo
 echo "== AY sound effect player"
 python3 test/ay_sfx/run.py
 echo

@@ -1,0 +1,43 @@
+Running it
+----------
+This is for an Amstrad PCW running CP/M Plus (the 8256, 8512, 9512 or
+10 of the family, or an emulator of one).  It needs the 61K the system
+leaves a program.
+
+  simcity.dsk     an 80 track, double sided disk image (720 KB, in the
+                  extended DSK format) with SIMCITY.COM on it.  The
+                  image has no CP/M on it: start the machine from its
+                  own CP/M Plus disk, put this one in the second drive
+                  (or copy SIMCITY.COM to a disk with PIP), and type
+                  B:SIMCITY (or SIMCITY).
+  simcity.com     the same program on its own, for copying to a disk of
+                  your own.
+
+The game uses the PCW's screen as a 40 by 32 grid of cells, centred, each
+a source 8 x 8 picture drawn twice as wide (the PCW's pixels are about
+twice as tall as they are wide); the map is drawn in inverse.  It uses
+the keyboard through CP/M, and there is no sound.  Cities are saved to
+and loaded from CP/M files (names of up to eight letters), on the disk it
+was started from.  There is no way out of the game but resetting the
+machine.
+
+This has been tried only in MAME (as the PCW 8256 with a second 720 KB
+drive): it is untested on a real machine, on the 9512, 10 or 8512, and
+the cursor keys have not been tried there.
+
+Keys
+----
+  O P Q A         left, right, up, down (shifted: eight squares)
+  Space, Enter    build with the tool
+  , .             the previous and next tool
+  0 - 9           choose a tool by its number
+  H               pause or run
+  + -             faster, slower
+  M               the next mini map (X goes back to the city)
+  B               the budget            V   the evaluation
+  S               save the city         L   load a city
+  X               the game menu: new city, options, disasters, the
+                  mini maps
+  Esc (EXIT)      leaves a screen and opens the game menu
+
+The cursor keys (as WordStar's ^E ^X ^S ^D) also move the cursor.

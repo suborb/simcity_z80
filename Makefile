@@ -59,6 +59,8 @@ X1     = build/x1/simcity.d88
 SPC1000 = build/spc1000/simcity.spc
 MSX2   = build/msx2/simcity.img
 EINSTEIN256 = build/einstein256/simcity.com
+CPM = build/cpm/simcity.com
+PCW = build/pcw/simcity.com
 MZ2500 = build/mz2500/simcity.dsk
 SAM    = build/sam/simcity.mgt
 ZXN   = build/zxn/simcity.nex
@@ -73,12 +75,12 @@ TESTK  = build/testnative/simcity.bin
 TESTA  = build/testart/simcity.bin
 TESTSC = build/testscroll/simcity.bin
 
-.PHONY: all dist aqplus z88rom zx multi8 pc88 x1 spc1000 msx2 einstein256 mz2500 sam zxn amiga-scenarios test testpanel testmodal testnarrow testsprites testoverlay testhires testnative testart testscroll check golden uitest tiletest z88test deadcode clean
+.PHONY: all dist aqplus z88rom zx multi8 pc88 x1 spc1000 msx2 einstein256 cpm pcw mz2500 sam zxn amiga-scenarios test testpanel testmodal testnarrow testsprites testoverlay testhires testnative testart testscroll check golden uitest tiletest z88test deadcode clean
 
 all: aqplus z88rom zx multi8 pc88 x1 spc1000 msx2 mz2500 sam zxn
 
 # The zip files for distribution, one for each machine (build/dist/; tools/make_dist.py)
-dist: aqplus z88rom multi8 pc88 x1 spc1000 msx2 einstein256 mz2500 sam zxn
+dist: aqplus z88rom multi8 pc88 x1 spc1000 msx2 einstein256 pcw mz2500 sam zxn
 	python3 tools/make_dist.py
 
 aqplus: $(AQPLUS)
@@ -90,6 +92,8 @@ x1:     $(X1)
 spc1000: $(SPC1000)
 msx2:   $(MSX2)
 einstein256: $(EINSTEIN256)
+cpm: $(CPM)
+pcw: $(PCW)
 mz2500: $(MZ2500)
 sam:    $(SAM)
 zxn:   $(ZXN)
@@ -278,6 +282,24 @@ $(EINSTEIN256): $(DEPS) tools/check_einstein_layout.py target/einstein256/mmap.i
 	    -a build/einstein256/simcity_EINSTEIN_GAME_OVL.bin:'SIMCITY GAM' \
 	    -a build/einstein256/simcity_EINSTEIN_MODAL_OVL.bin:'SIMCITY MOD'
 	@echo "einstein256: COM and overlay files packaged in $(@D)/simcity.dsk"
+
+# Generic CP/M: any Z80 machine with an 80x24 ANSI terminal (CPM_VT52 in plat_cpm.c: a VT52).  A character a square (ui/game.c glyph()), no mini maps; one COM.
+$(CPM): $(DEPS)
+	@mkdir -p $(@D)
+	$(ZCC) +cpm $(COMMON) -Itarget/cpm -Ca-Itarget/cpm -DTARGET_CPM \
+	    target/cpm/plat_cpm.c target/cpm/cpm_common.c target/cpm/cpm_io.asm $(GAME) $(ENTROPY) $(MENU) $(NOSOUND) $(FIELDS) -o $(@D)/simcity.com
+
+# The Amstrad PCW (CP/M Plus): 720x256 monochrome, drawn as 40x32 cells of 16x8 pixels, centred (target/pcw/).  The screen pages over the program, so the drawing code is in common memory (HIMEM).
+build/pcw/icons.bin: assets/udgs.bin
+	@mkdir -p $(@D)
+	head -c 448 $< > $@
+
+$(PCW): $(DEPS) build/pcw/icons.bin
+	@mkdir -p $(@D)
+	$(ZCC) +cpm -subtype=pcw80 $(COMMON) -pragma-include:target/pcw/zpragma.inc -Itarget/pcw -Ca-Itarget/pcw -DTARGET_PCW -Ca-DFMT_WIDTH=40 -Ca-DHAVE_MINIMAP_SQUARE \
+	    $(MMNATIVE) target/pcw/plat_pcw.c target/pcw/plat_pcw.asm target/pcw/plat_pcw_font.asm target/pcw/plat_pcw_crt.asm target/cpm/cpm_common.c target/cpm/cpm_io.asm \
+	    $(GAME) $(ENTROPY) $(MENU) $(NOSOUND) $(FIELDS) -o $(@D)/simcity
+	z88dk-appmake +cpmdisk -f pcw80 -b $(@D)/simcity -o $(@D)/simcity.dsk
 
 # The Sharp MZ-2500 (z88dk +mz2500: a boot disk the IPL loads page by page).  320x200 in 16 colours, planar video RAM; the Atari ST's art in a planar atlas (pages 22-24), 32 x 24 cells
 # of 8x8.  The program is linked at $0000 (RAM pages 16-17, started by the crt's BOOTSTRAP stub), the UI and the simulation are 16 KB banks at $4000 mapped into windows 2 and 3 by turns, the data is at
