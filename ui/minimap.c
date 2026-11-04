@@ -204,38 +204,41 @@ static const struct view views[MM_VIEWS + 1] = {
     { lv_crime, DENSITY },
 };
 
-/* 8 pixels of pixel row y: 4 tiles from column tx0 of tile row ty = y >> 1, two pixels each. */
-static uint8_t row(const struct view *v, uint8_t tx0, uint8_t y)
-{
-    uint8_t bits = 0, m = 0x80, i, l, tx, ty = y >> 1;
-    const uint8_t *b;
-
-    for (i = 0; i < 4; ++i) {
-        tx = (uint8_t)(tx0 + i);
-        l = v->level(tx, ty);
-        if (v->kind == SPECK)
-            b = bayer2 + ((y & 1) << 1);
-        else if (v->kind == DENSITY)
-            b = bayer4 + ((y & 3) << 2) + ((tx & 1) << 1);
-        else
-            b = bayer4 + ((ty & 3) << 2) + (tx & 3);
-        if (l > b[0])
-            bits |= m;
-        m >>= 1;
-        if (l > b[v->kind == COVERAGE ? 0 : 1])
-            bits |= m;
-        m >>= 1;
-    }
-    return bits;
-}
-
+/* A cell of the picture: 8 pixel rows of 8 pixels, 4 tiles across, 4 tile rows of 2 pixel rows (every tile's level is worked out once, for its two rows). */
 void minimap_cell(uint8_t v, uint8_t cx, uint8_t cy, uint8_t top, uint8_t cur_x, uint8_t cur_y,
                   uint8_t mark, uint8_t *art)
 {
-    uint8_t r, py = (uint8_t)(cur_y * 2 - top);     /* the cursor's pixel row in the picture (128 or more if above it) */
+    uint8_t r, i, j, y, ty, tx, bits, m, l[4];
+    const uint8_t *b;
+    const struct view *vw = views + v;
+    uint8_t py = (uint8_t)(cur_y * 2 - top);        /* the cursor's pixel row in the picture (128 or more if above it) */
 
-    for (r = 0; r < 8; ++r)
-        art[r] = row(views + v, (uint8_t)(cx * 4), (uint8_t)(top + cy * 8 + r));
+    for (j = 0; j < 4; ++j) {
+        ty = (uint8_t)((top + cy * 8) >> 1) + j;
+        for (i = 0; i < 4; ++i)
+            l[i] = vw->level((uint8_t)(cx * 4 + i), ty);
+        for (r = 0; r < 2; ++r) {
+            y = (uint8_t)(ty * 2 + r);              /* the pixel row */
+            bits = 0;
+            m = 0x80;
+            for (i = 0; i < 4; ++i) {
+                tx = (uint8_t)(cx * 4 + i);
+                if (vw->kind == SPECK)
+                    b = bayer2 + ((y & 1) << 1);
+                else if (vw->kind == DENSITY)
+                    b = bayer4 + ((y & 3) << 2) + ((tx & 1) << 1);
+                else
+                    b = bayer4 + ((ty & 3) << 2) + (tx & 3);
+                if (l[i] > b[0])
+                    bits |= m;
+                m >>= 1;
+                if (l[i] > b[vw->kind == COVERAGE ? 0 : 1])
+                    bits |= m;
+                m >>= 1;
+            }
+            art[j * 2 + r] = bits;
+        }
+    }
     if (mark && (cur_x >> 2) == cx && py < MM_PIXELS_H && (py >> 3) == cy) {
         r = (uint8_t)(py & 7);                      /* the tile's 2x2 pixels, inverted */
         art[r] ^= (uint8_t)(0xC0 >> ((cur_x & 3) * 2));

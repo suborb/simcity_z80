@@ -397,6 +397,7 @@ static uint8_t draw_cursor_enabled = 1;     /* the mouse can take the pointer of
 #endif
 #ifdef DRAW_SPRITES
 static struct sprite sprites[MAX_SPRITES], last_sprites[MAX_SPRITES];   /* the train, plane and tornado, now and last frame */
+static uint8_t sprites_on;                  /* any of them showing: nearly always none, and a cell need not look */
 #endif
 #ifdef HAVE_MOUSE_POINTER
 extern void plat_mouse_pointer_erase(void);
@@ -464,13 +465,13 @@ static void draw_cell(uint8_t cx, uint8_t cy)
         uint8_t art[8];
 
         plat_put_tile(cx, (uint8_t)(map_row + cy), view_art, view_attr, cursor);
-        if (sprites_cell(sprites, mx, my, sprite_blank, art))
+        if (sprites_on && sprites_cell(sprites, mx, my, sprite_blank, art))
             plat_put_overlay(cx, (uint8_t)(map_row + cy), art);
         return;
     }
 #else
     {
-        uint8_t art[8], key = sprites_cell(sprites, mx, my, view_art, art), i;
+        uint8_t art[8], key = sprites_on ? sprites_cell(sprites, mx, my, view_art, art) : 0, i;
 
         if (key) {                          /* a sprite is over this cell: its picture, not the tile's */
             if (cursor)
@@ -583,6 +584,7 @@ static void draw_view(uint8_t full, uint8_t dirty)
 
 #ifdef DRAW_SPRITES
     sprites_collect(sprites, frame);
+    sprites_on = (uint8_t)(sprites[0].on | sprites[1].on | sprites[2].on);
 #endif
 #ifdef HAVE_SCROLL
     if (full == 2)

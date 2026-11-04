@@ -261,10 +261,10 @@ uint8_t budget_screen(void)
         case KEY_LEFT: case '-': if (!change(-1)) continue; break;
         case KEY_RIGHT: case '+': if (!change(1)) continue; break;
 #ifndef HAVE_MENUS
-        case 'q': if (sel) --sel; break;
-        case 'a': if (sel < 3) ++sel; break;
-        case 'o': change(-1); break;
-        case 'p': change(1); break;
+        case 'q': case 'Q': if (sel) --sel; break;
+        case 'a': case 'A': if (sel < 3) ++sel; break;
+        case 'o': case 'O': change(-1); break;
+        case 'p': case 'P': change(1); break;
 #endif
         case KEY_ENTER: case ' ': case KEY_ESC:
             plat_text_clear();
