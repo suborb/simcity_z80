@@ -38,6 +38,19 @@ _cpm_print:
         pop     ix
         ret
 
+        PUBLIC  _cpm_version
+; uint8_t cpm_version(void): BDOS 12, the version: $22 for CP/M 2.2, $30 and up for CP/M Plus (and what is compatible: Z80DOS, DOS+)
+_cpm_version:
+        push    ix
+        push    iy
+        ld      c,12
+        call    5
+        ld      l,a
+        ld      h,0
+        pop     iy
+        pop     ix
+        ret
+
         PUBLIC  _cpm_seconds
 ; uint8_t cpm_seconds(void): BDOS 105, the time of day: the seconds (BCD) it returns in A
 _cpm_seconds:

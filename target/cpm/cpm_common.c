@@ -33,9 +33,10 @@ uint8_t plat_key(void)
 
 uint16_t plat_clock(void) { return clock_count; }
 
-/* A frame.  There is no timer a program can read, so the first call measures one: a chunk is a few turns of a loop and a read of the time of day (BDOS 105, whose
+/* A frame.  There is no timer a program can read, so the first call measures one: a chunk is a few turns of a loop and a read of the time of day (BDOS 105, CP/M Plus's, whose
    seconds change once a second), and a fiftieth of the chunks of a second is a frame.  If the clock does not tick the frame is what CPM_DELAY says. */
 extern uint8_t cpm_seconds(void);
+extern uint8_t cpm_version(void);
 static uint8_t frame_chunks;
 
 static uint8_t chunk(void)
@@ -53,6 +54,8 @@ static void calibrate(void)
     uint16_t n = 0, guard = 0;
 
     frame_chunks = CPM_DELAY;
+    if (cpm_version() < 0x30)                       /* (BDOS 105 is CP/M Plus's: before it there is no clock to ask) */
+        return;
     s0 = cpm_seconds();
     while ((s = chunk()) == s0)
         if (++guard == 0)

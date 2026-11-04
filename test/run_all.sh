@@ -34,6 +34,13 @@ echo
 echo "== Amstrad PCW screen code: row table, cell blit, invert, clear, and the doubled tiles and text"
 python3 test/pcw/run.py
 echo
+echo "== Amstrad PCW game under z88dk-ticks: the Lua PCW model runs build/pcw/simcity.com (the screen, scrolling, the mini map, the frame delay)"
+[ -f build/pcw/simcity.com ] || make pcw
+python3 test/pcw/game.py
+echo
+echo "== CP/M BDOS under z88dk-ticks: sequential files, search, a line, the time, truncate"
+python3 test/cpm/bdos.py
+echo
 echo "== AY sound effect player"
 python3 test/ay_sfx/run.py
 echo
