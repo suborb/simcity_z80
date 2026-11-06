@@ -602,6 +602,7 @@ _zxn_sprite_define:
         ld      bc,$303B
         xor     a
         out     (c),a                   ; pattern 0
+        push    ix                      ; (the C caller's frame pointer)
         ld      ix,arrow_rows
         ld      c,16
 sd_row: ld      e,(ix+0)
@@ -638,6 +639,7 @@ sd_put: out     ($5B),a
         in      a,(c)
         or      1                       ; the sprites visible
         nextreg $15,a
+        pop     ix
         ret
 
 ; void zxn_sprite_at(int16_t x, int16_t y) __smallc: sprite 0's tip at screen pixel (x,y) (the sprites' origin is (32,32)), or hidden with x < 0
