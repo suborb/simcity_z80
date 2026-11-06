@@ -8,6 +8,14 @@
 | `../target/common/` | Code and pictures shared by targets with the same screen: the 640x200, 3 bits a pixel mini map row builder (Multi 8, PC-8801). |
 | `../target/multi8/` | Mitsubishi Multi 8 implementation: 640x200 three plane colour screen, baked colour pictures, cassette, native pixel mini maps. |
 | `../target/pc88/` | NEC PC-8801 implementation: the same screen, drawn with the V2 ALU (or plane by plane), ALU scrolling, keyboard matrix. |
+| `../target/sam/` | SAM Coupe: allram layout with paged data, the Atari ST's art, pointer, SAA 1099 sound, MGT disk. |
+| `../target/zxn/` | ZX Spectrum Next: Layer 2 with the Amiga 1 Meg's art, hardware sprite pointer, AY sound, NEX file. |
+| `../target/x1/` | Sharp X1: 320x200 three plane screen behind I/O ports, PSG sound, 2D disk. |
+| `../target/spc1000/` | Samsung SPC-1000: MC6847 mono (and 4 colour mini maps) through I/O ports, AY sound, cassette, a packed program with a bootstrap. |
+| `../target/msx2/`, `../target/einstein256/` | MSX2 (MSX-DOS 2) and Tatung Einstein 256 (CP/M): V9938 screen 5 with the Atari ST's art, sharing `../target/common/v9938/`. |
+| `../target/mz2500/` | Sharp MZ-2500: 320x200 planar colour, the Atari ST's art, banked code, disk save slots. |
+| `../target/pcw/` | Amstrad PCW (CP/M Plus): 720x256 monochrome, the tiles drawn twice across. |
+| `../target/cpm/` | Generic CP/M text target, 80x24 characters. |
 | `../target/zx/` | Spectrum-specific implementation: fast 8x8 bitmap renderer, its UI capabilities and CRT settings. |
 | `../target/zx-original/` | Reference Spectrum build: original UI segments and engine segments in original order; byte-identical to the disassembly. |
 | `../target/z88/` | Z88-specific implementation: OZ screen/menu integration, icons, sound and ROM CRT settings. |
