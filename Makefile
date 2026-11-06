@@ -75,7 +75,7 @@ TESTK  = build/testnative/simcity.bin
 TESTA  = build/testart/simcity.bin
 TESTSC = build/testscroll/simcity.bin
 
-.PHONY: all dist aqplus z88rom zx multi8 pc88 x1 spc1000 msx2 einstein256 cpm pcw mz2500 sam zxn amiga-scenarios test testpanel testmodal testnarrow testsprites testoverlay testhires testnative testart testscroll check golden uitest tiletest z88test deadcode clean
+.PHONY: all dist aqplus z88rom zx multi8 pc88 x1 spc1000 msx2 einstein256 cpm pcw mz2500 sam zxn zxn-debug amiga-scenarios test testpanel testmodal testnarrow testsprites testoverlay testhires testnative testart testscroll check golden uitest tiletest z88test deadcode clean
 
 all: aqplus z88rom zx multi8 pc88 x1 spc1000 msx2 mz2500 sam zxn
 
@@ -97,6 +97,8 @@ pcw: $(PCW)
 mz2500: $(MZ2500)
 sam:    $(SAM)
 zxn:   $(ZXN)
+zxn-debug:
+	tools/zxn_debug.sh
 test:   $(TEST)
 testpanel: $(TESTP)
 testmodal: $(TESTM)
