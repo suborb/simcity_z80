@@ -11,3 +11,9 @@
     org     OVERLAY_WINDOW
     SECTION EINSTEIN_MODAL_OVL
     org     OVERLAY_WINDOW
+
+; The sound (the player, the engine's hooks and the effects: target/einstein256/plat_sound.asm, target/common/ay_*.asm) does not fit in the COM and is called from the engine and
+; the UI whichever overlay is loaded: it is a file of its own, SIMCITY.SND, read in above the window and left there.
+    defc    SND_BASE = $D800
+    SECTION EINSTEIN_SND
+    org     SND_BASE

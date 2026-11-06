@@ -32,6 +32,10 @@
         defc    AY_SKIP = 0
         ENDIF
 
+        IFDEF   AY_EINSTEIN
+        SECTION EINSTEIN_SND            ; the Einstein 256's sound file (SIMCITY.SND, target/einstein256/mmap.inc): the COM is full
+        EXTERN  ay_ports
+        ELSE
         IFDEF   AY_CODE_HI
         SECTION CODE_HI                 ; the MSX2's page 3 (target/msx2/msx_banks.asm): always mapped, and the resident part below $8000 is full
         ELSE
@@ -39,6 +43,7 @@
         SECTION code_home               ; the Next's engine bank (engine/sections.asm): this is called while the bank is mapped, so it is in the lowest 16 KB
         ELSE
         SECTION code_user
+        ENDIF
         ENDIF
         ENDIF
 
@@ -86,6 +91,12 @@ ay_start:
         IFDEF   AY_MSX
         and     $3F                     ; the MSX's joystick ports are on the chip's I/O: bit 6 clear (port A in), bit 7 set (port B out)
         or      $80
+        ENDIF
+        IFDEF   AY_EINSTEIN
+        and     $3F                     ; the Einstein's keyboard is on the chip's I/O (port A out for the row, port B in): the directions its system set stay
+        ld      b,a
+        ld      a,(ay_ports)
+        or      b
         ENDIF
         inc     hl
         ld      c,(hl)                  ; the length of the volume stream
@@ -353,6 +364,17 @@ ay_w_plain:
         out     (AY_DATA_PORT),a
         ret
         ELSE
+        IFDEF   AY_EINSTEIN
+ay_write:                               ; (the system's interrupt code also selects registers: between the two writes it would send ours to another)
+        push    af
+        di
+        ld      a,c
+        out     (AY_ADDR_PORT),a
+        pop     af
+        out     (AY_DATA_PORT),a
+        ei
+        ret
+        ELSE
 ay_write:
         push    af
         ld      a,c
@@ -360,6 +382,7 @@ ay_write:
         pop     af
         out     (AY_DATA_PORT),a
         ret
+        ENDIF
         ENDIF
         ENDIF
         ELSE

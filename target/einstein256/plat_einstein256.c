@@ -25,11 +25,16 @@ void v9938_leave(void)
 }
 
 uint16_t plat_clock(void) { return clock_count; }
-/* Once a pass of the game's loop, which waits for the next frame (the retrace flag: the vertical blank interrupt is off) */
+extern void ay_frame(void);                     /* (plat_sound.asm) a frame has begun */
+extern void ay_poll(void);                      /* (ay_hooks.asm) the sound's tick for it */
+
+/* Once a pass of the game's loop, which waits for the next frame (the retrace flag: the vertical blank interrupt is off), and is the sound's clock */
 void plat_idle(void)
 {
     ++clock_count;
     einstein_wait_frame();
+    ay_frame();
+    ay_poll();
 }
 void plat_flush(void) {}
 

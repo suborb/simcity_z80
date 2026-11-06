@@ -263,7 +263,7 @@ $(MSX2): $(DEPS) $(V9938_ASSETS)
 # The Tatung Einstein 256: CP/M, V9938 screen 5 and the V9938 drawing core it shares with the MSX2 (target/common/v9938).
 # One CP/M COM in the standard classic map (under 32 KB: the DOS will not load a bigger one); the two UI overlays are separate files that the start-up reads into
 # a window above the BSS and keeps in the unused part of the screen page's VRAM, and copies back as needed.  See docs/EINSTEIN256-layout.md.
-EINSTEIN256_PLATFORM = target/einstein256/einstein_boot.asm target/einstein256/einstein_io.asm target/einstein256/einstein_loader.c target/einstein256/einstein_dos.c target/einstein256/plat_einstein256.c target/common/minimap_key.c target/common/v9938/plat_v9938.c target/common/v9938/plat_v9938.asm target/common/v9938/v9938_data.asm platform/common/nosound.asm
+EINSTEIN256_PLATFORM = target/einstein256/einstein_boot.asm target/einstein256/einstein_io.asm target/einstein256/einstein_loader.c target/einstein256/einstein_dos.c target/einstein256/plat_einstein256.c target/common/minimap_key.c target/common/v9938/plat_v9938.c target/common/v9938/plat_v9938.asm target/common/v9938/v9938_data.asm target/einstein256/plat_sound.asm target/common/ay_hooks.asm target/common/ay_sfx.asm
 EINSTEIN256_GAME = $(filter-out ui/main.c,$(GAME))
 EINSTEIN256_TPA_TOP = E000          # the BDOS entry (the word at address 6) on the machine; the check script uses it
 
@@ -272,6 +272,7 @@ $(EINSTEIN256): $(DEPS) tools/check_einstein_layout.py target/einstein256/mmap.i
 	$(ZCC) +cpm -subtype=einstein256 $(COMMON) -pragma-include:target/einstein256/zpragma.inc -pragma-define:MMAP=-1 \
 	    -Itarget/einstein256 -Ibuild/v9938 -Ca-Itarget/einstein256 -Ca-Ibuild/v9938 \
 	    -DTARGET_EINSTEIN256 -Ca-DTARGET_EINSTEIN256 -Ca-DVDP_DATA=8 -Ca-DVDP_CMD=9 -Ca-DVDP_PAL=10 -Ca-DVDP_IND=11 -Ca-DFMT_WIDTH=32 -Ca-DHAVE_MINIMAP_SQUARE \
+	    -Ca-DHAVE_SOUND -Ca-DAY_EINSTEIN -Ca-DAY_ADDR_PORT=2 -Ca-DAY_DATA_PORT=3 \
 	    $(EINSTEIN256_PLATFORM) $(EINSTEIN256_GAME) $(ENTROPY) $(MENU) $(FIELDS) $(MMNATIVE) $(LINEEDIT) -o $(@D)/simcity
 	python3 tools/check_einstein_layout.py $(@D)/simcity.map $(EINSTEIN256_TPA_TOP)
 	@# appmake copies the CP/M name into the directory as is: it must be the 11-byte FCB form.  It also writes a
@@ -280,8 +281,9 @@ $(EINSTEIN256): $(DEPS) tools/check_einstein_layout.py target/einstein256/mmap.i
 	z88dk-appmake +cpmdisk -f einstein -b $(@D)/simcity -o $(@D)/simcity.dsk \
 	    -a build/einstein256/TILES.PAD:'TILES   DAT' \
 	    -a build/einstein256/simcity_EINSTEIN_GAME_OVL.bin:'SIMCITY GAM' \
-	    -a build/einstein256/simcity_EINSTEIN_MODAL_OVL.bin:'SIMCITY MOD'
-	@echo "einstein256: COM and overlay files packaged in $(@D)/simcity.dsk"
+	    -a build/einstein256/simcity_EINSTEIN_MODAL_OVL.bin:'SIMCITY MOD' \
+	    -a build/einstein256/simcity_EINSTEIN_SND.bin:'SIMCITY SND'
+	@echo "einstein256: COM, overlay and sound files packaged in $(@D)/simcity.dsk"
 
 # Generic CP/M: any Z80 machine with an 80x24 ANSI terminal (CPM_VT52 in plat_cpm.c: a VT52).  A character a square (ui/game.c glyph()), no mini maps; one COM.
 $(CPM): $(DEPS)

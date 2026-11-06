@@ -1,6 +1,6 @@
 /* Stage the UI overlays in VRAM; restore the requested overlay into CPU RAM.
    Both overlays are linked at einstein_overlay (the window).  SIMCITY.GAM and SIMCITY.MOD are read into it at start-up
-   and copied to VRAM, in the unused part of the screen page, game first and the modal one after it. */
+   and copied to VRAM, in the unused part of the screen page, game first and the modal one after it.  SIMCITY.SND, the sound, is read to where it is linked and stays. */
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -11,6 +11,8 @@
 
 extern uint8_t einstein_overlay[];      /* the window's address, and the two sizes (as the addresses of symbols) */
 extern uint8_t einstein_game_size, einstein_modal_size;
+extern uint8_t einstein_snd[];          /* the sound file's address and size, the same way */
+extern uint8_t einstein_snd_size;
 
 extern void v9938_fatal(const char *message);           /* (einstein_io.asm: prints the $-terminated string and exits) */
 extern void vram_write(uint16_t address, const uint8_t *source, uint16_t length);
@@ -36,16 +38,17 @@ static void vram_transfer(uint16_t vram, uint16_t length, uint8_t to_vram)
     }
 }
 
-static void stage(const char *name, uint16_t vram, uint16_t length)
+/* length bytes of the file to where it is linked (the rest of its last record is zeros) */
+static void read_file(const char *name, uint8_t *to, uint16_t length)
 {
     int fd = open(name, O_RDONLY, 0);
     uint16_t total = 0;
 
     if (fd < 0)                                 /* (the files are looked for on the default drive) */
-        v9938_fatal("SIMCITY.GAM/MOD not found\r\n$");
-    memset(einstein_overlay, 0, length);
+        v9938_fatal("SIMCITY.GAM/MOD/SND not found\r\n$");
+    memset(to, 0, length);
     while (total < length) {
-        int16_t count = (int16_t)read(fd, einstein_overlay + total, length - total);
+        int16_t count = (int16_t)read(fd, to + total, length - total);
         if (count <= 0)
             break;
         total += (uint16_t)count;
@@ -53,6 +56,11 @@ static void stage(const char *name, uint16_t vram, uint16_t length)
     close(fd);
     if (total == 0)
         exit(1);
+}
+
+static void stage(const char *name, uint16_t vram, uint16_t length)
+{
+    read_file(name, einstein_overlay, length);
     vram_transfer(vram, length, 1);
 }
 
@@ -63,6 +71,7 @@ void einstein_load_base(void)
     stage("SIMCITY.GAM", VRAM_STAGE, game_len);
     stage("SIMCITY.MOD", VRAM_STAGE + game_len, modal_len);
     vram_transfer(VRAM_STAGE, game_len, 0);
+    read_file("SIMCITY.SND", einstein_snd, records((uint16_t)&einstein_snd_size));
 }
 
 /* (Called from the resident code: the overlay in the window is replaced, so nothing in an overlay may be running.) */

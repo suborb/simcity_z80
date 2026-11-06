@@ -82,11 +82,14 @@ _v9938_fatal:
         jp      __Exit
 
 ; The overlay window and the two overlays' sizes, from the link (the loader sees them as extern arrays/bytes).
-        PUBLIC  _einstein_overlay, _einstein_game_size, _einstein_modal_size
+        PUBLIC  _einstein_overlay, _einstein_game_size, _einstein_modal_size, _einstein_snd, _einstein_snd_size
+        EXTERN  __EINSTEIN_SND_head, __EINSTEIN_SND_size
         EXTERN  __EINSTEIN_GAME_OVL_head, __EINSTEIN_GAME_OVL_size, __EINSTEIN_MODAL_OVL_size
         defc    _einstein_overlay = __EINSTEIN_GAME_OVL_head
         defc    _einstein_game_size = __EINSTEIN_GAME_OVL_size
         defc    _einstein_modal_size = __EINSTEIN_MODAL_OVL_size
+        defc    _einstein_snd = __EINSTEIN_SND_head
+        defc    _einstein_snd_size = __EINSTEIN_SND_size
 
 ; The DOS's error handler (einstein_dos_quiet in einstein_dos.c points its vectors here).  The BDOS runs on a stack of its own, with the
 ; address of the routine that finishes a call (restores IX and IY, loads HL from the result slot) and under that the address of the
