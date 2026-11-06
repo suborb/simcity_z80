@@ -18,6 +18,7 @@
 #define BOX_BOTTOM "\3\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\4"
 #define BOX_SIDE   "\6                            \6"
 #define HAVE_BUDGET
+#define HAVE_BUDGET_CAPS                /* the budget screen takes O P Q A in either case */
 #define HAVE_EVALUATION
 #define HAVE_TEXT_COLOUR                /* shades: plat_text_attr() inverts the selection, plat_bar() fills with a dither (the colour chooses it) */
 #define HAVE_DEMAND_BARS

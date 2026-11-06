@@ -9,6 +9,7 @@
 #define MODAL_ROWS 24
 #define HAVE_POPUP_MENU
 #define HAVE_BUDGET
+#define HAVE_BUDGET_CAPS                /* the budget screen takes O P Q A in either case */
 #define HAVE_EVALUATION
 #define HAVE_FILES
 #define FILE_NAME_MAX 8
