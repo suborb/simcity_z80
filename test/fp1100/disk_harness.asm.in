@@ -1,0 +1,19 @@
+; Runs asm_fp1100_disk_rw (z88dk's fp1100 library) once with the parameters of the test: mode @MODE@, unit @UNIT@, track @TRACK@, sector @SECTOR@, count @COUNT@, buffer $4000.
+        SECTION code_user
+        org     $2000
+start:  ld      sp,$7000
+        ld      a,@MODE@
+        ld      e,@UNIT@
+        ld      d,@TRACK@
+        ld      c,@SECTOR@
+        ld      b,@COUNT@
+        ld      hl,$4000
+        call    asm_fp1100_disk_rw
+        ld      ($3F00),hl
+        ld      a,l
+        ld      ($3F02),a
+        ld      a,1
+        ld      bc,$00FE
+        out     (c),a                   ; (the model dumps what was written)
+done:   jp      done
+        EXTERN  asm_fp1100_disk_rw

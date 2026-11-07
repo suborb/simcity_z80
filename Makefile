@@ -61,6 +61,7 @@ MSX2   = build/msx2/simcity.img
 EINSTEIN256 = build/einstein256/simcity.com
 CPM = build/cpm/simcity.com
 PCW = build/pcw/simcity.com
+FP1100 = build/fp1100/simcity.d88
 MZ2500 = build/mz2500/simcity.dsk
 SAM    = build/sam/simcity.mgt
 ZXN   = build/zxn/simcity.nex
@@ -75,12 +76,12 @@ TESTK  = build/testnative/simcity.bin
 TESTA  = build/testart/simcity.bin
 TESTSC = build/testscroll/simcity.bin
 
-.PHONY: all dist aqplus z88rom zx multi8 pc88 x1 spc1000 msx2 einstein256 cpm pcw mz2500 sam zxn zxn-debug amiga-scenarios test testpanel testmodal testnarrow testsprites testoverlay testhires testnative testart testscroll check golden uitest tiletest z88test deadcode clean
+.PHONY: all dist aqplus z88rom zx multi8 pc88 x1 spc1000 msx2 einstein256 cpm pcw fp1100 mz2500 sam zxn zxn-debug amiga-scenarios test testpanel testmodal testnarrow testsprites testoverlay testhires testnative testart testscroll check golden uitest tiletest z88test deadcode clean
 
-all: aqplus z88rom zx multi8 pc88 x1 spc1000 msx2 mz2500 sam zxn
+all: aqplus z88rom zx multi8 pc88 x1 spc1000 msx2 fp1100 mz2500 sam zxn
 
 # The zip files for distribution, one for each machine (build/dist/; tools/make_dist.py)
-dist: aqplus z88rom multi8 pc88 x1 spc1000 msx2 einstein256 pcw mz2500 sam zxn
+dist: aqplus z88rom multi8 pc88 x1 spc1000 msx2 einstein256 pcw fp1100 mz2500 sam zxn
 	python3 tools/make_dist.py
 
 aqplus: $(AQPLUS)
@@ -94,6 +95,7 @@ msx2:   $(MSX2)
 einstein256: $(EINSTEIN256)
 cpm: $(CPM)
 pcw: $(PCW)
+fp1100: $(FP1100)
 mz2500: $(MZ2500)
 sam:    $(SAM)
 zxn:   $(ZXN)
@@ -205,7 +207,7 @@ $(X1): $(DEPS) build/common/tiles_640x200_3bpp.bin
 	@mkdir -p $(@D)
 	$(ZCC) +x1 -create-app $(COMMON) -pragma-include:target/x1/zpragma.inc \
 	    -Itarget/x1 -DTARGET_X1 -Ca-DTARGET_X1 -Ca-DHAVE_MINIMAP_SQUARE -Ca-DHAVE_SOUND -Ca-DAY_PORT16 -Ca-DAY_ADDR_PORT=0x1C00 -Ca-DAY_DATA_PORT=0x1B00 $(GAME) $(ENTROPY) $(MENU) target/x1/plat_sound.asm target/common/ay_hooks.asm target/common/ay_sfx.asm $(FIELDS) $(MMNATIVE) $(LINEEDIT) $(X1_PLATFORM) -o $(@D)/simcity.bin
-	@size=`sed -n 's/^__tail *= \$$\([0-9A-Fa-f]*\).*/\1/p' $(@D)/simcity.map`; echo "x1: image and uninitialised data end at $$size (the stack is the top of memory)"
+	@size=`sed -n 's/^__BSS_END_tail *= \$$\([0-9A-Fa-f]*\).*/\1/p' $(@D)/simcity.map`; echo "x1: image and uninitialised data end at $$size (the stack is the top of memory)"
 
 # The Samsung SPC-1000 (z88dk +spc1000 -subtype=allram: BASIC loads a ZX0 packed program with a bootstrap that unpacks it at $0000 and takes the machine).
 # The screen is the MC6847's 256x192 mode of one bit a pixel behind I/O ports, so the pictures are the engine's own 1 bit art and the icons the
@@ -304,6 +306,31 @@ $(PCW): $(DEPS) build/pcw/icons.bin
 	    $(MMNATIVE) target/pcw/plat_pcw.c target/pcw/plat_pcw.asm target/pcw/plat_pcw_font.asm target/pcw/plat_pcw_crt.asm target/cpm/cpm_common.c target/cpm/cpm_io.asm \
 	    $(GAME) $(ENTROPY) $(MENU) $(NOSOUND) $(FIELDS) -o $(@D)/simcity
 	z88dk-appmake +cpmdisk -f pcw80 -b $(@D)/simcity -o $(@D)/simcity.dsk
+
+# The Casio FP-1100 on its own boot disc (no CP/M): 320x200 in 8 colours, three planes in the sub-CPU's video RAM, which a program running on the sub-CPU
+# (target/fp1100/sub.s.in, assembled by tools/build_fp1100_sub.py) draws into for the Z80 (fp_sub.asm).  Built by z88dk's +fp1100 -subtype=allram: the program is linked at $0000 and the
+# whole machine is RAM; z88dk's bootstrap (the ROM reads the boot sector, which brings in a loader with a RAM copy of the polled disk driver, which loads the program) and appmake +fp1100
+# make the disc, with the pictures (tools/fp1100_art.py) as the extra block after the program.  The program takes the sub-CPU over itself (fp_boot) and reads the pictures (fp_art).
+FP1100_SAVE_SECTOR = 384        # the saved cities' first sector: track 24 (plat_fp1100_files.asm)
+FP1100_PLATFORM = target/common/minimap_key_3bpp.c target/fp1100/plat_fp1100.c target/fp1100/fp_tile.asm target/fp1100/fp_sub.asm target/fp1100/fp_data.asm target/fp1100/plat_fp1100_files.asm target/common/plat_icons.c
+
+build/fp1100/sub.bin build/fp1100/loader.bin build/fp1100/sub.inc: tools/build_fp1100_sub.py tools/asm7801.py tools/asm7801_ops.json target/fp1100/sub.s.in target/fp1100/loader.s.in
+	@mkdir -p build/fp1100
+	python3 tools/build_fp1100_sub.py build/fp1100
+
+# 345 pictures of 24 bytes and the 112 cells of the tool icons (tools/fp1100_art.py), padded to 43 sectors, each byte turned about (the leftmost pixel is bit 0 on this machine)
+build/fp1100/art.bin: build/common/tiles_640x200_3bpp.bin assets/cpc_icons.bin tools/fp1100_art.py
+	@mkdir -p $(@D)
+	python3 tools/fp1100_art.py build/common/tiles_640x200_3bpp.bin assets/cpc_icons.bin $@
+
+$(FP1100): $(DEPS) build/fp1100/sub.bin build/fp1100/loader.bin build/fp1100/sub.inc build/fp1100/art.bin
+	@mkdir -p $(@D)
+	$(ZCC) +fp1100 -subtype=allram $(COMMON) -pragma-include:target/fp1100/zpragma.inc -Itarget/fp1100 -Ca-Itarget/fp1100 -Ca-Ibuild/fp1100 -DTARGET_FP1100 -Ca-DTARGET_FP1100 -Ca-DSIM_YIELD_EXTRA -Ca-DHAVE_MINIMAP_SQUARE \
+	    $(FP1100_PLATFORM) $(GAME) $(ENTROPY) $(MENU) $(NOSOUND) $(FIELDS) $(MMNATIVE) -o $(@D)/simcity.bin -create-app -Cz"--data build/fp1100/art.bin"
+	@size=`wc -c < $(@D)/simcity.bin`; tail=`sed -n 's/^__BSS_END_tail *= \$$\([0-9A-Fa-f]*\).*/\1/p' $(@D)/simcity.map`; \
+	    echo "fp1100: the program is $$size bytes and with its uninitialised data ends at $$tail (the loader is at F800, gone when the program runs)"; \
+	    [ $$(( 0x$$tail )) -le $$(( 0xF800 )) ] || { echo "too big: the program's data must end below F800 (the stack's 2 KB)"; rm -f $@; exit 1; }; \
+	    [ $$(( 9 + (size + 255) / 256 + `wc -c < build/fp1100/art.bin` / 256 )) -le $(FP1100_SAVE_SECTOR) ] || { echo "the program and pictures run into the saved cities (from sector $(FP1100_SAVE_SECTOR))"; rm -f $@; exit 1; }
 
 # The Sharp MZ-2500 (z88dk +mz2500: a boot disk the IPL loads page by page).  320x200 in 16 colours, planar video RAM; the Atari ST's art in a planar atlas (pages 22-24), 32 x 24 cells
 # of 8x8.  The program is linked at $0000 (RAM pages 16-17, started by the crt's BOOTSTRAP stub), the UI and the simulation are 16 KB banks at $4000 mapped into windows 2 and 3 by turns, the data is at

@@ -1,0 +1,339 @@
+; The Casio FP-1100's sub-CPU (uPD7801) program: it owns the video RAM, and the Z80 drives it a byte at a time.
+; It runs from the spare VRAM at @BASE@ (stored inverted: the VRAM bus inverts on a read), and the stack is at the top of the
+; sub-CPU's RAM.  Each command byte is the low address of its handler (dispatched with JB); Rcv fetches a byte from the Z80
+; with the handshake (writing $80 to $E800 says ready, the Z80's INT2 pulse is the byte, writing 0 acknowledges it).
+;
+; VRAM: three planes, blue $2000, red $6000, green $A000, each 40x25 cells of 8 bytes (a cell's lines).  A byte is 1 = lit when
+; read; a copy (a read then a write) keeps the pixels, a direct write needs the complement.
+; The pictures live in the spare VRAM above the screen, as 32-byte slots (blue 8 bytes, red 8, green 8, 8 spare) at
+; $4000 + 32n (bank 0, $00), $8000 + 32n (bank 1, $40) and $C000 + 32n (bank 2, $80): Bank selects the region, an index is one byte.
+;
+;   Bank v          v = 0, $40 or $80, the high byte offset of the picture region
+;   Addr lo hi      DE = a VRAM address (the cell's blue plane line 0)
+;   Pat             8 bytes to (DE+)
+;   Cell            24 bytes: the cell at DE, blue, red and green (DE is left at the next cell's blue plane)
+;   Tiles n i...    n-1 then n picture indexes, drawn at DE, DE advancing a cell each (DE ends at the next cell)
+;   Ovl             24 bytes (8 pixel lines for each plane) ORed into the cell at DE (a sprite over the picture)
+;   Inv             the cell at DE inverted (DE is left as it was)
+;   Fill n-1 v     n blank cells at DE (v is not used), DE advancing
+;   Text n-1 a c...  n characters (glyph codes) at DE, DE advancing a cell each, in the colours a: ink bits 0 to 2 (blue, red, green), paper bits 3 to 5
+;   Mini            72 bytes: a mini map row's two lines (the same byte for both) in 24 cells from DE, blue, red and green plane in turn, a byte a cell
+;   Mini2           144 bytes: the same with a byte for each of the two lines
+; Tick            returns the number of timer overflows (about every 0.67 ms) since the last Tick, counted while the program waits for a byte (mod 128): a clock for the Z80, which has none
+;   Keys            scans the key matrix and returns 3 bytes (7 bits each): 1 if a shift key is down, the matrix column (2 to 12) of a key that is down, or 0, and its row bits
+;
+; The program is two pages: this one (256 bytes, which the loader brings in) and the second at @BASE2@ (fp_boot sends it): the commands' entry points are all in this one
+; (the JB dispatch uses one page), and a long command is a jump to its body in the second.
+        ORG @BASE@
+Main:   CALL Rcv
+        MOV C,A
+        MVI B,@PAGE@
+        JB
+Bank:   CALL Rcv
+        MVI V,0                 ; (V is free: the sub-CPU's interrupts, which use it, are off)
+        ADD V,A
+        JR Main
+Pat:    CALL P8
+        JR Main
+Addr:   CALL Rcv
+        MOV E,A
+        CALL Rcv
+        MOV D,A
+        JR Main
+Cell:   LXI BC,P8              ; the three planes, each by P8 or O8
+        JR Tri
+Ovl:    LXI BC,O8
+Tri:    PUSH BC                 ; (the routines use B and C)
+        PUSH DE
+        CALB
+        POP DE
+        POP BC
+        ADI D,$40
+        PUSH BC
+        PUSH DE
+        CALB
+        POP DE
+        POP BC
+        ADI D,$40
+        CALB
+        ADI D,$80
+        JMP Main
+Tiles:  CALL Rcv
+        MOV B,A
+T1:     CALL Rcv
+        MVI C,0
+        SLR A
+        RLR C
+        SLR A
+        RLR C
+        SLR A
+        RLR C                   ; A = idx>>3, C = (idx&7)<<5
+        ADI A,$40
+        ADD A,V                 ; + bank offset
+        MOV H,A
+        MOV A,C
+        MOV L,A                 ; HL = $4000 + bank + idx*32
+        MVI C,7
+        PUSH DE
+        BLOCK                   ; blue plane: 8 bytes (HL+) -> (DE+)
+        POP DE
+        ADI D,$40
+        MVI C,7
+        PUSH DE
+        BLOCK                   ; red
+        POP DE
+        ADI D,$40
+        MVI C,7
+        BLOCK                   ; green
+        ADI D,$80               ; DE back to the blue plane, next cell
+        DCR B
+        JMP T1
+        JMP Main
+Inv:    MVI C,2                 ; three planes
+Inv1:   PUSH DE
+        MVI B,7
+Inv2:   LDAX DE                 ; (a read and a write of the same byte flip its pixels: the bus inverts both)
+        STAX DE+
+        DCR B
+        JR Inv2
+        POP DE
+        ADI D,$40
+        DCR C
+        JR Inv1
+        ADI D,$40               ; (the planes added up to $C0)
+        JMP Main
+Keys:   JMP KeysBody
+Tick:   JMP TickBody
+Fill:   JMP FillBody
+Text:   JMP TextBody
+Mini:   JMP MiniBody
+Mini2:  JMP Mini2Body
+O8:     MVI B,7                 ; 8 bytes ORed into (DE+), as pixels (a plane's read and write are inverted)
+O81:    CALL Rcv
+        ORAX DE
+        XRI A,$FF
+        STAX DE+
+        DCR B
+        JR O81
+        RET
+P8:     MVI B,7                 ; 8 bytes to (DE+)
+P81:    CALL Rcv
+        STAX DE+
+        DCR B
+        JR P81
+        RET
+Rcv:    MVI C,$80
+        MOV $E800,C
+Rw:     SKIT F2
+        JR Rt
+        MOV A,$E800
+        MVI C,0
+        MOV $E800,C
+        RET
+Rt:     SKIT FT                 ; (the timer's flag: count it in the sub-CPU's RAM, at $FFC0)
+        JR Rw
+        MOV A,$FFC0
+        ADI A,1
+        MOV $FFC0,A
+        JR Rw
+
+P1End:
+; ---- the second page ----
+        ORG @BASE2@
+KeysBody:
+        EXX                     ; (the alternate registers: DE is the address, and the Z80 counts on it staying)
+        MVI D,0
+        MVI E,0
+        MVI A,$21               ; column 1: the shift key is bit 0
+        MOV $E400,A
+        CALL Settle
+        MOV A,PB
+        ANI A,1
+        MOV H,A
+        MVI B,10                ; columns 12 down to 2 (B + 2)
+Kk1:    MOV A,B
+        ADI A,$22
+        MOV $E400,A
+        CALL Settle
+        MOV A,PB
+        ANI A,$7F
+        EQI A,0
+        JR Kkf
+Kk2:    DCR B
+        JR Kk1
+        MOV A,H
+        CALL Snd
+        MOV A,D
+        CALL Snd
+        MOV A,E
+        CALL Snd
+        EXX
+        JMP Main
+Kkf:    MOV E,A
+        MOV A,B
+        ADI A,2
+        MOV D,A
+        JR Kk2
+Settle: MVI C,12
+St1:    DCR C
+        JR St1
+        RET
+Snd:    ORI A,$80               ; a byte to the Z80: bit 7 is the ready flag
+        MOV $E800,A
+Sn1:    SKIT F2
+        JR Sn1
+        MVI C,0
+        MOV $E800,C
+        RET
+TickBody:
+        MOV A,$FFC0
+        ANI A,$7F
+        MVI C,0
+        MOV $FFC0,C
+        CALL Snd
+        JMP Main
+FillBody:                       ; (cells copied from the blank glyph's slot, a BLOCK each plane: a copy of a byte onto the next flips it, so a byte cannot be spread)
+        CALL Rcv
+        MOV B,A                 ; cells - 1
+        CALL Rcv                ; (the byte: not used, blank only)
+Fl1:    MVI A,$C4
+        MOV H,A
+        MVI A,0
+        MOV L,A                 ; HL = $C400: the space's slot
+        MVI C,7
+        PUSH DE
+        BLOCK
+        POP DE
+        ADI D,$40
+        MVI C,7
+        PUSH DE
+        BLOCK
+        POP DE
+        ADI D,$40
+        MVI C,7
+        BLOCK
+        ADI D,$80
+        DCR B
+        JMP Fl1
+        JMP Main
+TextBody:
+        CALL Rcv
+        MOV B,A                 ; characters - 1
+        CALL Rcv
+        MOV $FFC1,A             ; the attribute
+Tx1:    CALL Rcv
+        MVI C,0
+        SLR A
+        RLR C
+        SLR A
+        RLR C
+        SLR A
+        RLR C
+        ADI A,$C0
+        MOV H,A
+        MOV A,C
+        MOV L,A                 ; HL = the glyph's slot ($C000 + 32 * code), blue, red and green planes in turn
+        MOV A,$FFC1
+        CALL TxP
+        ADI D,$40
+        MOV A,$FFC1
+        SLR A
+        CALL TxP
+        ADI D,$40
+        MOV A,$FFC1
+        SLR A
+        SLR A
+        CALL TxP
+        ADI D,$80
+        INX DE                  ; (the next cell)
+        INX DE
+        INX DE
+        INX DE
+        INX DE
+        INX DE
+        INX DE
+        INX DE
+        DCR B
+        JMP Tx1
+        JMP Main
+TxP:    ANI A,9                 ; one plane: ink bit 0, paper bit 3 of A
+        PUSH DE
+        EQI A,1
+        JR Tp1
+        MVI C,7                 ; ink: the glyph
+        BLOCK
+        POP DE
+        RET
+Tp1:    EQI A,8
+        JR Tp2
+        MVI C,7                 ; paper: the glyph's inverse
+        BLOCK
+        POP DE
+        PUSH DE
+        MVI C,7
+Tp1a:   LDAX DE
+        STAX DE+
+        DCR C
+        JR Tp1a
+        POP DE
+        RET
+Tp2:    EQI A,9
+        JR Tp3
+        MVI A,0                 ; both: all lit (a direct write of 0)
+        JR Tp4
+Tp3:    MVI A,$FF               ; neither: blank
+Tp4:    MVI C,7
+Tp4a:   STAX DE+
+        DCR C
+        JR Tp4a
+        MOV A,L                 ; (the glyph's next plane)
+        ADI A,8
+        MOV L,A
+        POP DE
+        RET
+MiniBody:
+        CALL MnP
+        ADI D,$40
+        CALL MnP
+        ADI D,$40
+        CALL MnP
+        JMP Main
+MnP:    PUSH DE
+        MVI B,23
+Mn2:    CALL Rcv
+        STAX DE+
+        STAX DE
+        INX DE
+        INX DE
+        INX DE
+        INX DE
+        INX DE
+        INX DE
+        INX DE
+        DCR B
+        JR Mn2
+        POP DE
+        RET
+Mini2Body:
+        CALL MnQ
+        ADI D,$40
+        CALL MnQ
+        ADI D,$40
+        CALL MnQ
+        JMP Main
+MnQ:    PUSH DE
+        MVI B,23
+Mq2:    CALL Rcv
+        STAX DE+
+        CALL Rcv
+        STAX DE+
+        INX DE
+        INX DE
+        INX DE
+        INX DE
+        INX DE
+        INX DE
+        DCR B
+        JR Mq2
+        POP DE
+        RET

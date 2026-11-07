@@ -48,6 +48,7 @@ The following targets are available:
 * Amstrad PCW
 * Aquarius+
 * Cambridge z88
+* Casio FP-1100
 * Mitsubishi Multi8
 * MSX
 * NEC PC-88
@@ -80,6 +81,7 @@ The following targets are available:
 | `target/spc1000/` | Samsung SPC-1000: MC6847 256x192 mono and 128x192 colour (mini maps) through I/O ports, AY sound, cassette save/load in the ROM's format (z88dk's tape_save/tape_load_to), a packed program with a bootstrap that unpacks it. |
 | `target/msx2/` | MSX2 under MSX-DOS 2: screen 5 with the Atari ST's art copied by the VDP out of an atlas in video RAM (the drawing core is shared with the Einstein 256, `target/common/v9938/`), the code in two mapper segments (UI and simulation) switched into page 2, PSG sound from `H.TIMI` (in page 3), a mouse in a joystick connector, DOS file save/load. |
 | `target/mz2500/` | Sharp MZ-2500: 320x200 in 16 colours on planar video RAM (the Atari ST's art in a planar atlas, tiles blitted through borrowed 8 KB windows), banked UI and simulation code, YM2203 sound, SIO mouse and keyboard pointer, boot disk image whose last cylinders hold 8 save slots (floppy controller driven directly by z88dk's mz2500_disk_rw). 96x96 map, no scenarios. |
+| `target/fp1100/` | Casio FP-1100 on its own boot disc (no CP/M): 320x200 in eight colours on three planes of video RAM that belong to the sub-CPU, drawn by a small program the game loads into it and drives a byte at a time (maps, text and icons as pictures kept in the sub-CPU's RAM), the CPC art baked for the Multi 8, a polled uPD765A driver (z88dk's `fp1100_disk_read`/`write`), 8 save slots on the boot disc, mini maps, no sound or scenarios. Built by z88dk's `+fp1100 -subtype=allram`; see `docs/FP1100.md`. |
 | `target/x1/` | Sharp X1: the 320x200 colour screen behind I/O ports (the pictures baked for the PC-8801, from the `TILESET` art), PSG sound, keyboard from the sub CPU's interrupt, 2D disk image with save/load (z88dk's x1_disk_read/x1_disk_write). |
 | `target/zx/` | Spectrum-specific platform implementation: bitmap renderer, capabilities and CRT settings. |
 | `target/zxn/` | ZX Spectrum Next: the program at $0000 with its own start-up and NEX packaging, Layer 2 graphics from the Amiga SimCity 1 Meg's art (the 512K's with `ZXN_TILES`/`ZXN_ICONS`), a hardware sprite pointer and mouse, AY sound from the frame interrupt, esxDOS save/load. |
@@ -107,6 +109,7 @@ Needs [z88dk](https://z88dk.org).
     make pcw        # Amstrad PCW -> build/pcw/simcity.dsk (CP/M Plus)
     make cpm        # generic CP/M text -> build/cpm/simcity.com
     make einstein256 # Tatung Einstein 256 -> build/einstein256/simcity.dsk
+    make fp1100     # Casio FP-1100 -> build/fp1100/simcity.d88 (a boot disc; needs a z88dk with the fp1100 allram subtype and appmake --data)
     make x1         # Sharp X1   -> build/x1/simcity.d88
     make spc1000    # Samsung SPC-1000 -> build/spc1000/simcity.spc
     make msx2       # MSX2 (MSX-DOS 2) -> build/msx2/simcity.dsk and disk/ (SIMCITY.COM, .UI, .SIM, .HI and TILES.DAT: all five are needed)

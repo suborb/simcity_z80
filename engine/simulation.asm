@@ -1896,6 +1896,15 @@ DecTrafficMem:
 traffic_decay_loop_next:                                    ; $854F / 34127 - Advance HL and loop back; common tail for traffic minimap decay iteration
 .L854f  inc     hl
         dec     bc
+        IFDEF   SIM_YIELD_EXTRA
+        ld      a,c                     ;(a yield every 512 cells)
+        and     a
+        jr      nz,L854f_nx
+        ld      a,b
+        and     1
+        call    z,sim_yield
+L854f_nx:
+        ENDIF
         ld      a,b
         or      c
         jr      nz,L8521                ; (-52)
@@ -2179,6 +2188,11 @@ create_police_fire_minimaps:
         dec     c
         jr      nz,L8694                ; (-31)
         inc     d
+        IFDEF   SIM_YIELD_EXTRA
+        ld      a,d                     ;(a platform with a slow display asks for a yield every 16 rows: the scan is a quarter of a second)
+        and     15
+        call    z,sim_yield
+        ENDIF
         djnz    L8690                   ; (-38)
         ret     
 

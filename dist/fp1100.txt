@@ -1,0 +1,32 @@
+Running it
+----------
+simcity.d88 is a disk image for the Casio FP-1100 with its floppy disk
+pack (the uPD765A one).  Put it in the first drive and reset the machine
+(or start the emulator with it in the first drive): it boots straight
+into the game, with no CP/M or BASIC disk needed.  The image is a
+2D disk of 40 cylinders, two sides.
+
+The game takes the screen over from the machine's sub CPU: it uses the
+320 x 200 screen in eight colours as a grid of 40 by 25 cells.  There is
+no sound.  Cities are saved to and loaded from the same disk, in one of
+eight slots after the game itself (so the disk must not be write
+protected, and the image file is changed when you save).  The map is
+96 x 96 squares and there are no scenarios.
+
+Redrawing the whole screen (opening or leaving the budget, say) takes
+about two seconds, and a mini map five or six: the sub CPU is slow.
+
+Keys
+----
+  Cursor keys     move the cursor one square (shifted: eight)
+  O P Q A         left, right, up, down
+  Space, Enter    build with the tool
+  , .             the previous and next tool
+  0 - 9           choose a tool by its number
+  H               pause or run
+  + -             faster, slower
+  M               the next mini map (X goes back to the city)
+  B               the budget            V   the evaluation
+  S               save the city         L   load a city
+  X               the game menu: new city, options, disasters
+  Esc             back out of a menu or a question

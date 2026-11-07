@@ -1,0 +1,23 @@
+; The C entries of the library: fp1100_disk_read/write(unit @UNIT@, track @TRACK@, sector @SECTOR@, count @COUNT@, buffer $4000) with the arguments pushed as sccz80 does.
+        SECTION code_user
+        org     $2000
+start:  ld      sp,$7000
+        ld      hl,@UNIT@
+        push    hl
+        ld      hl,@TRACK@
+        push    hl
+        ld      hl,@SECTOR@
+        push    hl
+        ld      hl,@COUNT@
+        push    hl
+        ld      hl,$4000
+        push    hl
+        call    @ENTRY@
+        ld      ($3F00),hl
+        ld      a,l
+        ld      ($3F02),a
+        ld      a,1
+        ld      bc,$00FE
+        out     (c),a
+done:   jp      done
+        EXTERN  _fp1100_disk_read, _fp1100_disk_write
