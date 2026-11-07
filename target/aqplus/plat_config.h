@@ -2,6 +2,8 @@
 #ifndef PLAT_CONFIG_H
 #define PLAT_CONFIG_H
 
+#define NO_QUIT                         /* the menu has no QUIT */
+
 #define HAVE_TILES
 #define HAVE_BITMAP
 #define HAVE_POPUP_MENU     /* shared box + message selector over the bitmap console */

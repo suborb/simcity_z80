@@ -2,6 +2,8 @@
 #ifndef PLAT_CONFIG_H
 #define PLAT_CONFIG_H
 
+#define NO_QUIT                         /* the menu has no QUIT */
+
 #define HAVE_TILES
 #define HAVE_BITMAP
 #define PLAT_FIXED_COLS 32
