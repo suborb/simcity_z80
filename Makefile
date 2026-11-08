@@ -308,22 +308,46 @@ $(PCW): $(DEPS) build/pcw/icons.bin
 	z88dk-appmake +cpmdisk -f pcw80 -b $(@D)/simcity -o $(@D)/simcity.dsk
 
 # The Casio FP-1100 on its own boot disc (no CP/M): 320x200 in 8 colours, three planes in the sub-CPU's video RAM, which a program running on the sub-CPU
-# (target/fp1100/sub.s.in, assembled by tools/build_fp1100_sub.py) draws into for the Z80 (fp_sub.asm).  Built by z88dk's +fp1100 -subtype=allram: the program is linked at $0000 and the
+# (target/fp1100/sub.s.in, assembled by z88dk-asm7801) draws into for the Z80 (fp_sub.asm).  Built by z88dk's +fp1100 -subtype=allram: the program is linked at $0000 and the
 # whole machine is RAM; z88dk's bootstrap (the ROM reads the boot sector, which brings in a loader with a RAM copy of the polled disk driver, which loads the program) and appmake +fp1100
 # make the disc, with the pictures (tools/fp1100_art.py) as the extra block after the program.  The program takes the sub-CPU over itself (fp_boot) and reads the pictures (fp_art).
 FP1100_SAVE_SECTOR = 384        # the saved cities' first sector: track 24 (plat_fp1100_files.asm)
 FP1100_PLATFORM = target/common/minimap_key_3bpp.c target/fp1100/plat_fp1100.c target/fp1100/fp_tile.asm target/fp1100/fp_sub.asm target/fp1100/fp_data.asm target/fp1100/plat_fp1100_files.asm target/common/plat_icons.c
 
-build/fp1100/sub.bin build/fp1100/loader.bin build/fp1100/sub.inc: tools/build_fp1100_sub.py tools/asm7801.py tools/asm7801_ops.json target/fp1100/sub.s.in target/fp1100/loader.s.in
+# The sub program, assembled by z88dk's z88dk-asm7801: sub.all (both pages), the define file sub.inc (the PUBLIC labels as SUB_x DEFCs) and sub.map; the first page is cut at P1End (at most
+# 256 bytes: the JB dispatch needs the entry points in one page, and Page2 must follow it), the rest is padded to 8 bytes (fp_boot sends it 8 at a time); the loader (at most 40 bytes) runs at FP1100_LOADER.
+ASM7801 = z88dk-asm7801
+FP1100_BASE = 9000
+FP1100_BASE2 = 9100
+FP1100_PAGE = 90
+FP1100_LOADER = 3A60
+fp1100_addr = $$(( 0x$$(awk '$$1=="$(1)" {print substr($$3, 2)}' build/fp1100/sub.map) - 0x$(FP1100_BASE) ))
+
+build/fp1100/sub.all build/fp1100/sub.inc build/fp1100/sub.map: target/fp1100/sub.s.in
 	@mkdir -p build/fp1100
-	python3 tools/build_fp1100_sub.py build/fp1100
+	$(ASM7801) -DBASE='$$$(FP1100_BASE)' -DPAGE='$$$(FP1100_PAGE)' -DBASE2='$$$(FP1100_BASE2)' -o build/fp1100/sub.all -m build/fp1100/sub.map -d build/fp1100/sub.inc -p SUB_ -U target/fp1100/sub.s.in 0x$(FP1100_BASE) > /dev/null
+
+build/fp1100/sub.bin: build/fp1100/sub.all build/fp1100/sub.map
+	@p1=$(call fp1100_addr,P1End); p2=$(call fp1100_addr,Page2); \
+	    if [ $$p1 -gt 256 ] || [ $$p2 -ne 256 ]; then echo "sub program layout is wrong: page 1 $$p1 bytes, page 2 at $$p2"; exit 1; fi; \
+	    head -c $$p1 build/fp1100/sub.all > $@
+
+build/fp1100/sub2.bin: build/fp1100/sub.all
+	tail -c +257 build/fp1100/sub.all | dd bs=8 conv=sync of=$@ 2> /dev/null
+
+build/fp1100/loader.raw: target/fp1100/loader.s.in build/fp1100/sub.inc
+	cp target/fp1100/loader.s.in build/fp1100/loader.s       # (an INCLUDE is found next to the source)
+	$(ASM7801) -o $@ build/fp1100/loader.s 0x$(FP1100_LOADER) > /dev/null
+
+build/fp1100/loader.bin: build/fp1100/loader.raw
+	@[ `wc -c < $<` -le 40 ] || { echo "the fp1100 loader is over 40 bytes"; exit 1; }; dd bs=40 conv=sync if=$< of=$@ 2> /dev/null
 
 # 345 pictures of 24 bytes and the 112 cells of the tool icons (tools/fp1100_art.py), padded to 43 sectors, each byte turned about (the leftmost pixel is bit 0 on this machine)
 build/fp1100/art.bin: build/common/tiles_640x200_3bpp.bin assets/cpc_icons.bin tools/fp1100_art.py
 	@mkdir -p $(@D)
 	python3 tools/fp1100_art.py build/common/tiles_640x200_3bpp.bin assets/cpc_icons.bin $@
 
-$(FP1100): $(DEPS) build/fp1100/sub.bin build/fp1100/loader.bin build/fp1100/sub.inc build/fp1100/art.bin
+$(FP1100): $(DEPS) build/fp1100/sub.bin build/fp1100/sub2.bin build/fp1100/loader.bin build/fp1100/sub.inc build/fp1100/art.bin
 	@mkdir -p $(@D)
 	$(ZCC) +fp1100 -subtype=allram $(COMMON) -pragma-include:target/fp1100/zpragma.inc -Itarget/fp1100 -Ca-Itarget/fp1100 -Ca-Ibuild/fp1100 -DTARGET_FP1100 -Ca-DTARGET_FP1100 -Ca-DSIM_YIELD_EXTRA -Ca-DHAVE_MINIMAP_SQUARE \
 	    $(FP1100_PLATFORM) $(GAME) $(ENTROPY) $(MENU) $(NOSOUND) $(FIELDS) $(MMNATIVE) -o $(@D)/simcity.bin -create-app -Cz"--data build/fp1100/art.bin"

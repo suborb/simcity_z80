@@ -6,6 +6,8 @@
 ; argument at sp+2) and keep IX and IY.
 
         INCLUDE "sub.inc"
+        defc    SUB_SIZE = SUB_P1END - SUB_MAIN                       ; page 1
+        defc    SUB2_SIZE = (SUB_SUBEND - SUB_PAGE2 + 7) & $FFF8       ; the rest, in 8 byte units
 
         SECTION code_user
         PUBLIC  _fp_addr, _fp_bank, _fp_tiles, _fp_cell, _fp_ovl, _fp_pat, _fp_inv, _fp_keys, _fp_tick, _fp_fill, _fp_text, _fp_mini, _fp_byte, _fp_dim
@@ -120,7 +122,7 @@ fb_sp:  ld      a,(hl)
         ld      a,d
         or      e
         jr      nz,fb_sp
-        ld      a,SUB_ADDR              ; the second page of the program: into the video RAM at $9100, from the command that takes 8 bytes a time
+        ld      a,SUB_ADDR & $FF              ; the second page of the program: into the video RAM at $9100, from the command that takes 8 bytes a time
         call    fp_send
         xor     a
         call    fp_send
@@ -128,7 +130,7 @@ fb_sp:  ld      a,(hl)
         call    fp_send
         ld      hl,fp_prog2
         ld      c,SUB2_SIZE / 8
-fb_p2:  ld      a,SUB_PAT
+fb_p2:  ld      a,SUB_PAT & $FF
         call    fp_send
         ld      b,8
 fb_p3:  ld      a,(hl)
@@ -180,7 +182,7 @@ fa_chunk:
         ld      (fa_l),a
         ld      hl,(fa_buf)
         ld      b,32
-fa_pic: ld      a,SUB_ADDR
+fa_pic: ld      a,SUB_ADDR & $FF
         call    fp_send
         ld      a,(fa_sub)
         call    fp_send
@@ -189,7 +191,7 @@ fa_pic: ld      a,SUB_ADDR
         push    bc
         ld      b,3
 fa_pl:  push    bc
-        ld      a,SUB_PAT
+        ld      a,SUB_PAT & $FF
         call    fp_send
         ld      b,8
 fa_by:  ld      a,(hl)
@@ -244,7 +246,7 @@ fa_fail:                                ; hl = the error: that many white cells
 fa_n:   ld      b,a
         ld      c,1
 fa_lp:  push    bc
-        ld      a,SUB_ADDR
+        ld      a,SUB_ADDR & $FF
         call    fp_send
         ld      a,c
         add     a,a
@@ -253,7 +255,7 @@ fa_lp:  push    bc
         call    fp_send                 ; $2000 + 8 c
         ld      a,$20
         call    fp_send
-        ld      a,SUB_CELL
+        ld      a,SUB_CELL & $FF
         call    fp_send
         ld      b,24
 fa_wh:  xor     a                       ; (a raw 0 is lit)
@@ -282,7 +284,7 @@ _fp_addr:
         ld      e,(hl)
         inc     hl
         ld      d,(hl)
-        ld      a,SUB_ADDR
+        ld      a,SUB_ADDR & $FF
         call    fp_send
         ld      a,e
         call    fp_send
@@ -294,7 +296,7 @@ _fp_bank:
         ld      hl,2
         add     hl,sp
         ld      l,(hl)
-        ld      a,SUB_BANK
+        ld      a,SUB_BANK & $FF
         call    fp_send
         ld      a,l
         jp      fp_send
@@ -310,7 +312,7 @@ _fp_tiles:
         inc     hl
         ld      d,(hl)
         ex      de,hl
-        ld      a,SUB_TILES
+        ld      a,SUB_TILES & $FF
         call    fp_send
         ld      a,b
         dec     a
@@ -329,7 +331,7 @@ _fp_cell:
         inc     hl
         ld      d,(hl)
         ex      de,hl
-        ld      a,SUB_CELL
+        ld      a,SUB_CELL & $FF
         call    fp_send
         ld      b,24
         jr      ft1
@@ -342,7 +344,7 @@ _fp_ovl:
         inc     hl
         ld      d,(hl)
         ex      de,hl
-        ld      a,SUB_OVL
+        ld      a,SUB_OVL & $FF
         call    fp_send
         ld      b,24
         jr      ft1
@@ -355,14 +357,14 @@ _fp_pat:
         inc     hl
         ld      d,(hl)
         ex      de,hl
-        ld      a,SUB_PAT
+        ld      a,SUB_PAT & $FF
         call    fp_send
         ld      b,8
         jr      ft1
 
 ; void fp_inv(void): the cell at DE inverted
 _fp_inv:
-        ld      a,SUB_INV
+        ld      a,SUB_INV & $FF
         jp      fp_send
 
 ; void fp_keys(uint8_t *out): out[0] = 1 if a shift key is down, out[1] = the matrix column (2 to 12) of a key that is down, or 0, out[2] = its row bits (bit n: row n)
@@ -373,7 +375,7 @@ _fp_keys:
         inc     hl
         ld      d,(hl)
         ex      de,hl
-        ld      a,SUB_KEYS
+        ld      a,SUB_KEYS & $FF
         call    fp_send                 ; (it keeps hl; the acknowledgement first, then the answer: the ready flag of the byte's own wait is also a 1 in bit 7)
         call    fk_one
         call    fk_one
@@ -395,7 +397,7 @@ fk_a:   in      e,(c)
 
 ; uint8_t fp_tick(void): 1 if the sub-CPU's timer has overflowed since the last call
 _fp_tick:
-        ld      a,SUB_TICK
+        ld      a,SUB_TICK & $FF
         call    fp_send
         ld      hl,fp_tbuf
         call    fk_one
@@ -413,7 +415,7 @@ _fp_fill:
         inc     hl
         inc     hl
         ld      b,(hl)                  ; n
-        ld      a,SUB_FILL
+        ld      a,SUB_FILL & $FF
         call    fp_send
         ld      a,b
         dec     a
@@ -435,7 +437,7 @@ _fp_text:
         inc     hl
         ld      d,(hl)
         ex      de,hl
-        ld      a,SUB_TEXT
+        ld      a,SUB_TEXT & $FF
         call    fp_send
         ld      a,b
         dec     a
@@ -461,10 +463,10 @@ _fp_mini:
         ex      de,hl
         ld      bc,72
         or      a
-        ld      a,SUB_MINI
+        ld      a,SUB_MINI & $FF
         jr      z,fm1
         ld      bc,144
-        ld      a,SUB_MINI2
+        ld      a,SUB_MINI2 & $FF
 fm1:    call    fp_send
 fm2:    ld      a,(hl)
         inc     hl

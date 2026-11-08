@@ -1,5 +1,5 @@
 ; The Casio FP-1100's sub-CPU (uPD7801) program: it owns the video RAM, and the Z80 drives it a byte at a time.
-; It runs from the spare VRAM at @BASE@ (stored inverted: the VRAM bus inverts on a read), and the stack is at the top of the
+; It runs from the spare VRAM at BASE (stored inverted: the VRAM bus inverts on a read), and the stack is at the top of the
 ; sub-CPU's RAM.  Each command byte is the low address of its handler (dispatched with JB); Rcv fetches a byte from the Z80
 ; with the handshake (writing $80 to $E800 says ready, the Z80's INT2 pulse is the byte, writing 0 acknowledges it).
 ;
@@ -22,12 +22,13 @@
 ; Tick            returns the number of timer overflows (about every 0.67 ms) since the last Tick, counted while the program waits for a byte (mod 128): a clock for the Z80, which has none
 ;   Keys            scans the key matrix and returns 3 bytes (7 bits each): 1 if a shift key is down, the matrix column (2 to 12) of a key that is down, or 0, and its row bits
 ;
-; The program is two pages: this one (256 bytes, which the loader brings in) and the second at @BASE2@ (fp_boot sends it): the commands' entry points are all in this one
+; The program is two pages: this one (256 bytes, which the loader brings in) and the second at BASE2 (fp_boot sends it): the commands' entry points are all in this one
 ; (the JB dispatch uses one page), and a long command is a jump to its body in the second.
-        ORG @BASE@
+        PUBLIC Main, P1End, Page2, SubEnd, Bank, Addr, Pat, Cell, Ovl, Tiles, Inv, Keys, Tick, Fill, Text, Mini, Mini2
+        ORG BASE
 Main:   CALL Rcv
         MOV C,A
-        MVI B,@PAGE@
+        MVI B,PAGE
         JB
 Bank:   CALL Rcv
         MVI V,0                 ; (V is free: the sub-CPU's interrupts, which use it, are off)
@@ -139,7 +140,8 @@ Rt:     SKIT FT                 ; (the timer's flag: count it in the sub-CPU's R
 
 P1End:
 ; ---- the second page ----
-        ORG @BASE2@
+        ORG BASE2
+Page2:
 KeysBody:
         EXX                     ; (the alternate registers: DE is the address, and the Z80 counts on it staying)
         MVI D,0
@@ -337,3 +339,4 @@ Mq2:    CALL Rcv
         JR Mq2
         POP DE
         RET
+SubEnd:
