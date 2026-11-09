@@ -5,7 +5,7 @@ import os, re, subprocess, sys
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 OUT = os.path.join(ROOT, 'build', 'spc1000flat')
 BASE = 0xE000
-ZCC = ['zcc', '-compiler=80cc', '-fframe-pointer', '+spc1000', '-subtype=allram', '-create-app', '-m', '-Cp-DAPP_VERSION=1.2.0', '-Ca-DPORTABLE', '-Ca-Iengine', '-Ca-I.', '-Iui', '-Cc-standard-escape-chars',
+ZCC = ['zcc', '-compiler=80cc', '-fframe-pointer', '+spc1000', '-subtype=allram', '-create-app', '-m', '-Cp-DAPP_VERSION=1.3.0', '-Ca-DPORTABLE', '-Ca-Iengine', '-Ca-I.', '-Iui', '-Cc-standard-escape-chars',
        '-pragma-include:target/spc1000/zpragma.inc', '-Itarget/spc1000', '-DTARGET_SPC1000', '-Ca-DTARGET_SPC1000', '-Ca-DFMT_WIDTH=32', '-Ca-DHAVE_MINIMAP_SQUARE', '-Ca-DHAVE_SOUND', '-Ca-DAY_ISR',
        '-Ca-DAY_PORT16', '-Ca-DAY_ADDR_PORT=0x4000', '-Ca-DAY_DATA_PORT=0x4001', '-Ca-DVRAM_FLAT=0x%X' % BASE, '-Ca-Ibuild/spc1000flat']
 SRC = ['ui/main.c', 'ui/game.c', 'ui/text.c', 'ui/textfmt.c', 'ui/numfmt.asm', 'ui/budget.c', 'ui/evaluation.c', 'ui/cityfile.c', 'ui/minimap.c', 'ui/sprites.c',
