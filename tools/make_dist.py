@@ -31,6 +31,7 @@ MACHINES = {
     'pcw': ('Amstrad PCW (CP/M Plus)', ['pcw/simcity.dsk', 'pcw/simcity.com']),
     'fp1100': ('Casio FP-1100', ['fp1100/simcity.d88']),
     'mz2500': ('Sharp MZ-2500', ['mz2500/simcity.dsk']),
+    'smc777': ('Sony SMC-777', ['smc777/simcity.d88']),
     'sam': ('SAM Coupe', ['sam/simcity.mgt']),
     'zxn': ('ZX Spectrum Next', ['zxn/simcity.nex']),
 }

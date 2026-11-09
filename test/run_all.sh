@@ -35,11 +35,11 @@ echo "== Amstrad PCW screen code: row table, cell blit, invert, clear, and the d
 python3 test/pcw/run.py
 echo
 echo "== Amstrad PCW game under z88dk-ticks: the Lua PCW model runs build/pcw/simcity.com (the screen, scrolling, the mini map, the frame delay)"
-[ -f build/pcw/simcity.com ] || make pcw
+make pcw
 python3 test/pcw/game.py
 echo
 echo "== Casio FP-1100: the polled floppy driver, save/load and the boot loader under z88dk-ticks, against the uPD765A model (needs z88dk's fp1100 library and lib/ticks/upd765.lua)"
-[ -f build/fp1100/simcity.d88 ] || make fp1100
+make fp1100
 python3 test/fp1100/disk_test.py
 python3 test/fp1100/files_test.py
 python3 test/fp1100/stage2_test.py

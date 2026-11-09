@@ -4,7 +4,12 @@
 #include <stdint.h>
 #include "platform.h"
 
+#ifdef ICONS_FETCH
+/* A platform that keeps the icons where the Z80 cannot read them directly says ICONS_FETCH and has mp_icon_fetch(): the 16 bytes of cell n */
+extern void mp_icon_fetch(uint8_t *dest, uint8_t n);
+#else
 extern const uint8_t mp_icons[];
+#endif
 
 /* a cell from 24 bytes: a plane (blue, red, green) of eight rows after another */
 extern void mp_planar(uint8_t col, uint8_t row, const uint8_t *planes, uint8_t inverse);
@@ -54,6 +59,9 @@ void plat_icons(uint8_t selected)
     uint8_t i, r, c, y, bg, red, face, white, m, fb, fr, fg;
     const uint8_t *src;
     uint8_t planes[24];
+#ifdef ICONS_FETCH
+    uint8_t cell[16];
+#endif
 
     for (i = 0; i < NUM_ICONS; ++i) {
 #ifdef HAVE_ICON_CACHE
@@ -65,7 +73,12 @@ void plat_icons(uint8_t selected)
         fg = (face_colour[i] & 4) ? 0xFF : 0;
         for (r = 0; r < 2; ++r)
             for (c = 0; c < 2; ++c) {
+#ifdef ICONS_FETCH
+                mp_icon_fetch(cell, (uint8_t)(i * 4 + r * 2 + c));
+                src = cell;
+#else
                 src = mp_icons + (uint16_t)(i * 4 + r * 2 + c) * 16;
+#endif
                 for (y = 0; y < 8; ++y) {
                     bg = src[y * 2];
                     red = src[y * 2 + 1];

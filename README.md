@@ -56,6 +56,7 @@ The following targets are available:
 * Samsung SPC-1000
 * Sharp MZ-2500
 * Sharp X1
+* Sony SMC-777
 * Tatung Einstein 256
 * ZX Spectrum Next
 
@@ -83,6 +84,7 @@ The following targets are available:
 | `target/mz2500/` | Sharp MZ-2500: 320x200 in 16 colours on planar video RAM (the Atari ST's art in a planar atlas, tiles blitted through borrowed 8 KB windows), banked UI and simulation code, YM2203 sound, SIO mouse and keyboard pointer, boot disk image whose last cylinders hold 8 save slots (floppy controller driven directly by z88dk's mz2500_disk_rw). 96x96 map, no scenarios. |
 | `target/fp1100/` | Casio FP-1100 on its own boot disc (no CP/M): 320x200 in eight colours on three planes of video RAM that belong to the sub-CPU, drawn by a small program the game loads into it and drives a byte at a time (maps, text and icons as pictures kept in the sub-CPU's RAM), the CPC art baked for the Multi 8, a polled uPD765A driver (z88dk's `fp1100_disk_read`/`write`), 8 save slots on the boot disc, mini maps, no sound or scenarios. Built by z88dk's `+fp1100 -subtype=allram`; see `docs/FP1100.md`. |
 | `target/x1/` | Sharp X1: the 320x200 colour screen behind I/O ports (the pictures baked for the PC-8801, from the `TILESET` art), PSG sound, keyboard from the sub CPU's interrupt, 2D disk image with save/load (z88dk's x1_disk_read/x1_disk_write). |
+| `target/smc777/` | Sony SMC-777: the 320x200 screen of a nibble a pixel (eight colours used) behind I/O ports, as 40x25 cells like the X1 (the pictures from the `TILESET` art as nibbles, `tools/smc777_tiles.py`), the font and tool icons kept in the character generator's RAM to save room, a polled keyboard (the 8041's), a boot disc whose cylinders from 24 hold 8 save slots (z88dk's `smc777_disk_regs`), the status panel drawn a part a pass so the cursor keeps moving. 96x96 map, no scenarios, no sound yet. |
 | `target/zx/` | Spectrum-specific platform implementation: bitmap renderer, capabilities and CRT settings. |
 | `target/zxn/` | ZX Spectrum Next: the program at $0000 with its own start-up and NEX packaging, Layer 2 graphics from the Amiga SimCity 1 Meg's art (the 512K's with `ZXN_TILES`/`ZXN_ICONS`), a hardware sprite pointer and mouse, AY sound from the frame interrupt, esxDOS save/load. |
 | `target/einstein256/` | Tatung Einstein 256 under CP/M: V9938 screen 5 with the Atari ST's art, as the MSX2 (`target/common/v9938/`); the program in a COM with two UI overlays (`SIMCITY.GAM`, `SIMCITY.MOD`, kept in video RAM and copied in as needed), a sound file (`SIMCITY.SND`) and the `TILES.DAT` atlas, AY sound, CP/M file save/load. See its README. |
@@ -111,6 +113,7 @@ Needs [z88dk](https://z88dk.org).
     make einstein256 # Tatung Einstein 256 -> build/einstein256/simcity.dsk
     make fp1100     # Casio FP-1100 -> build/fp1100/simcity.d88 (a boot disc; needs a z88dk with the fp1100 allram subtype and appmake --data)
     make x1         # Sharp X1   -> build/x1/simcity.d88
+    make smc777     # Sony SMC-777 -> build/smc777/simcity.d88 (a boot disc; needs a z88dk with the smc777 disk driver and bootstrap)
     make spc1000    # Samsung SPC-1000 -> build/spc1000/simcity.spc
     make msx2       # MSX2 (MSX-DOS 2) -> build/msx2/simcity.dsk and disk/ (SIMCITY.COM, .UI, .SIM, .HI and TILES.DAT: all five are needed)
     make mz2500     # Sharp MZ-2500 -> build/mz2500/simcity.dsk (needs a z88dk with the mz2500 --low appmake and disk driver)

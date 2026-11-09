@@ -1282,6 +1282,58 @@ static void draw_status(void)
     plat_icons(tool);
 }
 #else
+#ifdef HAVE_STATUS_SLICE
+/* A platform that draws slowly (plat_config.h, HAVE_STATUS_SLICE) has the panel drawn a part at a time, one a pass, so the cursor and the sprites go on moving while it
+   is: draw_status only starts it, draw_status_slice (once a pass) draws the next part.  Part 1 is the first line, 2 the demand bars, 3 the advisor and the icons. */
+#ifndef HAVE_DEMAND_BARS
+#error "HAVE_STATUS_SLICE needs HAVE_DEMAND_BARS"
+#endif
+static uint8_t status_part;
+
+static void draw_status(void)
+{
+    status_part = 1;
+}
+
+static void draw_status_slice(void)
+{
+    if (!status_part)
+        return;
+#ifdef HAVE_MINIMAP_SQUARE
+    if (map_view) {
+        draw_map_sidebar();                 /* a square mini map has a sidebar in place of the panel */
+        status_part = 0;
+        return;
+    }
+#endif
+    st_month = text_months[V_month];
+    st_tool = tool_text(tool);
+    st_speed = st_speeds[V_simulation_speed & 3];
+    st_alert = V_alertmessage < sizeof(text_alerts) / sizeof(text_alerts[0]) ? text_alerts[V_alertmessage] : "";
+    if (status_part == 1) {
+        fmt_fields(top_status, sizeof(top_status) / sizeof(struct field));
+        status_part = 2;
+    } else if (status_part == 2) {
+        plat_demand(0, 4, 'R', demand_level(V_RValve, 26));
+        plat_demand(TOP_DEMAND_C, 4, 'C', demand_level(V_CValve, 30));
+        plat_demand(TOP_DEMAND_I, 4, 'I', demand_level(V_IValve, 30));
+        status_part = 3;
+    } else {
+#if defined(HAVE_MINIMAP) && !defined(HAVE_MINIMAP_SQUARE)
+        if (map_view) {
+            st_line[1] = minimap_names[map_view];
+            fmt_fields(top_map, sizeof(top_map) / sizeof(struct field));
+        } else
+#endif
+            fmt_fields(top_alert, 1);
+#ifdef HAVE_ICONS_AFFORD
+        plat_afford(afford_mask());
+#endif
+        plat_icons(tool);
+        status_part = 0;
+    }
+}
+#else
 static void draw_status(void)
 {
 #ifndef HAVE_DEMAND_BARS
@@ -1322,6 +1374,7 @@ static void draw_status(void)
 #endif
     plat_icons(tool);
 }
+#endif
 #endif
 #else
 /* The status panel: five lines, so it fits the top third of even a 16 row screen. */
@@ -2391,6 +2444,10 @@ static void play_city(void)
             plat_page_data();
             draw_status();
         }
+#ifdef HAVE_STATUS_SLICE
+        plat_page_data();
+        draw_status_slice();
+#endif
 #ifdef HAVE_ICONS_TOP                  /* the panel is at the top: it is drawn first, so a new screen does not show the map before it */
         plat_page_data();
         full = origin_x != last_ox || origin_y != last_oy || last_cx == 255;

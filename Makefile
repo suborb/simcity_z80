@@ -63,6 +63,7 @@ CPM = build/cpm/simcity.com
 PCW = build/pcw/simcity.com
 FP1100 = build/fp1100/simcity.d88
 MZ2500 = build/mz2500/simcity.dsk
+SMC777 = build/smc777/simcity.d88
 SAM    = build/sam/simcity.mgt
 ZXN   = build/zxn/simcity.nex
 TEST   = build/test/simcity.bin
@@ -76,12 +77,12 @@ TESTK  = build/testnative/simcity.bin
 TESTA  = build/testart/simcity.bin
 TESTSC = build/testscroll/simcity.bin
 
-.PHONY: all dist aqplus z88rom zx multi8 pc88 x1 spc1000 msx2 einstein256 cpm pcw fp1100 mz2500 sam zxn zxn-debug amiga-scenarios test testpanel testmodal testnarrow testsprites testoverlay testhires testnative testart testscroll check golden uitest tiletest z88test deadcode clean
+.PHONY: all dist aqplus z88rom zx multi8 pc88 x1 spc1000 msx2 einstein256 cpm pcw fp1100 mz2500 smc777 sam zxn zxn-debug amiga-scenarios test testpanel testmodal testnarrow testsprites testoverlay testhires testnative testart testscroll check golden uitest tiletest z88test deadcode clean
 
-all: aqplus z88rom zx multi8 pc88 x1 spc1000 msx2 fp1100 mz2500 sam zxn
+all: aqplus z88rom zx multi8 pc88 x1 spc1000 msx2 einstein256 pcw fp1100 mz2500 smc777 sam zxn
 
 # The zip files for distribution, one for each machine (build/dist/; tools/make_dist.py)
-dist: aqplus z88rom multi8 pc88 x1 spc1000 msx2 einstein256 pcw fp1100 mz2500 sam zxn
+dist: aqplus z88rom multi8 pc88 x1 spc1000 msx2 einstein256 pcw fp1100 mz2500 smc777 sam zxn
 	python3 tools/make_dist.py
 
 aqplus: $(AQPLUS)
@@ -97,6 +98,7 @@ cpm: $(CPM)
 pcw: $(PCW)
 fp1100: $(FP1100)
 mz2500: $(MZ2500)
+smc777: $(SMC777)
 sam:    $(SAM)
 zxn:   $(ZXN)
 zxn-debug:
@@ -208,6 +210,24 @@ $(X1): $(DEPS) build/common/tiles_640x200_3bpp.bin
 	$(ZCC) +x1 -create-app $(COMMON) -pragma-include:target/x1/zpragma.inc \
 	    -Itarget/x1 -DTARGET_X1 -Ca-DTARGET_X1 -Ca-DHAVE_MINIMAP_SQUARE -Ca-DHAVE_SOUND -Ca-DAY_PORT16 -Ca-DAY_ADDR_PORT=0x1C00 -Ca-DAY_DATA_PORT=0x1B00 $(GAME) $(ENTROPY) $(MENU) target/x1/plat_sound.asm target/common/ay_hooks.asm target/common/ay_sfx.asm $(FIELDS) $(MMNATIVE) $(LINEEDIT) $(X1_PLATFORM) -o $(@D)/simcity.bin
 	@size=`sed -n 's/^__BSS_END_tail *= \$$\([0-9A-Fa-f]*\).*/\1/p' $(@D)/simcity.map`; echo "x1: image and uninitialised data end at $$size (the stack is the top of memory)"
+
+# The Sony SMC-777 (z88dk +smc777: a boot disc, the IPL loads the program at $0100).  A 320x200 screen of a nibble a pixel behind I/O ports (8 digital colours used), the
+# Amstrad CPC game's pictures as nibbles (tools/smc777_tiles.py), the screen 40 columns of 8x8 cells like the X1's.  The uninitialised data follows the image and the stack is
+# at the top of memory.  The font and the tool icons live in the character generator's RAM (read with IN) and their room in the image is the cache of the map's cells.
+SMC777_FILES ?= 1               # 0: without save and load (about 2 KB less)
+SMC777_STACK_ROOM = 0x0240      # (the deepest the stack has gone in a game with the save dialogues is 320 bytes)
+SMC777_PLATFORM = target/smc777/plat_smc777.asm $(if $(filter 1,$(SMC777_FILES)),target/smc777/plat_smc777_files.asm) target/common/plat_charts.c target/common/minimap_key_3bpp.c target/common/plat_icons.c
+
+build/smc777/tiles4.bin: build/common/tiles_640x200_3bpp.bin tools/smc777_tiles.py
+	@mkdir -p $(@D)
+	python3 tools/smc777_tiles.py $< $@
+
+$(SMC777): $(DEPS) build/smc777/tiles4.bin assets/font_8x8_bbc_system.bin assets/cpc_icons.bin
+	@mkdir -p $(@D)
+	$(ZCC) +smc777 -create-app $(COMMON) -pragma-include:target/smc777/zpragma.inc \
+	    -Itarget/smc777 -DTARGET_SMC777 -Ca-DTARGET_SMC777 $(if $(filter 1,$(SMC777_FILES)),,-DNO_FILES -Ca-DNO_FILES) -Ca-DSIM_YIELD_EXTRA -Ca-DHAVE_MINIMAP_SQUARE $(GAME) $(ENTROPY) $(MENU) $(NOSOUND) $(FIELDS) $(MMNATIVE) $(LINEEDIT) $(SMC777_PLATFORM) -o $(@D)/simcity.bin
+	@size=`sed -n 's/^__BSS_END_tail *= \$$\([0-9A-Fa-f]*\).*/\1/p' $(@D)/simcity.map`; echo "smc777: image and uninitialised data end at $$size (the stack is the top of memory)"; \
+	    [ $$(( 0x$$size + $(SMC777_STACK_ROOM) )) -le 65536 ] || { echo "the program and its data leave no room for the stack"; rm -f $@; exit 1; }
 
 # The Samsung SPC-1000 (z88dk +spc1000 -subtype=allram: BASIC loads a ZX0 packed program with a bootstrap that unpacks it at $0000 and takes the machine).
 # The screen is the MC6847's 256x192 mode of one bit a pixel behind I/O ports, so the pictures are the engine's own 1 bit art and the icons the
