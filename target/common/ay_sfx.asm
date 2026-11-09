@@ -21,6 +21,9 @@
 
         PUBLIC  _ay_play, _ay_tick, _ay_stop, ay_start, ay_busy, ay_tick, ay_stop
         PUBLIC  _ay_sfx_data, ay_active
+        IFDEF   AY_SHADOW
+        PUBLIC  ay_regs
+        ENDIF
 
         IFNDEF  AY_ADDR_PORT
         defc    AY_ADDR_PORT = $F7
@@ -62,6 +65,9 @@ ay_period:  defw    0
 ay_delta:   defw    0
 ay_vptr:    defw    0
 ay_pptr:    defw    0
+        IFDEF   AY_SHADOW
+ay_regs:    defs    16                  ; the chip's registers, as the player has written them
+        ENDIF
 
 ; void ay_play(uint8_t n) __smallc
 _ay_play:
@@ -333,6 +339,21 @@ ay_scale_lp:
         ENDIF
         ENDIF
 
+        IFDEF   AY_SHADOW
+; No chip: the registers are kept for the platform's own synthesis (a Lynx's DAC: target/lynx/plat_sound.asm renders a tick from ay_regs).
+; Register C := A.  Keeps hl, de, b.
+ay_write:
+        push    hl
+        push    de
+        ld      hl,ay_regs
+        ld      e,c
+        ld      d,0
+        add     hl,de
+        ld      (hl),a
+        pop     de
+        pop     hl
+        ret
+        ELSE
         IFNDEF  AY_SAA
 ; Register C of the chip := A.  Keeps hl, de, b.
         IFDEF   AY_PORT16
@@ -528,4 +549,5 @@ saa_shadow:     defs    4
 ; the AY's volumes 0 to 15 (3 dB steps, 1 at the top) as the SAA's linear 0 to 15, in both ears
 saa_amp:        defb    $00,$00,$00,$00,$00,$11,$11,$11,$11,$22,$33,$44,$55,$88,$BB,$FF
 
+        ENDIF
         ENDIF

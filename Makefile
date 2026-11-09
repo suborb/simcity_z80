@@ -64,6 +64,8 @@ PCW = build/pcw/simcity.com
 FP1100 = build/fp1100/simcity.d88
 MZ2500 = build/mz2500/simcity.dsk
 SMC777 = build/smc777/simcity.d88
+LYNX   = build/lynx/simcity.bin
+LYNXDISC = build/lynx/simcity.ldf
 SAM    = build/sam/simcity.mgt
 ZXN   = build/zxn/simcity.nex
 TEST   = build/test/simcity.bin
@@ -77,12 +79,12 @@ TESTK  = build/testnative/simcity.bin
 TESTA  = build/testart/simcity.bin
 TESTSC = build/testscroll/simcity.bin
 
-.PHONY: all dist aqplus z88rom zx multi8 pc88 x1 spc1000 msx2 einstein256 cpm pcw fp1100 mz2500 smc777 sam zxn zxn-debug amiga-scenarios test testpanel testmodal testnarrow testsprites testoverlay testhires testnative testart testscroll check golden uitest tiletest z88test deadcode clean
+.PHONY: all dist aqplus z88rom zx multi8 pc88 x1 spc1000 msx2 einstein256 cpm pcw fp1100 mz2500 smc777 lynx sam zxn zxn-debug amiga-scenarios test testpanel testmodal testnarrow testsprites testoverlay testhires testnative testart testscroll check golden uitest tiletest z88test deadcode clean
 
-all: aqplus z88rom zx multi8 pc88 x1 spc1000 msx2 einstein256 pcw fp1100 mz2500 smc777 sam zxn
+all: aqplus z88rom zx multi8 pc88 x1 spc1000 msx2 einstein256 pcw fp1100 mz2500 smc777 lynx sam zxn
 
 # The zip files for distribution, one for each machine (build/dist/; tools/make_dist.py)
-dist: aqplus z88rom multi8 pc88 x1 spc1000 msx2 einstein256 pcw fp1100 mz2500 smc777 sam zxn
+dist: aqplus z88rom multi8 pc88 x1 spc1000 msx2 einstein256 pcw fp1100 mz2500 smc777 lynx sam zxn
 	python3 tools/make_dist.py
 
 aqplus: $(AQPLUS)
@@ -99,6 +101,7 @@ pcw: $(PCW)
 fp1100: $(FP1100)
 mz2500: $(MZ2500)
 smc777: $(SMC777)
+lynx:   $(LYNXDISC)
 sam:    $(SAM)
 zxn:   $(ZXN)
 zxn-debug:
@@ -228,6 +231,27 @@ $(SMC777): $(DEPS) build/smc777/tiles4.bin assets/font_8x8_bbc_system.bin assets
 	    -Itarget/smc777 -DTARGET_SMC777 -Ca-DTARGET_SMC777 $(if $(filter 1,$(SMC777_FILES)),,-DNO_FILES -Ca-DNO_FILES) -Ca-DSIM_YIELD_EXTRA -Ca-DHAVE_MINIMAP_SQUARE $(GAME) $(ENTROPY) $(MENU) $(NOSOUND) $(FIELDS) $(MMNATIVE) $(LINEEDIT) $(SMC777_PLATFORM) -o $(@D)/simcity.bin
 	@size=`sed -n 's/^__BSS_END_tail *= \$$\([0-9A-Fa-f]*\).*/\1/p' $(@D)/simcity.map`; echo "smc777: image and uninitialised data end at $$size (the stack is the top of memory)"; \
 	    [ $$(( 0x$$size + $(SMC777_STACK_ROOM) )) -le 65536 ] || { echo "the program and its data leave no room for the stack"; rm -f $@; exit 1; }
+
+# The Camputers Lynx 128K (z88dk +lynx, the program linked at $0100 in the user RAM; its own start-up code sets the memory up).  Three planes of 512x252 behind a
+# window the user RAM's writes are switched off for (target/lynx/plat_lynx.asm), the CPC art with every pixel doubled across, 32 columns of 8x8 cells.  The doubling tables
+# are at $F800 and the stack is the top of memory: the uninitialised data must end below the tables.
+LYNX_PLATFORM = target/lynx/plat_sound.asm target/common/ay_sfx.asm target/lynx/plat_lynx.asm target/lynx/plat_lynx_files.asm target/lynx/lynx_disk.asm target/common/plat_charts.c target/common/minimap_key_3bpp.c target/common/plat_icons.c
+LYNX_TABLES = 0xF800
+
+build/lynx/art.bin: build/common/tiles_640x200_3bpp.bin assets/font_8x8_bbc_system.bin assets/cpc_icons.bin tools/lynx_art.py
+	@mkdir -p $(@D)
+	python3 tools/lynx_art.py build/common/tiles_640x200_3bpp.bin assets/font_8x8_bbc_system.bin assets/cpc_icons.bin $@
+
+$(LYNX): $(DEPS) build/lynx/art.bin
+	@mkdir -p $(@D)
+	$(ZCC) +lynx $(COMMON) -pragma-include:target/lynx/zpragma.inc -pragma-define:CRT_ORG_CODE=0x0100 -Itarget/lynx -DTARGET_LYNX -Ca-DTARGET_LYNX -Ca-DFMT_WIDTH=32 -Ca-DHAVE_MINIMAP_SQUARE -Ca-DHAVE_SOUND -Ca-DAY_SHADOW \
+	    $(GAME) $(ENTROPY) $(MENU) $(FIELDS) $(MMNATIVE) $(LINEEDIT) $(LYNX_PLATFORM) -o $(@D)/simcity.bin
+	@tail=`sed -n 's/^__BSS_END_tail *= \$$\([0-9A-Fa-f]*\).*/\1/p' $(@D)/simcity.map`; echo "lynx: the program and its uninitialised data end at $$tail (the tables are at $(LYNX_TABLES))"; \
+	    [ $$(( 0x$$tail )) -le $$(( $(LYNX_TABLES) )) ] || { echo "the uninitialised data runs into the doubling tables"; rm -f $@; exit 1; }
+
+# The Lynx's game disc: EXT BOOT (after XROM) runs target/lynx/boot.asm, which loads the program and the art (tools/lynx_disc.py)
+$(LYNXDISC): $(LYNX) build/lynx/art.bin target/lynx/boot.asm tools/lynx_disc.py
+	python3 tools/lynx_disc.py $(LYNX) build/lynx/art.bin target/lynx/boot.asm $@
 
 # The Samsung SPC-1000 (z88dk +spc1000 -subtype=allram: BASIC loads a ZX0 packed program with a bootstrap that unpacks it at $0000 and takes the machine).
 # The screen is the MC6847's 256x192 mode of one bit a pixel behind I/O ports, so the pictures are the engine's own 1 bit art and the icons the

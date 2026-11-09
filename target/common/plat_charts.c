@@ -1,12 +1,16 @@
 /* Bar charts for the 3 bit 640x200 targets (the Multi 8 and the PC-8801), made of what their placers have: a picture of the filled part
    in the ink colour (mp_tile1) and over it the white dots of a checkerboard on the part that is not (plat_put_overlay), so the track
-   is a grey of sorts.  A cell is 8x8 pixels (each drawn twice across); a bar is six lines tall with a black line above and below.
+   is a grey of sorts (a platform that says NO_BAR_TRACK leaves the track out).  A cell is 8x8 pixels (each drawn twice across); a bar is six lines tall with a black line above and below.
    See HAVE_TEXT_COLOUR and HAVE_DEMAND_BARS in ui/platform.h. */
 #include <stdint.h>
 #include "platform.h"
 
 #if defined(HAVE_TEXT_COLOUR) || defined(HAVE_DEMAND_BARS)
 extern void mp_tile1(uint8_t col, uint8_t row, const uint8_t *art, uint8_t attr, uint8_t inverse);
+#ifdef HAVE_CHART_CELL
+/* A platform that cannot read its screen back, and would flash between the two draws below, says HAVE_CHART_CELL and draws a cell at once. */
+extern void mp_chart_cell(uint8_t col, uint8_t row, const uint8_t *fill, const uint8_t *dots, uint8_t ink);
+#endif
 
 /* One cell of a bar: `fill` is the pixels (bit 7 the left) in the ink, `zero` pixels that are white as well (the zero mark). */
 static void chart_cell(uint8_t col, uint8_t row, uint8_t fill, uint8_t zero, uint8_t ink)
@@ -17,11 +21,19 @@ static void chart_cell(uint8_t col, uint8_t row, uint8_t fill, uint8_t zero, uin
         a[k] = d[k] = 0;
         if (k && k < 7) {
             a[k] = fill;
+#ifdef NO_BAR_TRACK
+            d[k] = zero;                                    /* (no checkerboard track: only the zero mark) */
+#else
             d[k] = (uint8_t)(~fill & ((k & 1) ? 0xAA : 0x55) | zero);
+#endif
         }
     }
+#ifdef HAVE_CHART_CELL
+    mp_chart_cell(col, row, a, d, ink);
+#else
     mp_tile1(col, row, a, ink, 0);
     plat_put_overlay(col, row, d);
+#endif
 }
 #endif
 

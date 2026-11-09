@@ -16,7 +16,7 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 
 # What may go in a zip: the files a person runs, and nothing the build leaves beside them (maps, listings, objects, the pieces
 # a disk image is made of).  Each machine's files are named below, and checked against this and, afterwards, against the zip.
-RUNNABLE = {'.aqx', '.bin', '.epr', '.app', '.ap0', '.ap1', '.a5p', '.cas', '.d88', '.spc', '.mgt', '.nex', '.dsk', '.com', '.ui', '.sim', '.hi', '.dat'}
+RUNNABLE = {'.aqx', '.bin', '.epr', '.app', '.ap0', '.ap1', '.a5p', '.cas', '.d88', '.spc', '.mgt', '.nex', '.dsk', '.com', '.ui', '.sim', '.hi', '.dat', '.ldf'}
 
 # machine: (name for the people, [files in build/ to include])
 MACHINES = {
@@ -32,6 +32,7 @@ MACHINES = {
     'fp1100': ('Casio FP-1100', ['fp1100/simcity.d88']),
     'mz2500': ('Sharp MZ-2500', ['mz2500/simcity.dsk']),
     'smc777': ('Sony SMC-777', ['smc777/simcity.d88']),
+    'lynx': ('Camputers Lynx 128K', ['lynx/simcity.ldf']),
     'sam': ('SAM Coupe', ['sam/simcity.mgt']),
     'zxn': ('ZX Spectrum Next', ['zxn/simcity.nex']),
 }

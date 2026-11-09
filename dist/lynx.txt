@@ -1,0 +1,40 @@
+Running it
+----------
+simcity.ldf is a disk image for a Camputers Lynx 128K with its disk
+interface (or an emulator of one: in MAME, lynx128k with the image in the
+first floppy drive).  Start the machine, then type
+
+    XROM
+    EXT BOOT
+
+The game loads from the disk (a few seconds: the program, then its
+pictures, which go into the alternate green plane of the video RAM) and
+starts at the title screen: no CP/M disk is needed.  The 48K and 96K
+Lynx do not have the memory.
+
+The game uses the 512 x 252 screen in eight colours as a grid of 32 by 25
+cells.  Sound is made by the CPU through the DAC, so the game waits while
+an effect plays (up to two seconds for a crash; the earthquake rumbles for
+a few).  The Sound option in the game menu turns it off.  Cities are saved
+to and loaded from the same disk, in one of eight slots after the game
+itself (so the disk must not be write protected, and the image file is
+changed when you save).  The map is 96 x 96 squares and there are no
+scenarios.
+
+This has been run only in MAME: the disk timing, the sound pitch (it
+assumes a 6 MHz Z80) and whether the speaker needs enabling on the real
+machine are untested.
+
+Keys
+----
+  Cursor keys     move the cursor one square (shifted: eight)
+  O P Q A         left, right, up, down (shifted: eight)
+  Space, Enter    build with the tool
+  , .             the previous and next tool
+  0 - 9           choose a tool by its number
+  H               pause or run
+  + -             faster, slower
+  M               the next mini map (X goes back to the city)
+  B               the budget            V   the evaluation
+  S               save the city         L   load a city
+  X               the game menu: new city, options, disasters
