@@ -44,6 +44,16 @@ python3 test/fp1100/disk_test.py
 python3 test/fp1100/files_test.py
 python3 test/fp1100/stage2_test.py
 echo
+echo "== Camputers Lynx 128K: z88dk's disk driver, the file code's sector shim, the file module and the boot sector against the WD1793 model, and the sound's DAC timing, and the model itself (needs z88dk's lynx library, lib/ticks/wd1793.lua and lib/ticks/memory/lynx.lua)"
+make lynx
+python3 test/lynx/disk_test.py
+python3 test/lynx/lsec_test.py
+python3 test/lynx/files_test.py
+python3 test/lynx/boot_test.py
+python3 test/lynx/machine_test.py
+python3 test/lynx/game_test.py
+python3 test/lynx/sound_test.py
+echo
 echo "== CP/M BDOS under z88dk-ticks: sequential files, search, a line, the time, truncate"
 python3 test/cpm/bdos.py
 echo

@@ -4,7 +4,7 @@
 ; sector has the header block, zero padded, with the mark "SC" in its last two bytes; the map's sectors follow.  The first 12
 ; bytes of the header are the file name, so a name finds its slot, and a save takes the slot that has the same name or else
 ; the first one without a mark.  The map is written before the header, so a slot is only marked once it is complete.  The sectors
-; go through target/lynx/lynx_disk.asm's asm_lynx_disk_regs.
+; go through target/lynx/lynx_lsec.asm's asm_lynx_lsec_regs.
 ;
 ;     uint8_t plat_file_save(const char *name, const uint8_t *a, uint16_t alen, const uint8_t *b, uint16_t blen) __smallc
 ;     uint8_t plat_file_load(const char *name, uint8_t *a, uint16_t alen, uint8_t *b, uint16_t blen) __smallc
@@ -17,7 +17,7 @@
         PUBLIC  _plat_file_save
         PUBLIC  _plat_file_load
         PUBLIC  _plat_file_list
-        EXTERN  asm_lynx_disk_regs
+        EXTERN  asm_lynx_lsec_regs
 
         defc    SLOT_TRACK0 = 25                ; (a track here is 16 sectors of 256 bytes, eight of the disk's: 25 is the disk's track 20)
         defc    SLOT_TRACKS = 3
@@ -243,7 +243,7 @@ fl_io1:
         ld      b,1
 fl_rw:
         ld      e,0                     ; drive 0
-        call    asm_lynx_disk_regs
+        call    asm_lynx_lsec_regs
         ld      a,h
         or      l
         ret

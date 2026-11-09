@@ -1166,6 +1166,71 @@ mp_puts_next:
 
 ; void plat_init(void): the 6845, the interrupt, the doubling tables, the screen cleared
         PUBLIC  _plat_init
+; The art (tools/lynx_art.py's 16 KB image) from the disk to the alternate green plane.  appmake +lynx --disc --data puts it on the track after the program (the boot
+; sector, then the program from sector 2: so the program ends at sector 1 + the sectors of __DATA_END_tail); it is read 8 sectors (4 KB) at a time into ART_BUF and
+; moved into the plane through the drawing window (no stack there: DI, and no calls).  A read that fails is tried again until it works.
+        EXTERN  __DATA_END_tail
+        EXTERN  asm_lynx_disk_regs
+        defc    ART_BUF = $E800                 ; 4 KB: free until the tables at $F800 (the uninitialised data is below it, and is not in use yet)
+        defc    ART_SECTOR = ((1 + (__DATA_END_tail + 511) / 512 + 9) / 10) * 10      ; the first sector of the art
+        defc    ART_CHUNKS = 4
+
+mp_loadart:
+        ld      hl,ART_SECTOR
+        ld      (mp_asec),hl
+        ld      hl,ATLAS
+        ld      (mp_adst),hl
+        ld      a,ART_CHUNKS
+        ld      (mp_acnt),a
+mp_la_next:
+        ld      hl,(mp_asec)
+        ld      b,0                     ; b = the track: hl / 10
+mp_la_d1:
+        ld      a,h
+        or      a
+        jr      nz,mp_la_sub
+        ld      a,l
+        cp      10
+        jr      c,mp_la_dd
+mp_la_sub:
+        ld      de,-10
+        add     hl,de
+        inc     b
+        jr      mp_la_d1
+mp_la_dd:
+        inc     a                       ; the sector, 1 to 10
+        ld      c,a
+        ld      d,b                     ; the track
+        ld      e,0                     ; drive 0
+        ld      b,8
+        ld      hl,ART_BUF
+        xor     a                       ; read
+        call    asm_lynx_disk_regs
+        ld      a,h
+        or      l
+        ret     nz                      ; (the library tried each sector three times: go on without, if the art was put in the plane some other way)
+        ld      hl,ART_BUF
+        ld      de,(mp_adst)
+        ld      bc,4096
+        ld      a,DRAW
+        out     (PORT_BANK),a           ; the window: the stores go to the planes
+        ldir
+        ld      a,NORMAL
+        out     (PORT_BANK),a
+        ld      (mp_adst),de
+        ld      hl,(mp_asec)
+        ld      de,8
+        add     hl,de
+        ld      (mp_asec),hl
+        ld      hl,mp_acnt
+        dec     (hl)
+        jr      nz,mp_la_next
+        ret
+
+mp_asec: defw   0
+mp_adst: defw   0
+mp_acnt: defb   0
+
 _plat_init:
         di
         xor     a
@@ -1177,10 +1242,6 @@ _plat_init:
         jr      nz,mp_up_done
         inc     a
         ld      (mp_up),a
-        ld      a,$C3                   ; our frame interrupt (IM 1: the vector is in the user RAM)
-        ld      ($0038),a
-        ld      hl,mp_isr
-        ld      ($0039),hl
         ld      hl,VCOPY                ; the RAM half of VCOPY: LD A,$0E; OUT ($82),A (read the video RAM, write the RAM), and a RET where the plane's half ends
         ld      (hl),$3E
         inc     hl
@@ -1191,6 +1252,7 @@ _plat_init:
         ld      (hl),PORT_BANK
         ld      a,$C9
         ld      (VCOPY + 10),a
+        call    mp_loadart
         ld      hl,mp_crtc
         ld      b,16
         xor     a
@@ -1283,6 +1345,8 @@ mp_dn_get:
         ret
 
 ; The frame interrupt: a frame is counted, and interrupts stay off (the VSYNC is held for a few lines) until plat_idle waits for the next
+        PUBLIC  _z80_rst_38h
+_z80_rst_38h:                            ; (the crt's vector at $0038 jumps here: CRT_ENABLE_RST in zpragma.inc)
 mp_isr:
         push    af
         ld      a,(mp_vbl)

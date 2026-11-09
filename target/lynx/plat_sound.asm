@@ -25,7 +25,7 @@
         ENDIF
         defc    PORT_DAC = $84
         defc    SAMPLE_T = 180                          ; the loop's T-states a sample
-        defc    SETUP_T = 9600                          ; what a tick takes besides its samples (the two divisions are most of it: measured)
+        defc    SETUP_T = 10000                         ; what a tick takes besides its samples (the two divisions are most of it: measured by test/lynx/sound_test.py)
         defc    SAMPLES = (CPU_MHZ * 20000 - SETUP_T) / SAMPLE_T        ; so that a tick is 20 ms
         defc    PASSES = 3                              ; (the inner loop counts in B: 8 bits)
         defc    INNER = SAMPLES / PASSES
