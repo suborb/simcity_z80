@@ -15,6 +15,22 @@ extern void mp_chart_cell(uint8_t col, uint8_t row, const uint8_t *fill, const u
 /* One cell of a bar: `fill` is the pixels (bit 7 the left) in the ink, `zero` pixels that are white as well (the zero mark). */
 static void chart_cell(uint8_t col, uint8_t row, uint8_t fill, uint8_t zero, uint8_t ink)
 {
+#ifdef CHART_FAST
+    uint8_t a[8], d[8];
+
+    a[0] = a[7] = d[0] = d[7] = 0;                          /* (the first and last lines are blank) */
+    a[1] = a[2] = a[3] = a[4] = a[5] = a[6] = fill;
+#ifdef NO_BAR_TRACK
+    d[1] = d[2] = d[3] = d[4] = d[5] = d[6] = zero;         /* (no checkerboard track: only the zero mark) */
+#else
+    {
+        uint8_t k;
+
+        for (k = 1; k < 7; ++k)
+            d[k] = (uint8_t)(~fill & ((k & 1) ? 0xAA : 0x55) | zero);
+    }
+#endif
+#else
     uint8_t a[8], d[8], k;
 
     for (k = 0; k < 8; ++k) {
@@ -28,6 +44,7 @@ static void chart_cell(uint8_t col, uint8_t row, uint8_t fill, uint8_t zero, uin
 #endif
         }
     }
+#endif
 #ifdef HAVE_CHART_CELL
     mp_chart_cell(col, row, a, d, ink);
 #else
@@ -51,7 +68,35 @@ void plat_bar(uint8_t col, uint8_t row, uint8_t cells, uint8_t fill, uint8_t att
 #endif
 
 #ifdef HAVE_DEMAND_BARS
-/* seven cells, 56 pixels: the zero mark at pixel 27, `level` pixels of green to the right or red to the left */
+/* (CHART_FAST, which a platform that is slow at it says: the same cells by arithmetic, not by loops over the pixels: the Pasopia 7's status redraw)
+   seven cells, 56 pixels: the zero mark at pixel 27, `level` pixels of green to the right or red to the left */
+#ifdef CHART_FAST
+/* the pixels of cell k (bit 7 the left) that are in lo <= x < hi */
+static uint8_t span(int16_t lo, int16_t hi, uint8_t k)
+{
+    int16_t s = lo - 8 * k, e = hi - 8 * k;
+
+    if (s < 0)
+        s = 0;
+    if (e > 8)
+        e = 8;
+    if (e <= s)
+        return 0;
+    return (uint8_t)((0xFF >> s) & (0xFF << (8 - e)));
+}
+
+void plat_demand(uint8_t col, uint8_t row, char name, int8_t level)
+{
+    uint8_t k, fill, zero;
+
+    plat_put(col, row, (uint8_t)name);
+    for (k = 0; k < 7; ++k) {
+        zero = k == 3 ? 0x10 : 0;                           /* pixel 27 */
+        fill = level > 0 ? span(28, (int16_t)(28 + level), k) : level < 0 ? span((int16_t)(27 + level), 27, k) : 0;
+        chart_cell((uint8_t)(col + 1 + k), row, fill, zero, level > 0 ? COL_GREEN : COL_RED);
+    }
+}
+#else
 void plat_demand(uint8_t col, uint8_t row, char name, int8_t level)
 {
     uint8_t k, b, fill, zero;
@@ -70,4 +115,5 @@ void plat_demand(uint8_t col, uint8_t row, char name, int8_t level)
         chart_cell((uint8_t)(col + 1 + k), row, fill, zero, level > 0 ? COL_GREEN : COL_RED);
     }
 }
+#endif
 #endif

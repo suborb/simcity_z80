@@ -340,7 +340,8 @@ ay_scale_lp:
         ENDIF
 
         IFDEF   AY_SHADOW
-; No chip: the registers are kept for the platform's own synthesis (a Lynx's DAC: target/lynx/plat_sound.asm renders a tick from ay_regs).
+; No chip: the registers are kept for the platform's own synthesis (a Lynx's DAC: target/lynx/plat_sound.asm renders a tick from ay_regs; with AY_SHADOW_TICK the
+; platform's ay_shadow_tick is called at the end of each tick and of a stop: the Pasopia 7's SN76489).
 ; Register C := A.  Keeps hl, de, b.
 ay_write:
         push    hl
@@ -352,7 +353,15 @@ ay_write:
         ld      (hl),a
         pop     de
         pop     hl
+        IFDEF   AY_SHADOW_TICK
+        ld      a,c
+        cp      10                      ; (channel C's volume: the last register of a tick, and of a stop)
+        ret     nz
+        EXTERN  ay_shadow_tick
+        jp      ay_shadow_tick          ; the platform's: the tick's registers to its chip (keeps everything)
+        ELSE
         ret
+        ENDIF
         ELSE
         IFNDEF  AY_SAA
 ; Register C of the chip := A.  Keeps hl, de, b.

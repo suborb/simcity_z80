@@ -33,6 +33,7 @@ MACHINES = {
     'mz2500': ('Sharp MZ-2500', ['mz2500/simcity.dsk']),
     'smc777': ('Sony SMC-777', ['smc777/simcity.d88']),
     'lynx': ('Camputers Lynx 128K', ['lynx/simcity.ldf']),
+    'pasopia7': ('Toshiba Pasopia 7', ['pasopia7/simcity.dsk']),
     'sam': ('SAM Coupe', ['sam/simcity.mgt']),
     'zxn': ('ZX Spectrum Next', ['zxn/simcity.nex']),
 }

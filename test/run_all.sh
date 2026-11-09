@@ -54,6 +54,11 @@ python3 test/lynx/machine_test.py
 python3 test/lynx/game_test.py
 python3 test/lynx/sound_test.py
 echo
+echo "== Toshiba Pasopia 7: the file module (and so z88dk's disk driver) against the uPD765 model (needs z88dk's pasopia7 library, lib/ticks/memory/pasopia7.lua and upd765.lua)"
+make pasopia7
+python3 test/pasopia7/files_test.py
+python3 test/pasopia7/game_test.py
+echo
 echo "== CP/M BDOS under z88dk-ticks: sequential files, search, a line, the time, truncate"
 python3 test/cpm/bdos.py
 echo

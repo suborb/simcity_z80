@@ -1,0 +1,31 @@
+Running it
+----------
+simcity.dsk is a disk image for a Toshiba Pasopia 7 (a 5.25 inch disk, one
+side, 40 tracks).  Put it in the first drive and reset the machine (or
+start the emulator with it in the first drive): it boots straight into the
+game, with no BASIC or other disk needed.  Loading takes a few seconds.
+
+The game uses the 320 x 200 screen in eight colours as a grid of 40 by 25
+cells, using the SN76489 for the effects. Cities are saved to and loaded from 
+the same disk, in one of five slots after the game itself (so the disk must
+not be write protected, and the image file is changed when you save).  The
+map is 96 x 96 squares and there are no scenarios.
+
+This has been run in Takeda's EmuPIA7 and under a model of the machine; the
+Z80 CTC the game takes its time from (the machine's beeper channels), the
+keyboard and the disk timing on a real Pasopia 7 are untested.
+
+Keys
+----
+  Cursor keys     move the cursor one square (the up key with the shift
+                  key is down)
+  Q A O P         up, down, left, right (shifted: eight squares)
+  Space           build with the tool
+  , .             the previous and next tool
+  0 - 9           choose a tool by its number
+  H               pause or run
+  + -             faster, slower
+  M               the next mini map (X goes back to the city)
+  B               the budget            V   the evaluation
+  S               save the city         L   load a city
+  X               the game menu: new city, options, disasters

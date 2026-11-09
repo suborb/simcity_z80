@@ -64,6 +64,7 @@ PCW = build/pcw/simcity.com
 FP1100 = build/fp1100/simcity.d88
 MZ2500 = build/mz2500/simcity.dsk
 SMC777 = build/smc777/simcity.d88
+PASOPIA7 = build/pasopia7/simcity.dsk
 LYNXDISC = build/lynx/simcity.ldf
 SAM    = build/sam/simcity.mgt
 ZXN   = build/zxn/simcity.nex
@@ -78,12 +79,12 @@ TESTK  = build/testnative/simcity.bin
 TESTA  = build/testart/simcity.bin
 TESTSC = build/testscroll/simcity.bin
 
-.PHONY: all dist aqplus z88rom zx multi8 pc88 x1 spc1000 msx2 einstein256 cpm pcw fp1100 mz2500 smc777 lynx sam zxn zxn-debug amiga-scenarios test testpanel testmodal testnarrow testsprites testoverlay testhires testnative testart testscroll check golden uitest tiletest z88test deadcode clean
+.PHONY: all dist aqplus z88rom zx multi8 pc88 x1 spc1000 msx2 einstein256 cpm pcw fp1100 mz2500 smc777 lynx pasopia7 sam zxn zxn-debug amiga-scenarios test testpanel testmodal testnarrow testsprites testoverlay testhires testnative testart testscroll check golden uitest tiletest z88test deadcode clean
 
-all: aqplus z88rom zx multi8 pc88 x1 spc1000 msx2 einstein256 pcw fp1100 mz2500 smc777 lynx sam zxn
+all: aqplus z88rom zx multi8 pc88 x1 spc1000 msx2 einstein256 pcw fp1100 mz2500 smc777 lynx pasopia7 sam zxn
 
 # The zip files for distribution, one for each machine (build/dist/; tools/make_dist.py)
-dist: aqplus z88rom multi8 pc88 x1 spc1000 msx2 einstein256 pcw fp1100 mz2500 smc777 lynx sam zxn
+dist: aqplus z88rom multi8 pc88 x1 spc1000 msx2 einstein256 pcw fp1100 mz2500 smc777 lynx pasopia7 sam zxn
 	python3 tools/make_dist.py
 
 aqplus: $(AQPLUS)
@@ -100,6 +101,7 @@ pcw: $(PCW)
 fp1100: $(FP1100)
 mz2500: $(MZ2500)
 smc777: $(SMC777)
+pasopia7: $(PASOPIA7)
 lynx:   $(LYNXDISC)
 sam:    $(SAM)
 zxn:   $(ZXN)
@@ -247,6 +249,30 @@ $(LYNXDISC): $(DEPS) build/lynx/art.bin
 	    $(GAME) $(ENTROPY) $(MENU) $(FIELDS) $(MMNATIVE) $(LINEEDIT) $(LYNX_PLATFORM) -o $(@D)/simcity.bin -Cz"--data build/lynx/art.bin"
 	@tail=`sed -n 's/^__BSS_END_tail *= \$$\([0-9A-Fa-f]*\).*/\1/p' $(@D)/simcity.map`; echo "lynx: the program and its uninitialised data end at $$tail (the tables are at $(LYNX_TABLES))"; \
 	    [ $$(( 0x$$tail )) -le $$(( $(LYNX_TABLES) )) ] || { echo "the uninitialised data runs into the doubling tables"; rm -f $@; exit 1; }
+
+# The Toshiba Pasopia 7 (z88dk +pasopia7: a boot disc, the program at $0000 in all RAM).  The screen is 320x200 in 8 colours as 40x25 cells of three planes of 8 bytes, reached
+# through a window over $8000-$BFFF; the art is kept in the video RAM beyond what the screen shows (tools/pasopia7_art.py).  The uninitialised data is above the window ($A000
+# for now: the image holds the art until the disc loads it) and the stack is the top of memory.
+PASOPIA7_FILES ?= 1             # 0: without save and load
+PASOPIA7_BSS = 0x9000
+PASOPIA7_SLOT0 = 23             # the first track of the save slots (plat_pasopia7_files.asm: SLOT_TRACK0): the program and its art must end below it
+PASOPIA7_TOP = 0xFA00           # the uninitialised data must end below this: the stack is under $FF00
+PASOPIA7_PLATFORM = target/pasopia7/plat_time.asm target/pasopia7/plat_sound.asm target/common/ay_hooks.asm target/common/ay_sfx.asm target/pasopia7/plat_pasopia7.asm $(if $(filter 1,$(PASOPIA7_FILES)),target/pasopia7/plat_pasopia7_files.asm) target/common/plat_charts.c target/common/minimap_key_3bpp.c target/common/plat_icons.c
+
+build/pasopia7/art.bin: build/common/tiles_640x200_3bpp.bin assets/font_8x8_bbc_system.bin assets/cpc_icons.bin tools/pasopia7_art.py
+	@mkdir -p $(@D)
+	python3 tools/pasopia7_art.py build/common/tiles_640x200_3bpp.bin assets/font_8x8_bbc_system.bin assets/cpc_icons.bin $@
+
+$(PASOPIA7): $(DEPS) build/pasopia7/art.bin
+	@mkdir -p $(@D)
+	$(ZCC) +pasopia7 -create-app $(COMMON) -pragma-include:target/pasopia7/zpragma.inc -pragma-define:CRT_ORG_BSS=$(PASOPIA7_BSS) -Itarget/pasopia7 -DTARGET_PASOPIA7 -Ca-DTARGET_PASOPIA7 \
+	    $(if $(filter 1,$(PASOPIA7_FILES)),,-DNO_FILES -Ca-DNO_FILES) -Ca-DSIM_YIELD_EXTRA -Ca-DHAVE_MINIMAP_SQUARE -Ca-DHAVE_SOUND -Ca-DAY_SHADOW -Ca-DAY_SHADOW_TICK \
+	    $(GAME) $(ENTROPY) $(MENU) $(FIELDS) $(MMNATIVE) $(LINEEDIT) $(PASOPIA7_PLATFORM) -o $(@D)/simcity -Cz"--data build/pasopia7/art.bin"
+	@tail=`sed -n 's/^__BSS_END_tail *= \$$\([0-9A-Fa-f]*\).*/\1/p' $(@D)/simcity.map`; echo "pasopia7: the program and its uninitialised data end at $$tail (the stack is under $$FF00)"; \
+	    [ $$(( 0x$$tail )) -le $$(( $(PASOPIA7_TOP) )) ] || { echo "the uninitialised data runs into the stack"; rm -f $@; exit 1; }
+	@dtail=`sed -n 's/^__DATA_END_tail *= \$$\([0-9A-Fa-f]*\).*/\1/p' $(@D)/simcity.map`; \
+	    [ $$(( 0x$$dtail )) -le $$(( $(PASOPIA7_BSS) )) ] || { echo "the program ends at $$dtail, past where the uninitialised data starts ($(PASOPIA7_BSS)): raise PASOPIA7_BSS"; rm -f $@; exit 1; }; \
+	    [ $$(( 2 + (0x$$dtail + 2047) / 2048 + 3 )) -le $(PASOPIA7_SLOT0) ] || { echo "the program and the art run into the save slots (track $(PASOPIA7_SLOT0): target/pasopia7/plat_pasopia7_files.asm)"; rm -f $@; exit 1; }
 
 # The Samsung SPC-1000 (z88dk +spc1000 -subtype=allram: BASIC loads a ZX0 packed program with a bootstrap that unpacks it at $0000 and takes the machine).
 # The screen is the MC6847's 256x192 mode of one bit a pixel behind I/O ports, so the pictures are the engine's own 1 bit art and the icons the
