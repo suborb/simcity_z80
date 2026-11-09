@@ -31,6 +31,7 @@
 #define HAVE_ICON_CACHE         /* plat_icons draws only the icons that changed (plat_icon_same) */
 #define ICONS_FETCH             /* ... which are in the PCG RAM (mp_icon_fetch) */
 #define HAVE_TEXT_COLOUR        /* the budget and evaluation screens coloured, with bars (plat_text_attr, plat_bar) */
+#define NO_BAR_TRACK            /* the bars have no checkerboard track: just the fill and the zero mark */
 #define MODAL_NARROW            /* ... in their 32 column arrangement, */
 #define MODAL_X 4               /* ... centred in the 40 columns */
 #define HAVE_DEMAND_BARS        /* the R, C and I demand as coloured bar charts (plat_demand) */

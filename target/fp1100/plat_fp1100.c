@@ -502,8 +502,8 @@ uint8_t plat_text_input(uint8_t col, uint8_t row, char *buf, uint8_t max, uint8_
 }
 
 /* ---- the bar charts ----  (target/common/plat_charts.c made of mp_tile1 and an overlay: here a cell is worked out whole and sent once, so it never shows half of itself) */
-/* One cell of a bar: `fill` is the pixels (bit 7 the left) in the ink colour, `zero` pixels that are white as well, over the dots of a checkerboard that are white on the part that
-   is not filled; six lines tall with a black line above and below. */
+/* One cell of a bar: `fill` is the pixels (bit 7 the left) in the ink colour, `zero` pixels that are white as well (and, without NO_BAR_TRACK, the dots of a checkerboard that are
+   white on the part that is not filled); six lines tall with a black line above and below. */
 static void chart_cell(uint8_t col, uint8_t row, uint8_t fill, uint8_t zero, uint8_t ink)
 {
     uint8_t k, p, a, d;
@@ -512,7 +512,11 @@ static void chart_cell(uint8_t col, uint8_t row, uint8_t fill, uint8_t zero, uin
         a = d = 0;
         if (k && k < 7) {
             a = fill;
+#ifdef NO_BAR_TRACK
+            d = zero;                                       /* (no checkerboard track: only the zero mark) */
+#else
             d = (uint8_t)(~fill & ((k & 1) ? 0xAA : 0x55) | zero);
+#endif
         }
         for (p = 0; p < 3; ++p)
             planes[p * 8 + k] = rev((ink >> p) & 1 ? (uint8_t)(a | d) : d);

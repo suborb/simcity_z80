@@ -27,6 +27,7 @@
 #define HAVE_SPRITE_OVERLAY     /* the sprites go over the baked tiles, which have colours */
 #define HAVE_ICONS              /* the tools as 16x16 pictures */
 #define HAVE_TEXT_COLOUR        /* the budget and evaluation screens coloured, with bars (plat_text_attr, plat_bar) */
+#define NO_BAR_TRACK            /* the bars have no checkerboard track: just the fill and the zero mark */
 #define MODAL_NARROW            /* ... in their 32 column arrangement, */
 #define MODAL_X 4               /* ... centred in the 40 columns */
 #define HAVE_DEMAND_BARS        /* the R, C and I demand as coloured bar charts (plat_demand) */
