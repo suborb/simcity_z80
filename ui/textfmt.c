@@ -58,6 +58,7 @@ void fmt_flush(const char *row) __z88dk_fastcall
 }
 
 #ifdef HAVE_TEXT_COLOUR
+PLAT_CODE_MODAL_OVERLAY                             /* (only the budget and evaluation screens colour their text) */
 void fmt_fields_each(const struct field *f, uint8_t n, void (*done)(uint8_t row))
 {
     uint8_t i = 0, j, row;
@@ -78,5 +79,6 @@ void fmt_attr_runs(const struct attr_run *r, uint8_t n, uint8_t row)
         if (r->row == row)
             plat_text_attr((uint8_t)(r->col + FMT_COL0), row, r->len, r->attr);
 }
+PLAT_CODE_HOME
 #endif
 #endif

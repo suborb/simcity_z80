@@ -64,7 +64,11 @@ mm_nb:  defs    9                       ; ... and of the right
         IFDEF   TARGET_EINSTEIN256
         SECTION EINSTEIN_GAME_OVL
         ELSE
+        IFDEF   TARGET_PC6001MK2
+        SECTION OVERLAY_0
+        ELSE
         IN_CODE
+        ENDIF
         ENDIF
 _minimap_fast:
         push    ix

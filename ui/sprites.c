@@ -2,6 +2,8 @@
 #include "engine.h"
 #include "platform.h"
 #include "sprites.h"
+PLAT_CODE_GAME_OVERLAY
+PLAT_CONST_GAME_OVERLAY
 
 #ifdef HAVE_SPRITES
 

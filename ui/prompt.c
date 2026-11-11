@@ -22,7 +22,7 @@ static void line(uint8_t n, const char *s)
     plat_puts((uint8_t)(menu_col + 2), (uint8_t)(menu_row + n), s);
 }
 
-void prompt_say(const char *s)
+void prompt_say(const char *s) __z88dk_fastcall
 {
     uint8_t k;
 
@@ -36,10 +36,10 @@ void prompt_say(const char *s)
     } while (!k);
 }
 
-void prompt_status(const char *status)
+void prompt_status(const char *status) __z88dk_fastcall
 {
-    line(5, "                          ");        /* blank the whole keys line first */
-    line(5, status);
+    menu_box(5);                                    /* (the box before it may be a list's, of any height: the status gets a box of its own, as a message does) */
+    line(1, status);
 }
 
 uint8_t prompt_ask(const char *t, const char *l, char *name, uint8_t max, uint8_t spaces)
@@ -105,7 +105,7 @@ static void show(void)
     plat_flush();
 }
 
-void prompt_say(const char *s)
+void prompt_say(const char *s) __z88dk_fastcall
 {
     uint8_t k;
 

@@ -23,13 +23,13 @@ extern uint8_t prompt_pick(const char *title, uint8_t add, char *name);
 /* After a name is entered, show what is happening ("SAVING...") in the dialogue's last line, where the keys were.  Only
    the shared pop-up boxes do this; the other platforms' prompt screens are left as they are. */
 #ifdef HAVE_POPUP_MENU
-extern void prompt_status(const char *status);
+extern void prompt_status(const char *status) __z88dk_fastcall;
 #else
 #define prompt_status(s)
 #endif
 
 /* Show a message and wait for a key. */
-extern void prompt_say(const char *message);
+extern void prompt_say(const char *message) __z88dk_fastcall;
 
 /* Set city_name from 12 characters padded with spaces, as the file header keeps it; or 12 characters made of it. */
 extern void city_name_from(const uint8_t *padded);

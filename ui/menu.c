@@ -23,7 +23,7 @@ static const char side[] = "|                            |";
 #endif
 
 /* The rows the boxes are centred in: the map, which the game says (menu_area); else the whole screen. */
-static uint8_t area_row, area_rows;
+uint8_t area_row, area_rows;
 
 void menu_area(uint8_t row, uint8_t rows)
 {
@@ -33,7 +33,7 @@ void menu_area(uint8_t row, uint8_t rows)
 
 uint8_t menu_col, menu_row;
 
-void menu_box(uint8_t height)
+void menu_box(uint8_t height) __z88dk_fastcall
 {
     uint8_t y, r = area_rows ? area_rows : plat_rows();
 

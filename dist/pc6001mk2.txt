@@ -1,0 +1,36 @@
+Running it
+----------
+simcity.d88 is a disk image for an NEC PC-6001mkII with its disk unit (the
+PC-6031: a 5.25 inch disk, one side, 40 tracks).  Put it in the first drive
+and reset the machine (or start the emulator with it in the first drive): it
+boots straight into the game, with no BASIC or other disk needed, and shows
+a line of dots, one for each track, as it loads.  The disk only boots on the
+mkII: its boot sector checks the ROM and hands the machine back if it is
+not a mkII's.
+
+The game uses the 320 x 200 screen in four colours (green, yellow, blue and
+red) as a grid of 40 by 25 cells, with the effects on the sound chip.  Parts
+of the game (the budget, the evaluation, the file screens and the start)
+are read from the disk when they are needed, so a slow drive pauses for a
+moment as they open.  Cities are saved to and loaded from the same disk, in
+one of six slots after the game itself (so the disk must not be write
+protected, and the image file is changed when you save).  The map is 96 x 96
+squares and there are no scenarios.
+
+This has been run in Takeda's mkII emulation, and its disk driver, the
+overlays and its timer and keyboard interrupts under a model of the machine;
+a real mkII and its disk unit are untested.
+
+Keys
+----
+  Cursor keys     move the cursor one square
+  Q A O P         up, down, left, right (shifted: eight squares)
+  Space           build with the tool
+  , .             the previous and next tool
+  0 - 9           choose a tool by its number
+  H               pause or run
+  + -             faster, slower
+  M               the next mini map (X goes back to the city)
+  B               the budget            V   the evaluation
+  S               save the city         L   load a city
+  X               the game menu: new city, options, disasters

@@ -11,6 +11,7 @@
 ; In udgs.bin the same tables start at +536, +1288, +3296 and +3390.  The Spectrum
 ; build has the whole file in target/zx-original/zx_udgs.asm.
 ;
+; The PC-6001mkII build (TARGET_PC6001MK2) has assets/map_art_mk2.bin (tools/make_mk2_assets.py): the attribute bytes are an ink pen and a paper pen of its four colours.
 ; The Aquarius+ build (TARGET_AQPLUS) has assets/map_art_aq.bin instead: the same, with the attribute bytes
 ; converted to the colour bytes its bitmap wants (tools/make_aq_assets.py), so view_fetch's attribute goes
 ; straight to the screen.
@@ -52,7 +53,11 @@ view_udgs:
         IFDEF   TARGET_AQPLUS
         BINARY  "assets/map_art_aq.bin"
         ELSE
+        IFDEF   TARGET_PC6001MK2
+        BINARY  "assets/map_art_mk2.bin"
+        ELSE
         BINARY  "assets/map_art.bin"
+        ENDIF
         ENDIF
         defc    view_attrs = view_udgs + ART_TILE_ATTRS
         ENDIF

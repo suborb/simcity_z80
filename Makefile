@@ -47,7 +47,7 @@ Z88_PLATFORM = target/z88/plat_z88.c target/z88/plat_z88.asm target/z88/fgets_co
 
 # Everything a build depends on.
 DEPS = Makefile $(wildcard ui/*.c ui/*.h ui/*.asm engine/*.asm engine/*.inc engine/*.h platform/common/*.asm \
-         platform/console/*.[chai]* target/*/*.[chai]* target/*/*.inc) assets/map_art.bin assets/map_art_aq.bin assets/udgs.bin assets/icons.bin assets/icons_spec.bin assets/cpc_icons.bin assets/st_sounds.bin
+         platform/console/*.[chai]* target/*/*.[chai]* target/*/*.inc) assets/map_art.bin assets/map_art_aq.bin assets/map_art_mk2.bin assets/icons_mk2.bin assets/udgs.bin assets/icons.bin assets/icons_spec.bin assets/cpc_icons.bin assets/st_sounds.bin
 
 AQPLUS = build/aqplus/simcity.aqx
 NC200  = build/nc200/simcity.img
@@ -65,6 +65,7 @@ FP1100 = build/fp1100/simcity.d88
 MZ2500 = build/mz2500/simcity.dsk
 SMC777 = build/smc777/simcity.d88
 PASOPIA7 = build/pasopia7/simcity.dsk
+PC6001MK2 = build/pc6001mk2/simcity.d88
 LYNXDISC = build/lynx/simcity.ldf
 SAM    = build/sam/simcity.mgt
 ZXN   = build/zxn/simcity.nex
@@ -79,12 +80,12 @@ TESTK  = build/testnative/simcity.bin
 TESTA  = build/testart/simcity.bin
 TESTSC = build/testscroll/simcity.bin
 
-.PHONY: all dist aqplus z88rom zx multi8 pc88 x1 spc1000 msx2 einstein256 cpm pcw fp1100 mz2500 smc777 lynx pasopia7 sam zxn zxn-debug amiga-scenarios test testpanel testmodal testnarrow testsprites testoverlay testhires testnative testart testscroll check golden uitest tiletest z88test deadcode clean
+.PHONY: mk2demo all dist aqplus z88rom zx multi8 pc88 x1 spc1000 msx2 einstein256 cpm pcw fp1100 mz2500 smc777 lynx pasopia7 pc6001mk2 sam zxn zxn-debug amiga-scenarios test testpanel testmodal testnarrow testsprites testoverlay testhires testnative testart testscroll check golden uitest tiletest z88test deadcode clean
 
-all: aqplus z88rom zx multi8 pc88 x1 spc1000 msx2 einstein256 pcw fp1100 mz2500 smc777 lynx pasopia7 sam zxn
+all: aqplus z88rom zx multi8 pc88 pc6001mk2 x1 spc1000 msx2 einstein256 pcw fp1100 mz2500 smc777 lynx pasopia7 sam zxn
 
 # The zip files for distribution, one for each machine (build/dist/; tools/make_dist.py)
-dist: aqplus z88rom multi8 pc88 x1 spc1000 msx2 einstein256 pcw fp1100 mz2500 smc777 lynx pasopia7 sam zxn
+dist: aqplus z88rom multi8 pc88 pc6001mk2 x1 spc1000 msx2 einstein256 pcw fp1100 mz2500 smc777 lynx pasopia7 sam zxn
 	python3 tools/make_dist.py
 
 aqplus: $(AQPLUS)
@@ -102,6 +103,7 @@ fp1100: $(FP1100)
 mz2500: $(MZ2500)
 smc777: $(SMC777)
 pasopia7: $(PASOPIA7)
+pc6001mk2: $(PC6001MK2)
 lynx:   $(LYNXDISC)
 sam:    $(SAM)
 zxn:   $(ZXN)
@@ -273,6 +275,31 @@ $(PASOPIA7): $(DEPS) build/pasopia7/art.bin
 	@dtail=`sed -n 's/^__DATA_END_tail *= \$$\([0-9A-Fa-f]*\).*/\1/p' $(@D)/simcity.map`; \
 	    [ $$(( 0x$$dtail )) -le $$(( $(PASOPIA7_BSS) )) ] || { echo "the program ends at $$dtail, past where the uninitialised data starts ($(PASOPIA7_BSS)): raise PASOPIA7_BSS"; rm -f $@; exit 1; }; \
 	    [ $$(( 2 + (0x$$dtail + 2047) / 2048 + 3 )) -le $(PASOPIA7_SLOT0) ] || { echo "the program and the art run into the save slots (track $(PASOPIA7_SLOT0): target/pasopia7/plat_pasopia7_files.asm)"; rm -f $@; exit 1; }
+
+# The NEC PC-6001mkII on a boot disc (PC-6031 drive, D88 image), by z88dk's +pc6001 -subtype=mk2disc: the program is a flat RAM image at $0000 with the ROM mapped out, loaded by the
+# boot sector the crt carries; the overlays (the sections OVERLAY_0 to OVERLAY_4, one window: target/pc6001mk2/mmap.inc) follow it on the disc and pc6001mk2_overlay_load reads them.
+# The program, its data and the uninitialised data are below $C000, where the 16K VRAM goes.
+PC6001MK2_WINDOW = 0xB0F0       # the overlay window (target/pc6001mk2/mmap.inc): above the uninitialised data ...
+PC6001MK2_TOP = 0xBE00          # ... and ending below this: the stack grows down from $C000
+PC6001MK2_PLATFORM = target/pc6001mk2/plat_pc6001mk2.c target/pc6001mk2/plat_pc6001mk2.asm target/pc6001mk2/plat_irq.asm target/pc6001mk2/plat_sound.asm target/pc6001mk2/plat_minimap.asm target/pc6001mk2/plat_sprite.asm target/pc6001mk2/plat_minimap.c target/pc6001mk2/plat_files.c target/pc6001mk2/plat_text.c target/pc6001mk2/eval_ui.c target/pc6001mk2/file_ui.c
+$(PC6001MK2): $(DEPS) target/pc6001mk2/mmap.inc
+	@mkdir -p $(@D)
+	$(ZCC) +pc6001 -subtype=mk2disc -create-app $(COMMON) -pragma-include:target/pc6001mk2/zpragma.inc -pragma-define:MMAP=-1 -pragma-define:CRT_PC6001MK2_OVERLAYS=5 -Itarget/pc6001mk2 -Ca-Itarget/pc6001mk2 \
+	    -DTARGET_PC6001MK2 -Ca-DTARGET_PC6001MK2 -Ca-DHAVE_MINIMAP_SQUARE -Ca-DFMT_WIDTH=40 $(filter-out ui/prompt.c ui/cityfile.c ui/evaluation.c,$(GAME)) $(ENTROPY) $(MENU) $(FIELDS) $(MMNATIVE) $(PC6001MK2_PLATFORM) -o $(@D)/simcity
+	@dtail=`sed -n 's/^__DATA_END_tail *= \$$\([0-9A-Fa-f]*\).*/\1/p' $(@D)/simcity.map`; tail=`sed -n 's/^__BSS_END_tail *= \$$\([0-9A-Fa-f]*\).*/\1/p' $(@D)/simcity.map`; \
+	    g=`wc -c < $(@D)/simcity_OVERLAY_0.bin`; mo=`wc -c < $(@D)/simcity_OVERLAY_1.bin`; fo=`wc -c < $(@D)/simcity_OVERLAY_2.bin`; so=`wc -c < $(@D)/simcity_OVERLAY_3.bin`; eo=`wc -c < $(@D)/simcity_OVERLAY_4.bin`; big=$$(( g > mo ? g : mo )); big=$$(( big > fo ? big : fo )); big=$$(( big > so ? big : so )); big=$$(( big > eo ? big : eo )); \
+	    echo "pc6001mk2: the program and its data end at $$dtail, the uninitialised data at $$tail, the overlays are $$g (game), $$mo (modal), $$fo (file), $$so (start-up) and $$eo (evaluation) bytes in the window at $(PC6001MK2_WINDOW) (the stack is under \$$C000)"; \
+	    [ $$(( 0x$$tail )) -le $$(( $(PC6001MK2_WINDOW) )) ] || { echo "the uninitialised data runs into the overlay window: raise PC6001MK2_WINDOW here and in target/pc6001mk2/mmap.inc"; rm -f $@; exit 1; }; \
+	    [ $$(( $(PC6001MK2_WINDOW) + big )) -le $$(( $(PC6001MK2_TOP) )) ] || { echo "the overlay window runs into the stack"; rm -f $@; exit 1; }
+
+# A cartridge to try z88dk's PC-6001mkII 320x200 console and graphics (test/pc6001mk2/cart_demo.c): the ROM subtype with -clib=mk2, padded to 16 KB.  In MAME: mame pc6001mk2 -cart1 build/pc6001mk2/mk2demo.rom
+MK2DEMO = build/pc6001mk2/mk2demo.rom
+mk2demo: $(MK2DEMO)
+$(MK2DEMO): test/pc6001mk2/cart_demo.c
+	@mkdir -p build/pc6001mk2/demo
+	cd build/pc6001mk2/demo && $(ZCC) +pc6001 -subtype=rom -clib=mk2 -create-app ../../../test/pc6001mk2/cart_demo.c -o cart_demo
+	python3 -c "d = open('build/pc6001mk2/demo/cart_demo.bin', 'rb').read(); open('$@', 'wb').write(d.ljust(16384, b'\\xff'))"
+	@ls -l $@
 
 # The Samsung SPC-1000 (z88dk +spc1000 -subtype=allram: BASIC loads a ZX0 packed program with a bootstrap that unpacks it at $0000 and takes the machine).
 # The screen is the MC6847's 256x192 mode of one bit a pixel behind I/O ports, so the pictures are the engine's own 1 bit art and the icons the

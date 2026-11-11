@@ -19,6 +19,9 @@
 #ifndef PLAT_CONST_MODAL_OVERLAY
 #define PLAT_CONST_MODAL_OVERLAY
 #endif
+#ifndef PLAT_CODE_START_OVERLAY
+#define PLAT_CODE_START_OVERLAY
+#endif
 #ifndef PLAT_CODE_HIGH
 #define PLAT_CODE_HIGH
 #endif
@@ -29,13 +32,28 @@
 #define PLAT_CODE_HOME
 #endif
 
+#ifdef HAVE_START_OVERLAY
+#define PLAT_OVERLAY_START() plat_overlay_load(3)      /* the start-up code (the layout and the title screen) is an overlay of its own */
+#define PLAT_OVERLAY_START_END() plat_overlay_load(0)  /* ... and the game's comes back */
+#else
+#define PLAT_OVERLAY_START() ((void)0)
+#define PLAT_OVERLAY_START_END() ((void)0)
+#endif
 #ifdef HAVE_OVERLAY_UI
 extern void plat_overlay_load(uint8_t overlay);
 #define PLAT_OVERLAY_GAME()  plat_overlay_load(0)
 #define PLAT_OVERLAY_MODAL() plat_overlay_load(1)
+#define PLAT_OVERLAY_FILE()  plat_overlay_load(2)      /* the dialogues for files (a platform that has them in a third overlay) */
+#ifdef HAVE_EVAL_OVERLAY
+#define PLAT_OVERLAY_EVAL()  plat_overlay_load(4)      /* the evaluation screen is an overlay of its own */
+#else
+#define PLAT_OVERLAY_EVAL()  PLAT_OVERLAY_MODAL()
+#endif
 #else
 #define PLAT_OVERLAY_GAME()  ((void)0)
 #define PLAT_OVERLAY_MODAL() ((void)0)
+#define PLAT_OVERLAY_FILE()  ((void)0)
+#define PLAT_OVERLAY_EVAL()  ((void)0)
 #endif
 
 /* HAVE_DATA_PAGING (plat_config.h): the target banks the application's data, and plat_page_data() selects the data page (the UI calls it before it touches

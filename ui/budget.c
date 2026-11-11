@@ -219,7 +219,7 @@ static void draw(void)
 }
 
 /* Change the selected item by one step: 1 for tax, 10 for a funding level. */
-static uint8_t change(int8_t dir)
+static uint8_t change(int8_t dir) __z88dk_fastcall
 {
     int16_t v, step;
     uint8_t *p;

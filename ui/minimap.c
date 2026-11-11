@@ -8,6 +8,7 @@
 #include "engine.h"
 #include "platform.h"
 #include "minimap.h"
+PLAT_CODE_GAME_OVERLAY
 #ifdef HAVE_MINIMAP
 #define MM_POLLUTION_OFFSET MM_POLLUTION_AT /* into minimaps[] (ui/engine.h) */
 #define MM_FIRE_OFFSET      MM_FIRE_AT

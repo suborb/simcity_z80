@@ -59,6 +59,12 @@ make pasopia7
 python3 test/pasopia7/files_test.py
 python3 test/pasopia7/game_test.py
 echo
+echo "== NEC PC-6001mkII: z88dk's disc driver and overlays against appmake's disc layout, the 320x200 console and graphics (the boot disc and a cartridge), and the game's interrupt and sound code (needs z88dk's pc6001 library with -clib=mk2, appmake +pc6001mk2, lib/ticks/memory/pc6001mk2.lua and z88dk-ticks with the Lua interrupt hook)"
+make pc6001mk2
+python3 test/pc6001mk2/disc_test.py
+python3 test/pc6001mk2/irq_test.py
+python3 test/pc6001mk2/console_test.py
+echo
 echo "== CP/M BDOS under z88dk-ticks: sequential files, search, a line, the time, truncate"
 python3 test/cpm/bdos.py
 echo

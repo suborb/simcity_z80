@@ -602,9 +602,17 @@ static void draw_view(uint8_t full, uint8_t dirty)
 #endif
             cy = (uint8_t)(cur_y - origin_y);
             rows_dirty = tool_size[tool];
-            for (; rows_dirty && cy < view_h; --rows_dirty, ++cy)
-                for (cx = 0; cx < view_w; ++cx)
-                    draw_cell(cx, cy);
+            {                               /* only the footprint's columns and one either side (the pictures of what joins it): a whole row of a big tool was 240 cells */
+                uint8_t x0 = (uint8_t)(cur_x - origin_x), x1;
+
+                x0 = x0 ? (uint8_t)(x0 - 1) : 0;
+                x1 = (uint8_t)(cur_x - origin_x + rows_dirty + 1);
+                if (x1 > view_w || x1 < x0)
+                    x1 = view_w;
+                for (; rows_dirty && cy < view_h; --rows_dirty, ++cy)
+                    for (cx = x0; cx < x1; ++cx)
+                        draw_cell(cx, cy);
+            }
         }
         if (++draw_refresh_row >= view_h)
             draw_refresh_row = 0;
@@ -704,7 +712,7 @@ static void flat_base(uint8_t *colours, const uint8_t *base)
 }
 #endif
 
-static void draw_minirow(uint8_t sy)
+static void draw_minirow(uint8_t sy) __z88dk_fastcall
 {
 #ifdef HAVE_MINIMAP_SCROLL
     uint8_t source_sy = (uint8_t)(sy + mm_scroll_y);
@@ -773,7 +781,7 @@ static uint8_t draw_minimap(uint8_t full)
 }
 
 /* Show mini map v (1..MM_VIEWS), or 0 for the city again. */
-static void set_map_view(uint8_t v)
+static void set_map_view(uint8_t v) __z88dk_fastcall
 {
 #ifdef HAVE_MINIMAP_SQUARE
     if (v && (cols < 32 || rows < 24))
@@ -942,7 +950,7 @@ static void flip_page(int8_t dy)
 }
 
 /* Show mini map v (1..MM_VIEWS), or 0 for the city again. */
-static void set_map_view(uint8_t v)
+static void set_map_view(uint8_t v) __z88dk_fastcall
 {
     if (v && (view_w < MM_CELLS_W || view_h < MM_CELLS_H))
         return;                             /* nowhere to draw it */
@@ -1537,7 +1545,7 @@ static void jump_to(void)
    V_disaster_at, and the tornado and the plane have their sprites' places. */
 static uint8_t disaster_taken, crash_was, melt_was;
 
-static void jump_xy(const uint8_t *xy)
+static void jump_xy(const uint8_t *xy) __z88dk_fastcall
 {
     cur_x = xy[0] < MAP_W ? xy[0] : MAP_W - 1;      /* (the plane starts at the right edge, one column past the map) */
     cur_y = xy[1] < MAP_H ? xy[1] : MAP_H - 1;
@@ -1675,7 +1683,7 @@ static void apply_tool(void)
     tool_apply();
 }
 
-static void set_tool(uint8_t t)
+static void set_tool(uint8_t t) __z88dk_fastcall
 {
     if (t < NUM_TOOLS)
         tool = t;
@@ -1733,7 +1741,7 @@ void game_budget(void)
 /* The evaluation screen, modal. */
 static void game_evaluation(void)
 {
-    PLAT_OVERLAY_MODAL();
+    PLAT_OVERLAY_EVAL();
 #ifdef HAVE_MOUSE_POINTER
     plat_mouse_pointer_erase();
 #endif
@@ -1792,7 +1800,12 @@ static void game_scenario_end(void)
 /* Save the city to a file, or load one. */
 static void game_save(void)
 {
-    if (city_save() == CITY_QUIT)
+    uint8_t r;
+
+    PLAT_OVERLAY_FILE();
+    r = city_save();
+    PLAT_OVERLAY_GAME();
+    if (r == CITY_QUIT)
         quit = 1;
     else
         file_done();
@@ -1802,7 +1815,9 @@ static void game_load(void)
 {
     uint8_t r;
 
+    PLAT_OVERLAY_FILE();
     r = city_load();
+    PLAT_OVERLAY_GAME();
     if (r == CITY_QUIT) {
         quit = 1;
     } else if (r == CITY_BROKEN) {
@@ -2043,6 +2058,7 @@ static void handle_key(uint8_t k)
 }
 
 /* ---- start-up ----------------------------------------------------------------- */
+PLAT_CODE_START_OVERLAY
 static void choose_layout(void)
 {
     cols = plat_cols();
@@ -2070,9 +2086,6 @@ static void choose_layout(void)
     panel_col = panel_row = 0;                      /* the status panel, the top third */
     panel_w = cols;
     panel_h = map_row;
-#endif
-#ifdef HAVE_POPUP_MENU
-    menu_area(map_row, view_h);                     /* the menus and dialogues are centred in the map */
 #endif
 }
 
@@ -2164,6 +2177,8 @@ title_done:
     plat_flush();
 }
 
+PLAT_CODE_HOME
+
 /* One city, from the title screen until it is quit or replaced. */
 #if defined(HAVE_MOUSE) && defined(HAVE_MINIMAP) && defined(HAVE_MINIMAP_SQUARE)
 /* The pointer on a mini map.  A press on the picture goes to that place: the city's cursor is the tile (the picture is two pixels a tile) and the view is
@@ -2226,7 +2241,9 @@ static void play_city(void)
     uint8_t k, countdown, ticking = 0, full, last_ox = 0, last_oy = 0;
     struct status st, last_st;
 
+    PLAT_OVERLAY_START();
     title_screen();
+    PLAT_OVERLAY_START_END();
 
 #ifdef HAVE_BUDGET
     V_auto_budget = 0;                      /* the annual budget waits for the player (game_budget) */
@@ -2479,7 +2496,12 @@ void game_run(void)
 #ifdef HAVE_MOUSE
     plat_mouse_init();
 #endif
+    PLAT_OVERLAY_START();
     choose_layout();
+    PLAT_OVERLAY_START_END();
+#ifdef HAVE_POPUP_MENU
+    menu_area(map_row, view_h);                     /* the menus and dialogues are centred in the map */
+#endif
     do {
         quit = restart = 0;
         play_city();

@@ -17,7 +17,7 @@ void menu_area(uint8_t row, uint8_t rows);
 /* Draw an empty centred box of `height` rows; its top left corner is menu_col, menu_row.  Text goes at column + 2, from
    row + 1. */
 extern uint8_t menu_col, menu_row;
-void menu_box(uint8_t height);
+void menu_box(uint8_t height) __z88dk_fastcall;
 
 /* Draw a centred box, wait for a choice, and return the selected item's value.
    Q/A and cursor up/down move the marker; ENTER or SPACE selects; ESC cancels. */

@@ -24,6 +24,7 @@ MACHINES = {
     'z88': ('Cambridge Z88', ['z88rom/simcity.epr', 'z88rom/simcity.app', 'z88rom/simcity.ap0', 'z88rom/simcity.ap1', 'z88rom/simcity.a5p']),
     'multi8': ('Mitsubishi Multi 8', ['multi8/simcity.cas']),
     'pc88': ('NEC PC-8801', ['pc88/simcity.d88']),
+    'pc6001mk2': ('NEC PC-6001mkII', ['pc6001mk2/simcity.d88']),
     'x1': ('Sharp X1', ['x1/simcity.d88']),
     'spc1000': ('Samsung SPC-1000', ['spc1000/simcity.spc']),
     'msx2': ('MSX2 (MSX-DOS 2)', ['msx2/simcity.dsk', 'msx2/disk/SIMCITY.COM', 'msx2/disk/SIMCITY.UI', 'msx2/disk/SIMCITY.SIM', 'msx2/disk/SIMCITY.HI', 'msx2/disk/TILES.DAT']),
