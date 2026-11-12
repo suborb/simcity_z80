@@ -64,6 +64,7 @@ PCW = build/pcw/simcity.com
 FP1100 = build/fp1100/simcity.d88
 MZ2500 = build/mz2500/simcity.dsk
 SMC777 = build/smc777/simcity.d88
+MZ800 = build/mz800/simcity.d88
 PASOPIA7 = build/pasopia7/simcity.dsk
 PC6001MK2 = build/pc6001mk2/simcity.d88
 LYNXDISC = build/lynx/simcity.ldf
@@ -80,12 +81,12 @@ TESTK  = build/testnative/simcity.bin
 TESTA  = build/testart/simcity.bin
 TESTSC = build/testscroll/simcity.bin
 
-.PHONY: mk2demo all dist aqplus z88rom zx multi8 pc88 x1 spc1000 msx2 einstein256 cpm pcw fp1100 mz2500 smc777 lynx pasopia7 pc6001mk2 sam zxn zxn-debug amiga-scenarios test testpanel testmodal testnarrow testsprites testoverlay testhires testnative testart testscroll check golden uitest tiletest z88test deadcode clean
+.PHONY: mk2demo all dist aqplus z88rom zx multi8 pc88 x1 spc1000 msx2 einstein256 cpm pcw fp1100 mz2500 mz800 smc777 lynx pasopia7 pc6001mk2 sam zxn zxn-debug amiga-scenarios test testpanel testmodal testnarrow testsprites testoverlay testhires testnative testart testscroll check golden uitest tiletest z88test deadcode clean
 
-all: aqplus z88rom zx multi8 pc88 pc6001mk2 x1 spc1000 msx2 einstein256 pcw fp1100 mz2500 smc777 lynx pasopia7 sam zxn
+all: aqplus z88rom zx multi8 pc88 pc6001mk2 x1 spc1000 msx2 einstein256 pcw fp1100 mz2500 mz800 smc777 lynx pasopia7 sam zxn
 
 # The zip files for distribution, one for each machine (build/dist/; tools/make_dist.py)
-dist: aqplus z88rom multi8 pc88 pc6001mk2 x1 spc1000 msx2 einstein256 pcw fp1100 mz2500 smc777 lynx pasopia7 sam zxn
+dist: aqplus z88rom multi8 pc88 pc6001mk2 x1 spc1000 msx2 einstein256 pcw fp1100 mz2500 mz800 smc777 lynx pasopia7 sam zxn
 	python3 tools/make_dist.py
 
 aqplus: $(AQPLUS)
@@ -102,6 +103,7 @@ pcw: $(PCW)
 fp1100: $(FP1100)
 mz2500: $(MZ2500)
 smc777: $(SMC777)
+mz800: $(MZ800)
 pasopia7: $(PASOPIA7)
 pc6001mk2: $(PC6001MK2)
 lynx:   $(LYNXDISC)
@@ -126,7 +128,7 @@ testscroll: $(TESTSC)
 $(AQPLUS): $(DEPS)
 	@mkdir -p $(@D)
 	$(ZCC) +aquarius -clib=aqplus -subtype=allram -create-app $(COMMON) -pragma-include:target/aqplus/zpragma.inc \
-	    -Itarget/aqplus -DTARGET_AQPLUS -Ca-DTARGET_AQPLUS -Ca-DSIM_STACK_TOP=0x0c00 -Ca-DHAVE_MINIMAP_SQUARE -Ca-DHAVE_SOUND -Ca-DAY_SKIP=43 -Ca-DAY_SCALE $(GAME) $(ENTROPY) $(MENU) target/aqplus/plat_sound.asm target/common/ay_hooks.asm target/common/ay_sfx.asm $(FIELDS) $(MMNATIVE) $(AQPLUS_PLATFORM) -o $(@D)/simcity.bin
+	    -Itarget/aqplus -DTARGET_AQPLUS -Ca-DTARGET_AQPLUS -Ca-DSIM_STACK_TOP=0x0c00 -Ca-DHAVE_MINIMAP_SQUARE -Ca-DHAVE_SOUND -Ca-DAY_SCALE $(GAME) $(ENTROPY) $(MENU) target/aqplus/plat_sound.asm target/common/ay_hooks.asm target/common/ay_sfx.asm $(FIELDS) $(MMNATIVE) $(AQPLUS_PLATFORM) -o $(@D)/simcity.bin
 	@for s in _aq_blit8 aq_cell _plat_put _plat_clear _plat_init aq_scratch aq_box _font_8x8_bbc_system _view_tile_art _aq_icons; do \
 	    v=`sed -n "s/^$$s *= \$$\([0-9A-Fa-f]*\).*/\1/p" $(@D)/simcity.map | head -1`; \
 	    [ -z "$$v" ] || [ $$(( 0x$$v )) -lt 49152 ] || { echo "$$s is not below $$C000 (at $$v)"; rm -f $@; exit 1; }; done
@@ -291,6 +293,22 @@ $(PC6001MK2): $(DEPS) target/pc6001mk2/mmap.inc
 	    echo "pc6001mk2: the program and its data end at $$dtail, the uninitialised data at $$tail, the overlays are $$g (game), $$mo (modal), $$fo (file), $$so (start-up) and $$eo (evaluation) bytes in the window at $(PC6001MK2_WINDOW) (the stack is under \$$C000)"; \
 	    [ $$(( 0x$$tail )) -le $$(( $(PC6001MK2_WINDOW) )) ] || { echo "the uninitialised data runs into the overlay window: raise PC6001MK2_WINDOW here and in target/pc6001mk2/mmap.inc"; rm -f $@; exit 1; }; \
 	    [ $$(( $(PC6001MK2_WINDOW) + big )) -le $$(( $(PC6001MK2_TOP) )) ] || { echo "the overlay window runs into the stack"; rm -f $@; exit 1; }
+
+# The Sharp MZ-800 (z88dk +mz800: a boot disc, the IPL reads the program to $1200 and moves it to $2000).  The 320x200 screen of two bit planes (the art of the PC-6001mkII), the video RAM
+# paged in at $8000-$9FFF only while something is drawn: the drawing code (section code_driver: the platform's asm) must end below $8000 (checked); the sound is the SN76489 (target/mz800/plat_sound.asm).
+MZ800_SLOT_BASE = 256           # the first logical sector of the save slots (target/mz800/plat_files.c: SLOT_BASE): the program (and the header sector) must end before it
+MZ800_TOP = 0xFC00              # the uninitialised data must end below this: the stack (1 KB; the other 8 bit targets' deepest was 320-570 bytes) is the top of memory
+MZ800_PLATFORM = target/mz800/plat_sound.asm target/common/ay_hooks.asm target/common/ay_sfx.asm target/mz800/plat_mz800.c target/mz800/plat_mz800.asm target/mz800/plat_input.asm target/mz800/plat_minimap.asm target/mz800/plat_sprite.asm target/mz800/plat_minimap.c target/mz800/plat_text.c target/mz800/plat_files.c
+$(MZ800): $(DEPS)
+	@mkdir -p $(@D)
+	$(ZCC) +mz800 -create-app $(COMMON) -pragma-include:target/mz800/zpragma.inc -Itarget/mz800 -Ca-Itarget/mz800 \
+	    -DTARGET_MZ800 -Ca-DTARGET_MZ800 -Ca-DHAVE_MINIMAP_SQUARE -Ca-DFMT_WIDTH=40 -Ca-DHAVE_SOUND -Ca-DAY_SHADOW -Ca-DAY_SHADOW_TICK $(GAME) $(ENTROPY) $(MENU) $(FIELDS) $(MMNATIVE) $(MZ800_PLATFORM) -o $(@D)/simcity
+	@dtail=`sed -n 's/^__DATA_END_tail *= \$$\([0-9A-Fa-f]*\).*/\1/p' $(@D)/simcity.map`; tail=`sed -n 's/^__BSS_END_tail *= \$$\([0-9A-Fa-f]*\).*/\1/p' $(@D)/simcity.map`; \
+	    echo "mz800: the program and its data end at $$dtail, the uninitialised data at $$tail (the stack is the top of memory)"; \
+	    ctail=`sed -n 's/^__code_driver_tail *= \$$\([0-9A-Fa-f]*\).*/\1/p' $(@D)/simcity.map`; \
+	    [ $$(( 0x$$ctail )) -le 32768 ] || { echo "the drawing code (section code_driver) ends at $$ctail, past the video RAM window at $$8000"; rm -f $@; exit 1; }; \
+	    [ $$(( 0x$$tail )) -le $$(( $(MZ800_TOP) )) ] || { echo "the uninitialised data runs into the stack"; rm -f $@; exit 1; }; \
+	    [ $$(( 1 + ( 0x$$dtail - 0x2000 + 255 ) / 256 )) -le $(MZ800_SLOT_BASE) ] || { echo "the program runs into the save slots (logical sector $(MZ800_SLOT_BASE): target/mz800/plat_files.c)"; rm -f $@; exit 1; }
 
 # A cartridge to try z88dk's PC-6001mkII 320x200 console and graphics (test/pc6001mk2/cart_demo.c): the ROM subtype with -clib=mk2, padded to 16 KB.  In MAME: mame pc6001mk2 -cart1 build/pc6001mk2/mk2demo.rom
 MK2DEMO = build/pc6001mk2/mk2demo.rom

@@ -57,6 +57,7 @@ The following targets are available:
 * Sam Coupe
 * Samsung SPC-1000
 * Sharp MZ-2500
+* Sharp MZ-800
 * Sharp X1
 * Sony SMC-777
 * Tatung Einstein 256
@@ -81,7 +82,7 @@ The following targets are available:
 | `assets/` | Binary art and sound data used by the targets (tiles, icons, `st_sounds.bin`). |
 | `tools/` | `extract_text.py` (generate `ui/text.h` and `ui/text.c`), `find_dead.py`, `make_map_art.py`, `make_z88_icons.py`, the `extract_*` and `make_*assets` scripts that build `assets/` from the Atari ST and CPC versions (the ST sound effects are packed by `extract_st_sounds.py` and played by `target/common/ay_sfx.asm`). |
 | `Makefile` | Builds every platform (`make zx`, `make aqplus`, ...) and runs the tests (`make check`). |
-| `test/` | `run_all.sh` runs everything (the SAM MAME tests only when `SAM_MAME` is set, the Next's JNext tests only when `JNEXT` is; the Lynx's `test/lynx/*_test.py` run under z88dk-ticks on z88dk's `lib/ticks/memory/lynx.lua` and `wd1793.lua`, and `test/lynx/roundtrip.sh` is the MAME save/load check; the Pasopia 7's `test/pasopia7/*_test.py` run on z88dk's `lib/ticks/memory/pasopia7.lua` and `upd765.lua`; the PC-6001mkII's `test/pc6001mk2/*_test.py` run on z88dk's `lib/ticks/memory/pc6001mk2.lua`). |
+| `test/` | `run_all.sh` runs everything (the SAM MAME tests only when `SAM_MAME` is set, the Next's JNext tests only when `JNEXT` is; the Lynx's `test/lynx/*_test.py` run under z88dk-ticks on z88dk's `lib/ticks/memory/lynx.lua` and `wd1793.lua`, and `test/lynx/roundtrip.sh` is the MAME save/load check; the Pasopia 7's `test/pasopia7/*_test.py` run on z88dk's `lib/ticks/memory/pasopia7.lua` and `upd765.lua`; the PC-6001mkII's `test/pc6001mk2/*_test.py` run on z88dk's `lib/ticks/memory/pc6001mk2.lua`; the MZ-800's `test/mz800/*_test.py` run on z88dk's `lib/ticks/memory/mz800.lua`, and the ones that boot the game need the 16 KB MZ-800 monitor ROM, `MZ800_ROM`). |
 | `PORTING.md` | Strategy, status and plan. |
 
 ### Building and testing

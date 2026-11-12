@@ -65,6 +65,18 @@ python3 test/pc6001mk2/disc_test.py
 python3 test/pc6001mk2/irq_test.py
 python3 test/pc6001mk2/console_test.py
 echo
+echo "== Sharp MZ-800: z88dk's console, graphics and keyboard, and its disc driver against the model's MB8876 (needs z88dk's mz800 library, appmake +mz800 and lib/ticks/memory/mz800.lua); the IPL boot, the game, save/load and the sound on the model with the real 16 KB monitor ROM (MZ800_ROM; skipped without it)"
+make mz800
+python3 test/mz800/disk_test.py
+python3 test/mz800/lib_test.py
+if [ -f "${MZ800_ROM:-$HOME/emu/sord/binary/binary/mz800/Sharp MZ-800 BIOS (19xx)(Sharp).bin}" ]; then
+  python3 test/mz800/ipl_boot.py
+  python3 test/mz800/game_test.py
+  python3 test/mz800/sound_test.py
+else
+  echo "(MZ800_ROM not found: the IPL boot, game and sound tests are skipped)"
+fi
+echo
 echo "== CP/M BDOS under z88dk-ticks: sequential files, search, a line, the time, truncate"
 python3 test/cpm/bdos.py
 echo

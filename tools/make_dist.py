@@ -32,6 +32,7 @@ MACHINES = {
     'pcw': ('Amstrad PCW (CP/M Plus)', ['pcw/simcity.dsk', 'pcw/simcity.com']),
     'fp1100': ('Casio FP-1100', ['fp1100/simcity.d88']),
     'mz2500': ('Sharp MZ-2500', ['mz2500/simcity.dsk']),
+    'mz800': ('Sharp MZ-800', ['mz800/simcity.d88']),
     'smc777': ('Sony SMC-777', ['smc777/simcity.d88']),
     'lynx': ('Camputers Lynx 128K', ['lynx/simcity.ldf']),
     'pasopia7': ('Toshiba Pasopia 7', ['pasopia7/simcity.dsk']),

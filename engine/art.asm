@@ -56,7 +56,11 @@ view_udgs:
         IFDEF   TARGET_PC6001MK2
         BINARY  "assets/map_art_mk2.bin"
         ELSE
+        IFDEF   TARGET_MZ800                    ; (the same four pens as the PC-6001mkII)
+        BINARY  "assets/map_art_mk2.bin"
+        ELSE
         BINARY  "assets/map_art.bin"
+        ENDIF
         ENDIF
         ENDIF
         defc    view_attrs = view_udgs + ART_TILE_ATTRS

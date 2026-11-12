@@ -1,0 +1,37 @@
+Running it
+----------
+simcity.d88 is a disk image for a Sharp MZ-800 (or MZ-1500) with a disk
+unit (the MZ-1E05 or an MB8876 interface): a 3.5 inch 2DD disk, 2 sides,
+80 cylinders, 16 sectors of 256 bytes.  Put it in the first drive and reset
+the machine in MZ-800 mode (not MZ-700 mode): the IPL boots it, printing
+the game's name while it loads, and with no BASIC or other disk needed.
+
+The game uses the 320 x 200 screen in four colours (green, yellow, blue and
+red, chosen from the sixteen by the palette) as a grid of 40 by 25 cells,
+and the SN76489 for the sound effects.  The map is 96 x 96 squares and
+there are no scenarios.
+
+Cities are saved to and loaded from the same disk, in one of six slots
+after the game itself (so the disk must not be write protected, and the
+image file is changed when you save).  The game lists the saved cities when
+you load or save, so you pick one; a new name takes a free slot, and an old
+one is replaced.
+
+This has been run in Takeda's EmuZ-800, and its disk driver and the game
+under a model of the machine (with the real IPL ROM).  A real MZ-800 is
+untested.
+
+Keys
+----
+  Cursor keys     move the cursor one square (shifted: eight)
+  Q A O P         up, down, left, right (shifted: eight squares)
+  Space           build with the tool
+  , .             the previous and next tool
+  0 - 9           choose a tool by its number
+  H               pause or run
+  + -             faster, slower
+  M               the next mini map (X goes back to the city)
+  B               the budget            V   the evaluation
+  S               save the city         L   load a city
+  X               the game menu: new city, options, disasters
+  BREAK           the same menu (and Esc in the dialogues)
