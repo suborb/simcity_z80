@@ -9,65 +9,21 @@
         PUBLIC  _pc_wait_frame
         EXTERN  snd_tick
         EXTERN  snd_init
+        EXTERN  __pc6001mk2_irq_table
 
         defc    TIMER_DIV = 31          ; ($F6) 487.5 * 4 / 32 = 60.9 Hz
 
-; void pc_irq_init(void): the vector table (in the first page boundary inside irq_buf, as the table's address is $xx00: its high byte goes in I), the timer's rate, interrupts on
+; void pc_irq_init(void): the timer's vector in the crt's table (z88dk's allrammk2.asm: at a page boundary, every other vector "ei, reti"; the keyboard's
+; is z88dk's too, see pc_key_take: it has set I and IM 2 before main), the timer's rate, interrupts on.  ($F3, the custom interrupt masks and vectors, and the timer's vector $F7 = $06 are left as the ROM has them.)
 _pc_irq_init:
         di
-        ld      hl,irq_buf
-        ld      a,l
-        or      a
-        jr      z,aligned
-        inc     h
-aligned: ld     l,0
-        push    hl
-        ld      de,irq_default
-        ld      b,20                    ; the vectors $00, $02 ... $26
-ifill:  ld      (hl),e
-        inc     hl
-        ld      (hl),d
-        inc     hl
-        djnz    ifill
-        pop     hl
-        push    hl
-        ld      de,$02                  ; the keyboard
-        add     hl,de
-        ld      de,key_isr
-        ld      (hl),e
-        inc     hl
-        ld      (hl),d
-        pop     hl
-        push    hl
-        ld      de,$06                  ; the timer
-        add     hl,de
-        ld      de,timer_isr
-        ld      (hl),e
-        inc     hl
-        ld      (hl),d
-        pop     hl
-        ld      a,h
-        ld      i,a
-        im      2
-        xor     a
-        out     ($f3),a                 ; (the custom interrupt masks and vectors: the defaults)
-        ld      a,6
-        out     ($f7),a                 ; the timer's vector
+        ld      hl,timer_isr
+        ld      (__pc6001mk2_irq_table+$06),hl  ; the timer
         ld      a,TIMER_DIV
         out     ($f6),a
-        xor     a
-        ld      (key_last),a
         call    snd_init
         ei
         ret
-
-key_isr:
-        push    af
-        in      a,($90)
-        ld      (key_last),a
-        pop     af
-        ei
-        reti
 
 timer_isr:
         push    af
@@ -81,20 +37,10 @@ timer_isr:
         ei
         reti
 
-irq_default:
-        ei
-        reti
-
-; uint8_t pc_key_take(void): the last key code sent (0 if none since the last call)
-_pc_key_take:
-        di
-        ld      a,(key_last)
-        ld      l,a
-        ld      h,0
-        xor     a
-        ld      (key_last),a
-        ei
-        ret
+; uint8_t pc_key_take(void): the last key code sent (0 if none since the last call): z88dk's, which also has the keyboard's interrupt (pc6001mk2_key.asm: it
+; sets the vector $02 and IM 2 at start-up, before main)
+        EXTERN  _pc6001mk2_key_take
+        defc    _pc_key_take = _pc6001mk2_key_take
 
 ; uint16_t pc_ticks(void): the timer's count
 _pc_ticks:
@@ -118,6 +64,4 @@ wf:     halt
         ret
 
         SECTION bss_user
-irq_buf:    defs 512
-key_last:   defb 0
 ticks:      defw 0
