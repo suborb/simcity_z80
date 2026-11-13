@@ -1,27 +1,46 @@
 Running it
 ----------
 simcity.tap is a cassette image for the Samsung SPC-1500 (built with
-z88dk): the machine's own tape format, at 17,000 samples a second, one
-byte for each bit (the MAME cassette format).  In MAME ("mame spc1500
--cass simcity.tap"): at the IPL menu press C (cassette system), then
-start the tape with the emulator's Play.  The program loads in about
-three and a half minutes, unpacks itself and starts.  It needs the
+z88dk): the machine's own tape format, loaded by the IPL's "C: cassette
+system", in the form MAME reads (one byte, 0 or 1, for each bit of the
+tape).  In MAME:
+
+    mame spc1500 -cass simcity.tap
+
+1. At the IPL menu press C (cassette system): the IPL says it is looking
+   for a program from CMT and to push the play button.
+2. Start the tape with MAME's tape control (Play).  The IPL prints the
+   program's name, loads it, and the program unpacks itself and starts.
+
+The program takes about three and a half minutes to load.  It needs the
 machine's 64 KB of RAM.
 
 The game uses the X1-style 40 column mode: 320 x 200 pixels, three bit
 planes (eight colours).  Sound is on the AY.
 
-Saving a city writes it to the cassette in the machine's own format and
-loading reads it back: press RECORD and PLAY (or PLAY), then a key;
-Shift+Break stops a tape operation.  Loading looks for the name you
-type, passing over other files on the tape.
+Saving and loading
+------------------
+Choose Save City or Load City (X or Esc opens the menu) and type a name,
+up to 12 characters: capitals and lower case are different names.
+
+Saving writes the city (about 9 KB) to the cassette in the machine's own
+format, which takes about a minute and a half: press RECORD and PLAY,
+then a key.  In MAME, give it a new file to record to ("mame spc1500
+-cass city.wav") and start the recording from the tape control first.
+
+Loading: press PLAY.  The game passes over any other files on the tape
+until it finds the name.  To load in MAME, give it the recorded file
+("-cass city.wav") and press Play.
+
+Shift+Break together stops a tape operation.  The machine's motor relay
+is turned on and off by the game.
 
 This has been tried in MAME only, not on a real machine.
 
 Keys
 ----
-  Cursor keys     move the cursor one square (shifted: eight)
-  O P Q A         left, right, up, down
+  Cursor keys     move the cursor one square (with Shift: eight)
+  O P Q A         left, right, up, down (with Shift: eight)
   Space, Enter    build with the tool
   , .             the previous and next tool
   0 - 9           choose a tool by its number
@@ -32,3 +51,4 @@ Keys
   S               save the city         L   load a city
   X, Esc          the game menu: save, load, budget, evaluation,
                   mini map, options, disasters, new city
+  Backspace       when typing a name, deletes the last character

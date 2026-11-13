@@ -1,5 +1,8 @@
-/* Samsung SPC-1500 capabilities for the shared game UI: the X1-like video, the 40 column mode's 320x200 screen of three planes (8 colours), used as 40 columns
-   of 8x8 cells, a cell a byte wide (target/spc1500/plat_spc1500.asm).  The screen is reached through I/O ports, not memory.  */
+/* Samsung SPC-1500 capabilities for the shared game UI: the X1-like video, the
+   40 column mode's 320x200 screen of three planes (8 colours), used as 40
+   columns
+   of 8x8 cells, a cell a byte wide (target/spc1500/plat_spc1500.asm).  The
+   screen is reached through I/O ports, not memory. */
 #ifndef PLAT_CONFIG_H
 #define PLAT_CONFIG_H
 
@@ -8,7 +11,8 @@
 #define HAVE_TILES
 #define HAVE_BITMAP
 #define HAVE_POPUP_MENU     /* shared box + message selector over the bitmap */
-/* the box's frame in the placer's line pieces: 1 and 2 the top corners, 3 and 4 the bottom ones, 5 across, 6 down */
+/* the box's frame in the placer's line pieces: 1 and 2 the top corners, 3 and 4
+   the bottom ones, 5 across, 6 down */
 #define BOX_TOP    "\1\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\2"
 #define BOX_BOTTOM "\3\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\5\4"
 #define BOX_SIDE   "\6                            \6"

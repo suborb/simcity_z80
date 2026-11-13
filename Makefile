@@ -223,12 +223,12 @@ $(X1): $(DEPS) build/common/tiles_640x200_3bpp.bin
 
 # The Samsung SPC-1500 (z88dk +spc1500: a cassette for the IPL's "C: cassette system", a 128 byte bootstrap that unpacks the ZX0 packed program at $0000).  Its video is the X1's (a
 # 40 column mode of three planes behind I/O ports, 320x200), so the X1's pictures and drawing code serve.  The uninitialised data follows the image and the stack is the top of memory.
-SPC1500_PLATFORM = target/spc1500/plat_spc1500.asm target/spc1500/plat_files.asm target/spc1500/plat_files.c target/common/plat_charts.c target/common/minimap_key_3bpp.c target/common/plat_icons.c
+SPC1500_PLATFORM = target/spc1500/plat_spc1500.asm target/spc1500/plat_files.c target/common/plat_charts.c target/common/minimap_key_3bpp.c target/common/plat_icons.c
 
-$(SPC1500): $(DEPS) build/common/tiles_640x200_3bpp.bin target/spc1500/keytab.inc
+$(SPC1500): $(DEPS) build/common/tiles_640x200_3bpp.bin
 	@mkdir -p $(@D)
 	$(ZCC) +spc1500 -create-app $(COMMON) -pragma-include:target/spc1500/zpragma.inc \
-	    -Itarget/spc1500 -DTARGET_SPC1500 -Ca-DTARGET_SPC1500 -Ca-I. -Ca-DHAVE_MINIMAP_SQUARE -Ca-DHAVE_SOUND -Ca-DAY_PORT16 -Ca-DAY_ADDR_PORT=0x1C00 -Ca-DAY_DATA_PORT=0x1B00 $(GAME) $(ENTROPY) $(MENU) target/spc1500/plat_sound.asm target/common/ay_hooks.asm target/common/ay_sfx.asm $(FIELDS) $(MMNATIVE) $(LINEEDIT) $(SPC1500_PLATFORM) -o $(@D)/simcity.bin
+	    -Itarget/spc1500 -DTARGET_SPC1500 -Ca-DTARGET_SPC1500 -Ca-I. -Ca-DHAVE_MINIMAP_SQUARE -Ca-DHAVE_SOUND -Ca-DAY_MSX -Ca-DAY_PORT16 -Ca-DAY_ADDR_PORT=0x1C00 -Ca-DAY_DATA_PORT=0x1B00 $(GAME) $(ENTROPY) $(MENU) target/spc1500/plat_sound.asm target/common/ay_hooks.asm target/common/ay_sfx.asm $(FIELDS) $(MMNATIVE) $(LINEEDIT) $(SPC1500_PLATFORM) -o $(@D)/simcity.bin
 	@size=`sed -n 's/^__BSS_END_tail *= \$$\([0-9A-Fa-f]*\).*/\1/p' $(@D)/simcity.map`; echo "spc1500: image and uninitialised data end at $$size (the stack is the top of memory)"
 
 # The Sony SMC-777 (z88dk +smc777: a boot disc, the IPL loads the program at $0100).  A 320x200 screen of a nibble a pixel behind I/O ports (8 digital colours used), the
