@@ -1,0 +1,34 @@
+Running it
+----------
+simcity.tap is a cassette image for the Samsung SPC-1500 (built with
+z88dk): the machine's own tape format, at 17,000 samples a second, one
+byte for each bit (the MAME cassette format).  In MAME ("mame spc1500
+-cass simcity.tap"): at the IPL menu press C (cassette system), then
+start the tape with the emulator's Play.  The program loads in about
+three and a half minutes, unpacks itself and starts.  It needs the
+machine's 64 KB of RAM.
+
+The game uses the X1-style 40 column mode: 320 x 200 pixels, three bit
+planes (eight colours).  Sound is on the AY.
+
+Saving a city writes it to the cassette in the machine's own format and
+loading reads it back: press RECORD and PLAY (or PLAY), then a key;
+Shift+Break stops a tape operation.  Loading looks for the name you
+type, passing over other files on the tape.
+
+This has been tried in MAME only, not on a real machine.
+
+Keys
+----
+  Cursor keys     move the cursor one square (shifted: eight)
+  O P Q A         left, right, up, down
+  Space, Enter    build with the tool
+  , .             the previous and next tool
+  0 - 9           choose a tool by its number
+  H               pause or run
+  + -             faster, slower
+  M               the next mini map (X goes back to the city)
+  B               the budget            V   the evaluation
+  S               save the city         L   load a city
+  X, Esc          the game menu: save, load, budget, evaluation,
+                  mini map, options, disasters, new city

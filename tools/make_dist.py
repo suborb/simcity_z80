@@ -16,7 +16,7 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 
 # What may go in a zip: the files a person runs, and nothing the build leaves beside them (maps, listings, objects, the pieces
 # a disk image is made of).  Each machine's files are named below, and checked against this and, afterwards, against the zip.
-RUNNABLE = {'.aqx', '.bin', '.epr', '.app', '.ap0', '.ap1', '.a5p', '.cas', '.d88', '.spc', '.mgt', '.nex', '.dsk', '.com', '.ui', '.sim', '.hi', '.dat', '.ldf'}
+RUNNABLE = {'.aqx', '.bin', '.epr', '.app', '.ap0', '.ap1', '.a5p', '.cas', '.d88', '.spc', '.mgt', '.nex', '.dsk', '.com', '.ui', '.sim', '.hi', '.dat', '.ldf', '.tap'}
 
 # machine: (name for the people, [files in build/ to include])
 MACHINES = {
@@ -27,6 +27,7 @@ MACHINES = {
     'pc6001mk2': ('NEC PC-6001mkII', ['pc6001mk2/simcity.d88']),
     'x1': ('Sharp X1', ['x1/simcity.d88']),
     'spc1000': ('Samsung SPC-1000', ['spc1000/simcity.spc']),
+    'spc1500': ('Samsung SPC-1500', ['spc1500/simcity.tap']),
     'msx2': ('MSX2 (MSX-DOS 2)', ['msx2/simcity.dsk', 'msx2/disk/SIMCITY.COM', 'msx2/disk/SIMCITY.UI', 'msx2/disk/SIMCITY.SIM', 'msx2/disk/SIMCITY.HI', 'msx2/disk/TILES.DAT']),
     'einstein256': ('Tatung Einstein 256', ['einstein256/simcity.dsk']),
     'pcw': ('Amstrad PCW (CP/M Plus)', ['pcw/simcity.dsk', 'pcw/simcity.com']),

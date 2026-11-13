@@ -57,6 +57,7 @@ MULTI8 = build/multi8/simcity.cas
 PC88   = build/pc88/simcity.d88
 X1     = build/x1/simcity.d88
 SPC1000 = build/spc1000/simcity.spc
+SPC1500 = build/spc1500/simcity.tap
 MSX2   = build/msx2/simcity.img
 EINSTEIN256 = build/einstein256/simcity.com
 CPM = build/cpm/simcity.com
@@ -81,12 +82,12 @@ TESTK  = build/testnative/simcity.bin
 TESTA  = build/testart/simcity.bin
 TESTSC = build/testscroll/simcity.bin
 
-.PHONY: mk2demo all dist aqplus z88rom zx multi8 pc88 x1 spc1000 msx2 einstein256 cpm pcw fp1100 mz2500 mz800 smc777 lynx pasopia7 pc6001mk2 sam zxn zxn-debug amiga-scenarios test testpanel testmodal testnarrow testsprites testoverlay testhires testnative testart testscroll check golden uitest tiletest z88test deadcode clean
+.PHONY: mk2demo all dist aqplus z88rom zx multi8 pc88 x1 spc1000 spc1500 msx2 einstein256 cpm pcw fp1100 mz2500 mz800 smc777 lynx pasopia7 pc6001mk2 sam zxn zxn-debug amiga-scenarios test testpanel testmodal testnarrow testsprites testoverlay testhires testnative testart testscroll check golden uitest tiletest z88test deadcode clean
 
-all: aqplus z88rom zx multi8 pc88 pc6001mk2 x1 spc1000 msx2 einstein256 pcw fp1100 mz2500 mz800 smc777 lynx pasopia7 sam zxn
+all: aqplus z88rom zx multi8 pc88 pc6001mk2 x1 spc1000 spc1500 msx2 einstein256 pcw fp1100 mz2500 mz800 smc777 lynx pasopia7 sam zxn
 
 # The zip files for distribution, one for each machine (build/dist/; tools/make_dist.py)
-dist: aqplus z88rom multi8 pc88 pc6001mk2 x1 spc1000 msx2 einstein256 pcw fp1100 mz2500 mz800 smc777 lynx pasopia7 sam zxn
+dist: aqplus z88rom multi8 pc88 pc6001mk2 x1 spc1000 spc1500 msx2 einstein256 pcw fp1100 mz2500 mz800 smc777 lynx pasopia7 sam zxn
 	python3 tools/make_dist.py
 
 aqplus: $(AQPLUS)
@@ -96,6 +97,7 @@ multi8: $(MULTI8)
 pc88:   $(PC88)
 x1:     $(X1)
 spc1000: $(SPC1000)
+spc1500: $(SPC1500)
 msx2:   $(MSX2)
 einstein256: $(EINSTEIN256)
 cpm: $(CPM)
@@ -218,6 +220,16 @@ $(X1): $(DEPS) build/common/tiles_640x200_3bpp.bin
 	$(ZCC) +x1 -create-app $(COMMON) -pragma-include:target/x1/zpragma.inc \
 	    -Itarget/x1 -DTARGET_X1 -Ca-DTARGET_X1 -Ca-DHAVE_MINIMAP_SQUARE -Ca-DHAVE_SOUND -Ca-DAY_PORT16 -Ca-DAY_ADDR_PORT=0x1C00 -Ca-DAY_DATA_PORT=0x1B00 $(GAME) $(ENTROPY) $(MENU) target/x1/plat_sound.asm target/common/ay_hooks.asm target/common/ay_sfx.asm $(FIELDS) $(MMNATIVE) $(LINEEDIT) $(X1_PLATFORM) -o $(@D)/simcity.bin
 	@size=`sed -n 's/^__BSS_END_tail *= \$$\([0-9A-Fa-f]*\).*/\1/p' $(@D)/simcity.map`; echo "x1: image and uninitialised data end at $$size (the stack is the top of memory)"
+
+# The Samsung SPC-1500 (z88dk +spc1500: a cassette for the IPL's "C: cassette system", a 128 byte bootstrap that unpacks the ZX0 packed program at $0000).  Its video is the X1's (a
+# 40 column mode of three planes behind I/O ports, 320x200), so the X1's pictures and drawing code serve.  The uninitialised data follows the image and the stack is the top of memory.
+SPC1500_PLATFORM = target/spc1500/plat_spc1500.asm target/spc1500/plat_files.asm target/spc1500/plat_files.c target/common/plat_charts.c target/common/minimap_key_3bpp.c target/common/plat_icons.c
+
+$(SPC1500): $(DEPS) build/common/tiles_640x200_3bpp.bin target/spc1500/keytab.inc
+	@mkdir -p $(@D)
+	$(ZCC) +spc1500 -create-app $(COMMON) -pragma-include:target/spc1500/zpragma.inc \
+	    -Itarget/spc1500 -DTARGET_SPC1500 -Ca-DTARGET_SPC1500 -Ca-I. -Ca-DHAVE_MINIMAP_SQUARE -Ca-DHAVE_SOUND -Ca-DAY_PORT16 -Ca-DAY_ADDR_PORT=0x1C00 -Ca-DAY_DATA_PORT=0x1B00 $(GAME) $(ENTROPY) $(MENU) target/spc1500/plat_sound.asm target/common/ay_hooks.asm target/common/ay_sfx.asm $(FIELDS) $(MMNATIVE) $(LINEEDIT) $(SPC1500_PLATFORM) -o $(@D)/simcity.bin
+	@size=`sed -n 's/^__BSS_END_tail *= \$$\([0-9A-Fa-f]*\).*/\1/p' $(@D)/simcity.map`; echo "spc1500: image and uninitialised data end at $$size (the stack is the top of memory)"
 
 # The Sony SMC-777 (z88dk +smc777: a boot disc, the IPL loads the program at $0100).  A 320x200 screen of a nibble a pixel behind I/O ports (8 digital colours used), the
 # Amstrad CPC game's pictures as nibbles (tools/smc777_tiles.py), the screen 40 columns of 8x8 cells like the X1's.  The uninitialised data follows the image and the stack is

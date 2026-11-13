@@ -56,6 +56,7 @@ The following targets are available:
 * NEC PC-88
 * Sam Coupe
 * Samsung SPC-1000
+* Samsung SPC-1500
 * Sharp MZ-2500
 * Sharp MZ-800
 * Sharp X1
