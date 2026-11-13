@@ -43,27 +43,31 @@ The rebuild utilises the original simulation engine and assets. Instead of being
 simulation and UI cooperatively multitask which allows porting to hardware where an interrupt source
 is not available.
 
-The following targets are available:
+The following targets are available. 
 
-* Amstrad PCW
-* Aquarius+
-* Cambridge z88
-* Camputers Lynx 128K
-* Casio FP-1100
-* Mitsubishi Multi8
-* MSX
-* NEC PC-6001mkII
-* NEC PC-88
-* Sam Coupe
-* Samsung SPC-1000
-* Samsung SPC-1500
-* Sharp MZ-2500
-* Sharp MZ-800
-* Sharp X1
-* Sony SMC-777
-* Tatung Einstein 256
-* Toshiba Pasopia 7
-* ZX Spectrum Next
+| Machine | Graphics | Sound | Save/load | Mouse | Scenarios |
+|---|---|---|---|---|---|
+| Amstrad PCW | ZX | none | disc | no | no |
+| Aquarius+ | ZX | ST (AY) | SD (ESP32) | yes | no |
+| Cambridge z88 | ZX | 1-bit | RAM filing | no | no |
+| Camputers Lynx 128K | CPC | ST (DAC) | disc | no | no |
+| Casio FP-1100 | CPC | none | disc | no | no |
+| Mitsubishi Multi8 | CPC | ST (PSG) | tape | no | no |
+| MSX2 | ST | ST (PSG) | disc | yes | no |
+| NEC PC-6001mkII | ZX | custom (PSG) | disc | no | no |
+| NEC PC-88 | CPC | none | disc | no | no |
+| Sam Coupe | ST | ST (SAA 1099) | disc | yes | no |
+| Samsung SPC-1000 | ZX | ST (AY) | tape | no | no |
+| Samsung SPC-1500 | CPC | ST (AY) | tape | no | no |
+| Sharp MZ-2500 | ST | ST (SSG) | disc | yes | no |
+| Sharp MZ-800 | ZX | ST (SN76489) | disc | no | no |
+| Sharp X1 | CPC | ST (PSG) | disc | no | no |
+| Sony SMC-777 | CPC | none | disc | no | no |
+| Tatung Einstein 256 | ST | ST (AY) | disc | no | no |
+| Toshiba Pasopia 7 | CPC | ST (SN76489) | disc | no | no |
+| ZX Spectrum Next | Amiga | ST (AY) | SD (esxDOS) | yes | yes |
+
+The generic CP/M build (`make cpm`) is text only: a character a square, saved to disc, no sound, mouse or scenarios.
 
 
 ### Layout
