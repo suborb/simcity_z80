@@ -1844,24 +1844,19 @@ static void handle_key(uint8_t k)
 {
     switch (k) {
 #ifndef HAVE_POINTER                                /* (with a pointer the keys move it: plat_pointer_keys, and Space or Enter is its button) */
-    case KEY_LEFT:   move_cursor(-1, 0); break;
-    case KEY_RIGHT:  move_cursor(1, 0);  break;
-    case KEY_UP:     move_cursor(0, -1); break;
-    case KEY_DOWN:   move_cursor(0, 1);  break;
-    case KEY_FAR_LEFT:  move_cursor(-8, 0); break;
-    case KEY_FAR_RIGHT: move_cursor(8, 0);  break;
-    case KEY_FAR_UP:    move_cursor(0, -8); break;
-    case KEY_FAR_DOWN:  move_cursor(0, 8);  break;
 #if !defined(HAVE_MENUS) || defined(HAVE_KEYS_QAOP)    /* the letters, for keyboards without cursor keys (or for a tester's sanity) */
-    case 'o': move_cursor(-1, 0); break;
-    case 'p': move_cursor(1, 0);  break;
-    case 'q': move_cursor(0, -1); break;
-    case 'a': move_cursor(0, 1);  break;
-    case 'O': move_cursor(-8, 0); break;
-    case 'P': move_cursor(8, 0);  break;
-    case 'Q': move_cursor(0, -8); break;
-    case 'A': move_cursor(0, 8);  break;
+#define KEY_LETTER(c) case c:
+#else
+#define KEY_LETTER(c)
 #endif
+    case KEY_LEFT:   KEY_LETTER('o') move_cursor(-1, 0); break;
+    case KEY_RIGHT:  KEY_LETTER('p') move_cursor(1, 0);  break;
+    case KEY_UP:     KEY_LETTER('q') move_cursor(0, -1); break;
+    case KEY_DOWN:   KEY_LETTER('a') move_cursor(0, 1);  break;
+    case KEY_FAR_LEFT:  KEY_LETTER('O') move_cursor(-8, 0); break;
+    case KEY_FAR_RIGHT: KEY_LETTER('P') move_cursor(8, 0);  break;
+    case KEY_FAR_UP:    KEY_LETTER('Q') move_cursor(0, -8); break;
+    case KEY_FAR_DOWN:  KEY_LETTER('A') move_cursor(0, 8);  break;
     case ' ': case KEY_ENTER:  apply_tool(); break;
 #endif
     case ',': set_tool((uint8_t)(tool ? tool - 1 : NUM_TOOLS - 1)); break;
@@ -1914,7 +1909,7 @@ static void handle_key(uint8_t k)
 #ifdef HAVE_POPUP_MENU
     case MENU_BUDGET:
 #endif
-#ifndef TARGET_AQPLUS
+#ifdef HAVE_CMD_KEYS
     case CMD_BUDGET:
 #endif
         game_budget(); break;
@@ -1924,7 +1919,7 @@ static void handle_key(uint8_t k)
 #ifdef HAVE_POPUP_MENU
     case MENU_EVALUATION:
 #endif
-#ifndef TARGET_AQPLUS
+#ifdef HAVE_CMD_KEYS
     case CMD_EVALUATION:
 #endif
         game_evaluation(); break;
@@ -1934,7 +1929,7 @@ static void handle_key(uint8_t k)
 #ifdef HAVE_POPUP_MENU
     case MENU_SAVE:
 #endif
-#ifndef TARGET_AQPLUS
+#ifdef HAVE_CMD_KEYS
     case CMD_SAVE:
 #endif
         game_save(); break;
@@ -1944,7 +1939,7 @@ static void handle_key(uint8_t k)
 #ifdef HAVE_POPUP_MENU
     case MENU_LOAD:
 #endif
-#ifndef TARGET_AQPLUS
+#ifdef HAVE_CMD_KEYS
     case CMD_LOAD:
 #endif
         game_load(); break;
@@ -1956,7 +1951,7 @@ static void handle_key(uint8_t k)
 #ifdef HAVE_POPUP_MENU
     case MENU_NEW_CITY:
 #endif
-#ifndef TARGET_AQPLUS
+#ifdef HAVE_CMD_KEYS
     case CMD_NEW_CITY:
 #endif
         restart = quit = 1; break;
@@ -1966,12 +1961,14 @@ static void handle_key(uint8_t k)
 #ifdef HAVE_POPUP_MENU
     case MENU_PAUSE:
 #endif
-#ifndef TARGET_AQPLUS
+#ifdef HAVE_CMD_KEYS
     case CMD_PAUSE:
 #endif
         V_simulation_speed = (V_simulation_speed == 3) ? 1 : 3; break;
 #ifndef TARGET_AQPLUS
     case CMD_QUIT: quit = 1; break;
+#endif
+#ifdef HAVE_CMD_KEYS
     case CMD_MAP_OFF: set_map_view(0); break;
 #endif
 #ifdef HAVE_POPUP_MENU
@@ -1981,7 +1978,7 @@ static void handle_key(uint8_t k)
         else V_simulation_speed = 2;
         break;
 #endif
-#ifndef TARGET_AQPLUS
+#ifdef HAVE_CMD_KEYS
     case CMD_SPEED_FAST:       V_simulation_speed = 0; break;
     case CMD_SPEED_NORMAL:     V_simulation_speed = 1; break;
     case CMD_SPEED_SLOW:       V_simulation_speed = 2; break;
@@ -1995,7 +1992,7 @@ static void handle_key(uint8_t k)
         redraw |= REDRAW_TEXT;
         break;
 #endif
-#ifndef TARGET_AQPLUS
+#ifdef HAVE_CMD_KEYS
     case CMD_POWER_COAL:
         power_nuclear = 0;
         redraw |= REDRAW_TEXT;
@@ -2008,14 +2005,14 @@ static void handle_key(uint8_t k)
 #ifdef HAVE_POPUP_MENU
     case MENU_DISASTERS_TOGGLE: V_disaster_reset = !V_disaster_reset; break;
 #endif
-#ifndef TARGET_AQPLUS
+#ifdef HAVE_CMD_KEYS
     case CMD_DISASTERS_ON:     V_disaster_reset = 0; break;
     case CMD_DISASTERS_OFF:    V_disaster_reset = 1; break;
 #endif
 #ifdef HAVE_POPUP_MENU
     case MENU_BULLDOZE_TOGGLE: V_auto_bulldoze = !V_auto_bulldoze; break;
 #endif
-#ifndef TARGET_AQPLUS
+#ifdef HAVE_CMD_KEYS
     case CMD_AUTOBULLDOZE_ON:  V_auto_bulldoze = 1; break;
     case CMD_AUTOBULLDOZE_OFF: V_auto_bulldoze = 0; break;
 #endif
@@ -2023,7 +2020,7 @@ static void handle_key(uint8_t k)
 #ifdef HAVE_POPUP_MENU
     case MENU_SOUND_TOGGLE:    sound_enabled = !sound_enabled; break;
 #endif
-#ifndef TARGET_AQPLUS
+#ifdef HAVE_CMD_KEYS
     case CMD_SOUND_ON:         sound_enabled = 1; break;
     case CMD_SOUND_OFF:        sound_enabled = 0; break;
 #endif
@@ -2031,13 +2028,13 @@ static void handle_key(uint8_t k)
 #ifdef HAVE_POPUP_MENU
     case MENU_AUTOBUDGET_TOGGLE: V_auto_budget = !V_auto_budget; break;
 #endif
-#ifndef TARGET_AQPLUS
+#ifdef HAVE_CMD_KEYS
     case CMD_AUTOBUDGET_ON:    V_auto_budget = 1; break;
     case CMD_AUTOBUDGET_OFF:   V_auto_budget = 0; break;
     case CMD_REDRAW:           redraw = REDRAW_ALL; break;
 #endif
     default:
-#ifndef TARGET_AQPLUS
+#ifdef HAVE_CMD_KEYS
         if (k >= CMD_MAP && k < CMD_MAP + MM_VIEWS)
             set_map_view((uint8_t)(k - CMD_MAP + 1));
         else
@@ -2049,7 +2046,7 @@ static void handle_key(uint8_t k)
         else if (k >= MENU_DISASTER && k < MENU_DISASTER + 6)
             V_disaster_option = (uint8_t)(k - MENU_DISASTER + 1);
 #endif
-#ifndef TARGET_AQPLUS
+#ifdef HAVE_CMD_KEYS
         else if (k >= CMD_DISASTER && k < CMD_DISASTER + 6)
             V_disaster_option = (uint8_t)(k - CMD_DISASTER + 1);       /* the engine starts it a few frames on */
 #endif

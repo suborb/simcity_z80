@@ -148,7 +148,9 @@ extern void plat_mouse_pointer_refresh(void);
 #define KEY_ESC    27
 
 /* Commands.  A platform with menus (the Z88's OZ menus) returns these from plat_key() just as it
-   returns keys; the game treats them like the keys that do the same thing.  The codes are the
+   returns keys; the game treats them like the keys that do the same thing.  Only a platform whose
+   plat_config.h defines HAVE_CMD_KEYS (the Z88 and the test platform) compiles them in; the compact
+   popup menu returns only CMD_QUIT, which is always handled.  The codes are the
    range OZ gives menu commands (0x81..0xB0), which the Z88's application descriptor uses. */
 #define CMD_DISASTER        0x81    /* + 0..5 (0x81..0x86): start a fire, flood, earthquake, air crash, tornado or meltdown */
 #define CMD_NEW_CITY        0x90    /* back to the title screen, then a new city */

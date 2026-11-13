@@ -13,6 +13,7 @@
 #define HAVE_SPRITES
 #define HAVE_TEXT_WINDOW
 #define HAVE_MENUS
+#define HAVE_CMD_KEYS                   /* plat_key() returns the CMD_* menu commands (ui/platform.h) */
 #define HAVE_KEYS_QAOP         /* Q A O P (and shifted, 8 cells) move the cursor as well as the cursor keys */
 #define HAVE_ICONS
 #define HAVE_DEMAND_BARS       /* the demand indicators as bars of user defined characters (plat_demand()) */

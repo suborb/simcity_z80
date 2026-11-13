@@ -5,6 +5,7 @@
    Spectrum's (the 32 column budget and evaluation layouts). */
 #ifndef PLAT_CONFIG_H
 #define PLAT_CONFIG_H
+#define HAVE_CMD_KEYS                   /* the tests send the CMD_* commands (ui/platform.h) */
 
 #ifdef TEST_SCROLL                      /* the Aquarius+-shaped screen, whose platform can scroll the map by moving its pixels */
 #define TEST_HIRES_MINIMAP
