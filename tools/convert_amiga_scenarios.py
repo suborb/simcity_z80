@@ -7,6 +7,10 @@ piece per row.  This writes fixed-size records (engine map, 1-pixel-per-cell
 colour preview, metadata) and 16 KB banks for the NEX linker.
 
     python3 tools/convert_amiga_scenarios.py build/amiga_scenarios build/zxn
+
+With --sam TILES (the SAM Coupe's build/sam/tiles.bin, for its palette) it writes the SAM's files instead: scen0..scen7, one file a scenario for the disc
+(the power map, the traffic map run length coded, the map: see sam_scenario), and picker.bin, which the picker keeps in a bank of its own (the previews, a
+colour of the SAM's 16 to each 2x2 tiles at 4 bits, then the metadata).
 """
 import argparse
 import glob
@@ -429,8 +433,99 @@ def build_banks(records, outdir):
     return asm
 
 
+# ---- the SAM Coupe: a file a scenario on the disc, and the picker's bank ----------------------------------------------------
+SAM_PREVIEW_W, SAM_PREVIEW_H = W // 2, H // 2           # the preview, a colour to each 2x2 tiles
+SAM_PREVIEW_BYTES = SAM_PREVIEW_W * SAM_PREVIEW_H // 2  # 4 bits a pixel, the left pixel in the high nibble (as the SAM's screen)
+SAM_PREVIEWS_AT = 0
+SAM_META_AT = 8 * SAM_PREVIEW_BYTES
+SAM_PICKER_BYTES = SAM_META_AT + 8 * META_BYTES
+SAM_FILE_MAX = 16384                                    # a file is read into one 16 KB page
+
+
+def sam_rle(data):
+    """Run length coding: pairs of a count (1..255) and a byte.  The traffic map is all zeros but the busy roads."""
+    out = bytearray()
+    i = 0
+    while i < len(data):
+        n = 1
+        while i + n < len(data) and data[i + n] == data[i] and n < 255:
+            n += 1
+        out += bytes((n, data[i]))
+        i += n
+    return bytes(out)
+
+
+def sam_unrle(data, size):
+    out = bytearray()
+    for i in range(0, len(data), 2):
+        out += bytes((data[i + 1],)) * data[i]
+    if len(out) != size:
+        raise ValueError(f'run length data makes {len(out)} bytes, not {size}')
+    return bytes(out)
+
+
+SAM_RLE_MAX = 512                                       # room for the coded traffic map
+
+
+def sam_scenario(converted, power, traffic):
+    """The scenario file, a fixed length (plat_scenario_read asks for it whole): the power map (POWER_BYTES), the length of the coded traffic map (16 bits), the coded
+    traffic map padded to SAM_RLE_MAX bytes, and then the map (MAP_BYTES)."""
+    packed = sam_rle(traffic)
+    if sam_unrle(packed, TRAFFIC_BYTES) != traffic:
+        raise ValueError('traffic map does not survive its coding')
+    if len(packed) > SAM_RLE_MAX:
+        raise ValueError(f'the coded traffic map is {len(packed)} bytes: over {SAM_RLE_MAX}')
+    data = power + struct.pack('<H', len(packed)) + packed.ljust(SAM_RLE_MAX, b'\0') + converted
+    if len(data) > SAM_FILE_MAX:
+        raise ValueError(f'a scenario file is {len(data)} bytes: over {SAM_FILE_MAX}')
+    return data
+
+
+def sam_colours(tiles_path):
+    """The SAM palette of the pictures (the first 16 bytes of tiles.bin) as (red, green, blue) 0..255."""
+    from st_tiles_3bpp import sam_level
+    pal = open(tiles_path, 'rb').read(16)
+    return [tuple(round(v * 255 / 7) for v in sam_level(c)) for c in pal]
+
+
+def sam_preview(preview, palette, sam_palette):
+    """The 120x100 preview (colours 16 + the Amiga palette's index) as 60x50 pixels in the SAM's 16 colours, 4 bits each: the colour that most of each 2x2
+    tiles have (the first of them on a tie), nearest in RGB."""
+    near = {}
+
+    def sam_of(c):
+        if c not in near:
+            rgb = palette[c - 16]
+            near[c] = min(range(16), key=lambda i: sum((rgb[k] - sam_palette[i][k]) ** 2 for k in range(3)))
+        return near[c]
+
+    pixels = bytearray()
+    for y in range(SAM_PREVIEW_H):
+        for x in range(SAM_PREVIEW_W):
+            votes = [sam_of(preview[(2 * y + dy) * W + 2 * x + dx]) for dy in (0, 1) for dx in (0, 1)]
+            pixels.append(max(votes, key=lambda c: (votes.count(c), -votes.index(c))))
+    return bytes(pixels[i] << 4 | pixels[i + 1] for i in range(0, len(pixels), 2))
+
+
+def build_sam(scenarios, outdir):
+    os.makedirs(outdir, exist_ok=True)
+    picker = bytearray(SAM_PICKER_BYTES)
+    for i, (converted, power, traffic, preview, meta) in enumerate(scenarios):
+        if converted is not None:
+            with open(os.path.join(outdir, f'scen{i}'), 'wb') as f:
+                f.write(sam_scenario(converted, power, traffic))
+        at = SAM_PREVIEWS_AT + i * SAM_PREVIEW_BYTES
+        picker[at:at + SAM_PREVIEW_BYTES] = preview
+        at = SAM_META_AT + i * META_BYTES
+        picker[at:at + META_BYTES] = meta
+    path = os.path.join(outdir, 'picker.bin')
+    open(path, 'wb').write(picker)
+    return path
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument('--sam', metavar='TILES', help="write the SAM Coupe's files (see above); TILES is its tiles.bin")
     ap.add_argument('scenario_dir')
     ap.add_argument('outdir')
     ap.add_argument('--tiles', default='assets/amiga_1meg_tiles.bin')
@@ -439,6 +534,8 @@ def main():
         sys.exit(f'{args.tiles}: missing Amiga 1 Meg tile palette')
     palette = image_palette(args.tiles)
     records = []
+    scenarios = []
+    sam_pal = sam_colours(args.sam) if args.sam else None
     files = sorted(glob.glob(os.path.join(args.scenario_dir, '*.map')))
     if not files:
         sys.exit(f'{args.scenario_dir}: no extracted .map files')
@@ -451,12 +548,21 @@ def main():
         converted, buildings, power, traffic = convert_map(path, None)
         preview = preview_pixels(path, args.tiles, palette)
         records.append(converted + preview + power + traffic + make_meta(info))
+        if sam_pal:
+            scenarios.append((converted, power, traffic, sam_preview(preview, palette, sam_pal), make_meta(info)))
         print(f'{info["title"]:16} {info["year"]}: converted map, {buildings} intact zones, preview and scenario text')
     expected = 8
     if len(records) > expected:
         raise ValueError(f'expected at most {expected} scenarios, got {len(records)}')
     while len(records) < expected:
         records.append(bytes(RECORD_BYTES))
+    if sam_pal:
+        while len(scenarios) < expected:
+            scenarios.append((None, None, None, bytes(SAM_PREVIEW_BYTES), bytes(META_BYTES)))
+        path = build_sam(scenarios, args.outdir)
+        sizes = [os.path.getsize(os.path.join(args.outdir, f'scen{i}')) for i in range(len(files))]
+        print(f'{len(files)} scenario files ({min(sizes)} to {max(sizes)} bytes), picker {SAM_PICKER_BYTES} bytes -> {path}')
+        return
     asm = build_banks(records, args.outdir)
     print(f'{len(records)} scenario slots ({RECORD_BYTES} bytes each) -> {asm}')
 

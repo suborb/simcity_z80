@@ -509,10 +509,36 @@ SAM_NUMBERING = cpc
 else
 SAM_NUMBERING = ours
 endif
-$(SAM): $(DEPS) build/sam/tiles.bin build/sam/anim.inc
+# The UI overlays (SAM_OVERLAYS=1: target/sam/mmap.inc, tools/sam_overlays.py): the budget and evaluation screens, the title screen and the file, menu, prompt, sprite and mini map code are
+# linked at one window in the low RAM and kept in the pictures' block, where plat_overlay_load copies the one that is wanted.  SAM_WINDOW is mmap.inc's OVERLAY_WINDOW.
+SAM_OVERLAYS ?= 1
+SAM_WINDOW = 0x6B00
+ifeq ($(SAM_OVERLAYS),1)
+SAM_OVERLAY_FLAGS = -DSAM_OVERLAYS -Ca-DSAM_OVERLAYS
+SAM_OVERLAY_STEP = python3 tools/sam_overlays.py $(@D) $(SAM_WINDOW) build/sam/tiles.bin
+else
+SAM_OVERLAY_STEP = true
+endif
+# The scenarios (on by default; SAM_SCENARIOS=0 builds the game without them): a file each on the disc, which the file module reads, and the picker's previews and texts in a
+# 32 KB block after the pictures (see tools/convert_amiga_scenarios.py --sam).  The z88dk-appmake +mgt here needs its --add-file.
+SAM_SCENARIOS ?= 1
+# The map is 120x100 (the scenarios': the SAM has no 96x96 build; the overlays, the mini map's panning and the scenarios are made for this size).  The power search's list and queue are the Next's
+# size in the engine bank; the SAM's window is full, so they are small.
+SAM_MAPFLAGS = -DMAP_W=120 -DMAP_H=100 -Ca-DMAP_W=120 -Ca-DMAP_H=100 -Ca-DPOWER_STATION_SLOTS_MAX=32 -Ca-DPOWER_QUEUE_ENTRIES_MAX=256
+ifeq ($(SAM_SCENARIOS),1)
+SAM_SCENARIO_DIR = build/sam/scenarios
+SAM_SCENARIO_ADD = $(foreach i,0 1 2 3 4 5 6 7,-a $(SAM_SCENARIO_DIR)/scen$(i):scen$(i))
+SAM_SCENARIO_BLOCK = $(SAM_SCENARIO_DIR)/picker.bin
+SAM_SCENARIO_FINE = $(if $(filter 1,$(SAM_FINE)),--fine)
+SAM_SCENARIO_FLAGS = -DHAVE_SCENARIOS -Ca-DHAVE_SCENARIOS
+SAM_SCENARIO_C = target/sam/scenarios.c target/sam/scenario_msg.c
+$(SAM_SCENARIO_DIR)/picker.bin: $(wildcard assets/amiga_scenarios/*) assets/amiga_1meg_tiles.bin tools/convert_amiga_scenarios.py tools/st_tiles_3bpp.py build/sam/tiles.bin
+	python3 tools/convert_amiga_scenarios.py $(SAM_SCENARIO_FINE) --sam build/sam/tiles.bin assets/amiga_scenarios $(@D)
+endif
+$(SAM): $(DEPS) build/sam/tiles.bin build/sam/anim.inc $(SAM_SCENARIO_BLOCK)
 	@mkdir -p $(@D)
 	$(ZCC) +sam -subtype=allram $(COMMON) -pragma-include:target/sam/zpragma.inc \
-	    -pragma-define:MMAP=-1 -Itarget/sam -Ca-Itarget/sam -DTARGET_SAM -DHAVE_MOUSE -DHAVE_POINTER -DHAVE_MOUSE_POINTER -Ca-DTARGET_SAM $(SAM_FINE_FLAG) -Ca-DENGINE_SIM_SECTION -Ca-DFMT_WIDTH=32 -Ca-DHAVE_MINIMAP_SQUARE -Ca-DHAVE_SOUND -Ca-DAY_SAA -Ca-DAY_ISR $(SAM_TEST) target/sam/plat_sam_files.asm $(GAME) $(ENTROPY) $(MENU) target/sam/plat_sound.asm target/common/ay_hooks.asm target/common/ay_sfx.asm $(FIELDS) $(MMNATIVE) $(LINEEDIT) $(SAM_PLATFORM_NOFILES) -o $(@D)/simcity.bin
+	    -pragma-define:MMAP=-1 -Itarget/sam -Ca-Itarget/sam -DTARGET_SAM -DHAVE_MOUSE -DHAVE_POINTER -DHAVE_MOUSE_POINTER -Ca-DTARGET_SAM $(SAM_FINE_FLAG) -Ca-DENGINE_SIM_SECTION -Ca-DFMT_WIDTH=32 -Ca-DHAVE_MINIMAP_SQUARE -Ca-DHAVE_SOUND -Ca-DAY_SAA -Ca-DAY_ISR $(SAM_MAPFLAGS) $(SAM_OVERLAY_FLAGS) $(SAM_SCENARIO_FLAGS) $(SAM_TEST) target/sam/plat_sam_files.asm $(GAME) $(ENTROPY) $(MENU) target/sam/plat_sound.asm target/common/ay_hooks.asm target/common/ay_sfx.asm $(FIELDS) $(MMNATIVE) $(LINEEDIT) $(SAM_PLATFORM_NOFILES) $(SAM_SCENARIO_C) -o $(@D)/simcity.bin
 	@size=`wc -c < $(@D)/simcity.bin`; echo "sam image: $$size bytes (BSS trimmed from the disk image)"; \
 	    [ $$size -le 65536 ] || { echo "the initialized image exceeds the 64 KB program window"; rm -f $@; exit 1; }
 	@# Screen-dependent routines must stay below $8000; mp_screen_end marks the start of the low code_driver section.
@@ -524,8 +550,9 @@ $(SAM): $(DEPS) build/sam/tiles.bin build/sam/anim.inc
 	    [ -n "$$v" ] && [ $$(( 0x$$v + 80 )) -le 32768 ] || { echo "the SAM lookup buffer is not in resident low RAM (mp_space at $$v)"; rm -f $@; exit 1; }
 	@v=`sed -n 's/^mp_dpage *= \$$\([0-9A-Fa-f]*\).*/\1/p' $(@D)/simcity.map`; \
 	    [ -n "$$v" ] && [ $$(( 0x$$v )) -lt 32768 ] || { echo "the screen restore state is not below $$8000 (mp_dpage at $$v)"; rm -f $@; exit 1; }
-	python3 -c "from pathlib import Path; low=Path('$(@D)/simcity.bin').read_bytes(); high=Path('$(@D)/simcity_code_simulation.bin').read_bytes(); assert len(low) <= 32768, f'low RAM image is {len(low)} bytes (limit 32768)'; assert len(high) <= 32768, f'high RAM image is {len(high)} bytes (limit 32768)'; Path('$(@D)/simcity.all').write_bytes(low + bytes(32768-len(low)) + high + bytes(32768-len(high)) + Path('build/sam/tiles.bin').read_bytes())"
-	z88dk-appmake +mgt -b $(@D)/simcity.all --org 0 --exec --default-dosfile $$ZCCCFG/../target/sam/classic/samdos2.bin -o $@
+	python3 -c "from pathlib import Path; low=Path('$(@D)/simcity.bin').read_bytes(); high=Path('$(@D)/simcity_code_simulation.bin').read_bytes(); assert len(low) <= 32768, f'low RAM image is {len(low)} bytes (limit 32768)'; assert len(high) <= 32768, f'high RAM image is {len(high)} bytes (limit 32768)'; Path('$(@D)/simcity.all').write_bytes(low + bytes(32768-len(low)) + high + bytes(32768-len(high)) + Path('build/sam/tiles.bin').read_bytes()); ex=Path('$(SAM_SCENARIO_BLOCK)') if '$(SAM_SCENARIO_BLOCK)' else None; ex and Path('$(@D)/simcity.all').write_bytes(Path('$(@D)/simcity.all').read_bytes().ljust(98304, bytes(1)) + ex.read_bytes())"
+	$(SAM_OVERLAY_STEP)
+	z88dk-appmake +mgt -b $(@D)/simcity.all --org 0 --exec --default-dosfile $$ZCCCFG/../target/sam/classic/samdos2.bin $(SAM_SCENARIO_ADD) -o $@
 
 # The ZX Spectrum Next: Layer 2 (256x192, a byte a pixel), the Atari ST's art in its 16 colours, as the SAM Coupe.  The program is linked at
 # $0000 (z88dk's zxn crt with CRT_ORG_CODE 0: target/zxn/zpragma.inc) and the stack and the uninitialised data are at

@@ -72,12 +72,20 @@
         defc    POWER_QUEUE_BYTES = 256         ; the original's
         ENDIF
         ELSE
+        IFDEF   POWER_STATION_SLOTS_MAX         ; a target short of RAM caps the list (stations beyond it are ignored: see build_powerstation_list); the original had 16
+        defc    POWER_STATION_SLOTS = POWER_STATION_SLOTS_MAX
+        ELSE
         defc    POWER_STATION_SLOTS = (MAP_W / 4) * (MAP_H / 4)
+        ENDIF
         defc    POWER_STATION_LIST_BYTES = 2 * (POWER_STATION_SLOTS+1) ; include the zero terminator
         IFDEF   POWER_SCAN_TEST
         defc    POWER_QUEUE_BYTES = 16 ; force refill in the focused scan test
         ELSE
+        IFDEF   POWER_QUEUE_ENTRIES_MAX         ; a target short of RAM makes the queue smaller (the search refills it more often; the original's was 128 entries)
+        defc    POWER_QUEUE_ENTRIES = POWER_QUEUE_ENTRIES_MAX
+        ELSE
         defc    POWER_QUEUE_ENTRIES = (2 * 1350) + 2 ; bounded frontier; overflow triggers a map rescan/refill
+        ENDIF
         defc    POWER_QUEUE_BYTES = 2 * POWER_QUEUE_ENTRIES
         ENDIF
         ENDIF

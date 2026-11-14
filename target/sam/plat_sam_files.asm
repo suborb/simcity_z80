@@ -21,6 +21,7 @@
 
         MODULE  plat_sam_files
         SECTION code_user
+        INCLUDE "mapsize.inc"
         PUBLIC  _plat_file_save
         PUBLIC  _plat_file_load
         PUBLIC  _plat_file_list
@@ -36,13 +37,13 @@
         defc    HSAVE = $84
         defc    HERAZ = $A6
         defc    HRSAD = $A0
-        defc    CITY_LEN = 31 + 96 * 96 ; a city file's length: the header block and the map (it is 96 x 96 here)
+        defc    CITY_LEN = 31 + MAP_CELLS ; a city file's length: the header block and the map (96 x 96 or the build's MAP_W x MAP_H: mapsize.inc; at most a page)
         defc    LIST_MAX = 8
         defc    FILE_CODE = 19
         defc    NAME = 10
         defc    DIFA = 80               ; the header the DOS passes back: this far above the UIFA
         defc    LMPR_BASIC = l_dcal + 2 ; where the startup code kept the LMPR it was started with
-        defc    FS_PAGE = 12            ; the spare page (the game's are 1 to 6 and the screen's 8 and 9) and the one above it
+        defc    FS_PAGE = 12            ; the spare page (the game's are 1 to 8 and the screen's 10 and 11) and the one above it
         defc    FS_WINDOW = $8000       ; where the file is, with FS_PAGE in
         defc    FS_STUB = $C000         ; and what the DOS call needs, in the page after
         defc    FS_SP = $C0F0
@@ -52,6 +53,7 @@
         defc    FS_STACK = $C100        ; (32 bytes)
         defc    FS_UIFA = $C200         ; the UIFA (48 bytes) and, 80 above it, the DIFA the DOS makes
         defc    FS_CHUNK = 128
+        defc    FS_SAVE = FS_WINDOW + $2000     ; (the spare page: the program's first 512 bytes while HRSAD has them)
 
 ; The arguments (copied from the stack at the entry points, below)
 _plat_file_save:
@@ -82,6 +84,75 @@ fs_exit:
         pop     hl
         pop     ix
         ret
+
+        IFDEF   HAVE_SCENARIOS
+; The scenarios' files (tools/convert_amiga_scenarios.py --sam): the power map, 16 bits for the length of the coded traffic map, that map padded to SCEN_RLE bytes, and the map, a fixed length.
+        PUBLIC  _plat_scenario_read
+        PUBLIC  _plat_scenario_peek
+        defc    SCEN_RLE = 512
+        defc    SCEN_MAP_AT = MMO_POWER_SIZE + 2 + SCEN_RLE
+        defc    SCEN_LEN = SCEN_MAP_AT + MAP_CELLS
+
+; uint8_t plat_scenario_read(const char *name, uint8_t *map) __smallc: the scenario file into the spare page, which keeps it (plat_scenario_peek reads the rest of it), and its map to `map`
+; (in the game's data): 0, or 1 if there is no such file.  Nothing else may use the spare page (the file module's other calls do) until the last peek.
+_plat_scenario_read:
+        ld      hl,2
+        add     hl,sp
+        ld      e,(hl)
+        inc     hl
+        ld      d,(hl)                  ; map
+        inc     hl
+        ld      c,(hl)
+        inc     hl
+        ld      b,(hl)                  ; name
+        ld      (f_b),de
+        ld      (f_name),bc
+        ld      hl,SCEN_LEN
+        ld      (f_alen),hl
+        ld      hl,0
+        ld      (f_blen),hl
+        push    ix
+        call    fs_setup
+        call    ld_fetch
+        ld      a,h
+        or      l
+        jr      nz,fs_exit
+        ld      hl,FS_WINDOW + SCEN_MAP_AT
+        ld      (fs_src),hl
+        ld      hl,(f_b)
+        ld      (fs_dst),hl
+        ld      hl,MAP_CELLS
+        ld      (fs_len),hl
+        call    fs_get
+        ld      hl,0
+        jr      fs_exit
+
+; void plat_scenario_peek(uint8_t *dst, uint16_t off, uint16_t len) __smallc: len bytes of the scenario file at `off`, to `dst` in the game's data
+_plat_scenario_peek:
+        ld      hl,2
+        add     hl,sp
+        ld      c,(hl)
+        inc     hl
+        ld      b,(hl)                  ; len
+        inc     hl
+        ld      e,(hl)
+        inc     hl
+        ld      d,(hl)                  ; off
+        inc     hl
+        ld      a,(hl)
+        inc     hl
+        ld      h,(hl)
+        ld      l,a                     ; dst
+        ld      (fs_dst),hl
+        ld      (fs_len),bc
+        ld      hl,FS_WINDOW
+        add     hl,de
+        ld      (fs_src),hl
+        in      a,(HMPR)
+        and     31
+        ld      (fs_dpage),a
+        jp      fs_get
+        ENDIF
 
 ; uint8_t plat_file_list(char *names) __smallc: the CODE files of a city's length in the disk's directory (up to LIST_MAX, in the order they are
 ; kept), as names of 13 bytes, the blanks at the end cut and a NUL.  The directory is the 40 sectors of tracks 0 to 3 of drive 1, two 256
@@ -117,14 +188,33 @@ fn_div: cp      10
         jr      fn_div
 fn_ts:  inc     a
         ld      e,a                     ; d = the track, e = the sector
-        ld      hl,FS_WINDOW
+; HRSAD does not read into the page HMPR gives $8000, as HLOAD does: it works the page out of the address (the DOS, at $5EE2: $4000 is page 0, $8000 page 1, $C000 page 2), so the sector goes to
+; the first 512 bytes of page 1, which are the start of the program (the vectors, the startup, l_dcal and the LMPR it keeps, the bottom of the stack).  Those are put away in the spare page
+; (interrupts off, as the vector at $0038 is not there while the DOS has them), the sector is copied to the spare page, and they go back.
+        di
+        push    de
+        ld      de,FS_SAVE
+        call    fs_p1_out
+        pop     de
+        ld      a,FS_PAGE
+        out     (HMPR),a
+        ld      hl,FS_WINDOW            ; (a destination in section C: page 1)
         ld      a,HRSAD
-        call    fs_dos
+        call    fs_dos_noei
+        push    hl
+        ld      de,FS_WINDOW
+        call    fs_p1_out               ; the sector, to the spare page
+        ld      hl,FS_SAVE
+        call    fs_p1_in                ; and the program's own bytes back
+        ld      a,FS_PAGE
+        out     (HMPR),a
+        IFDEF   HAVE_SOUND
+        ei                              ; (the sound's frame interrupt: the stub leaves them off)
+        ENDIF
+        pop     hl
         ld      a,h
         or      l
         jr      nz,fn_end
-        ld      a,FS_PAGE
-        out     (HMPR),a
         xor     a
         ld      (fl_blank),a
         ld      hl,FS_WINDOW
@@ -284,6 +374,27 @@ fl_fail1:
         ret
 
 ld_body:
+        call    ld_fetch
+        ld      a,h
+        or      l
+        ret     nz                      ; (hl = 1: the map is as it was)
+        ld      hl,FS_WINDOW            ; the header block, then the map, out of the spare page
+        ld      (fs_src),hl
+        ld      hl,(f_a)
+        ld      (fs_dst),hl
+        ld      hl,(f_alen)
+        ld      (fs_len),hl
+        call    fs_get
+        ld      hl,(f_b)
+        ld      (fs_dst),hl
+        ld      hl,(f_blen)
+        ld      (fs_len),hl
+        call    fs_get
+        ld      hl,0
+        ret
+
+; The file whose length is fs_total, from the disk into the spare page: hl = 0, or 1 if it is not there (or is more than the page holds)
+ld_fetch:
         call    fs_total
         ld      a,h
         cp      $40
@@ -304,18 +415,6 @@ ld_body:
         ld      a,h
         or      l
         jr      nz,fl_fail1             ; (the map is as it was: the file went to the spare page)
-        ld      hl,FS_WINDOW            ; the header block, then the map, out of the spare page
-        ld      (fs_src),hl
-        ld      hl,(f_a)
-        ld      (fs_dst),hl
-        ld      hl,(f_alen)
-        ld      (fs_len),hl
-        call    fs_get
-        ld      hl,(f_b)
-        ld      (fs_dst),hl
-        ld      hl,(f_blen)
-        ld      (fs_len),hl
-        call    fs_get
         ld      hl,0
         ret
 
@@ -444,6 +543,57 @@ mk_pad:
         ld      (FS_UIFA + 37),a        ; no execution address
         ret
 
+; 512 bytes of page 1 ($8000 with it paged in) to (de) in the spare page, 64 at a time through fs_xfer (fs_buf has the names so far); HMPR is left at the spare page
+fs_p1_out:
+        ld      hl,$8000
+        ld      b,8
+fo_l:   push    bc
+        push    de
+        ld      a,1
+        out     (HMPR),a
+        ld      de,fs_xfer
+        ld      bc,64
+        ldir
+        pop     de
+        ld      a,FS_PAGE
+        out     (HMPR),a
+        push    hl
+        ld      hl,fs_xfer
+        ld      bc,64
+        ldir
+        pop     hl
+        pop     bc
+        djnz    fo_l
+        ret
+
+; 512 bytes from (hl) in the spare page to page 1 ($8000); HMPR is left at page 1
+fs_p1_in:
+        ld      de,$8000
+        ld      b,8
+fi_l:   push    bc
+        push    de
+        ld      a,FS_PAGE
+        out     (HMPR),a
+        ld      de,fs_xfer
+        ld      bc,64
+        ldir
+        pop     de
+        ld      a,1
+        out     (HMPR),a
+        push    hl
+        ld      hl,fs_xfer
+        ld      bc,64
+        ldir
+        pop     hl
+        pop     bc
+        djnz    fi_l
+        ret
+
+; fs_dos without the interrupts coming back on after it
+fs_dos_noei:
+        ld      (FS_STUB + fs_hook - fs_stub_src),a
+        jp      FS_STUB
+
 ; Hook a (de, bc, hl as the hook wants them) with ix = the UIFA.  Returns hl = the error number, 0 if there was none.
 fs_dos_ix:
         ld      ix,FS_UIFA
@@ -501,3 +651,4 @@ fl_count: defb  0
 fl_gap:  defb   0
 fl_blank: defb  0
 fs_buf:  defs   FS_CHUNK
+fs_xfer: defs   64

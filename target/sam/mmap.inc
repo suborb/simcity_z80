@@ -44,3 +44,14 @@ IF __crt_org_far > 0
 ENDIF
     SECTION HIMEM_END
 ENDIF
+
+; The UI overlays (target/sam/plat_config.h, SAM_OVERLAYS; ui/platform.h): OVERLAY_0 the game's (the file, menu, prompt, sprite and mini map code), 1 the budget and evaluation
+; screens', 3 the start-up's, each linked at the one window in the low RAM and kept, whole, in the pictures' block (plat_overlay_load in plat_sam.asm copies one into the window).
+; (the sections are empty, and make no file, in a build without them.)  The Makefile checks that the resident code ends below the window and that the window and the stack fit under $8000.
+    defc    OVERLAY_WINDOW = $6B00
+    SECTION OVERLAY_0
+    org     OVERLAY_WINDOW
+    SECTION OVERLAY_1
+    org     OVERLAY_WINDOW
+    SECTION OVERLAY_3
+    org     OVERLAY_WINDOW

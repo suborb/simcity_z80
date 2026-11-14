@@ -403,6 +403,7 @@ static uint8_t sprites_on;                  /* any of them showing: nearly alway
 extern void plat_mouse_pointer_erase(void);
 extern void plat_mouse_pointer_refresh(void);
 extern void plat_mouse_pointer_before_map_row(void);
+extern void plat_mouse_pointer_before_minirow(uint8_t ty);
 extern void plat_forget_tile(uint8_t col, uint8_t row);
 #endif
 #ifdef HAVE_MOUSE
@@ -714,6 +715,9 @@ static void flat_base(uint8_t *colours, const uint8_t *base)
 
 static void draw_minirow(uint8_t sy) __z88dk_fastcall
 {
+#ifdef HAVE_MOUSE_POINTER
+    plat_mouse_pointer_before_minirow(sy);  /* (an arrow drawn in the picture comes off if the row is under it: what it saved is stale once the row changes) */
+#endif
 #ifdef HAVE_MINIMAP_SCROLL
     uint8_t source_sy = (uint8_t)(sy + mm_scroll_y);
 #else
@@ -752,6 +756,9 @@ static void draw_minirow(uint8_t sy) __z88dk_fastcall
 #endif
     plat_put_minirow(sy, colours);
 #endif
+#endif
+#ifdef HAVE_MOUSE_POINTER
+    plat_mouse_pointer_refresh();           /* (the arrow is back as soon as the row is) */
 #endif
 }
 
@@ -825,6 +832,9 @@ static void set_map_view(uint8_t v) __z88dk_fastcall
 }
 
 #ifdef HAVE_MINIMAP_SCROLL
+#ifndef MM_PAN_STEP
+#define MM_PAN_STEP 1                       /* the tiles the picture pans at the edge of it, at a time (plat_config.h: a platform that is slow to redraw makes it more: a pan costs the same whatever it uncovers) */
+#endif
 static void scroll_minimap(int8_t dx, int8_t dy)
 {
     int16_t x = (int16_t)mm_scroll_x + dx;
@@ -844,13 +854,19 @@ static void scroll_minimap(int8_t dx, int8_t dy)
         plat_minimap_scroll(mm_scroll_x);      /* the picture is incomplete: restart a full redraw */
         mm_pan_redraw = 0;
     } else {
+#ifdef HAVE_MOUSE_POINTER
+        plat_mouse_pointer_erase();         /* (the picture moves: the arrow is put back, at the pointer, by the loop) */
+#endif
         plat_minimap_pan((int8_t)(x - old_x), (int8_t)(y - old_y), mm_scroll_x);
         if (x != old_x && y == old_y) {
             mm_pan_redraw = 1;                 /* redraw the exposed tile column over a few frames */
             map_full = 1;
         } else if (y != old_y && x == old_x) {
+            uint8_t n = y > old_y ? (uint8_t)(y - old_y) : (uint8_t)(old_y - y), r;
+
             mm_pan_redraw = 0;
-            draw_minirow(dy > 0 ? 95 : 0);      /* only one tile row came into view */
+            for (r = 0; r < n; ++r)             /* only these tile rows came into view */
+                draw_minirow(y > old_y ? (uint8_t)(95 - r) : r);
         } else {
             plat_minimap_scroll(mm_scroll_x);
             mm_pan_redraw = 0;
@@ -1771,6 +1787,7 @@ static void game_scenario_end(void)
     uint8_t won;
 
     scenario_end = 0;
+    PLAT_OVERLAY_MODAL();                   /* (evaluate() and the message are the modal overlay's) */
     evaluate(&e);
     switch (scenario_goal) {
     case 2:  won = V_TrafficAverage < 80; break;
@@ -1785,6 +1802,7 @@ static void game_scenario_end(void)
         quit = 1;
     else
         redraw |= REDRAW_TEXT;
+    PLAT_OVERLAY_GAME();
 }
 #endif
 
@@ -2158,6 +2176,9 @@ title_again:
     }
 #endif
     V_InitialSeed = (uint16_t)(seed ^ first ^ (plat_clock() - first) ^ plat_entropy()) | 1; /* ...and the name took to type */
+#ifdef SEED_TEST
+    V_InitialSeed = SEED_TEST;                      /* (a test build: the same city whenever the level is chosen) */
+#endif
 #ifdef HAVE_SCENARIOS
 title_done:
 #endif
@@ -2227,7 +2248,7 @@ static void minimap_mouse(uint8_t events)
         else if (row == 23)
             dy = 1;
         if (dx | dy)
-            scroll_minimap(dx, dy);
+            scroll_minimap((int8_t)(dx * MM_PAN_STEP), (int8_t)(dy * MM_PAN_STEP));
     }
 #endif
 }

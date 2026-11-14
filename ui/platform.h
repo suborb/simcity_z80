@@ -398,7 +398,7 @@ extern void plat_minimap_mode(uint8_t on);
 #endif
 #ifdef HAVE_MINIMAP_SCROLL
 extern void plat_minimap_scroll(uint8_t x);
-#ifdef HAVE_SCROLL
+#if defined(HAVE_SCROLL) || defined(HAVE_MINIMAP_PAN)      /* (HAVE_MINIMAP_PAN: moves the picture without the map's scroll, which the SAM does not have) */
 extern void plat_minimap_pan(int8_t dx, int8_t dy, uint8_t x);
 #endif
 #endif

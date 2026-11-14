@@ -29,7 +29,7 @@
         defc    HMPR = 251
         defc    VMPR = 252
         defc    CLUT = 248
-        defc    SCRPAGE = 8             ; the screen's first page (and the video mode: 4 is bits 6 and 5)
+        defc    SCRPAGE = 10            ; the screen's first page (the pages before it are the program's, the pictures' and the scenarios' blocks: 1 to 8) (and the video mode: 4 is bits 6 and 5)
         defc    SCREEN = $8000
         defc    ICONS = $8000 + 24      ; the 14 tool icons in the block: after the palette and the attribute colours, 14 rows of 12 bytes each
         defc    ICON_BYTES = 14 * 12
@@ -68,6 +68,13 @@ mm_ty:    defb  0
 mm_cnt:   defb  0
 mm_dens:  defb  0
 mm_bptr:  defw  0
+mm_scx:   defb  0                       ; the tile column at the picture's left edge (a 96 x 96 window of the city)
+mm_edge:  defb  0                       ; after a pan sideways: 1 draws only the left tile column, 2 only the right (the rest was moved)
+mm_n:     defb  96                      ; the tiles of a row to draw, and the byte column of the first
+mm_x:     defb  0
+mm_pdy:   defb  0
+mm_pn:    defb  1                       ; the tiles a pan moved
+mm_pc:    defb  0
 mp_gl:    defs  8
 mp_pr:    defs  4
 mp_pal:   defs  24
@@ -1855,6 +1862,217 @@ mp_clear_cache:
         ldir
         ret
 
+; void plat_overlay_load(uint8_t overlay) __smallc: copies the UI overlay (ui/platform.h; target/sam/mmap.inc) from the pictures' block into the window: 0 the game's, 1 the
+; modal screens', 3 the start-up's (2, the file dialogues, are in 0, and 4, the evaluation, in 1).  An overlay already there is left.  The images are in slots in the block,
+; after the pictures (the Makefile checks that they fit): OVL_0_AT, OVL_1_AT and OVL_3_AT bytes from its start.  Interrupts are off for the copy (an interrupt takes the high
+; window for the data for a while), and come back if they were on.  The caller is resident code: the window is replaced.
+        IFDEF   SAM_OVERLAYS
+        SECTION code_driver
+        EXTERN  __OVERLAY_0_size, __OVERLAY_1_size, __OVERLAY_3_size
+        EXTERN  __OVERLAY_0_head
+        PUBLIC  _plat_overlay_load
+        defc    OVL_0_AT = $5000
+        defc    OVL_1_AT = $6400
+        defc    OVL_3_AT = $7600
+_plat_overlay_load:
+        ld      hl,2
+        add     hl,sp
+        ld      a,(hl)
+        cp      2
+        jr      nz,ol_n2
+        xor     a
+ol_n2:  cp      4
+        jr      nz,ol_n4
+        ld      a,1
+ol_n4:  ld      hl,ol_cur
+        cp      (hl)
+        ret     z                       ; (already there)
+        ld      (hl),a
+        ld      hl,OVL_0_AT
+        ld      bc,__OVERLAY_0_size
+        or      a
+        jr      z,ol_go
+        ld      hl,OVL_1_AT
+        ld      bc,__OVERLAY_1_size
+        dec     a
+        jr      z,ol_go
+        ld      hl,OVL_3_AT
+        ld      bc,__OVERLAY_3_size
+ol_go:  ld      de,$8000
+        add     hl,de                   ; (in the block, which is paged in at $8000)
+        ld      de,__OVERLAY_0_head
+        ld      a,i
+        push    af                      ; (P/V is the interrupt flag)
+        di
+        ld      a,(mp_tpage)
+        out     (HMPR),a
+        ldir
+        ld      a,(mp_dpage)
+        out     (HMPR),a
+        pop     af
+        ret     po
+        ei
+        ret
+ol_cur: defb    $FF                     ; the overlay in the window
+        ENDIF
+
+        IFDEF   HAVE_SCENARIOS
+; The scenario picker's block (tools/convert_amiga_scenarios.py --sam: the previews, 1500 bytes each, 60 x 50 pixels of 4 bits, then the texts, 1024 bytes each) is the 32 KB after the
+; pictures'; its page is two after theirs.
+        SECTION code_driver
+        PUBLIC  _plat_picker_read
+        PUBLIC  _plat_picker_preview
+        defc    PK_ROWS = 50
+        defc    PK_COLS = 30            ; the bytes of a row of the preview
+        defc    PK_X = 68               ; where the picture is on the screen: byte 68 of the line (pixel 136), line 64
+        defc    PK_Y = 64
+pk_page:
+        ld      a,(mp_tpage)
+        add     a,2
+        ret
+
+; void plat_picker_read(uint8_t *dst, uint16_t off, uint16_t len) __smallc: len bytes from `off` in the picker's block to dst in the game's data (32 at a time through pk_buf, the data being out
+; while the block is in)
+_plat_picker_read:
+        ld      hl,2
+        add     hl,sp
+        ld      c,(hl)
+        inc     hl
+        ld      b,(hl)                  ; len
+        inc     hl
+        ld      e,(hl)
+        inc     hl
+        ld      d,(hl)                  ; off
+        inc     hl
+        ld      a,(hl)
+        inc     hl
+        ld      h,(hl)
+        ld      l,a                     ; dst
+        ld      (pk_dst),hl
+        ld      (pk_len),bc
+        ld      hl,$8000
+        add     hl,de
+        ld      (pk_src),hl
+pk_next:
+        ld      bc,(pk_len)
+        ld      a,b
+        or      c
+        ret     z
+        ld      a,b
+        or      a
+        jr      nz,pk_full
+        ld      a,c
+        cp      33
+        jr      c,pk_n
+pk_full:
+        ld      a,32
+pk_n:   ld      c,a
+        ld      b,0
+        ld      hl,(pk_len)
+        or      a
+        sbc     hl,bc
+        ld      (pk_len),hl
+        push    bc
+        call    pk_page
+        out     (HMPR),a
+        ld      hl,(pk_src)
+        ld      de,pk_buf
+        ldir
+        ld      (pk_src),hl
+        ld      a,(mp_dpage)
+        out     (HMPR),a
+        pop     bc
+        ld      hl,pk_buf
+        ld      de,(pk_dst)
+        ldir
+        ld      (pk_dst),de
+        jr      pk_next
+
+; void plat_picker_preview(uint8_t index) __smallc: scenario `index`'s preview, each pixel 2 x 2, 120 x 100 pixels at (136, 64)
+_plat_picker_preview:
+        ld      hl,2
+        add     hl,sp
+        ld      a,(hl)
+        ld      hl,0
+        ld      de,PK_ROWS * PK_COLS
+        or      a
+pp_mul: jr      z,pp_got
+        add     hl,de
+        dec     a
+        jr      pp_mul
+pp_got: ld      de,$8000
+        add     hl,de
+        ld      (pk_src),hl
+        xor     a
+        ld      (pk_row),a
+pp_row: call    pk_page
+        out     (HMPR),a
+        ld      hl,(pk_src)
+        ld      de,pk_buf
+        ld      bc,PK_COLS
+        ldir
+        ld      (pk_src),hl
+        ld      hl,pk_buf               ; each pixel to two: a byte of 2 pixels to 2 bytes
+        ld      de,pk_exp
+        ld      b,PK_COLS
+pp_x:   ld      a,(hl)
+        inc     hl
+        ld      c,a
+        and     $F0
+        ld      (de),a
+        rrca
+        rrca
+        rrca
+        rrca
+        ex      de,hl
+        or      (hl)
+        ld      (hl),a
+        inc     hl
+        ex      de,hl
+        ld      a,c
+        and     $0F
+        ld      c,a
+        rlca
+        rlca
+        rlca
+        rlca
+        or      c
+        ld      (de),a
+        inc     de
+        djnz    pp_x
+        ld      a,SCRPAGE
+        out     (HMPR),a
+        ld      a,(pk_row)              ; the two lines
+        ld      h,a
+        ld      l,0
+        ld      de,$8000 + PK_Y * 128 + PK_X
+        add     hl,de
+        ex      de,hl
+        ld      hl,pk_exp
+        ld      bc,PK_COLS * 2
+        ldir
+        ld      hl,128 - PK_COLS * 2
+        add     hl,de
+        ex      de,hl
+        ld      hl,pk_exp
+        ld      bc,PK_COLS * 2
+        ldir
+        ld      a,(mp_dpage)
+        out     (HMPR),a
+        ld      hl,pk_row
+        inc     (hl)
+        ld      a,(hl)
+        cp      PK_ROWS
+        jr      c,pp_row
+        ret
+pk_buf: defs    32
+pk_exp: defs    PK_COLS * 2
+pk_src: defw    0
+pk_dst: defw    0
+pk_len: defw    0
+pk_row: defb    0
+        ENDIF
+
 ; void plat_put_minirow(uint8_t ty, const uint8_t *colours, const uint8_t *base, uint8_t view) __smallc
 ; Tile row ty (0..95) of the mini map: 96 colours (0..7, what the builder makes), each a tile of 2x2 pixels (a byte of one colour on
 ; two lines), the picture 192x192 at the left of the screen.  What a colour is depends on the view: mm_tabs has the ST palette entry
@@ -1941,8 +2159,37 @@ mm_u:
         inc     e
         djnz    mm_u
         pop     bc                      ; the colours
-        ld      de,mm_buf
+        ld      a,96                    ; the whole row, or the one column a pan left to draw
+        ld      (mm_n),a
+        xor     a
+        ld      (mm_x),a
+        ld      a,(mm_edge)
+        or      a
+        jr      z,mm_ne
+        ld      a,(mm_pn)
+        ld      (mm_n),a
+        ld      c,a
+        ld      a,(mm_edge)
+        cp      2
+        jr      nz,mm_ne
         ld      a,96
+        sub     c
+        ld      (mm_x),a
+mm_ne:  ld      a,(mm_scx)              ; the window's first tile: the colours and the base start there (and at the column)
+        ld      hl,mm_x
+        add     a,(hl)
+        ld      e,a
+        ld      d,0
+        ld      h,b
+        ld      l,c
+        add     hl,de
+        ld      b,h
+        ld      c,l
+        ld      hl,(mm_bptr)
+        add     hl,de
+        ld      (mm_bptr),hl
+        ld      de,mm_buf
+        ld      a,(mm_n)
         ld      (mm_cnt),a
 mm_tile:
         ld      hl,(mm_bptr)
@@ -1983,14 +2230,209 @@ mm_look:
         ld      a,(mm_ty)
         add     a,$80
         ld      d,a
+        ld      a,(mm_x)
+        ld      e,a
+        ld      a,(mm_n)
+        ld      c,a
+        ld      b,0
+        ld      hl,mm_buf
+        ldir
+        ld      a,(mm_x)
+        add     a,$80
+        ld      e,a
+        ld      a,(mm_n)
+        ld      c,a
+        ld      b,0
+        ld      hl,mm_buf
+        ldir
+        jp      mp_back
+
+; void plat_minimap_scroll(uint8_t x): the tile column at the picture's left edge; what was left of a pan is forgotten (the rows are drawn whole).
+        PUBLIC  _plat_minimap_scroll
+_plat_minimap_scroll:
+        ld      hl,2
+        add     hl,sp
+        ld      a,(hl)
+        ld      (mm_scx),a
+        xor     a
+        ld      (mm_edge),a
+        ret
+
+; void plat_minimap_pan(int8_t dx, int8_t dy, uint8_t x): the picture, which is 96 bytes of each of the first 192 lines, moves |dx| tiles (bytes) sideways or |dy| tiles (two lines each) up or
+; down, the way the window did (the picture goes left when dx > 0); the UI draws what that uncovered: after a move sideways plat_put_minirow draws only those columns (mm_edge, mm_pn), after one
+; up or down the rows.  |dx| and |dy| are up to 8 (MM_PAN_STEP).
+        PUBLIC  _plat_minimap_pan
+_plat_minimap_pan:
+        ld      hl,2
+        add     hl,sp
+        ld      a,(hl)
+        ld      (mm_scx),a
+        inc     hl
+        inc     hl
+        ld      a,(hl)
+        ld      (mm_pdy),a
+        inc     hl
+        inc     hl
+        ld      b,(hl)                  ; dx
+        xor     a
+        ld      (mm_edge),a
+        or      b
+        jr      z,mm_pv0
+        ld      a,b
+        ld      c,2                     ; the edge: 2 the right column(s), 1 the left
+        bit     7,a
+        jr      z,mm_pe
+        neg
+        dec     c
+mm_pe:  ld      (mm_pn),a               ; |dx|
+        ld      a,c
+        ld      (mm_edge),a
+mm_pv0: ld      a,SCRPAGE
+        out     (HMPR),a
+        ld      a,(mm_edge)
+        or      a
+        jr      z,mm_pv
+        ld      a,(mm_pn)
+        ld      c,a                     ; c = n
+        ld      a,96
+        sub     c
+        ld      (mm_pc),a               ; the bytes of a line that move: 96 - n
+        ld      a,(mm_edge)
+        cp      2
+        jr      z,mm_pr
+        ld      hl,$8000                ; sideways, left: byte n of each line to byte 0, on
+        ld      d,0
+        ld      e,c
+        add     hl,de
+        ld      de,$8000
+        ld      a,192
+mm_pl:  push    hl
+        push    de
+        push    af
+        ld      a,(mm_pc)
+        ld      c,a
+        ld      b,0
+        ldir
+        pop     af
+        pop     de
+        pop     hl
+        ld      bc,128
+        add     hl,bc
+        ex      de,hl
+        add     hl,bc
+        ex      de,hl
+        dec     a
+        jr      nz,mm_pl
+        jr      mm_pv
+mm_pr:  ld      a,(mm_pc)               ; right: byte 95 - n of each line to byte 95, back to 0
+        dec     a
+        ld      l,a
+        ld      h,0
+        ld      de,$8000
+        add     hl,de                   ; (the last byte that moves: 96 - n - 1)
+        push    hl
+        ld      hl,$8000 + 95
+        ex      de,hl
+        pop     hl
+        ld      a,192
+mm_prl: push    hl
+        push    de
+        push    af
+        ld      a,(mm_pc)
+        ld      c,a
+        ld      b,0
+        lddr
+        pop     af
+        pop     de
+        pop     hl
+        ld      bc,128
+        add     hl,bc
+        ex      de,hl
+        add     hl,bc
+        ex      de,hl
+        dec     a
+        jr      nz,mm_prl
+mm_pv:  ld      a,(mm_pdy)
+        or      a
+        jr      z,mm_pdone
+        ld      c,a
+        bit     7,c
+        jr      z,mm_pvp
+        ld      a,c
+        neg
+        ld      c,a
+mm_pvp: ld      a,192                   ; the lines that move: 192 - 2 n, each from 2 n lines on (up) or back (down)
+        sub     c
+        sub     c
+        ld      b,a
+        ld      (mm_pc),a
+        ld      a,c                     ; the distance between the two lines: 256 n bytes
+        ld      (mm_pn),a
+        ld      a,(mm_pdy)
+        bit     7,a
+        jr      nz,mm_pu
+        ld      a,(mm_pn)               ; up (the view goes down): line n + 2 to line n, from the top
+        ld      d,a
         ld      e,0
-        ld      hl,mm_buf
+        ld      hl,$8000
+        add     hl,de
+        ex      de,hl                  ; (de = $8000 + 256 n)
+        ld      hl,$8000
+        ex      de,hl                  ; hl = the source ($8000 + 256 n), de = $8000
+        ld      a,(mm_pc)
+mm_pul: push    hl
+        push    de
+        push    af
         ld      bc,96
         ldir
-        ld      e,$80
-        ld      hl,mm_buf
+        pop     af
+        pop     de
+        pop     hl
+        ld      bc,128
+        add     hl,bc
+        ex      de,hl
+        add     hl,bc
+        ex      de,hl
+        dec     a
+        jr      nz,mm_pul
+        jr      mm_pdone
+mm_pu:  ld      a,(mm_pc)               ; down: line (190 - 2 n + 1 ...) to the line 2 n below it, from the bottom: the last line that moves is 191 - 2 n
+        dec     a
+        ld      l,a
+        ld      h,0
+        add     hl,hl
+        add     hl,hl
+        add     hl,hl
+        add     hl,hl
+        add     hl,hl
+        add     hl,hl
+        add     hl,hl                   ; 128 (the last line)
+        ld      de,$8000
+        add     hl,de
+        ld      a,(mm_pn)
+        ld      d,a
+        ld      e,0
+        push    hl
+        add     hl,de
+        ex      de,hl                   ; de = the last line + 256 n
+        pop     hl
+        ld      a,(mm_pc)
+mm_pdl: push    hl
+        push    de
+        push    af
         ld      bc,96
         ldir
+        pop     af
+        pop     de
+        pop     hl
+        ld      bc,-128
+        add     hl,bc
+        ex      de,hl
+        add     hl,bc
+        ex      de,hl
+        dec     a
+        jr      nz,mm_pdl
+mm_pdone:
         jp      mp_back
 
 ; void plat_swatch(uint8_t col, uint8_t row, uint8_t cells, uint8_t index) __smallc
@@ -2365,6 +2807,6 @@ mp_ktab:
         defb    ' ',0,'m','n','b',',','.',0
         defb    0,11,10,8,9,0,0,0
 
-; What each map cell shows (32 x 18 words): in the data, so used only with it paged in
-        SECTION bss_user
+; What each map cell shows (32 x 17 words): in the low RAM (the data window is full)
+        SECTION code_user
 mp_cache: defs  COLS * MAP_ROWS * 2

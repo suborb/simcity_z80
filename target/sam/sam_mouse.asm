@@ -57,7 +57,8 @@ sm_icon_miss:
         ld      hl,$00FF
         ret
 
-        SECTION bss_user
+; In the low RAM with the code (as the placer's variables are), not in the data window, which the simulation, the map and the mini maps fill
+        SECTION code_user
         PUBLIC  _plat_mouse_pointer_cell_count
         PUBLIC  _plat_mouse_pointer_cells
         PUBLIC  _plat_mouse_pointer_background

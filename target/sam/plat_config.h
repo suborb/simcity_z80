@@ -25,6 +25,9 @@
 #define HAVE_MINIMAP
 #define HAVE_MINIMAP_NATIVE    /* the whole city in colour (plat_put_minirow) */
 #define HAVE_MINIMAP_SQUARE    /* ... every tile row, 2x2 pixels a tile, 192x192 with a sidebar (the Makefile defines it for the assembler too) */
+#define HAVE_MINIMAP_PAN
+#define MM_PAN_STEP 8          /* (a tile row's colours are made whole, so a pan of 8 tiles costs what one does: the pan is 8 times as quick) */
+#define HAVE_MINIMAP_SCROLL    /* the city is 120x100: the mini map is a 96x96 window on it, panned a tile at a time (plat_minimap_scroll, plat_minimap_pan) */
 #define HAVE_CLEAR_MAP          /* a mini map clears the screen below the panel only (plat_clear_map) */
 #define HAVE_DEMAND_BARS        /* the R, C and I demand as coloured bar charts (plat_demand) */
 #define HAVE_TEXT_COLOUR        /* the budget and evaluation screens coloured, with bars (plat_text_attr, plat_bar) */
@@ -39,5 +42,16 @@
 #define PLAT_FIXED_ROWS 24
 #define MAX_VIEW_W 32
 #define MAX_VIEW_H 17
+#ifdef SAM_OVERLAYS     /* (the Makefile) the budget and evaluation screens, the title screen and the dialogues are code in the pictures' block, copied into one window in the low RAM when wanted */
+#define HAVE_OVERLAY_UI
+#define HAVE_START_OVERLAY
+#define PLAT_CODE_GAME_OVERLAY   _Pragma("codeseg OVERLAY_0")      /* the file, menu, prompt, sprite and mini map code: the window's usual content */
+#define PLAT_CONST_GAME_OVERLAY  _Pragma("constseg OVERLAY_0")
+#define PLAT_CODE_MODAL_OVERLAY  _Pragma("codeseg OVERLAY_1")      /* the budget and evaluation screens (the evaluation is the modal one too: no HAVE_EVAL_OVERLAY) */
+#define PLAT_CONST_MODAL_OVERLAY _Pragma("constseg OVERLAY_1")
+#define PLAT_CODE_START_OVERLAY  _Pragma("codeseg OVERLAY_3")      /* the layout and the title screen */
+#define PLAT_CODE_FILE_OVERLAY   _Pragma("codeseg OVERLAY_0")
+#define PLAT_CODE_HOME           _Pragma("codeseg code_compiler")  /* (back to the resident code after an overlay's part of a file) */
+#endif
 
 #endif

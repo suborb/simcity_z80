@@ -34,7 +34,23 @@ static uint8_t pointer_row_overlaps(uint8_t row)
     return row >= first && row <= last;
 }
 
+static uint16_t pointer_x, pointer_y;          /* where the arrow was drawn */
+
 #pragma codeseg code_driver
+/* A mini map's tile row ty (two lines of the picture) is about to be drawn: if the arrow's cells reach it, the arrow comes off first (and the loop puts it back). */
+void plat_mouse_pointer_before_minirow(uint8_t ty)
+{
+    uint16_t lo = (uint16_t)(pointer_y >> 3) * 8;
+    uint16_t hi = (uint16_t)(((pointer_y + 15) >> 3) + 1) * 8 - 1;
+    uint16_t line = (uint16_t)ty * 2;
+
+    if (plat_mouse_pointer_cell_count && line + 1 >= lo && line <= hi) {
+        plat_page_data();
+        plat_mouse_pointer_restore_screen();
+        plat_mouse_pointer_cell_count = 0;
+    }
+}
+
 void plat_mouse_pointer_before_map_row(void)
 {
     uint8_t row = (uint8_t)(map_row + draw_refresh_row);
@@ -48,7 +64,6 @@ void plat_mouse_pointer_before_map_row(void)
 
 #pragma codeseg code_compiler
 
-static uint16_t pointer_x, pointer_y;
 extern void plat_mouse_pointer_draw(void);     /* (plat_sam.asm: the arrow, composed from its bit planes) */
 
 void plat_mouse_pointer_erase(void)
