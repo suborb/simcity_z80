@@ -6,6 +6,21 @@ boot it (F9).  In SimCoupe, insert the image as Disk 1.
 The game uses screen mode 4 (256 x 192, 16 colours) and the SAA 1099 for
 sound effects, played from the frame interrupt.  Cities are saved to and
 loaded from the disk (SAMDOS files); file names can be ten characters.
+The image is about 120 KB and takes a little while to load.
+
+The map is 120 x 100 squares, bigger than the Spectrum game's 96 x 96, so
+cities saved by earlier versions are not offered (they are a different
+length).  The title screen offers the Amiga game's eight scenarios: choose
+one with the left and right cursor keys, read about it with up and down,
+and press Enter to play.  Each scenario has a time limit and a goal, both
+given in its text.  When the time is up the game tells you whether you won
+or lost, and then you can carry on in the same city.  The scenarios are
+files on the disk (scen0 to scen7), so keep them on any copy of the disk
+that is to play them.  Scenarios and saved cities need the disk the game
+was loaded from to stay in drive 1.
+
+The mini map shows 96 x 96 squares of the city.  Moving the arrow to the
+edge of the picture scrolls it, eight squares at a time.
 
 Keys
 ----

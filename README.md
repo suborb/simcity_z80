@@ -56,7 +56,7 @@ The following targets are available.
 | MSX2 | ST | ST (PSG) | disc | yes | no |
 | NEC PC-6001mkII | ZX | custom (PSG) | disc | no | no |
 | NEC PC-88 | CPC | none | disc | no | no |
-| Sam Coupe | ST | ST (SAA 1099) | disc | yes | no |
+| Sam Coupe | ST | ST (SAA 1099) | disc | yes | yes |
 | Samsung SPC-1000 | ZX | ST (AY) | tape | no | no |
 | Samsung SPC-1500 | CPC | ST (AY) | tape | no | no |
 | Sharp MZ-2500 | ST | ST (SSG) | disc | yes | no |
@@ -99,3 +99,19 @@ Needs [z88dk](https://z88dk.org).
 
 z88dk's tools (`zcc`, `z88dk-z80asm`, `z88dk-ticks`) must be on the `PATH`.
 
+
+#### The Sam Coupe
+
+`make sam` builds `build/sam/simcity.mgt`, a boot disc with the game and, on it, the eight scenarios as files (`scen0` to `scen7`); `SAM_SCENARIOS=0` leaves them out.
+The map is 120 x 100 (there is no 96 x 96 build).  The disc is written by `z88dk-appmake +mgt`, which needs its `--add-file` option (extra files on the disc).
+
+The budget and evaluation screens, the title screen and the file, menu, prompt, sprite and mini map code are overlays: linked at one window in the low 32 KB (`target/sam/mmap.inc`)
+and kept in the pictures' block of the disc image, from where `plat_overlay_load` copies the one that is wanted (`tools/sam_overlays.py` packs them and checks the layout).  The map and
+mini maps, the simulation and its tables fill the 32 KB the startup code pages in over `$8000`.  The scenarios' previews and texts are a block of their own after the pictures.
+
+The SAMDOS hook that reads a directory sector, HRSAD, writes to the page it works out from the address (`$8000` is page 1: the start of the program), not to the one HMPR gives: `plat_file_list`
+(`target/sam/plat_sam_files.asm`) puts the program's first 512 bytes away while it is read.
+
+The MAME tests in `test/sam/` (`SAM_MAME` is the MAME directory; they build nothing): `pointer_check.sh` (the keys that move the arrow, the mini map and its scrolling), `overlay_check.sh`
+(the screens in the overlays), `roundtrip.sh` (saving and loading a city, also over a new city), `scenario_check.sh` (the picker and a scenario's map) and `scenario_end_check.sh` (the win and
+lose messages; a build with `SAM_TEST=-DSCENARIO_YEARS_TEST`).  The scripts take their clock from when the game is up (`go.sh`), and `keys.lua` has the peeks, pokes and PC traces they use.
