@@ -17,6 +17,9 @@
         EXTERN  _font_8x8_bbc_system
         EXTERN  _view_tile_art          ; picture n is at 8 * n from it
         EXTERN  asm_set_palette
+        IFDEF   TARGET_X1TURBOZ
+        EXTERN  tz_init
+        ENDIF
         IFDEF   HAVE_SOUND
         EXTERN  ay_poll, ay_sync, ay_tick, snd_init
         ENDIF
@@ -27,14 +30,18 @@
 
 ; The baked map pictures
         SECTION data_fcntl
+        IFNDEF  TARGET_X1TURBOZ
 mp_tiles:
         BINARY  "build/common/tiles_640x200_3bpp.bin"
+        ENDIF
 
 ; The 14 tool icons of the Amstrad CPC game: four cells each, see tools/extract_cpc_icons.py
         SECTION rodata_user
         PUBLIC  _mp_icons
 _mp_icons:
+        IFNDEF  TARGET_X1TURBOZ
         BINARY  "assets/cpc_icons.bin"
+        ENDIF
 
         SECTION code_user
 
@@ -48,6 +55,25 @@ mp_draw:
         call    mp_plane8
         call    mp_plane8
         call    mp_plane8
+        IFDEF   TARGET_X1TURBOZ
+        ; The ordinary UI draws three 1-bit colour planes.  Clear the extra
+        ; bit of each component so a former 64-colour map cell cannot show
+        ; through its text, boxes or icons.
+        ld      hl,(mp_scr)
+        ld      a,h
+        add     a,$44
+        ld      b,a
+        ld      c,l
+        call    mp_zero8
+        ld      a,h
+        add     a,$84
+        ld      b,a
+        call    mp_zero8
+        ld      a,h
+        add     a,$C4
+        ld      b,a
+        call    mp_zero8
+        ENDIF
         IFDEF   HAVE_SOUND
         jp      ay_poll                 ; (the sound's ticks go on while the screen is drawn)
         ELSE
@@ -63,6 +89,18 @@ mp_plane8:
         ld      b,a
         ENDR
         ret
+        IFDEF   TARGET_X1TURBOZ
+mp_zero8:
+        xor     a
+        REPT    8
+        out     (c),a
+        ld      a,b
+        add     a,8
+        ld      b,a
+        xor     a
+        ENDR
+        ret
+        ENDIF
 
 ; a = row, b = col: hl and mp_scr = the cell's offset, row * 40 + col.  Uses a, hl.
 mp_scraddr:
@@ -83,10 +121,14 @@ mp_scraddr:
         ld      (mp_scr),hl
         pop     de
         ret
+        IFDEF   TARGET_X1TURBOZ
+        PUBLIC  mp_cached, mp_scraddr, mp_scr
+        ENDIF
 
 ; void plat_put_tile(uint8_t col, uint8_t row, const uint8_t *art, uint8_t attr, uint8_t inverse) __smallc
 ; A map picture: art is _view_tile_art + 8 * n, drawn from mp_tiles (24 bytes a picture).  The attribute is not used; `inverse` draws the
 ; complement (the cursor).
+        IFNDEF  TARGET_X1TURBOZ
         PUBLIC  _plat_put_tile
 _plat_put_tile:
         ld      hl,2
@@ -122,6 +164,7 @@ _plat_put_tile:
         ex      de,hl                   ; de = its planes
         pop     bc
         pop     af
+        ENDIF
 mp_pl_go:
         bit     0,c
         jr      z,mp_pl_draw
@@ -396,6 +439,25 @@ _plat_put_overlay:
         ld      c,l
         call    mp_or8
         call    mp_or8
+        call    mp_or8
+        IFDEF   TARGET_X1TURBOZ
+        ; A sprite's white pixels set both bits of every RGB component.
+        ld      hl,(mp_scr)
+        ld      a,h
+        add     a,$44
+        ld      b,a
+        ld      c,l
+        call    mp_or8
+        ld      a,h
+        add     a,$84
+        ld      b,a
+        call    mp_or8
+        ld      a,h
+        add     a,$C4
+        ld      b,a
+        call    mp_or8
+        ENDIF
+        ret
 mp_or8:
         ld      de,(mp_src)
         REPT    8
@@ -541,6 +603,9 @@ mp_crtc_lp:
         ld      hl,$CCAA                ; the palette: colour n is the planes' bits n (blue $AA, red $CC, green $F0)
         ld      e,$F0
         call    asm_set_palette
+        IFDEF   TARGET_X1TURBOZ
+        call    tz_init
+        ENDIF
         ld      bc,$2000                ; the text layer: attributes white,
         ld      a,7
         call    mp_fill_text

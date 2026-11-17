@@ -45,29 +45,32 @@ is not available.
 
 The following targets are available. 
 
-| Machine | Graphics | Sound | Save/load | Mouse | Scenarios |
-|---|---|---|---|---|---|
-| Amstrad PCW | ZX | none | disc | no | no |
-| Aquarius+ | ZX | ST (AY) | SD (ESP32) | yes | no |
-| Cambridge z88 | ZX | 1-bit | RAM filing | no | no |
-| Camputers Lynx 128K | CPC | ST (DAC) | disc | no | no |
-| Casio FP-1100 | CPC | none | disc | no | no |
-| Mitsubishi Multi8 | CPC | ST (PSG) | tape | no | no |
-| MSX2 | ST | ST (PSG) | disc | yes | no |
-| NEC PC-6001mkII | ZX | custom (PSG) | disc | no | no |
-| NEC PC-88 | CPC | none | disc | no | no |
-| Sam Coupe | ST | ST (SAA 1099) | disc | yes | yes |
-| Samsung SPC-1000 | ZX | ST (AY) | tape | no | no |
-| Samsung SPC-1500 | CPC | ST (AY) | tape | no | no |
-| Sharp MZ-2500 | ST | ST (SSG) | disc | yes | no |
-| Sharp MZ-800 | ZX | ST (SN76489) | disc | no | no |
-| Sharp X1 | CPC | ST (PSG) | disc | no | no |
-| Sony SMC-777 | CPC | none | disc | no | no |
-| Tatung Einstein 256 | ST | ST (AY) | disc | no | no |
-| Toshiba Pasopia 7 | CPC | ST (SN76489) | disc | no | no |
-| ZX Spectrum Next | Amiga | ST (AY) | SD (esxDOS) | yes | yes |
+| Machine | Graphics | Sound | Save/load | Mouse | Scenarios | R/C/I levels |
+|---|---|---|---|---|---|---|
+| Amstrad PCW | ZX | none | disc | no | no | 4/4/4 |
+| Aquarius+ | ZX | ST (AY) | SD (ESP32) | yes | no | 4/4/4 |
+| Cambridge z88 | ZX | 1-bit | RAM filing | no | no | 4/4/4 |
+| Camputers Lynx 128K | CPC | ST (DAC) | disc | no | no | 4/4/4 |
+| Casio FP-1100 | CPC | none | disc | no | no | 4/4/4 |
+| Mitsubishi Multi8 | CPC | ST (PSG) | tape | no | no | 4/4/4 |
+| MSX2 | ST | ST (PSG) | disc | yes | no | 8/10/8 |
+| NEC PC-6001mkII | ZX | custom (PSG) | disc | no | no | 4/4/4 |
+| NEC PC-88 | CPC | none | disc | no | no | 4/4/4 |
+| Sam Coupe | ST | ST (SAA 1099) | disc | yes | yes | 8/10/8 |
+| Samsung SPC-1000 | ZX | ST (AY) | tape | no | no | 4/4/4 |
+| Samsung SPC-1500 | CPC | ST (AY) | tape | no | no | 4/4/4 |
+| Sharp MZ-2500 | ST | ST (SSG) | disc | yes | no | 8/10/8 |
+| Sharp MZ-800 | ZX | ST (SN76489) | disc | no | no | 4/4/4 |
+| Sharp X1 | CPC | ST (PSG) | disc | no | no | 4/4/4 |
+| Sharp X1 Turbo Z | Amiga | ST (PSG) | disc | no | no | 8/10/8 |
+| Sony SMC-777 | CPC | none | disc | no | no | 4/4/4 |
+| Tatung Einstein 256 | ST | ST (AY) | disc | no | no | 4/4/4 |
+| Toshiba Pasopia 7 | CPC | ST (SN76489) | disc | no | no | 4/4/4 |
+| ZX Spectrum Next | Amiga | ST (AY) | SD (esxDOS) | yes | yes | 8/10/8 |
 
 The generic CP/M build (`make cpm`) is text only: a character a square, saved to disc, no sound, mouse or scenarios.
+
+The Sharp X1 Turbo uses the regular X1 build (`make x1`) and its 8-colour graphics palette. `make x1turboz` builds a separate disk for the X1 Turbo Z, using its 64-colour graphics mode and Amiga art.
 
 
 ### Layout

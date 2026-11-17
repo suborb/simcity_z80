@@ -26,6 +26,7 @@ MACHINES = {
     'pc88': ('NEC PC-8801', ['pc88/simcity.d88']),
     'pc6001mk2': ('NEC PC-6001mkII', ['pc6001mk2/simcity.d88']),
     'x1': ('Sharp X1', ['x1/simcity.d88']),
+    'x1turboz': ('Sharp X1 Turbo Z', ['x1turboz/simcity.d88']),
     'spc1000': ('Samsung SPC-1000', ['spc1000/simcity.spc']),
     'spc1500': ('Samsung SPC-1500', ['spc1500/simcity.tap']),
     'msx2': ('MSX2 (MSX-DOS 2)', ['msx2/simcity.dsk', 'msx2/disk/SIMCITY.COM', 'msx2/disk/SIMCITY.UI', 'msx2/disk/SIMCITY.SIM', 'msx2/disk/SIMCITY.HI', 'msx2/disk/TILES.DAT']),

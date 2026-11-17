@@ -26,6 +26,9 @@
 #define HAVE_SPRITES
 #define HAVE_SPRITE_OVERLAY     /* the sprites go over the baked tiles, which have colours */
 #define HAVE_ICONS              /* the tools as 16x16 pictures */
+#ifdef TARGET_X1TURBOZ
+#define HAVE_ICONS_STORED       /* 64-colour Amiga buttons in graphics page 1 */
+#endif
 #define HAVE_TEXT_COLOUR        /* the budget and evaluation screens coloured, with bars (plat_text_attr, plat_bar) */
 #define NO_BAR_TRACK            /* the bars have no checkerboard track: just the fill and the zero mark */
 #define MODAL_NARROW            /* ... in their 32 column arrangement, */

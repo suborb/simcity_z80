@@ -56,6 +56,7 @@ ZX     = build/zx/simcity.tap
 MULTI8 = build/multi8/simcity.cas
 PC88   = build/pc88/simcity.d88
 X1     = build/x1/simcity.d88
+X1TURBOZ = build/x1turboz/simcity.d88
 SPC1000 = build/spc1000/simcity.spc
 SPC1500 = build/spc1500/simcity.tap
 MSX2   = build/msx2/simcity.img
@@ -82,12 +83,12 @@ TESTK  = build/testnative/simcity.bin
 TESTA  = build/testart/simcity.bin
 TESTSC = build/testscroll/simcity.bin
 
-.PHONY: mk2demo all dist aqplus z88rom zx multi8 pc88 x1 spc1000 spc1500 msx2 einstein256 cpm pcw fp1100 mz2500 mz800 smc777 lynx pasopia7 pc6001mk2 sam zxn zxn-debug amiga-scenarios test testpanel testmodal testnarrow testsprites testoverlay testhires testnative testart testscroll check golden uitest tiletest z88test deadcode clean
+.PHONY: mk2demo all dist aqplus z88rom zx multi8 pc88 x1 x1turboz spc1000 spc1500 msx2 einstein256 cpm pcw fp1100 mz2500 mz800 smc777 lynx pasopia7 pc6001mk2 sam zxn zxn-debug amiga-scenarios test testpanel testmodal testnarrow testsprites testoverlay testhires testnative testart testscroll check golden uitest tiletest z88test deadcode clean
 
 all: aqplus z88rom zx multi8 pc88 pc6001mk2 x1 spc1000 spc1500 msx2 einstein256 pcw fp1100 mz2500 mz800 smc777 lynx pasopia7 sam zxn
 
 # The zip files for distribution, one for each machine (build/dist/; tools/make_dist.py)
-dist: aqplus z88rom multi8 pc88 pc6001mk2 x1 spc1000 spc1500 msx2 einstein256 pcw fp1100 mz2500 mz800 smc777 lynx pasopia7 sam zxn
+dist: aqplus z88rom multi8 pc88 pc6001mk2 x1 x1turboz spc1000 spc1500 msx2 einstein256 pcw fp1100 mz2500 mz800 smc777 lynx pasopia7 sam zxn
 	python3 tools/make_dist.py
 
 aqplus: $(AQPLUS)
@@ -96,6 +97,7 @@ zx:     $(ZX)
 multi8: $(MULTI8)
 pc88:   $(PC88)
 x1:     $(X1)
+x1turboz: $(X1TURBOZ)
 spc1000: $(SPC1000)
 spc1500: $(SPC1500)
 msx2:   $(MSX2)
@@ -220,6 +222,17 @@ $(X1): $(DEPS) build/common/tiles_640x200_3bpp.bin
 	$(ZCC) +x1 -create-app $(COMMON) -pragma-include:target/x1/zpragma.inc \
 	    -Itarget/x1 -DTARGET_X1 -Ca-DTARGET_X1 -Ca-DHAVE_MINIMAP_SQUARE -Ca-DHAVE_SOUND -Ca-DAY_PORT16 -Ca-DAY_ADDR_PORT=0x1C00 -Ca-DAY_DATA_PORT=0x1B00 $(GAME) $(ENTROPY) $(MENU) target/x1/plat_sound.asm target/common/ay_hooks.asm target/common/ay_sfx.asm $(FIELDS) $(MMNATIVE) $(LINEEDIT) $(X1_PLATFORM) -o $(@D)/simcity.bin
 	@size=`sed -n 's/^__BSS_END_tail *= \$$\([0-9A-Fa-f]*\).*/\1/p' $(@D)/simcity.map`; echo "x1: image and uninitialised data end at $$size (the stack is the top of memory)"
+
+# The Turbo Z's 320x200x64 mode: a 48 KB screen in graphics page 0 and the
+# Amiga 1 Meg's 471 tiles, animation frames and icons in page 1, streamed from disk tracks 16..23.
+build/x1turboz/atlas.bin: assets/amiga_1meg_tiles.bin assets/amiga_1meg_icons.bin tools/x1turboz_art.py tools/st_tiles_3bpp.py
+	python3 tools/x1turboz_art.py --outdir build/x1turboz
+
+$(X1TURBOZ): $(DEPS) build/x1turboz/atlas.bin target/x1/plat_x1turboz.asm target/x1/plat_x1turboz_icons.c
+	@mkdir -p $(@D)
+	$(ZCC) +x1 -create-app $(COMMON) -pragma-include:target/x1/zpragma.inc \
+	    -Itarget/x1 -DTARGET_X1 -DTARGET_X1TURBOZ -Ca-DTARGET_X1 -Ca-DTARGET_X1TURBOZ -Ca-DFINE_ZONE_LEVELS -DFINE_ZONE_LEVELS -Ca-DHAVE_MINIMAP_SQUARE -Ca-DHAVE_SOUND -Ca-DAY_PORT16 -Ca-DAY_ADDR_PORT=0x1C00 -Ca-DAY_DATA_PORT=0x1B00 $(GAME) $(ENTROPY) $(MENU) target/x1/plat_sound.asm target/common/ay_hooks.asm target/common/ay_sfx.asm $(FIELDS) $(MMNATIVE) $(LINEEDIT) $(X1_PLATFORM) target/x1/plat_x1turboz.asm target/x1/plat_x1turboz_icons.c -o $(@D)/simcity.bin -Cz"--data build/x1turboz/atlas.bin --data-track 16"
+	@size=`sed -n 's/^__BSS_END_tail *= \$$\([0-9A-Fa-f]*\).*/\1/p' $(@D)/simcity.map`; echo "x1turboz: image and uninitialised data end at $$size"
 
 # The Samsung SPC-1500 (z88dk +spc1500: a cassette for the IPL's "C: cassette system", a 128 byte bootstrap that unpacks the ZX0 packed program at $0000).  Its video is the X1's (a
 # 40 column mode of three planes behind I/O ports, 320x200), so the X1's pictures and drawing code serve.  The uninitialised data follows the image and the stack is the top of memory.

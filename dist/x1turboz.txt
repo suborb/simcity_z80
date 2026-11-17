@@ -1,0 +1,22 @@
+Running it
+----------
+simcity.d88 is a bootable disk image for the Sharp X1 Turbo Z. Put it in
+the first drive and reset the machine.
+
+The game uses the Turbo Z's 320 x 200, 64-colour graphics mode. The Amiga
+map tiles and toolbar art are loaded from the disk at startup. Cities are
+saved to and loaded from the disk.
+
+Keys
+----
+  Cursor keys     move the cursor one square (shifted: eight)
+  O P Q A         left, right, up, down
+  Space, Enter    build with the tool
+  , .             the previous and next tool
+  0 - 9           choose a tool by its number
+  H               pause or run
+  + -             faster, slower
+  M               the next mini map (X goes back to the city)
+  B               the budget            V   the evaluation
+  S               save the city         L   load a city
+  X               the game menu: new city, options, disasters
