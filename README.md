@@ -64,7 +64,7 @@ The following targets are available.
 | Sharp X1 | CPC | ST (PSG) | disc | no | no | 4/4/4 |
 | Sharp X1 Turbo Z | Amiga | ST (PSG) | disc | no | no | 8/10/8 |
 | Sony SMC-777 | CPC | none | disc | no | no | 4/4/4 |
-| Tatung Einstein 256 | ST | ST (AY) | disc | no | no | 4/4/4 |
+| Tatung Einstein 256 | ST | ST (AY) | disc | no | no | 8/10/8 |
 | Toshiba Pasopia 7 | CPC | ST (SN76489) | disc | no | no | 4/4/4 |
 | ZX Spectrum Next | Amiga | ST (AY) | SD (esxDOS) | yes | yes | 8/10/8 |
 

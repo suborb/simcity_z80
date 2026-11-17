@@ -410,7 +410,7 @@ $(EINSTEIN256): $(DEPS) tools/check_einstein_layout.py target/einstein256/mmap.i
 	@mkdir -p $(@D)
 	$(ZCC) +cpm -subtype=einstein256 $(COMMON) -pragma-include:target/einstein256/zpragma.inc -pragma-define:MMAP=-1 \
 	    -Itarget/einstein256 -Ibuild/v9938 -Ca-Itarget/einstein256 -Ca-Ibuild/v9938 \
-	    -DTARGET_EINSTEIN256 -Ca-DTARGET_EINSTEIN256 -Ca-DVDP_DATA=8 -Ca-DVDP_CMD=9 -Ca-DVDP_PAL=10 -Ca-DVDP_IND=11 -Ca-DFMT_WIDTH=32 -Ca-DHAVE_MINIMAP_SQUARE \
+	    -DTARGET_EINSTEIN256 -Ca-DTARGET_EINSTEIN256 -DFINE_ZONE_LEVELS -Ca-DFINE_ZONE_LEVELS -Ca-DVDP_DATA=8 -Ca-DVDP_CMD=9 -Ca-DVDP_PAL=10 -Ca-DVDP_IND=11 -Ca-DFMT_WIDTH=32 -Ca-DHAVE_MINIMAP_SQUARE \
 	    -Ca-DHAVE_SOUND -Ca-DAY_EINSTEIN -Ca-DAY_ADDR_PORT=2 -Ca-DAY_DATA_PORT=3 \
 	    $(EINSTEIN256_PLATFORM) $(EINSTEIN256_GAME) $(ENTROPY) $(MENU) $(FIELDS) $(MMNATIVE) $(LINEEDIT) -o $(@D)/simcity
 	python3 tools/check_einstein_layout.py $(@D)/simcity.map $(EINSTEIN256_TPA_TOP)
